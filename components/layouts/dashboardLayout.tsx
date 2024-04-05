@@ -30,7 +30,7 @@ export default function DashboardLayout({
       <aside className="inset-y fixed left-0 z-20 flex h-full flex-col border-r bg-white w-40">
         {/* Logo/Home Button */}
         <div className="border-b p-2">
-          <Link href="/dashboard" legacyBehavior>
+          <Link href="/" legacyBehavior>
             <Button variant="outline" aria-label="Home">
               <div className="flex flex-row ">
                 <Image

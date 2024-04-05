@@ -46,7 +46,7 @@ export default function ItineraryChoiceDialog({
                       />
                     </div>
                     <div className="flex text-sm justify-center items-center text-center font-bold">
-                      Itinerary Builder
+                      AI Magic Itinerary
                     </div>
                   </CardContent>
                 </Card>
@@ -56,7 +56,7 @@ export default function ItineraryChoiceDialog({
                 or
               </div>
 
-              <Link href="/itinerary/builder" legacyBehavior>
+              <Link href="/itinerary/1/overview" legacyBehavior>
                 <Card className="pt-4 col-span-2 first-letter:flex items-center justify-center bg-white hover:bg-zinc-200 transition-colors duration-300 border border-black hover:border-zinc-400 group-hover:border-zinc-500 cursor-pointer rounded-lg">
                   <CardContent className="flex flex-col items-center justify-center text-center h-full">
                     <div className="flex items-center justify-center h-full">
