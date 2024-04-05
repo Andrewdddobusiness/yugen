@@ -19,6 +19,7 @@ import Link from "next/link";
 import { MoreHorizontal } from "lucide-react";
 
 interface ItineraryCardProps {
+  link: string;
   imageUrl: string;
   destination: string;
   startDate: string;
@@ -26,6 +27,7 @@ interface ItineraryCardProps {
 }
 
 export default function ItineraryCard({
+  link,
   imageUrl,
   destination,
   startDate,
@@ -34,7 +36,7 @@ export default function ItineraryCard({
   const [isHovered, setIsHovered] = useState(false);
 
   return (
-    <Link href="/your-next-page" legacyBehavior passHref>
+    <Link href={link} legacyBehavior passHref>
       <Card
         className="aspect-w-1 aspect-h-1 cursor-pointer relative"
         onMouseEnter={() => setIsHovered(true)}

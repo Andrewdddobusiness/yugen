@@ -8,29 +8,31 @@ export default function Home() {
   return (
     <NavLayout>
       <PageLayout>
-        <div className="grid md:grid-cols-2 pt-12 ">
-          <div className="flex-1 pt-24 text-center md:text-left z-50">
-            <div className="text-6xl font-bold mb-4">
-              Planning Vacations S*ck!
-            </div>
-            <div className="text-xl mb-4 ">
-              Build, personalize, and optimize your itineraries with our AI trip
-              planner.
-            </div>
-            <div className="mb-4">
-              <Button size="sm" className="ml-auto gap-1.5 text-sm">
-                Create a travel itinerary
-              </Button>
+        <div className="pt-12 flex flex-col md:flex-row items-center">
+          <div className="md:w-1/2">
+            <div className="text-center md:text-left">
+              <div className="text-4xl sm:text-6xl font-bold mb-4">
+                Planning Vacations S*ck!
+              </div>
+              <div className="text-lg mb-4">
+                Build, personalize, and optimize your itineraries with our AI
+                trip planner.
+              </div>
+              <div className="mb-4">
+                <Button size="sm" className="gap-1.5 text-sm">
+                  Create a travel itinerary
+                </Button>
+              </div>
             </div>
           </div>
-          <div className="flex justify-center z-50">
+          <div className="md:w-1/2 mt-8 flex justify-center">
             <div>
               <Image
                 src="/Globalization.png"
                 alt="globalization"
                 width={500}
                 height={500}
-                className="max-w-lg"
+                className="max-w-full h-auto"
               />
             </div>
           </div>

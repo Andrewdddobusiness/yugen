@@ -4,12 +4,7 @@ import ItineraryCardCreate from "./itineraryCardCreate";
 // Sample JSON data
 const itineraryData = [
   {
-    imageUrl: "/map2.jpg",
-    destination: "Sydney, Australia",
-    startDate: "01 Mar 2024",
-    endDate: "05 Mar 2024",
-  },
-  {
+    link: "itinerary/1/overview",
     imageUrl: "/map.jpg",
     destination: "Bali, Indonesia",
     startDate: "25 Mar 2024",
@@ -23,6 +18,7 @@ export default function ItineraryCards() {
       {itineraryData.map((itinerary, index) => (
         <ItineraryCard
           key={index}
+          link={itinerary.link}
           imageUrl={itinerary.imageUrl}
           destination={itinerary.destination}
           startDate={itinerary.startDate}
