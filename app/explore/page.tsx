@@ -1,4 +1,4 @@
-import React, { ReactNode } from "react";
+import React from "react";
 import Image from "next/image";
 import ItineraryCards from "@/components/cards/itineraryCards";
 

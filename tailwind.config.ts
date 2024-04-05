@@ -10,6 +10,19 @@ const config = {
   ],
   prefix: "",
   theme: {
+    fontSize: {
+      xs: "0.625rem",
+      sm: "0.75rem",
+      md: "0.875rem",
+      lg: "1rem",
+      xl: "1.125rem",
+      "2xl": "1.25rem",
+      "3xl": "1.563rem",
+      "4xl": "1.953rem",
+      "5xl": "2.441rem",
+      "6xl": "3.052rem",
+      "7xl": "3.815rem",
+    },
     container: {
       center: true,
       padding: "2rem",
@@ -18,6 +31,9 @@ const config = {
       },
     },
     extend: {
+      gridTemplateColumns: {
+        "23": "repeat(23, minmax(0, 1fr))",
+      },
       screens: {
         xs: "475px",
         "3xl": "1600px",
