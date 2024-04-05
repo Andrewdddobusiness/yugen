@@ -9,7 +9,6 @@
     "lint": "next lint"
   },
   "dependencies": {
-    "next/babel": "latest",
     "@daypilot/daypilot-lite-react": "^3.21.0",
     "@fullcalendar/core": "^6.1.11",
     "@fullcalendar/daygrid": "^6.1.11",
