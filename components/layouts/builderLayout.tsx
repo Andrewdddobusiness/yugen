@@ -1,4 +1,7 @@
 import React, { ReactNode } from "react";
+import Image from "next/image";
+import Link from "next/link";
+
 import {
   Settings,
   Plus,
@@ -9,16 +12,23 @@ import {
   Footprints,
 } from "lucide-react";
 
+import { Button } from "@/components/ui/button";
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
   TooltipProvider,
 } from "@/components/ui/tooltip";
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
-import { Button } from "@/components/ui/button";
-import Image from "next/image";
-import Link from "next/link";
 import ItineraryChoiceDialog from "../dialog/itineraryChoiceDialog";
 
 interface PageLayoutProps {
@@ -155,26 +165,6 @@ export default function BuilderLayout({
                 Settings
               </TooltipContent>
             </Tooltip>
-            {/* Profile Button */}
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Link href="/settings/profile">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className={`mt-auto rounded-lg ${
-                      activePage === "setting" ? "bg-muted" : ""
-                    }`}
-                    aria-label="Setting"
-                  >
-                    <CircleUserRound className="size-5" />
-                  </Button>
-                </Link>
-              </TooltipTrigger>
-              <TooltipContent side="right" sideOffset={5}>
-                Profile
-              </TooltipContent>
-            </Tooltip>
           </TooltipProvider>
         </nav>
       </aside>
@@ -182,6 +172,33 @@ export default function BuilderLayout({
       <div className="flex flex-col flex-1">
         <header className="sticky top-0 z-10 flex h-14 items-center gap-1 border-b bg-background">
           <h1 className="text-xl font-semibold pl-4">{title}</h1>
+          <div className="ml-auto  pr-4">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="overflow-hidden rounded-full"
+                >
+                  <Image
+                    src="/placeholder-user.jpg"
+                    width={36}
+                    height={36}
+                    alt="Avatar"
+                    className="overflow-hidden rounded-full"
+                  />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuLabel>My Account</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem>Settings</DropdownMenuItem>
+                <DropdownMenuItem>Support</DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem>Logout</DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </header>
       </div>
 

@@ -1,4 +1,7 @@
 import React, { ReactNode } from "react";
+import Image from "next/image";
+import Link from "next/link";
+
 import {
   Home,
   Settings,
@@ -9,8 +12,16 @@ import {
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import Image from "next/image";
-import Link from "next/link";
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+
 import ItineraryChoiceDialog from "../dialog/itineraryChoiceDialog";
 
 interface PageLayoutProps {
@@ -77,6 +88,7 @@ export default function DashboardLayout({
             Explore
           </Link>
         </nav>
+
         {/* Footer Navigation */}
         <nav className="mt-auto grid gap-1 py-2 px-4">
           <Link
@@ -87,15 +99,6 @@ export default function DashboardLayout({
           >
             <Settings className="h-4 w-4" />
             Settings
-          </Link>
-          <Link
-            href="/settings/profile"
-            className={`flex items-center gap-3 rounded-lg px-3 py-2 transition-all hover:text-primary text-sm ${
-              activePage === "profile" ? "bg-muted" : ""
-            }`}
-          >
-            <CircleUserRound className="h-4 w-4" />
-            Profile
           </Link>
         </nav>
       </aside>
@@ -110,6 +113,33 @@ export default function DashboardLayout({
                 Create an Itinerary
               </Button>
             </ItineraryChoiceDialog>
+          </div>
+          <div className="pr-4">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="overflow-hidden rounded-full"
+                >
+                  <Image
+                    src="/placeholder-user.jpg"
+                    width={36}
+                    height={36}
+                    alt="Avatar"
+                    className="overflow-hidden rounded-full"
+                  />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuLabel>My Account</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem>Settings</DropdownMenuItem>
+                <DropdownMenuItem>Support</DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem>Logout</DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </header>
       </div>

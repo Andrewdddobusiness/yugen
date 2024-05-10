@@ -33,7 +33,7 @@ export default function ItineraryChoiceDialog({
               We recommend our latest AI Travel Itinerary Generator.
             </div>
             <div className="grid grid-cols-5 gap-4 mt-4">
-              <Link href="/itinerary/generator" legacyBehavior>
+              <Link href="/newTrip" legacyBehavior>
                 <Card className="pt-4 col-span-2 first-letter:flex items-center justify-center bg-white hover:bg-zinc-200 transition-colors duration-300 border border-black hover:border-zinc-400 group-hover:border-zinc-500 cursor-pointer rounded-lg">
                   <CardContent className="flex flex-col items-center justify-center text-center h-full">
                     <div className="flex items-center justify-center h-full">

@@ -19,7 +19,7 @@ export default function Home() {
                 trip planner.
               </div>
               <div className="mb-4">
-                <Button size="sm" className="gap-1.5 text-sm">
+                <Button size="sm" className="text-sm">
                   Create a travel itinerary
                 </Button>
               </div>
