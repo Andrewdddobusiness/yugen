@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 import ItineraryChoiceDialog from "../dialog/itineraryChoiceDialog";
+import LogoutButton from "../buttons/logoutButton";
 
 interface PageLayoutProps {
   title: string;
@@ -137,7 +138,9 @@ export default function DashboardLayout({
                 <DropdownMenuItem>Settings</DropdownMenuItem>
                 <DropdownMenuItem>Support</DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem>Logout</DropdownMenuItem>
+                <DropdownMenuItem>
+                  <LogoutButton />
+                </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           </div>

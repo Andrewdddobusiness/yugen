@@ -21,6 +21,19 @@ export async function login(formData: FormData) {
   return data;
 }
 
+export async function logout() {
+  const supabase = createClient();
+
+  const { error } = await supabase.auth.signOut();
+
+  if (error) {
+    console.log(error);
+    return { success: false, message: "Logout failed", error };
+  }
+  revalidatePath("/", "layout");
+  return { success: true, message: "Logout successful" };
+}
+
 export async function signup(formData: FormData) {
   const supabase = createClient();
 
