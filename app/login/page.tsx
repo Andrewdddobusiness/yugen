@@ -23,11 +23,10 @@ import { useToast } from "@/components/ui/use-toast";
 import LoadingSpinner from "@/components/loadingSpinner/loadingSpinner";
 
 import { login } from "@/actions/auth/actions";
-import loginSchema from "@/schemas/loginSchema";
+import { loginSchema } from "@/schemas/loginSchema";
 
 export default function LoginPage() {
-  const [user, setUser] = useState<any>();
-  const [loading, setLoading] = useState<any>();
+  const [loading, setLoading] = useState<any>(false);
 
   const { toast } = useToast();
   const router = useRouter();
@@ -45,11 +44,11 @@ export default function LoginPage() {
     const formData = new FormData();
     formData.append("email", values.email);
     formData.append("password", values.password);
+    console.log("hi");
 
     try {
       const response = await login(formData);
-      if (response) {
-        setUser(response);
+      if (response.success === true) {
         toast({
           title: "Logged in.",
           description: "Welcome back traveller!",

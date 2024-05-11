@@ -22,7 +22,7 @@ import { useToast } from "@/components/ui/use-toast";
 import LoadingSpinner from "@/components/loadingSpinner/loadingSpinner";
 
 import { signup, logout } from "@/actions/auth/actions";
-import loginSchema from "@/schemas/loginSchema";
+import { signUpSchema } from "@/schemas/loginSchema";
 
 export default function SignUpPage() {
   const [user, setUser] = useState<any>();
@@ -30,8 +30,8 @@ export default function SignUpPage() {
 
   const { toast } = useToast();
 
-  const form = useForm<z.infer<typeof loginSchema>>({
-    resolver: zodResolver(loginSchema),
+  const form = useForm<z.infer<typeof signUpSchema>>({
+    resolver: zodResolver(signUpSchema),
     defaultValues: {
       first_name: "",
       last_name: "",
@@ -40,7 +40,7 @@ export default function SignUpPage() {
     },
   });
 
-  const handleSignUp = async (values: z.infer<typeof loginSchema>) => {
+  const handleSignUp = async (values: z.infer<typeof signUpSchema>) => {
     setLoading(true);
     const formData = new FormData();
     formData.append("first_name", values.first_name);
@@ -51,7 +51,7 @@ export default function SignUpPage() {
     try {
       const response = await signup(formData);
       if (response.success === true) {
-        setUser(response);
+        setUser(response.data);
         toast({
           title: "Welcome aboard!",
           description: "Please check your email to verify your account.",

@@ -5,20 +5,21 @@ import { createClient } from "@/utils/supabase/server";
 
 export async function login(formData: FormData) {
   const supabase = createClient();
+  console.log("hello");
 
   const loginFormData = {
     email: formData.get("email") as string,
     password: formData.get("password") as string,
   };
 
-  const { data, error } = await supabase.auth.signInWithPassword(loginFormData);
+  const { error } = await supabase.auth.signInWithPassword(loginFormData);
 
   if (error) {
     console.log(error);
     return { success: false, message: "Error with login", error };
   }
   revalidatePath("/", "layout");
-  return { success: true, message: "Login successful", data };
+  return { success: true, message: "Login successful" };
 }
 
 export async function logout() {
