@@ -24,11 +24,12 @@ export default function Footer() {
             />
 
             <div className="flex items-center font-Patua text-xl font-bold ml-2">
-              <Link href={"/"}>yugen</Link>
+              <Link href={"/"}>Planaway</Link>
             </div>
           </div>
           <div className="text-xs text-zinc-500 mt-2">
-            Turn your next trip into a hassle-free experience <br /> with yugen.
+            Turn your next trip into a hassle-free experience <br /> with
+            Planaway.
           </div>
         </div>
         <div className="col-span-2 md:col-span-1 flex justify-center md:justify-end">
@@ -46,7 +47,7 @@ export default function Footer() {
         </div>
 
         <div className="col-span-2 flex justify-center items-center text-xs mt-16 md:mt-8">
-          © 2023 Yugen. All rights reserved
+          © 2023 Planaway. All rights reserved
         </div>
       </div>
     </footer>

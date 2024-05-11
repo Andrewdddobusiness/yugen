@@ -11,14 +11,14 @@ export async function login(formData: FormData) {
     password: formData.get("password") as string,
   };
 
-  const { error, data } = await supabase.auth.signInWithPassword(loginFormData);
+  const { data, error } = await supabase.auth.signInWithPassword(loginFormData);
 
   if (error) {
     console.log(error);
-    return error;
+    return { success: false, message: "Error with login", error };
   }
   revalidatePath("/", "layout");
-  return data;
+  return { success: true, message: "Login successful", data };
 }
 
 export async function logout() {
@@ -40,14 +40,31 @@ export async function signup(formData: FormData) {
   const signUpFormData = {
     email: formData.get("email") as string,
     password: formData.get("password") as string,
+    options: {
+      data: {
+        first_name: formData.get("first_name") as string,
+        last_name: formData.get("last_name") as string,
+      },
+    },
   };
 
-  const { error, data } = await supabase.auth.signUp(signUpFormData);
+  const { data: existingUser } = await supabase
+    .from("profiles")
+    .select("*")
+    .eq("email", signUpFormData.email)
+    .single();
+
+  if (existingUser) {
+    console.log("Email already exists:", signUpFormData.email);
+    return { success: false, message: "Email already exists" };
+  }
+
+  const { data, error } = await supabase.auth.signUp(signUpFormData);
 
   if (error) {
     console.log(error);
-    return error;
+    return { success: false, message: "Error with sign up" };
   }
   revalidatePath("/", "layout");
-  return data;
+  return { success: true, message: "Logout successful", data };
 }

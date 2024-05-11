@@ -41,7 +41,7 @@ export default function Navigation() {
           />
         </div>
         <div className="flex items-center font-Patua text-xl font-bold ml-2">
-          <Link href={"/"}>yugen</Link>
+          <Link href={"/"}>Planaway</Link>
         </div>
       </div>
       <div className="hidden sm:block">

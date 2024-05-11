@@ -4,8 +4,8 @@ import { GeistSans } from "geist/font/sans";
 import { Toaster } from "@/components/ui/toaster";
 
 export const metadata: Metadata = {
-  title: "yugen",
-  description: "Creating your next travel plan, easier.",
+  title: "Planaway",
+  description: "Creating your next travel plan, way easier.",
 };
 
 export default function RootLayout({

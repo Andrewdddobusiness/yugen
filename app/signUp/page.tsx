@@ -21,7 +21,7 @@ import { useToast } from "@/components/ui/use-toast";
 
 import LoadingSpinner from "@/components/loadingSpinner/loadingSpinner";
 
-import { signup } from "@/actions/auth/actions";
+import { signup, logout } from "@/actions/auth/actions";
 import loginSchema from "@/schemas/loginSchema";
 
 export default function SignUpPage() {
@@ -33,6 +33,8 @@ export default function SignUpPage() {
   const form = useForm<z.infer<typeof loginSchema>>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
+      first_name: "",
+      last_name: "",
       email: "",
       password: "",
     },
@@ -41,16 +43,27 @@ export default function SignUpPage() {
   const handleSignUp = async (values: z.infer<typeof loginSchema>) => {
     setLoading(true);
     const formData = new FormData();
+    formData.append("first_name", values.first_name);
+    formData.append("last_name", values.last_name);
     formData.append("email", values.email);
     formData.append("password", values.password);
 
     try {
       const response = await signup(formData);
-      if (response) {
+      if (response.success === true) {
         setUser(response);
         toast({
           title: "Welcome aboard!",
           description: "Please check your email to verify your account.",
+        });
+        await logout();
+      } else if (
+        response.success === false &&
+        response.message === "Email already exists"
+      ) {
+        toast({
+          title: "Email has already been registered.",
+          description: "Please login in or use a different email.",
         });
       }
       setLoading(false);
@@ -72,7 +85,7 @@ export default function SignUpPage() {
         </Link>
       </div>
       <div className="flex items-center justify-center py-12 mt-10 sm:t-0">
-        {user ? (
+        {!user ? (
           <div className="mx-auto grid w-[350px] gap-6">
             <div className="grid gap-2 text-center">
               <h1 className="text-3xl font-bold">Sign Up</h1>
@@ -86,6 +99,40 @@ export default function SignUpPage() {
                 onSubmit={form.handleSubmit(handleSignUp)}
                 className="space-y-8"
               >
+                <FormField
+                  control={form.control}
+                  name="first_name"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>First Name</FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="John"
+                          type="first_name"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="last_name"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Last Name</FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="Smith"
+                          type="last_name"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
                 <FormField
                   control={form.control}
                   name="email"

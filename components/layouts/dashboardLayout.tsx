@@ -54,7 +54,7 @@ export default function DashboardLayout({
                   className="max-w-[25px]"
                 />
               </div>
-              <div className="font-Patua text-xl font-bold ml-2">yugen</div>
+              <div className="font-Patua text-xl font-bold ml-2">Planaway</div>
             </Button>
           </Link>
         </div>
