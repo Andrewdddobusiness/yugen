@@ -48,25 +48,28 @@ export default function Navigation() {
         <NavigationMenu>
           <NavigationMenuList className="flex space-x-4">
             <NavigationMenuItem>
-              <Link href="/" legacyBehavior passHref>
-                <NavigationMenuLink className={navigationMenuTriggerStyle()}>
-                  Pricing
-                </NavigationMenuLink>
-              </Link>
+              <NavigationMenuLink
+                href="/"
+                className={navigationMenuTriggerStyle()}
+              >
+                Pricing
+              </NavigationMenuLink>
             </NavigationMenuItem>
             <NavigationMenuItem>
-              <Link href="/login" legacyBehavior passHref>
-                <NavigationMenuLink className={navigationMenuTriggerStyle()}>
-                  Login
-                </NavigationMenuLink>
-              </Link>
+              <NavigationMenuLink
+                href="/login"
+                className={navigationMenuTriggerStyle()}
+              >
+                Login
+              </NavigationMenuLink>
             </NavigationMenuItem>
             <NavigationMenuItem>
-              <Link href="/signUp" legacyBehavior passHref>
-                <NavigationMenuLink className={navigationMenuTriggerStyle2()}>
-                  Sign Up
-                </NavigationMenuLink>
-              </Link>
+              <NavigationMenuLink
+                href="/signUp"
+                className={navigationMenuTriggerStyle2()}
+              >
+                Sign Up
+              </NavigationMenuLink>
             </NavigationMenuItem>
           </NavigationMenuList>
         </NavigationMenu>

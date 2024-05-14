@@ -15,8 +15,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={`${GeistSans.className} `}>{children}</body>
-      <Toaster />
+      <body className={`${GeistSans.className} `}>
+        {children} <Toaster />
+      </body>
     </html>
   );
 }

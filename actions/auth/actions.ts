@@ -49,13 +49,20 @@ export async function signup(formData: FormData) {
     },
   };
 
-  const { data: existingUser } = await supabase
-    .from("profiles")
-    .select("*")
-    .eq("email", signUpFormData.email)
-    .single();
+  // const { data: existingUser } = await supabase
+  //   .from("profiles")
+  //   .select("*")
+  //   .eq("email", signUpFormData.email)
+  //   .single();
 
-  if (existingUser) {
+  const { auth } = supabase;
+  const { data: user } = await auth.getUser();
+
+  // if (!user.user) {
+  //   return { success: false, message: "Error with sign up" };
+  // }
+
+  if (formData.get("email") === user.user?.email) {
     console.log("Email already exists:", signUpFormData.email);
     return { success: false, message: "Email already exists" };
   }
