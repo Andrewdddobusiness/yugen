@@ -18,7 +18,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 
 import { MdPerson } from "react-icons/md";
 
-import LoadingSpinner from "@/components/loadingSpinner/loadingSpinner";
+import LoadingSpinner from "@/components/loading/loadingSpinner";
 import DashboardLayout from "@/components/layouts/dashboardLayout";
 
 // import { uploadToStorage } from "@/actions/file/actions";
@@ -192,7 +192,7 @@ const Profile = () => {
     fetchPublicUrl();
 
     return () => {};
-  }, []);
+  }, [supabase]);
 
   useEffect(() => {
     const fetchUserData = async () => {
@@ -222,7 +222,7 @@ const Profile = () => {
     };
 
     fetchUserData();
-  }, []);
+  }, [supabase]);
 
   return (
     <div>

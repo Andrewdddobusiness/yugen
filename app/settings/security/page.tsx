@@ -63,7 +63,9 @@ export default function Settings() {
                   <Dialog>
                     <DialogTrigger>
                       <div className="flex items-center gap-2">
-                        <Button>Reset Password</Button>
+                        <Link href={"/login/reset"}>
+                          <Button>Reset Password</Button>
+                        </Link>
                       </div>
                     </DialogTrigger>
                     <DialogContent>
@@ -73,10 +75,7 @@ export default function Settings() {
                           Don&apos;t worry, we&apos;ll send you a message to
                           help you reset your password.
                           <div className="mt-4">
-                            <Input
-                              type={"password"}
-                              placeholder="Enter your email"
-                            />
+                            <Input type={"password"} />
                           </div>
                         </DialogDescription>
                       </DialogHeader>

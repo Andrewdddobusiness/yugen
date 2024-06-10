@@ -20,6 +20,7 @@ export default function LogoutButton() {
         });
 
         router.push("/");
+        window.location.reload();
       } else {
         toast({
           title: "Logout failed",

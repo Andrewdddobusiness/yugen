@@ -2,6 +2,7 @@
 import React, { ReactNode, useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { createClient } from "@/utils/supabase/client";
 
 import {
   Home,
@@ -27,8 +28,7 @@ import ItineraryChoiceDialog from "../dialog/itineraryChoiceDialog";
 import LogoutButton from "../buttons/logoutButton";
 
 import { MdPersonOutline } from "react-icons/md";
-
-import { createClient } from "@/utils/supabase/client";
+import { Skeleton } from "../ui/skeleton";
 
 interface PageLayoutProps {
   title: string;
@@ -67,7 +67,7 @@ export default function DashboardLayout({
     fetchPublicUrl();
 
     return () => {};
-  }, []);
+  }, [supabase]);
 
   return (
     <div className="h-screen w-full pl-14">
@@ -90,10 +90,8 @@ export default function DashboardLayout({
         {/* <h1 className="text-xl font-semibold pl-16">{title}</h1> */}
         <div className="ml-auto pr-4">
           <ItineraryChoiceDialog>
-            <Button variant="default" size="sm" className="gap-1.5 text-sm">
-              <Plus className="size-3.5" />
-              Create an Itinerary
-            </Button>
+            <Plus className="size-3.5 mr-1" />
+            <div> Create an Itinerary</div>
           </ItineraryChoiceDialog>
         </div>
         <div className="pr-4">
@@ -104,13 +102,18 @@ export default function DashboardLayout({
                 size="icon"
                 className="overflow-hidden rounded-full"
               >
-                <Image
-                  alt="Avatar"
-                  src={profileUrl ? profileUrl : ""}
-                  width={100}
-                  height={100}
-                  className="w-8 h-8 rounded-full"
-                />
+                {profileUrl ? (
+                  <Image
+                    alt="Profile"
+                    src={profileUrl ? profileUrl : ""}
+                    width={100}
+                    height={100}
+                    className="w-8 h-8 rounded-full"
+                    priority
+                  />
+                ) : (
+                  <Skeleton className="h-[32px] w-[32px] rounded-full" />
+                )}
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">

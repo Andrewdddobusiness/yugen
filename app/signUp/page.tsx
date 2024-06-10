@@ -19,7 +19,7 @@ import {
 } from "@/components/ui/form";
 import { useToast } from "@/components/ui/use-toast";
 
-import LoadingSpinner from "@/components/loadingSpinner/loadingSpinner";
+import LoadingSpinner from "@/components/loading/loadingSpinner";
 
 import { signup, logout } from "@/actions/auth/actions";
 import { signUpSchema } from "@/schemas/loginSchema";

@@ -19,9 +19,7 @@ export default function Explore() {
           <div className="pt-8">
             <div className="text-lg font-bold">My Itineraries</div>
           </div>
-          <div className="py-4">
-            <ItineraryCards />
-          </div>
+          <div className="py-4">{/* <ItineraryCards /> */}</div>
         </div>
       </DashboardLayout>
     </div>

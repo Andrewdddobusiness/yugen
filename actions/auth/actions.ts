@@ -5,7 +5,6 @@ import { createClient } from "@/utils/supabase/server";
 
 export async function login(formData: FormData) {
   const supabase = createClient();
-  console.log("hello");
 
   const loginFormData = {
     email: formData.get("email") as string,
@@ -49,18 +48,8 @@ export async function signup(formData: FormData) {
     },
   };
 
-  // const { data: existingUser } = await supabase
-  //   .from("profiles")
-  //   .select("*")
-  //   .eq("email", signUpFormData.email)
-  //   .single();
-
   const { auth } = supabase;
   const { data: user } = await auth.getUser();
-
-  // if (!user.user) {
-  //   return { success: false, message: "Error with sign up" };
-  // }
 
   if (formData.get("email") === user.user?.email) {
     console.log("Email already exists:", signUpFormData.email);

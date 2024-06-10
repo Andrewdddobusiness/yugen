@@ -15,9 +15,9 @@ export default function Builder() {
     <div>
       <BuilderLayout title="Builder" activePage="builder" itineraryNumber={1}>
         <ResizablePanelGroup direction="horizontal">
-          <ResizablePanel className="p-4 border-b">
+          {/* <ResizablePanel className="p-4 border-b">
             <DragDropCalendar />
-          </ResizablePanel>
+          </ResizablePanel> */}
           <ResizableHandle withHandle />
           <ResizablePanel maxSize={50} minSize={20} className="hidden sm:block">
             <MapBox />

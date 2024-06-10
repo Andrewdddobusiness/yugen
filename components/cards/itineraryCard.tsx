@@ -18,13 +18,15 @@ import Image from "next/image";
 import Link from "next/link";
 import { MoreHorizontal } from "lucide-react";
 
-interface ItineraryCardProps {
-  link: string;
-  imageUrl: string;
-  destination: string;
-  startDate: string;
-  endDate: string;
-}
+import { capitalizeFirstLetter } from "@/utils/formatting/capitaliseFirstLetter";
+
+// interface ItineraryCardProps {
+//   link?: string;
+//   imageUrl?: string;
+//   destination?: string;
+//   startDate?: string;
+//   endDate?: string;
+// }
 
 export default function ItineraryCard({
   link,
@@ -32,18 +34,18 @@ export default function ItineraryCard({
   destination,
   startDate,
   endDate,
-}: ItineraryCardProps) {
+}: any) {
   const [isHovered, setIsHovered] = useState(false);
 
   return (
-    <Link href={link} legacyBehavior passHref>
+    <Link href={link || ""} legacyBehavior passHref>
       <Card
         className="aspect-w-1 aspect-h-1 cursor-pointer relative"
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
       >
         <Image
-          src={imageUrl}
+          src={imageUrl || ""}
           alt="Image"
           width={1920}
           height={1080}
@@ -51,7 +53,7 @@ export default function ItineraryCard({
           className="h-40 w-full rounded-t-lg"
         />
         <CardHeader>
-          <CardTitle>{destination}</CardTitle>
+          <CardTitle>{capitalizeFirstLetter(destination)}</CardTitle>
           <CardDescription>
             {startDate} - {endDate}
           </CardDescription>

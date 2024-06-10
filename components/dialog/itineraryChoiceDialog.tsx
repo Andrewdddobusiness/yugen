@@ -12,16 +12,20 @@ import {
 import Image from "next/image";
 import React, { ReactNode } from "react";
 
-interface PageLayoutProps {
+interface PageLayoutProps extends React.HTMLAttributes<HTMLDivElement> {
   children: ReactNode;
 }
 
 export default function ItineraryChoiceDialog({
   children,
+  className,
+  ...props
 }: PageLayoutProps): React.ReactElement {
   return (
     <Dialog>
-      <DialogTrigger className="flex items-center justify-center bg-zinc-100 hover:bg-zinc-200 transition-colors duration-300 border border-transparent hover:border-zinc-400 group-hover:border-zinc-500 cursor-pointer rounded-lg">
+      <DialogTrigger
+        className={`flex items-center justify-center py-3 px-4 text-sm text-white bg-black hover:opacity-80 transition-colors duration-300 cursor-pointer rounded-lg ${className}`}
+      >
         {children}
       </DialogTrigger>
 
@@ -56,7 +60,7 @@ export default function ItineraryChoiceDialog({
                 or
               </div>
 
-              <Link href="/itinerary/1/overview" legacyBehavior>
+              <Link href="/newTrip" legacyBehavior>
                 <Card className="pt-4 col-span-2 first-letter:flex items-center justify-center bg-white hover:bg-zinc-200 transition-colors duration-300 border border-black hover:border-zinc-400 group-hover:border-zinc-500 cursor-pointer rounded-lg">
                   <CardContent className="flex flex-col items-center justify-center text-center h-full">
                     <div className="flex items-center justify-center h-full">

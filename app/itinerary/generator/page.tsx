@@ -21,9 +21,7 @@ export default function Generator() {
               AI Travel Itinerary Generator
             </div>
           </div>
-          <div className="py-4">
-            <ItineraryCards />
-          </div>
+          <div className="py-4">{/* <ItineraryCards /> */}</div>
         </div>
       </DashboardLayout>
     </div>
