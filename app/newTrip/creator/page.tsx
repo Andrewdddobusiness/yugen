@@ -1,5 +1,7 @@
 "use client";
 import React, { useEffect, useState } from "react";
+import Image from "next/image";
+
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -16,9 +18,11 @@ import { itinerarySchema } from "@/schemas/createItinerarySchema";
 import { createClient } from "@/utils/supabase/client";
 import { fetchTableData, insertTableData } from "@/actions/supabase/actions";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useRouter } from "next/navigation";
 
 export default function NewTripCreator() {
   const supabase = createClient();
+  const router = useRouter();
 
   const [adultsCount, setAdultsCount] = useState(1);
   const [kidsCount, setKidsCount] = useState(0);
@@ -70,6 +74,8 @@ export default function NewTripCreator() {
       console.log(response);
     } catch (error) {
       console.error(error);
+      setLoading(false);
+      return;
     }
 
     const selectedCity = cityList.find(
@@ -82,6 +88,8 @@ export default function NewTripCreator() {
       destinationCityId = selectedCity.city_id;
     } else {
       console.error("Assigning city id failed.");
+      setLoading(false);
+      return;
     }
 
     const itineraryDestinationsData = {
@@ -97,8 +105,12 @@ export default function NewTripCreator() {
         itineraryDestinationsData
       );
       console.log(response);
+      if (response.success) {
+        router.push("/");
+      }
     } catch (error) {
       console.error(error);
+      setLoading(false);
     } finally {
       setLoading(false);
     }
@@ -150,12 +162,12 @@ export default function NewTripCreator() {
   }, []);
 
   return (
-    <div>
-      <DashboardLayout title="Itineraries" activePage="itineraries">
-        <div className="flex flex-col items-center m-4  h-screen ">
-          <div className="flex flex-col items-left w-1/2">
+    <DashboardLayout title="Itineraries" activePage="itineraries">
+      <div className="grid grid-cols-2 h-screen">
+        <div className="flex flex-col items-center">
+          <div className="flex flex-col items-left w-3/4 mt-16">
             <>
-              <div className="text-5xl font-semibold mt-8">
+              <div className="text-4xl font-semibold">
                 Plan your next holiday!
               </div>
               <div className="text-md text-zinc-500 mt-2">
@@ -177,9 +189,12 @@ export default function NewTripCreator() {
                 )}
               </div>
               <div className="flex flex-row text-5xl mt-2">
-                <DatePickerWithRange onDateChange={handleDateChange} />
+                <DatePickerWithRange
+                  onDateChange={handleDateChange}
+                  disablePastDates={true}
+                />
               </div>
-              <div className="flex flex-row text-5xl mt-2">
+              {/* <div className="flex flex-row text-5xl mt-2">
                 <Button
                   className="rounded-full text-sm"
                   size={"sm"}
@@ -187,7 +202,7 @@ export default function NewTripCreator() {
                 >
                   <Plus size={12} className="mr-1" /> Add Destination
                 </Button>
-              </div>
+              </div> */}
 
               <div className="text-xl font-semibold mt-8">
                 How many people are going?
@@ -260,15 +275,25 @@ export default function NewTripCreator() {
                   size="sm"
                   variant={"default"}
                   onClick={handleCreateItinerary}
-                  className={`w-20 rounded-full`}
+                  className={`rounded-full`}
                 >
-                  Confirm
+                  Create Itinerary
                 </Button>
               )}
             </div>
           </div>
         </div>
-      </DashboardLayout>
-    </div>
+        <div>
+          <Image
+            src="/map2.jpg"
+            alt="Image"
+            width={1920}
+            height={1080}
+            objectFit="cover"
+            className="h-full w-full object-cover"
+          />
+        </div>
+      </div>
+    </DashboardLayout>
   );
 }

@@ -6,7 +6,7 @@ interface PageLayoutProps {
   children: ReactNode;
 }
 
-export default function NavLayout({
+export default function HomeLayout({
   children,
 }: PageLayoutProps): React.ReactElement {
   return (

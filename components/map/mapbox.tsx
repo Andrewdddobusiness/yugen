@@ -1,24 +1,75 @@
-import mapboxgl, { LngLatLike } from "mapbox-gl";
-import "mapbox-gl/dist/mapbox-gl.css";
+"use client";
 import { useEffect, useRef, useState } from "react";
+
+import mapboxgl, { LngLatLike } from "mapbox-gl";
 import MapboxGeocoder from "@mapbox/mapbox-gl-geocoder";
 import "@mapbox/mapbox-gl-geocoder/dist/mapbox-gl-geocoder.css";
+import "mapbox-gl/dist/mapbox-gl.css";
+
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+import { Search } from "lucide-react";
 
 const accessToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN || "";
 
+import WaypointSidebar from "../sidebar/activitySideBar";
+
 mapboxgl.accessToken = accessToken;
 
-export default function MapBox() {
+const styles = [
+  { label: "Standard", value: "mapbox://styles/mapbox/standard" },
+  { label: "Streets", value: "mapbox://styles/mapbox/streets-v12" },
+  { label: "Outdoors", value: "mapbox://styles/mapbox/outdoors-v12" },
+  { label: "Light", value: "mapbox://styles/mapbox/light-v11" },
+  { label: "Dark", value: "mapbox://styles/mapbox/dark-v11" },
+  { label: "Satellite", value: "mapbox://styles/mapbox/satellite-v9" },
+  {
+    label: "Satellite Streets",
+    value: "mapbox://styles/mapbox/satellite-streets-v12",
+  },
+  {
+    label: "Navigation Day",
+    value: "mapbox://styles/mapbox/navigation-day-v1",
+  },
+  {
+    label: "Navigation Night",
+    value: "mapbox://styles/mapbox/navigation-night-v1",
+  },
+];
+
+const locations = [
+  { name: "Royal Botanic Garden Sydney", coordinates: [151.2167, -33.8642] },
+  { name: "Art Gallery of New South Wales", coordinates: [151.2171, -33.8689] },
+  { name: "Sydney Opera House", coordinates: [151.214, -33.8568] },
+  { name: "Taronga Zoo Sydney", coordinates: [151.2395, -33.8457] },
+  { name: "Sydney Harbour Bridge", coordinates: [151.2108, -33.8523] },
+];
+
+// const locations = [{}];
+
+export default function MapBox({ selectedActivity, setSelectedActivity }: any) {
   const mapContainer = useRef<any>(null);
   const map = useRef<mapboxgl.Map | null>(null);
   const geocoderContainer = useRef<any>(null);
-  const [isDarkMode, setIsDarkMode] = useState(false);
+  const [selectedStyle, setSelectedStyle] = useState(styles[0].value);
   const [mapState, setMapState] = useState({
     center: [151.2093, -33.8688],
     zoom: 12,
     bearing: -17.6,
     pitch: 45,
   });
+
+  const [isMouseOverWaypoint, setIsMouseOverWaypoint] = useState(false);
+
+  const onClose = () => {
+    setSelectedActivity(false);
+  };
 
   useEffect(() => {
     if (!accessToken) {
@@ -30,23 +81,22 @@ export default function MapBox() {
     if (mapState.center && mapState.center.length >= 2) {
       center = mapState.center as LngLatLike;
     } else {
-      center = [151.2093, -33.8688]; // Default center if mapState.center is not defined or doesn't have enough elements
+      center = [151.2093, -33.8688];
     }
 
     map.current = new mapboxgl.Map({
       container: mapContainer.current,
-      style: isDarkMode
-        ? "mapbox://styles/mapbox/dark-v10"
-        : "mapbox://styles/mapbox/standard",
+      style: selectedStyle,
       center: center,
-      zoom: mapState.zoom || 12, // Default zoom level if mapState.zoom is not defined
-      pitch: mapState.pitch || 0, // Default pitch if mapState.pitch is not defined
-      bearing: mapState.bearing || 0, // Default bearing if mapState.bearing is not defined
+      zoom: mapState.zoom || 12,
+      pitch: mapState.pitch || 0,
+      bearing: mapState.bearing || 0,
       antialias: true,
     });
 
     // Add navigation control (zoom and rotation controls)
-    map.current.addControl(new mapboxgl.NavigationControl());
+    const navigationControl = new mapboxgl.NavigationControl();
+    map.current.addControl(navigationControl, "top-left");
 
     // Enable dragRotate interaction
     map.current.dragRotate.enable();
@@ -64,19 +114,17 @@ export default function MapBox() {
       geocoderContainer.current.appendChild(geocoder.onAdd(map.current));
     }
 
-    // Load the custom icon
     map.current.on("load", () => {
-      map.current!.loadImage(
-        "/", // Path to your custom icon in the public folder
-        (error, image) => {
-          if (error) throw error;
+      map.current!.loadImage("/waypointRed.png", (error, image) => {
+        if (error) throw error;
 
-          // Add the image to the map's style
-          if (map.current && image) {
-            map.current.addImage("custom-icon", image);
+        // Add the image to the map's style
+        if (map.current && image) {
+          map.current.addImage("custom-icon", image);
 
-            // Add a data source containing one point feature
-            map.current.addSource("point", {
+          locations.forEach((location, index) => {
+            // Add a source for each location
+            map.current!.addSource(`point-${index}`, {
               type: "geojson",
               data: {
                 type: "FeatureCollection",
@@ -85,27 +133,35 @@ export default function MapBox() {
                     type: "Feature",
                     geometry: {
                       type: "Point",
-                      coordinates: [151.2093, -33.8688], // Custom icon position
+                      coordinates: location.coordinates,
                     },
-                    properties: null,
+                    properties: {
+                      title: location.name,
+                      description: location.name,
+                    },
                   },
                 ],
               },
             });
 
-            // Add a layer to use the image to represent the data
-            map.current.addLayer({
-              id: "points",
+            // Add a layer for each location
+            map.current!.addLayer({
+              id: `point-${index}`,
               type: "symbol",
-              source: "point", // Reference the data source
+              source: `point-${index}`,
               layout: {
-                "icon-image": "custom-icon", // Reference the image
-                "icon-size": 0.5, // Adjust the size of the icon
+                "icon-image": "custom-icon",
+                "icon-size": 0.1,
+                "text-field": "{title}",
+                "text-font": ["Open Sans Bold", "Arial Unicode MS Bold"],
+                "text-size": 12,
+                "text-anchor": "top",
+                "text-offset": [0, 2],
               },
             });
-          }
+          });
         }
-      );
+      });
 
       // Add 3D buildings layer
       map.current!.addLayer({
@@ -140,6 +196,18 @@ export default function MapBox() {
       });
     });
 
+    // Inside the useEffect hook where you add the waypoint layers
+
+    map.current.on("click", (e) => {
+      const features = map.current!.queryRenderedFeatures(e.point, {
+        layers: locations.map((_, i) => `point-${i}`),
+      });
+
+      if (features.length) {
+        setSelectedActivity(features[0].properties!.title); // Set selected location
+      }
+    });
+
     // Cleanup function to remove map instance
     return () => {
       if (map.current) {
@@ -147,7 +215,7 @@ export default function MapBox() {
       }
     };
   }, [
-    isDarkMode,
+    selectedStyle,
     mapState.bearing,
     mapState.center,
     mapState.pitch,
@@ -160,8 +228,8 @@ export default function MapBox() {
     }
   }, [mapContainer]);
 
-  const toggleStyle = () => {
-    setIsDarkMode(!isDarkMode);
+  const handleStyleChange = (value: string) => {
+    setSelectedStyle(value);
     saveMapState();
   };
 
@@ -241,39 +309,60 @@ export default function MapBox() {
   };
 
   return (
-    <div style={{ position: "relative", width: "100%", height: "100%" }}>
-      <button
-        onClick={toggleStyle}
-        style={{
-          position: "absolute",
-          top: "10px",
-          left: "10px",
-          zIndex: 1,
-          padding: "10px",
-          background: "#fff",
-          border: "none",
-          borderRadius: "5px",
-          cursor: "pointer",
-        }}
+    <div>
+      <div
+        className={`absolute top-36 ${
+          selectedActivity ? "right-100 mr-2" : "right-7"
+        } z-50 rounded-lg cursor-pointer`}
       >
-        Toggle Style
-      </button>
+        <Select
+          onValueChange={handleStyleChange}
+          defaultValue={styles[0].value}
+        >
+          <SelectTrigger className="w-[180px]">
+            <SelectValue placeholder="Map Style" />
+          </SelectTrigger>
+          <SelectContent>
+            {styles.map((style) => (
+              <SelectItem key={style.value} value={style.value}>
+                {style.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
       <div
         ref={geocoderContainer}
-        style={{
-          position: "absolute",
-          top: "10px",
-          left: "50%",
-          transform: "translateX(-50%)",
-          zIndex: 1,
-          width: "300px",
-          borderRadius: "5px",
-          overflow: "hidden",
-        }}
-      ></div>
-      <div id="map" style={{ width: "100%", height: "100%" }}>
+        className="absolute top-36 left-72 transform -translate-x-1/2 z-50 w-72 rounded-lg overflow-hidden"
+      >
+        <div className="relative ml-auto flex-1 md:grow-0">
+          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search for places"
+            className="w-full rounded-lg bg-background pl-8 md:w-[200px] lg:w-[336px]"
+            onChange={(e) => {
+              const geocoder = new MapboxGeocoder({
+                accessToken: mapboxgl.accessToken,
+                mapboxgl: mapboxgl,
+              });
+
+              geocoder.query(e.target.value);
+            }}
+          />
+        </div>
+      </div>
+
+      <div
+        id="map"
+        className="w-full h-[1120px] rounded-lg overflow-hidden z-0"
+      >
         <div style={{ width: "100%", height: "100%" }} ref={mapContainer} />
       </div>
+
+      {selectedActivity && (
+        <WaypointSidebar waypoint={selectedActivity} onClose={onClose} />
+      )}
     </div>
   );
 }

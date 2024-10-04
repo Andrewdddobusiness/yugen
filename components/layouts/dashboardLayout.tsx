@@ -4,14 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { createClient } from "@/utils/supabase/client";
 
-import {
-  Home,
-  Settings,
-  Plus,
-  NotebookText,
-  LibraryBig,
-  CircleUserRound,
-} from "lucide-react";
+import { Home, Settings, Plus, NotebookText, LibraryBig } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -23,12 +16,10 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Skeleton } from "../ui/skeleton";
 
 import ItineraryChoiceDialog from "../dialog/itineraryChoiceDialog";
 import LogoutButton from "../buttons/logoutButton";
-
-import { MdPersonOutline } from "react-icons/md";
-import { Skeleton } from "../ui/skeleton";
 
 interface PageLayoutProps {
   title: string;
@@ -108,7 +99,7 @@ export default function DashboardLayout({
                     src={profileUrl ? profileUrl : ""}
                     width={100}
                     height={100}
-                    className="w-8 h-8 rounded-full"
+                    className="w-10 h-10 rounded-full"
                     priority
                   />
                 ) : (

@@ -12,8 +12,7 @@ export default function Dashboard() {
   const supabase = createClient();
 
   const [user, setUser] = useState<any>();
-  const [loading, setLoading] = useState<any>(false);
-
+  const [loadingItinerary, setLoadingItinerary] = useState<any>(false);
   const [itineraryData, setItineraryData] = useState<any[]>([]);
 
   // const handleCreateItinerary = async () => {
@@ -43,6 +42,7 @@ export default function Dashboard() {
   useEffect(() => {
     const fetchUserData = async () => {
       try {
+        setLoadingItinerary(true);
         const { auth } = supabase;
         const { data: user } = await auth.getUser();
         console.log(user.user);
@@ -61,9 +61,9 @@ export default function Dashboard() {
   useEffect(() => {
     const fetchItineraryData = async () => {
       if (user) {
-        setLoading(true);
+        setLoadingItinerary(true);
         try {
-          const { data, error } = await fetchItineraryWithCities(user.id);
+          const { data, error } = await fetchItineraryWithCities();
           console.log("refined data: ", data);
           if (error) {
             console.error("Error fetching itinerary data:", error);
@@ -75,15 +75,13 @@ export default function Dashboard() {
           console.error("Error fetching itinerary data:", error);
           setItineraryData([]);
         } finally {
-          setLoading(false);
+          setLoadingItinerary(false);
         }
       }
     };
 
     fetchItineraryData();
   }, [user]);
-
-  //  but how do you build one?
 
   return (
     <DashboardLayout title="Dashboard" activePage="home">
@@ -98,8 +96,11 @@ export default function Dashboard() {
         <div className="pt-8">
           <div className="text-lg font-bold">My Itineraries</div>
         </div>
-        <div className="py-4">
-          <ItineraryCards itineraries={itineraryData} />
+        <div className="flex flex-row py-4">
+          <ItineraryCards
+            itineraries={itineraryData}
+            loading={loadingItinerary}
+          />
         </div>
       </div>
     </DashboardLayout>

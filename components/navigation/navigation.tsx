@@ -73,7 +73,7 @@ export default function Navigation() {
   }, []);
 
   return (
-    <div className="flex flex-row items-center justify-between p-2 px-4 sm:px-8 pt-4 shadow-sm">
+    <div className="fixed top-0 left-0 right-0 flex flex-row items-center justify-between p-2 px-4 sm:px-8 pt-4 shadow-sm bg-white z-50">
       <div className="flex flex-row items-center">
         <div className="hidden sm:block max-w-[35px]">
           <Image
@@ -121,7 +121,7 @@ export default function Navigation() {
                     src={profileUrl ? profileUrl : ""}
                     width={100}
                     height={100}
-                    className="w-8 h-8 rounded-full"
+                    className="w-10 h-10 rounded-full"
                   />
                 </Button>
               </DropdownMenuTrigger>

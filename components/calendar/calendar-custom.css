@@ -1,0 +1,56 @@
+/* Hide the all-day cells */
+.rbc-allday-cell {
+  display: none !important;
+}
+
+/* Adjust the time content to fill the space */
+.rbc-time-content {
+  border-top: 1px solid #ddd;
+  height: calc(100% - 30px) !important; /* Adjust this value as needed */
+}
+
+/* Remove extra borders */
+.rbc-time-header.rbc-overflowing {
+  border-right: none;
+}
+
+.rbc-time-header > .rbc-row:first-child {
+  border-bottom: none;
+}
+
+.rbc-time-header > .rbc-row.rbc-row-resource {
+  border-bottom: none;
+}
+
+.rbc-time-header-content {
+  border-left: none;
+}
+
+/* Adjust the header height */
+.rbc-time-header {
+  height: 30px !important; /* Adjust this value to match your header height */
+}
+
+/* Remove the gap between header and time slots */
+.rbc-time-view {
+  display: flex;
+  flex-direction: column;
+}
+
+.rbc-time-header {
+  flex: 0 0 auto;
+}
+
+.rbc-time-content {
+  flex: 1 1 auto;
+}
+
+/* Hide the unnecessary header in day view */
+.rbc-time-view.rbc-day-view .rbc-time-header-content {
+  display: none;
+}
+
+/* Adjust the content to take full height in day view */
+.rbc-time-view.rbc-day-view .rbc-time-content {
+  height: 100% !important;
+}

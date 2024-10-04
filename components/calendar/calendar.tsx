@@ -1,105 +1,231 @@
-import React from "react";
-import { hoursOfDay } from "./data";
+"use client";
+import React, { useState, useEffect } from "react";
+import { Calendar, momentLocalizer, View } from "react-big-calendar";
+import withDragAndDrop from "react-big-calendar/lib/addons/dragAndDrop";
+import "react-big-calendar/lib/addons/dragAndDrop/styles.css";
+import moment from "moment";
+import "react-big-calendar/lib/css/react-big-calendar.css";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import "./calendar-custom.css";
+import { capitalizeFirstLetterOfEachWord } from "@/utils/formatting/capitalise";
+import { useItineraryStore } from "@/store/itineraryStore";
+import { useDateRangeStore } from "@/store/dateRangeStore";
 
-const DragDropCalendar: React.FC = () => {
+const localizer = momentLocalizer(moment);
+const DnDCalendar = withDragAndDrop(Calendar);
+
+interface CalendarProps {
+  isLoading: boolean;
+}
+
+const DragDropCalendar: React.FC<CalendarProps> = ({ isLoading }) => {
+  const [view, setView] = useState("week");
+  const { startDate, endDate } = useDateRangeStore();
+  const [date, setDate] = useState(startDate || new Date());
+  const { activities, updateActivity } = useItineraryStore();
+
+  const events = activities.map((item) => ({
+    id: item.itinerary_activity_id,
+    title: capitalizeFirstLetterOfEachWord(item.activities.activity_name),
+    start: new Date(`${item.activity_date}T${item.activity_start_time}`),
+    end: new Date(`${item.activity_date}T${item.activity_end_time}`),
+  }));
+
+  const handleEventDrop = async ({ event, start, end }: any) => {
+    const activityToUpdate = activities.find(
+      (activity) => activity.itinerary_activity_id === event.id
+    );
+    if (!activityToUpdate) return;
+
+    const updatedActivity = {
+      ...activityToUpdate,
+      activity_date: moment(start).format("YYYY-MM-DD"),
+      activity_start_time: moment(start).format("HH:mm:ss"),
+      activity_end_time: moment(end).format("HH:mm:ss"),
+    };
+
+    // Update local store immediately
+    useItineraryStore
+      .getState()
+      .setActivities(
+        activities.map((a) =>
+          a.itinerary_activity_id === updatedActivity.itinerary_activity_id
+            ? updatedActivity
+            : a
+        )
+      );
+
+    // Then update the database
+    try {
+      await updateActivity(updatedActivity);
+    } catch (error) {
+      console.error("Error updating activity:", error);
+      // Revert the local change if the database update fails
+      useItineraryStore.getState().setActivities(activities);
+    }
+  };
+
+  const handleEventResize = async ({ event, start, end }: any) => {
+    const activityToUpdate = activities.find(
+      (activity) => activity.itinerary_activity_id === event.id
+    );
+    if (!activityToUpdate) return;
+
+    const updatedActivity = {
+      ...activityToUpdate,
+      activity_date: moment(start).format("YYYY-MM-DD"),
+      activity_start_time: moment(start).format("HH:mm:ss"),
+      activity_end_time: moment(end).format("HH:mm:ss"),
+    };
+
+    // Update local store immediately
+    useItineraryStore
+      .getState()
+      .setActivities(
+        activities.map((a) =>
+          a.itinerary_activity_id === updatedActivity.itinerary_activity_id
+            ? updatedActivity
+            : a
+        )
+      );
+
+    // Update local store immediately
+    useItineraryStore.getState().updateActivity(updatedActivity);
+
+    // Then update the database
+    try {
+      await updateActivity(updatedActivity);
+    } catch (error) {
+      console.error("Error updating activity:", error);
+      // Revert the local change if the database update fails
+      useItineraryStore.getState().setActivities(activities);
+    }
+  };
+
+  const handleNavigate = (newDate: Date) => {
+    setDate(newDate);
+  };
+
+  const handleViewChange = (newView: string) => {
+    setView(newView);
+  };
+
+  const formatHeaderDate = () => {
+    if (view === "day") {
+      return moment(date).format("dddd, MMMM D, YYYY");
+    } else {
+      return moment(date).format("MMMM YYYY");
+    }
+  };
+
+  const CustomHeader = ({ date, label, view }: any) => {
+    if (view === "day") {
+      return null;
+    } else {
+      return (
+        <div className="text-sm font-semibold text-gray-800 p-1 text-center h-10">
+          {label}
+        </div>
+      );
+    }
+  };
+
+  useEffect(() => {
+    if (startDate) {
+      setDate(startDate);
+    }
+  }, [startDate]);
+
+  if (isLoading) {
+    return <div>Loading...</div>;
+  }
+
   return (
     <div className="w-full h-full rounded-xl border border-zinc-200 relative pb-14">
       <div className="w-full h-[50px] bg-zinc-100 rounded-t-xl border-b border-zinc-200 flex items-center justify-between">
-        <div className="text-sm font-bold ml-4"> January 2024</div>
+        <div className="text-sm font-bold ml-4">{formatHeaderDate()}</div>
 
         <div className="mr-4 flex flex-row items-center">
           <div className="overflow-hidden flex flex-row">
-            <Button className="h-8 px-4 py-2 rounded-l-lg rounded-r-none flex items-center">
+            <Button
+              className="h-8 px-4 py-2 rounded-l-lg rounded-r-none flex items-center"
+              onClick={() =>
+                handleNavigate(moment(date).subtract(1, view).toDate())
+              }
+            >
               <ChevronLeft size={12} />
             </Button>
-            <Button className="h-8 px-4 py-2 rounded-none text-xs">
+            <Button
+              className="h-8 px-4 py-2 rounded-none text-xs"
+              onClick={() => setDate(new Date())}
+            >
               Today
             </Button>
-            <Button className="h-8 px-4 py-2 rounded-r-lg rounded-l-none flex items-center">
+            <Button
+              className="h-8 px-4 py-2 rounded-r-lg rounded-l-none flex items-center"
+              onClick={() => handleNavigate(moment(date).add(1, view).toDate())}
+            >
               <ChevronRight size={12} />
             </Button>
           </div>
           <Separator
             orientation="vertical"
-            className="h-6 mx-4 border-zinc-200"
+            className="h-6 m==][x-4 border-zinc-200"
           />
 
-          <Button className="text-xs px-4 h-8 rounded-lg">+ Add Event</Button>
+          <Button
+            className="text-xs px-4 h-8 rounded-lg"
+            onClick={() => handleViewChange(view === "week" ? "day" : "week")}
+          >
+            {view === "week" ? "Day View" : "Week View"}
+          </Button>
         </div>
       </div>
 
-      <div className="overflow-y-scroll h-full">
-        <div className="w-full min-h-[35px] grid grid-cols-10 lg:grid-cols-23 grid-rows-1 border-b border-zinc-200 shadow-md sticky top-0 z-10 bg-white">
-          <div className="col-span-1 border-r"></div>
-          <div className="col-span-2 lg:col-span-3 border-r flex justify-center items-center">
-            <div className="text-xs text-zinc-500">Mon</div>
-            <div className="text-xs text-zinc-900 font-bold ml-1">1</div>
-          </div>
-          <div className="col-span-2 lg:col-span-3 border-r flex justify-center items-center">
-            <div className="text-xs text-zinc-500">Tue</div>
-            <div className="text-xs text-zinc-900 font-bold ml-1">2</div>
-          </div>
-          <div className="col-span-2 lg:col-span-3 border-r flex justify-center items-center">
-            <div className="text-xs text-zinc-500">Wed</div>
-            <div className="text-xs text-zinc-900 font-bold ml-1">3</div>
-          </div>
-          <div className="col-span-2 lg:col-span-3 border-r flex justify-center items-center">
-            <div className="text-xs text-zinc-500">Thu</div>
-            <div className="text-xs text-zinc-900 font-bold ml-1">4</div>
-          </div>
-          <div className="hidden lg:flex lg:col-span-3 border-r justify-center items-center">
-            <div className="text-xs text-zinc-500">Fri</div>
-            <div className="text-xs text-zinc-900 font-bold ml-1">5</div>
-          </div>
-          <div className="hidden lg:flex lg:col-span-3 border-r justify-center items-center">
-            <div className="text-xs text-zinc-500">Sat</div>
-            <div className="text-xs text-zinc-900 font-bold ml-1">6</div>
-          </div>
-          <div className="hidden lg:flex lg:col-span-3 border-r justify-center items-center">
-            <div className="text-xs text-zinc-500">Sun</div>
-            <div className="text-xs text-zinc-900 font-bold ml-1">7</div>
-          </div>
-          <div className="col-span-1"></div>
-        </div>
-
-        <div className="h-auto">
-          <div className="min-w-full">
-            {hoursOfDay.map((hour, index) => (
-              <div key={index}>
-                <div className="w-full h-[35px] grid grid-cols-10 lg:grid-cols-23 grid-rows-1 border-zinc-200">
-                  <div className="col-span-1 border-r text-xs text-zinc-500"></div>
-                  <div className="col-span-2 lg:col-span-3 border-r flex justify-center items-center border-b"></div>
-                  <div className="col-span-2 lg:col-span-3 border-r flex justify-center items-center border-b"></div>
-                  <div className="col-span-2 lg:col-span-3 border-r flex justify-center items-center border-b"></div>
-                  <div className="col-span-2 lg:col-span-3 border-r flex justify-center items-center border-b"></div>
-                  <div className="hidden lg:flex lg:col-span-3 border-r justify-center items-center border-b"></div>
-                  <div className="hidden lg:flex lg:col-span-3 border-r justify-center items-center border-b"></div>
-                  <div className="hidden lg:flex lg:col-span-3 border-r justify-center items-center border-b"></div>
-
-                  <div className="col-span-1 border-b"></div>
-                </div>
-                <div className="w-full h-[35px] grid grid-cols-10 lg:grid-cols-23 grid-rows-1 border-zinc-200">
-                  <div className="col-span-1 border-r text-xs text-zinc-500 flex justify-center">
-                    {hour}
-                  </div>
-                  <div className="col-span-2 lg:col-span-3 border-r flex justify-center items-center border-b"></div>
-                  <div className="col-span-2 lg:col-span-3 border-r flex justify-center items-center border-b"></div>
-                  <div className="col-span-2 lg:col-span-3 border-r flex justify-center items-center border-b"></div>
-                  <div className="col-span-2 lg:col-span-3 border-r flex justify-center items-center border-b"></div>
-                  <div className="hidden lg:flex lg:col-span-3 border-r justify-center items-center border-b"></div>
-                  <div className="hidden lg:flex lg:col-span-3 border-r justify-center items-center border-b"></div>
-                  <div className="hidden lg:flex lg:col-span-3 border-r justify-center items-center border-b"></div>
-
-                  <div className="col-span-1 border-b"></div>
-                </div>
+      <div className="h-[calc(100%-50px)] overflow-y-auto">
+        <DnDCalendar
+          localizer={localizer}
+          events={events}
+          view={view as View}
+          onView={handleViewChange}
+          date={date}
+          onNavigate={handleNavigate}
+          style={{ height: "100%" }}
+          toolbar={false}
+          popup
+          draggableAccessor={(event: any) => true}
+          onEventDrop={handleEventDrop}
+          onEventResize={handleEventResize}
+          resizable
+          components={{
+            timeSlotWrapper: ({ children }: any) => (
+              <div className="text-xs font-medium text-gray-600">
+                {children}
               </div>
-            ))}
-          </div>
-        </div>
+            ),
+            eventWrapper: ({ event, children }: any) => (
+              <div className="text-xs">{children}</div>
+            ),
+            header: CustomHeader,
+          }}
+          dayPropGetter={(date: Date) => ({
+            className:
+              date.getDay() === 0 || date.getDay() === 6
+                ? "bg-gray-100"
+                : "bg-white",
+          })}
+          eventPropGetter={(event: any) => ({
+            style: {
+              backgroundColor: "#171717",
+              color: "white",
+              borderRadius: "4px",
+              border: "none",
+              fontSize: "0.65rem",
+            },
+          })}
+        />
       </div>
     </div>
   );

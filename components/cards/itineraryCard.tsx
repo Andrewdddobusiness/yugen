@@ -1,32 +1,25 @@
 "use client";
 import { useState } from "react";
+import Image from "next/image";
+import Link from "next/link";
+
 import {
   Card,
   CardHeader,
   CardTitle,
   CardDescription,
 } from "@/components/ui/card";
+
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import Image from "next/image";
-import Link from "next/link";
+
 import { MoreHorizontal } from "lucide-react";
 
-import { capitalizeFirstLetter } from "@/utils/formatting/capitaliseFirstLetter";
-
-// interface ItineraryCardProps {
-//   link?: string;
-//   imageUrl?: string;
-//   destination?: string;
-//   startDate?: string;
-//   endDate?: string;
-// }
+import { capitalizeFirstLetter } from "@/utils/formatting/capitalise";
 
 export default function ItineraryCard({
   link,
@@ -50,7 +43,8 @@ export default function ItineraryCard({
           width={1920}
           height={1080}
           objectFit="cover"
-          className="h-40 w-full rounded-t-lg"
+          priority={true}
+          className="h-40 w-60 rounded-t-lg"
         />
         <CardHeader>
           <CardTitle>{capitalizeFirstLetter(destination)}</CardTitle>

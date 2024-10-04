@@ -2,7 +2,7 @@
 import { useState } from "react";
 import Image from "next/image";
 
-import NavLayout from "@/components/layouts/navLayout";
+import HomeLayout from "@/components/layouts/homeLayout";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 
@@ -63,7 +63,7 @@ export default function ResetPage() {
   };
 
   return (
-    <NavLayout>
+    <HomeLayout>
       <div className="flex flex-col w-full h-screen justify-center items-center relative">
         <div className="absolute inset-0 -z-50 blur-sm">
           <Image
@@ -126,6 +126,6 @@ export default function ResetPage() {
           )}
         </div>
       </div>
-    </NavLayout>
+    </HomeLayout>
   );
 }

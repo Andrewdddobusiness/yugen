@@ -1,11 +1,12 @@
-import React, { ReactNode } from "react";
+"use client";
+import React, { ReactNode, useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 
+import { createClient } from "@/utils/supabase/client";
+
 import {
   Settings,
-  Plus,
-  CircleUserRound,
   CircleChevronLeft,
   TextSearch,
   Hammer,
@@ -30,6 +31,9 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 import ItineraryChoiceDialog from "../dialog/itineraryChoiceDialog";
+import { Skeleton } from "../ui/skeleton";
+import LogoutButton from "../buttons/logoutButton";
+import { useSearchParams } from "next/navigation";
 
 interface PageLayoutProps {
   title: string;
@@ -44,10 +48,42 @@ export default function BuilderLayout({
   activePage,
   itineraryNumber,
 }: PageLayoutProps): React.ReactElement {
+  const supabase = createClient();
+  const searchParams = useSearchParams();
+
+  const id = searchParams.get("i");
+
+  const [profileUrl, setProfileUrl] = useState("");
+
+  useEffect(() => {
+    const fetchPublicUrl = async () => {
+      try {
+        const { auth } = supabase;
+        const { data: user, error } = await auth.getUser();
+        if (error || !user) {
+          throw new Error("User not authenticated");
+        }
+        const { data } = await supabase.storage
+          .from("avatars")
+          .getPublicUrl(user.user.id + "/profile");
+        if (error || !data) {
+          throw new Error("Error fetching public URL");
+        }
+        setProfileUrl(data.publicUrl);
+      } catch (error: any) {
+        console.error("Error fetching public URL:", error.message);
+      }
+    };
+
+    fetchPublicUrl();
+
+    return () => {};
+  }, [supabase]);
+
   return (
     <div className="h-screen w-full pl-14">
       {/* Sidebar */}
-      <aside className="inset-y fixed left-0 z-20 flex h-full flex-col border-r">
+      <aside className="inset-y fixed left-0 z-50 flex h-full flex-col border-r">
         {/* Logo/Home Button */}
         <div className="border-b p-2">
           <Link href="/dashboard" legacyBehavior>
@@ -82,7 +118,7 @@ export default function BuilderLayout({
 
             <Tooltip>
               <TooltipTrigger asChild>
-                <Link href={`/itinerary/${itineraryNumber}/overview`}>
+                <Link href={`/itinerary/overview?i=${id}`}>
                   <Button
                     variant="ghost"
                     size="icon"
@@ -102,7 +138,7 @@ export default function BuilderLayout({
 
             <Tooltip>
               <TooltipTrigger asChild>
-                <Link href={`/itinerary/${itineraryNumber}/builder`}>
+                <Link href={`/itinerary/builder?i=${id}`}>
                   <Button
                     variant="ghost"
                     size="icon"
@@ -122,7 +158,7 @@ export default function BuilderLayout({
 
             <Tooltip>
               <TooltipTrigger asChild>
-                <Link href={`/itinerary/${itineraryNumber}/activities`}>
+                <Link href={`/itinerary/activities?i=${id}`}>
                   <Button
                     variant="ghost"
                     size="icon"
@@ -170,9 +206,9 @@ export default function BuilderLayout({
       </aside>
 
       <div className="flex flex-col flex-1">
-        <header className="sticky top-0 z-10 flex h-14 items-center gap-1 border-b bg-background">
-          <h1 className="text-xl font-semibold pl-4">{title}</h1>
-          <div className="ml-auto  pr-4">
+        <nav className="flex items-center justify-between w-full h-[65px] px-4 bg-white border-b fixed top-0 left-0 z-20">
+          <h1 className="text-xl font-semibold ml-16">{title}</h1>
+          <div className="ml-auto pr-4">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button
@@ -180,13 +216,18 @@ export default function BuilderLayout({
                   size="icon"
                   className="overflow-hidden rounded-full"
                 >
-                  <Image
-                    src="/placeholder-user.jpg"
-                    width={36}
-                    height={36}
-                    alt="Avatar"
-                    className="overflow-hidden rounded-full"
-                  />
+                  {profileUrl ? (
+                    <Image
+                      alt="Profile"
+                      src={profileUrl ? profileUrl : ""}
+                      width={100}
+                      height={100}
+                      className="w-10 h-10 rounded-full"
+                      priority
+                    />
+                  ) : (
+                    <Skeleton className="h-[32px] w-[32px] rounded-full" />
+                  )}
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
@@ -195,14 +236,15 @@ export default function BuilderLayout({
                 <DropdownMenuItem>Settings</DropdownMenuItem>
                 <DropdownMenuItem>Support</DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem>Logout</DropdownMenuItem>
+                <DropdownMenuItem>
+                  <LogoutButton />
+                </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
-        </header>
+        </nav>
       </div>
-
-      {children}
+      <div className="ml-2 mt-16">{children}</div>
     </div>
   );
 }
