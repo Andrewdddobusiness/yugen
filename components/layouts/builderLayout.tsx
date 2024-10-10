@@ -81,7 +81,7 @@ export default function BuilderLayout({
   }, [supabase]);
 
   return (
-    <div className="h-screen w-full pl-14">
+    <div className="h-screen w-full pl-14 z-50">
       {/* Sidebar */}
       <aside className="inset-y fixed left-0 z-50 flex h-full flex-col border-r">
         {/* Logo/Home Button */}
@@ -244,7 +244,7 @@ export default function BuilderLayout({
           </div>
         </nav>
       </div>
-      <div className="ml-2 mt-16">{children}</div>
+      <div className="pl-2 pt-16 h-screen">{children}</div>
     </div>
   );
 }
