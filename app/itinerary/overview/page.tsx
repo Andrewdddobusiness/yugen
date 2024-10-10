@@ -78,7 +78,7 @@ export default function Overview() {
               alt="Image"
               width="1920"
               height="1080"
-              className="h-[250px] w-full object-cover dark:brightness-[0.2] dark:grayscale rounded-lg"
+              className="h-[200px] w-full object-cover dark:brightness-[0.2] dark:grayscale rounded-lg"
             />
           ) : (
             <Skeleton className="w-full h-[250px] rounded-lg" />
