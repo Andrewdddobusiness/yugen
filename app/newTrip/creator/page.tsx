@@ -7,7 +7,7 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 
 import DashboardLayout from "@/components/layouts/dashboardLayout";
-import { DatePickerWithRange } from "@/components/date/dateRangePicker";
+import { DatePickerWithRangePopover } from "@/components/date/dateRangePickerPopover";
 import { ComboBox } from "@/components/comboBox/comboBox";
 
 import { Button } from "@/components/ui/button";
@@ -189,10 +189,7 @@ export default function NewTripCreator() {
                 )}
               </div>
               <div className="flex flex-row text-5xl mt-2">
-                <DatePickerWithRange
-                  onDateChange={handleDateChange}
-                  disablePastDates={true}
-                />
+                <DatePickerWithRangePopover onRateChange={handleDateChange} />
               </div>
               {/* <div className="flex flex-row text-5xl mt-2">
                 <Button

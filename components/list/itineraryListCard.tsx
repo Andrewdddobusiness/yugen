@@ -70,7 +70,7 @@ export const ItineraryListCard: React.FC<ItineraryListCardProps> = ({
                         width={200}
                         height={200}
                         priority={true}
-                        className="xs:min-w-60 md:min-w-48 object-cover rounded-md"
+                        className="xs:min-w-60 md:min-w-48 max-h-32 object-cover rounded-md"
                       />
                     </CarouselItem>
                   )
