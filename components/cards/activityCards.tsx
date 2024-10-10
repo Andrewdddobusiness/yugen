@@ -11,18 +11,17 @@ const ActivityCards: React.FC<ActivityCardsProps> = ({
   onSelectActivity,
 }) => {
   return (
-    <div className="h-60 flex flex-wrap gap-4">
+    <div className="h-60 flex flex-wrap gap-4 p-4">
       {activities.map((activity: any, index: number) => (
         <ActivityCard
           key={index}
-          imageUrls={activity.image_url}
-          title={activity.activity_name}
-          address={activity.address}
-          description={activity.description}
-          duration={activity.duration}
-          cost={activity.activity_price}
+          imageUrl={`https://places.googleapis.com/v1/${activity.photos[0].name}/media?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}&maxHeightPx=1000&maxWidthPx=1000`}
+          title={activity.displayName.text}
+          address={activity.formattedAddress}
+          description={activity.editorialSummary?.text || ""}
+          priceLevel={activity.priceLevel}
           rating={activity.rating}
-          reviews={activity.reviews}
+          types={activity.types}
           onClick={() => onSelectActivity(activity)}
         />
       ))}

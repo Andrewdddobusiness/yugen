@@ -169,6 +169,33 @@ export const fetchActivityDetails = async (itineraryId: any) => {
   return { data };
 };
 
+export const fetchItineraryDestination = async (itineraryId: string) => {
+  const supabase = createClient();
+
+  const { data, error } = await supabase
+    .from("itinerary_destinations")
+    .select(
+      `
+      destination_city_id,
+      cities:destination_city_id (
+        city_name,
+        countries:country_id (
+          country_name
+        )
+      )
+    `
+    )
+    .eq("itinerary_id", itineraryId)
+    .single();
+
+  if (error) {
+    console.error("Error fetching itinerary destination:", error);
+    return { error };
+  }
+
+  return { data };
+};
+
 export const fetchItineraryActivityDetails = async (itineraryId: any) => {
   const supabase = createClient();
 

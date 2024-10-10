@@ -1,0 +1,22 @@
+export const includedTypes = [
+  // Food and Drink
+  "restaurant",
+  "bakery",
+  "bar",
+  "cafe",
+  "coffee_shop",
+  "fast_food_restaurant",
+  "ice_cream_shop",
+  "meal_takeaway",
+  "american_restaurant",
+  "chinese_restaurant",
+  "french_restaurant",
+  "italian_restaurant",
+  "japanese_restaurant",
+  "mexican_restaurant",
+  "seafood_restaurant",
+  "steak_house",
+  "sushi_restaurant",
+  "thai_restaurant",
+  "vegetarian_restaurant",
+];
