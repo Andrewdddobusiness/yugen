@@ -13,7 +13,10 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 import { DatePickerPopover } from "../date/datePickerPopover";
-import { useItineraryStore, IActivity } from "@/store/itineraryStore";
+import {
+  useitineraryActivityStore,
+  IActivity,
+} from "@/store/itineraryActivityStore";
 
 interface ItineraryListCardProps {
   activity: IActivity;
@@ -26,7 +29,7 @@ export const ItineraryListCard: React.FC<ItineraryListCardProps> = ({
   dragHandleProps,
   isDragging,
 }) => {
-  const { activities } = useItineraryStore();
+  const { activities } = useitineraryActivityStore();
 
   // Find the latest activity data from the store
   const latestActivity =
@@ -96,8 +99,8 @@ export const ItineraryListCard: React.FC<ItineraryListCardProps> = ({
             <div className="flex flex-row gap-4">
               <TimePopover
                 itineraryActivityId={latestActivity.itinerary_activity_id}
-                storeStartTime={latestActivity.activity_start_time}
-                storeEndTime={latestActivity.activity_end_time}
+                storeStartTime={latestActivity.start_time}
+                storeEndTime={latestActivity.end_time}
               />
 
               <DatePickerPopover

@@ -1,5 +1,5 @@
 "use client";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 
@@ -15,25 +15,35 @@ import ActivitySidebar from "@/components/sidebar/activitySideBar";
 import { MdMoneyOff, MdAttachMoney } from "react-icons/md";
 import { Drama, Landmark, MountainSnow, Palette } from "lucide-react";
 
-import { fetchItineraryDestination } from "@/actions/supabase/actions";
+import {
+  fetchTableData,
+  fetchItineraryDestination,
+} from "@/actions/supabase/actions";
 import { fetchCityCoordinates } from "@/actions/google/actions";
 import { fetchNearbyActivities } from "@/actions/google/actions";
 import Loading from "@/components/loading/loading";
 import ActivityFilters from "@/components/filters/activityFilters";
 
+import { IActivity, IActivityWithLocation } from "@/store/activityStore";
+import {
+  IItineraryActivity,
+  useitineraryActivityStore,
+} from "@/store/itineraryActivityStore";
+
 export default function Activities() {
   const searchParams = useSearchParams();
-  const id = searchParams.get("i");
+  const itineraryId = searchParams.get("i");
+  const destinationId = searchParams.get("d");
+
+  const { fetchItineraryActivities, setItineraryActivities } =
+    useitineraryActivityStore();
 
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [freeFilter, setFreeFilter] = useState<boolean>(false);
   const [paidFilter, setPaidFilter] = useState<boolean>(false);
-  const [outdoorFilter, setOutdoorFilter] = useState<boolean>(false);
-  const [historicalFilter, setHistoricalFilter] = useState<boolean>(false);
-  const [artFilter, setArtFilter] = useState<boolean>(false);
-  const [entertainmentFilter, setEntertainmentFilter] =
-    useState<boolean>(false);
-  const [selectedActivity, setSelectedActivity] = useState<any>(null);
+  const [selectedActivity, setSelectedActivity] = useState<IActivity | null>(
+    null
+  );
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [sidebarKey, setSidebarKey] = useState(0);
   const [mapCenterFunction, setMapCenterFunction] = useState<
@@ -41,11 +51,29 @@ export default function Activities() {
   >(null);
   const [selectedFilter, setSelectedFilter] = useState("");
 
+  const { data: itineraryActivities, isLoading: isItineraryActivitiesLoading } =
+    useQuery({
+      queryKey: ["itineraryActivities", itineraryId, destinationId],
+      queryFn: () =>
+        fetchItineraryActivities(
+          itineraryId as string,
+          destinationId as string
+        ),
+      enabled: !!itineraryId && !!destinationId,
+    });
+
+  useEffect(() => {
+    if (itineraryActivities) {
+      setItineraryActivities(itineraryActivities as IItineraryActivity[]);
+      console.log(itineraryActivities);
+    }
+  }, [itineraryActivities, setItineraryActivities]);
+
   const { data: destinationData, isLoading: isDestinationLoading } = useQuery({
-    queryKey: ["itineraryDestination", id],
-    queryFn: () => fetchItineraryDestination(id as string),
-    enabled: !!id,
-    staleTime: Infinity, // Data won't become stale
+    queryKey: ["itineraryDestination", itineraryId],
+    queryFn: () => fetchItineraryDestination(itineraryId as string),
+    enabled: !!itineraryId,
+    staleTime: Infinity,
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
   });
@@ -53,17 +81,15 @@ export default function Activities() {
   const { data: cityCoordinates, isLoading: isCoordinatesLoading } = useQuery({
     queryKey: [
       "cityCoordinates",
-      destinationData?.data?.cities?.city_name,
-      destinationData?.data?.cities?.countries?.country_name,
+      destinationData?.data?.city,
+      destinationData?.data?.country,
     ],
     queryFn: () =>
       fetchCityCoordinates(
-        destinationData?.data?.cities?.city_name,
-        destinationData?.data?.cities?.countries?.country_name
+        destinationData?.data?.city,
+        destinationData?.data?.country
       ),
-    enabled:
-      !!destinationData?.data?.cities?.city_name &&
-      !!destinationData?.data?.cities?.countries?.country_name,
+    enabled: !!destinationData?.data?.city && !!destinationData?.data?.country,
     staleTime: Infinity,
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
@@ -112,7 +138,7 @@ export default function Activities() {
   const filteredActivities =
     selectedFilter === ""
       ? activitiesData
-      : activitiesData.filter((activity: any) => {
+      : activitiesData?.filter((activity: any) => {
           const types = activity.types || [];
           switch (selectedFilter) {
             case "Food & Drink":
@@ -136,7 +162,10 @@ export default function Activities() {
       activePage="activities"
       itineraryNumber={1}
     >
-      {isCoordinatesLoading || isDestinationLoading || isActivitiesLoading ? (
+      {isCoordinatesLoading ||
+      isDestinationLoading ||
+      isActivitiesLoading ||
+      isItineraryActivitiesLoading ? (
         <Loading />
       ) : (
         <div className="flex flex-row flex-grow overflow-y-auto h-full relative">
@@ -229,9 +258,13 @@ export default function Activities() {
             {isSidebarOpen && (
               <ActivitySidebar
                 key={sidebarKey}
-                å
+                activity={{
+                  ...(selectedActivity as IActivityWithLocation),
+                  country_name: destinationData?.data?.country,
+                  city_name: destinationData?.data?.city,
+                  destination_id: destinationData?.data?.destination_id,
+                }}
                 onClose={handleCloseSidebar}
-                activity={selectedActivity}
               />
             )}
           </div>

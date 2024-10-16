@@ -32,15 +32,15 @@ export function DatePickerPopover({
     const fetchExistingDate = async () => {
       try {
         const result = await fetchFilteredTableData(
-          "itinerary_activities",
-          "activity_date",
+          "itinerary_activity",
+          "date",
           "itinerary_activity_id",
           [itineraryActivityId.toString()]
         );
         if (result.success && result.data && result.data.length > 0) {
-          const { activity_date } = result.data[0];
-          if (activity_date) {
-            setDate(new Date(activity_date));
+          const { date } = result.data[0];
+          if (date) {
+            setDate(new Date(date));
           }
         }
       } catch (error) {
@@ -57,10 +57,10 @@ export function DatePickerPopover({
     setDate(newDate);
     try {
       await setTableData(
-        "itinerary_activities",
+        "itinerary_activity",
         {
           itinerary_activity_id: itineraryActivityId,
-          activity_date: newDate ? format(newDate, "yyyy-MM-dd") : null,
+          date: newDate ? format(newDate, "yyyy-MM-dd") : null,
         },
         ["itinerary_activity_id"]
       );

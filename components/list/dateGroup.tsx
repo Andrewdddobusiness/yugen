@@ -33,8 +33,8 @@ export function DateGroup({
 
   const sortedActivities = useMemo(() => {
     return [...activities].sort((a, b) => {
-      if (a.activity_time && b.activity_time) {
-        return a.activity_time.localeCompare(b.activity_time);
+      if (a.time && b.time) {
+        return a.time.localeCompare(b.time);
       }
       return 0;
     });

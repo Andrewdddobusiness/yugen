@@ -1,27 +1,24 @@
 import React from "react";
 import ActivityCard from "./activityCard";
+import { IActivity } from "@/store/activityStore";
 
-type ActivityCardsProps = {
-  activities: any[];
+interface IActivityCardsProps {
+  activities: IActivity[];
   onSelectActivity: (activity: any) => void;
-};
+  onHover: (activity: any) => void;
+}
 
-const ActivityCards: React.FC<ActivityCardsProps> = ({
+const ActivityCards: React.FC<IActivityCardsProps> = ({
   activities,
   onSelectActivity,
+  onHover,
 }) => {
   return (
     <div className="h-60 flex flex-wrap gap-4 p-4">
-      {activities.map((activity: any, index: number) => (
+      {activities.map((activity: IActivity, index: number) => (
         <ActivityCard
           key={index}
-          imageUrl={`https://places.googleapis.com/v1/${activity.photos[0].name}/media?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}&maxHeightPx=1000&maxWidthPx=1000`}
-          title={activity.displayName.text}
-          address={activity.formattedAddress}
-          description={activity.editorialSummary?.text || ""}
-          priceLevel={activity.priceLevel}
-          rating={activity.rating}
-          types={activity.types}
+          activity={activity}
           onClick={() => onSelectActivity(activity)}
         />
       ))}

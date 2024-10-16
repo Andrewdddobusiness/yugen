@@ -12,25 +12,26 @@ import {
 import ItineraryList from "@/components/list/itineraryList";
 import { useSearchParams } from "next/navigation";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { useItineraryStore } from "@/store/itineraryStore";
+import { useitineraryActivityStore } from "@/store/itineraryActivityStore";
 
 export default function Builder() {
   const searchParams = useSearchParams();
   const id = searchParams.get("i");
 
-  const { fetchActivities, setActivities } = useItineraryStore();
+  const { fetchItineraryActivities, setItineraryActivities } =
+    useitineraryActivityStore();
 
   const { isLoading, error, data } = useQuery({
     queryKey: ["itineraryActivities", id],
-    queryFn: () => fetchActivities(id || ""),
+    queryFn: () => fetchItineraryActivities(id || ""),
     enabled: !!id,
   });
 
   useEffect(() => {
     if (data) {
-      setActivities(data);
+      setItineraryActivities(data);
     }
-  }, [data, setActivities]);
+  }, [data, setItineraryActivities]);
 
   if (isLoading) return <div>Loading...</div>;
   if (error) return <div>An error occurred: {error.message}</div>;

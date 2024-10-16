@@ -3,24 +3,14 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "../ui/button";
 import Rating from "../rating/rating";
 import Link from "next/link";
-import { formatDateTime } from "@/utils/formatting/time";
+import { formatDateTime } from "@/utils/formatting/datetime";
+import { IReview } from "@/store/activityStore";
 
-interface Review {
-  author_name: string;
-  text: { text: string };
-  rating: number;
-  authorAttribution: {
-    uri: string;
-    displayName: string;
-  };
-  publishTime: string;
+interface IReviewsCarouselProps {
+  reviews: IReview[];
 }
 
-interface CommentsCarouselProps {
-  reviews: Review[];
-}
-
-const CommentsCarousel: React.FC<CommentsCarouselProps> = ({ reviews }) => {
+export default function ReviewsCarousel({ reviews }: IReviewsCarouselProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [expandedReviews, setExpandedReviews] = useState<Set<number>>(
     new Set()
@@ -52,7 +42,7 @@ const CommentsCarousel: React.FC<CommentsCarouselProps> = ({ reviews }) => {
 
   const review = reviews[currentIndex];
   const isExpanded = expandedReviews.has(currentIndex);
-  const reviewText = review.text.text;
+  const reviewText = review.description;
   const shouldTruncate = reviewText.length > 200;
 
   return (
@@ -70,7 +60,6 @@ const CommentsCarousel: React.FC<CommentsCarouselProps> = ({ reviews }) => {
           <ChevronLeft className="h-4 w-4" />
         </Button>
         <div>
-          <p className="font-medium">{review.author_name}</p>
           <div
             className={`text-sm text-zinc-500 italic ${
               isExpanded ? "" : "line-clamp-4"
@@ -92,12 +81,12 @@ const CommentsCarousel: React.FC<CommentsCarouselProps> = ({ reviews }) => {
           </div>
           <Link
             className="text-sm hover:underline text-blue-500 hover:text-blue-700"
-            href={review.authorAttribution.uri}
+            href={review.uri}
           >
-            {review.authorAttribution.displayName} - Google Review
+            {review.author} - Google Review
           </Link>
           <p className="text-xs text-gray-500">
-            {formatDateTime(review.publishTime)}
+            {formatDateTime(review.publish_date_time)}
           </p>
         </div>
         <Button
@@ -111,6 +100,4 @@ const CommentsCarousel: React.FC<CommentsCarouselProps> = ({ reviews }) => {
       </div>
     </div>
   );
-};
-
-export default CommentsCarousel;
+}

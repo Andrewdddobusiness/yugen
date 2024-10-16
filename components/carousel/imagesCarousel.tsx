@@ -9,16 +9,14 @@ import {
 import { Button } from "../ui/button";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
-interface ImageCarouselProps {
-  images: { name: string }[];
+interface IImageCarouselProps {
+  photoNames: string[];
   showButtons?: boolean;
-  apiKey: string;
 }
 
-const ImageCarousel: React.FC<ImageCarouselProps> = ({
-  images,
+const ImageCarousel: React.FC<IImageCarouselProps> = ({
+  photoNames,
   showButtons = false,
-  apiKey,
 }) => {
   const [api, setApi] = useState<CarouselApi>();
 
@@ -39,10 +37,10 @@ const ImageCarousel: React.FC<ImageCarouselProps> = ({
           </Button>
         )}
         <CarouselContent>
-          {images.map((photo, index) => (
+          {photoNames.map((photoName: string, index: number) => (
             <CarouselItem key={index}>
               <Image
-                src={`https://places.googleapis.com/v1/${photo.name}/media?key=${apiKey}&maxHeightPx=1000&maxWidthPx=1000`}
+                src={`https://places.googleapis.com/v1/${photoName}/media?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}&maxHeightPx=1000&maxWidthPx=1000`}
                 alt={`Image ${index}`}
                 width={1000}
                 height={1000}

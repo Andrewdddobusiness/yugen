@@ -19,14 +19,19 @@ import {
   fetchFilteredTableData,
 } from "@/actions/supabase/actions";
 import { useDateRangeStore } from "@/store/dateRangeStore";
+import { useEffect } from "react";
 
 type DatePickerWithRangeProps = React.HTMLAttributes<HTMLDivElement> & {
   itineraryId?: string | null;
+  fetchDateRangeProp?: boolean;
+  onDateChange?: (dateRange: DateRange | undefined) => void;
 };
 
 export function DatePickerWithRangePopover({
   className,
   itineraryId,
+  fetchDateRangeProp = true,
+  onDateChange,
 }: DatePickerWithRangeProps) {
   const [date, setDate] = React.useState<DateRange | undefined>(undefined);
   const [isOpen, setIsOpen] = React.useState(false);
@@ -34,9 +39,9 @@ export function DatePickerWithRangePopover({
   const [error, setError] = React.useState<string | null>(null);
   const { setDateRange } = useDateRangeStore();
 
-  React.useEffect(() => {
+  useEffect(() => {
     const fetchDateRange = async () => {
-      if (itineraryId) {
+      if (itineraryId && fetchDateRangeProp) {
         try {
           const result = await fetchFilteredTableData(
             "itinerary_destinations",
@@ -53,6 +58,9 @@ export function DatePickerWithRangePopover({
               to: endDate,
             });
             setDateRange(startDate, endDate);
+            if (onDateChange) {
+              onDateChange({ from: startDate, to: endDate }); // Call onRateChange with the fetched date range
+            }
           }
         } catch (error) {
           console.error("Error fetching date range:", error);
@@ -62,36 +70,45 @@ export function DatePickerWithRangePopover({
     };
 
     fetchDateRange();
-  }, [itineraryId, setDateRange]);
+  }, [itineraryId, setDateRange, fetchDateRangeProp, onDateChange]);
 
   const handleDateChange = (newDate: DateRange | undefined) => {
     setDate(newDate);
     if (newDate?.from && newDate?.to) {
       setDateRange(newDate.from, newDate.to);
+      if (onDateChange) {
+        onDateChange(newDate);
+      }
     }
   };
 
   const handleSave = async () => {
-    if (!date?.from || !date?.to || !itineraryId) return;
+    if (!date?.from || !date?.to) return;
 
     setIsLoading(true);
     setError(null);
 
     try {
-      const result = await setTableData(
-        "itinerary_destinations",
-        {
-          itinerary_id: itineraryId,
-          from_date: format(date.from, "yyyy-MM-dd"),
-          to_date: format(date.to, "yyyy-MM-dd"),
-        },
-        ["itinerary_id"]
-      );
+      if (fetchDateRangeProp) {
+        if (!itineraryId) return;
+        const result = await setTableData(
+          "itinerary_destinations",
+          {
+            itinerary_id: itineraryId,
+            from_date: format(date.from, "yyyy-MM-dd"),
+            to_date: format(date.to, "yyyy-MM-dd"),
+          },
+          ["itinerary_id"]
+        );
 
-      if (result.success) {
-        setIsOpen(false);
+        if (result.success) {
+          setIsOpen(false);
+        } else {
+          setError("Failed to update date range. Please try again.");
+        }
       } else {
-        setError("Failed to update date range. Please try again.");
+        setDateRange(date.from, date.to);
+        setIsOpen(false);
       }
     } catch (err) {
       console.error("Error updating date range:", err);

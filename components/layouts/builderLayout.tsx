@@ -51,7 +51,8 @@ export default function BuilderLayout({
   const supabase = createClient();
   const searchParams = useSearchParams();
 
-  const id = searchParams.get("i");
+  const itineraryId = searchParams.get("i");
+  const destinationId = searchParams.get("d");
 
   const [profileUrl, setProfileUrl] = useState("");
 
@@ -118,7 +119,9 @@ export default function BuilderLayout({
 
             <Tooltip>
               <TooltipTrigger asChild>
-                <Link href={`/itinerary/overview?i=${id}`}>
+                <Link
+                  href={`/itinerary/overview?i=${itineraryId}&d=${destinationId}`}
+                >
                   <Button
                     variant="ghost"
                     size="icon"
@@ -138,7 +141,9 @@ export default function BuilderLayout({
 
             <Tooltip>
               <TooltipTrigger asChild>
-                <Link href={`/itinerary/builder?i=${id}`}>
+                <Link
+                  href={`/itinerary/builder?i=${itineraryId}&d=${destinationId}`}
+                >
                   <Button
                     variant="ghost"
                     size="icon"
@@ -158,7 +163,9 @@ export default function BuilderLayout({
 
             <Tooltip>
               <TooltipTrigger asChild>
-                <Link href={`/itinerary/activities?i=${id}`}>
+                <Link
+                  href={`/itinerary/activities?i=${itineraryId}&d=${destinationId}`}
+                >
                   <Button
                     variant="ghost"
                     size="icon"

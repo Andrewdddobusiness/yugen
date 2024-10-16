@@ -4,40 +4,18 @@ import Image from "next/image";
 import ItineraryCards from "@/components/cards/itineraryCards";
 import DashboardLayout from "@/components/layouts/dashboardLayout";
 
-import { fetchItineraryWithCities } from "@/actions/supabase/actions";
+import { fetchTableData } from "@/actions/supabase/actions";
 
 import { createClient } from "@/utils/supabase/client";
+
+import { IItineraryCard } from "@/components/cards/itineraryCard";
 
 export default function Dashboard() {
   const supabase = createClient();
 
   const [user, setUser] = useState<any>();
-  const [loadingItinerary, setLoadingItinerary] = useState<any>(false);
-  const [itineraryData, setItineraryData] = useState<any[]>([]);
-
-  // const handleCreateItinerary = async () => {
-  //   setLoading(true);
-  //   const itineraryData = {
-  //     user_id: user.id,
-  //     adults: adultsCount,
-  //     kids: kidsCount,
-  //   };
-
-  //   let itineraryId;
-  //   let destinationCityId;
-
-  //   try {
-  //     const response = await fetchTableData("itineraries", itineraryData);
-  //     console.log(response);
-  //     if (response.data) {
-  //       itineraryId = response.data[0].itinerary_id;
-  //     }
-
-  //     console.log(response);
-  //   } catch (error) {
-  //     console.error(error);
-  //   }
-  // };
+  const [loadingItinerary, setLoadingItinerary] = useState<boolean>(false);
+  const [itineraryData, setItineraryData] = useState<IItineraryCard[]>([]);
 
   useEffect(() => {
     const fetchUserData = async () => {
@@ -63,13 +41,39 @@ export default function Dashboard() {
       if (user) {
         setLoadingItinerary(true);
         try {
-          const { data, error } = await fetchItineraryWithCities();
-          console.log("refined data: ", data);
+          const response = (await fetchTableData(
+            "itinerary_destination",
+            "itinerary_id, destination_id, city, country, from_date, to_date"
+          )) as { data: any[]; error: any }; // Type assertion with correct structure
+
+          // Log the entire response to inspect it
+          console.log("Response from fetchTableData:", response);
+
+          const { data, error } = response;
+
           if (error) {
             console.error("Error fetching itinerary data:", error);
             setItineraryData([]);
           } else {
-            setItineraryData(data);
+            // Check if data is an array and has the expected structure
+            if (Array.isArray(data)) {
+              // Map the data to match the IItineraryCard interface
+              const mappedData: IItineraryCard[] = data.map((item) => ({
+                destination_id: item.destination_id,
+                itinerary_id: item.itinerary_id,
+                city: item.city,
+                country: item.country,
+                from_date: new Date(item.from_date), // Convert to Date object
+                to_date: new Date(item.to_date), // Convert to Date object
+              }));
+
+              // Set the mapped itinerary data
+              setItineraryData(mappedData);
+              console.log("mappedData: ", mappedData);
+            } else {
+              console.error("Unexpected data structure:", data);
+              setItineraryData([]);
+            }
           }
         } catch (error) {
           console.error("Error fetching itinerary data:", error);

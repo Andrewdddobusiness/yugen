@@ -18,6 +18,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { capitalizeFirstLetterOfEachWord } from "@/utils/formatting/capitalise";
 
 export function ComboBox({ selection, onSelectionChange }: any) {
   const [open, setOpen] = React.useState(false);
@@ -26,7 +27,7 @@ export function ComboBox({ selection, onSelectionChange }: any) {
   const handleSelection = (currentValue: string) => {
     setValue(currentValue === value ? "" : currentValue);
     setOpen(false);
-    onSelectionChange(currentValue); // Invoke the onSelectionChange callback
+    onSelectionChange(currentValue);
   };
 
   return (
@@ -38,9 +39,11 @@ export function ComboBox({ selection, onSelectionChange }: any) {
           aria-expanded={open}
           className="w-[200px] justify-between"
         >
-          {value
-            ? value.charAt(0).toUpperCase() + value.slice(1).toLowerCase()
-            : "Select..."}
+          <div className="font-normal">
+            {value
+              ? capitalizeFirstLetterOfEachWord(value)
+              : "Select Destination"}
+          </div>
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
@@ -58,7 +61,7 @@ export function ComboBox({ selection, onSelectionChange }: any) {
                       value === item ? "opacity-100" : "opacity-0"
                     )}
                   />
-                  {item.charAt(0).toUpperCase() + item.slice(1).toLowerCase()}
+                  {capitalizeFirstLetterOfEachWord(item)}
                 </CommandItem>
               ))}
             </CommandList>

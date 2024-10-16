@@ -2,8 +2,14 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { GeistSans } from "geist/font/sans";
 import { Toaster } from "@/components/ui/toaster";
+import { Outfit } from "next/font/google";
 
 import Providers from "./providers";
+
+const outfit = Outfit({
+  subsets: ["latin"],
+  display: "swap",
+});
 
 export const metadata: Metadata = {
   title: "Planaway",
@@ -17,7 +23,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={`${GeistSans.className} `}>
+      <body className={outfit.className}>
         <Providers>
           {children} <Toaster />
         </Providers>

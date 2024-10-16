@@ -1,15 +1,9 @@
 "use client";
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
-import Image from "next/image";
 import { useSearchParams } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
-import {
-  Carousel,
-  CarouselContent,
-  CarouselItem,
-} from "@/components/ui/carousel";
 import {
   Accordion,
   AccordionContent,
@@ -18,18 +12,20 @@ import {
 } from "@/components/ui/accordion";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
-
-import { Star, Globe, Clock, Loader2, X, Phone } from "lucide-react";
-
-import { capitalizeFirstLetterOfEachWord } from "@/utils/formatting/capitalise";
-
-import { checkEntryExists, insertTableData } from "@/actions/supabase/actions";
-import Rating from "../rating/rating";
-
-import { formatDateTime } from "@/utils/formatting/time";
+import { toast } from "sonner";
 
 import CommentsCarousel from "../carousel/commentsCarousel";
 import ImagesCarousel from "../carousel/imagesCarousel";
+
+import { Globe, Clock, Loader2, X, Phone } from "lucide-react";
+
+import { capitalizeFirstLetterOfEachWord } from "@/utils/formatting/capitalise";
+
+import Rating from "../rating/rating";
+
+import { useitineraryActivityStore } from "@/store/itineraryActivityStore";
+import { IActivityWithLocation } from "@/store/activityStore";
+import { formatOpenHours } from "@/utils/formatting/datetime";
 
 const getDayName = (dayNumber: number) => {
   const days = [
@@ -44,47 +40,44 @@ const getDayName = (dayNumber: number) => {
   return days[dayNumber];
 };
 
-const formatMiltaryTime = (
-  openHour: number,
-  openMinute: number,
-  closeHour: number,
-  closeMinute: number
-) => {
-  const openAmpm = openHour >= 12 ? "PM" : "AM";
-  const closeAmpm = closeHour >= 12 ? "PM" : "AM";
+interface IActivitySidebarProps {
+  activity: IActivityWithLocation;
+  onClose: () => void;
+}
 
-  const formattedOpenHour = openHour % 12 || 12;
-  const formattedOpenMinute = openMinute.toString().padStart(2, "0");
-
-  const formattedCloseHour = closeHour % 12 || 12;
-  const formattedCloseMinute = closeMinute.toString().padStart(2, "0");
-
-  return `${formattedOpenHour}:${formattedOpenMinute} ${openAmpm} - ${formattedCloseHour}:${formattedCloseMinute} ${closeAmpm}`;
-};
-
-const ActivitySidebar = ({ onClose, activity }: any) => {
+export default function ActivitySidebar({
+  activity,
+  onClose,
+}: IActivitySidebarProps) {
   const searchParams = useSearchParams();
   const itineraryId = searchParams.get("i");
 
-  const [loading, setLoading] = useState<any>(false);
+  const {
+    insertItineraryActivity,
+    removeItineraryActivity,
+    itineraryActivities,
+  } = useitineraryActivityStore();
   const [isActivityAdded, setIsActivityAdded] = useState<boolean>(false);
-  const [expandedReviews, setExpandedReviews] = useState<Set<number>>(
-    new Set()
-  );
+  const [loading, setLoading] = useState<boolean>(false);
 
   useEffect(() => {
     const checkIfActivityAdded = async () => {
       if (!activity || !itineraryId) return;
       try {
         setLoading(true);
-        const { exists, error } = await checkEntryExists(
-          "itinerary_activities",
-          {
-            itineraryId,
-            activityId: activity.activity_id,
-          }
+        const activityExists = itineraryActivities.some((itineraryActivity) => {
+          const isMatch =
+            itineraryActivity.activity?.place_id === activity.place_id;
+          const isActive = itineraryActivity.is_active === true;
+          console.log(
+            `Activity ${activity.name}: Match: ${isMatch}, Active: ${isActive}`
+          );
+          return isMatch && isActive;
+        });
+        console.log(
+          `Activity ${activity.name} exists in itinerary: ${activityExists}`
         );
-        if (exists) setIsActivityAdded(true);
+        setIsActivityAdded(activityExists);
       } catch (error) {
         console.error("Error checking activity exists: ", error);
       } finally {
@@ -93,53 +86,49 @@ const ActivitySidebar = ({ onClose, activity }: any) => {
     };
 
     checkIfActivityAdded();
-  }, [activity, itineraryId]);
+  }, [activity, itineraryId, itineraryActivities]);
 
-  const handleActivity = async () => {
-    if (!activity || !itineraryId) return;
+  const handleAddToItinerary = async () => {
     setLoading(true);
-
-    const itineraryActivityData = {
-      activity_id: activity.activity_id,
-      itinerary_id: itineraryId,
-    };
-
-    try {
-      await insertTableData("itinerary_activities", itineraryActivityData);
-      const { exists } = await checkEntryExists("itinerary_activities", {
-        itineraryId,
-        activityId: activity.activity_id,
-      });
-      if (exists) {
-        setIsActivityAdded(true);
-      }
-    } catch (error) {
-      console.error("Error adding activity:", error);
-    } finally {
-      setLoading(false);
+    if (!activity || !itineraryId) return;
+    const { success } = await insertItineraryActivity(activity, itineraryId);
+    if (success) {
+      setIsActivityAdded(true);
+    } else {
+      toast.error("Failed to add activity to itinerary");
     }
+    setLoading(false);
+  };
+
+  const handleRemoveToItinerary = async () => {
+    setLoading(true);
+    if (!activity || !itineraryId) return;
+    const { success } = await removeItineraryActivity(
+      activity.place_id,
+      itineraryId
+    );
+    if (success) {
+      setIsActivityAdded(false);
+    } else {
+      toast.error("Failed to remove activity from itinerary");
+    }
+    setLoading(false);
   };
 
   const renderOpeningHours = () => {
-    if (
-      !activity ||
-      !activity.currentOpeningHours ||
-      !activity.currentOpeningHours.periods
-    ) {
+    if (!activity) {
       return <p>Opening hours not available</p>;
     }
 
-    const periods = activity.currentOpeningHours.periods;
+    const periods = activity.open_hours;
 
     // Check if it's open 24/7
     if (
       periods.length === 1 &&
-      periods[0].open.day === 2 &&
-      periods[0].open.hour === 0 &&
-      periods[0].open.minute === 0 &&
-      periods[0].close.day === 1 &&
-      periods[0].close.hour === 23 &&
-      periods[0].close.minute === 59
+      periods[0].open_hour === 0 &&
+      periods[0].open_minute === 0 &&
+      periods[0].close_hour === 23 &&
+      periods[0].close_minute === 59
     ) {
       return (
         <div className="grid grid-cols-[120px_1fr] items-center">
@@ -163,16 +152,10 @@ const ActivitySidebar = ({ onClose, activity }: any) => {
 
     return periods.map((period: any, index: number) => (
       <div key={index} className="grid grid-cols-[120px_1fr] items-center py-2">
-        <div className="text-sm font-medium">
-          {getDayName(period.open.day)}:
-        </div>
+        <div className="text-sm font-medium">{getDayName(period.day)}:</div>
         <div className="text-sm">
-          {formatMiltaryTime(
-            period.open.hour,
-            period.open.minute,
-            period.close.hour,
-            period.close.minute
-          )}
+          {formatOpenHours(period.day, period.open_hour, period.open_minute)} -{" "}
+          {formatOpenHours(period.day, period.close_hour, period.close_minute)}
         </div>
       </div>
     ));
@@ -201,24 +184,23 @@ const ActivitySidebar = ({ onClose, activity }: any) => {
           </Button>
         </div>
         <ScrollArea className="h-full">
-          <Accordion type="single" collapsible key={activity.activity_id}>
+          <Accordion type="single" collapsible>
             <div className="px-4 pt-16">
               <div className="mt-4">
-                {activity.photos && activity.photos.length > 0 && (
+                {activity.photo_names && activity.photo_names.length > 0 && (
                   <div className="mt-4">
                     <ImagesCarousel
-                      images={activity.photos}
+                      photoNames={activity.photo_names}
                       showButtons={true}
-                      apiKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || ""}
                     />
                   </div>
                 )}
               </div>
               <div className="mt-6">
                 <div className="font-semibold text-2xl">
-                  {capitalizeFirstLetterOfEachWord(activity.displayName.text)}
+                  {capitalizeFirstLetterOfEachWord(activity.name)}
                 </div>
-                {activity.editorialSummary && (
+                {activity.rating && (
                   <div className="flex flex-row space-x-1 items-center mt-2">
                     <Rating rating={activity.rating} />
                     <div className="ml-2 text-xs text-zinc-500">
@@ -227,43 +209,37 @@ const ActivitySidebar = ({ onClose, activity }: any) => {
                   </div>
                 )}
 
-                <p className="text-gray-500 text-md mt-1">
-                  {activity.formattedAddress}
-                </p>
-                {activity.editorialSummary && (
-                  <p className="mt-2 text-md">
-                    {activity.editorialSummary.text}
-                  </p>
+                <p className="text-gray-500 text-md mt-1">{activity.address}</p>
+                {activity.description && (
+                  <p className="mt-2 text-md">{activity.description}</p>
                 )}
 
-                {activity.websiteUri && (
+                {activity.website_url && (
                   <>
                     <div>
-                      {activity.websiteUri && (
-                        <Link
-                          href={activity.websiteUri}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="flex flex-row items-center hover:bg-gray-50 text-md hover:underline mt-4"
-                        >
-                          <div className="p-4">
-                            <Globe size={20} />
-                          </div>
-                          <div>Website</div>
-                        </Link>
-                      )}
+                      <Link
+                        href={activity.website_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex flex-row items-center hover:bg-gray-50 text-md hover:underline mt-4"
+                      >
+                        <div className="p-4">
+                          <Globe size={20} />
+                        </div>
+                        <div>Website</div>
+                      </Link>
                     </div>
                     <Separator />
                   </>
                 )}
 
-                {activity.nationalPhoneNumber && (
+                {activity.phone_number && (
                   <>
                     <div className="flex flex-row items-center hover:bg-gray-50 text-md  hover:underline">
                       <div className="p-4">
                         <Phone size={20} />
                       </div>
-                      <div>{activity.nationalPhoneNumber}</div>
+                      <div>{activity.phone_number}</div>
                     </div>
                     <Separator />
                   </>
@@ -298,16 +274,27 @@ const ActivitySidebar = ({ onClose, activity }: any) => {
           {/* <Link href={`/itinerary/${1}/overview`}> */}
           <Separator className="mt-4" />
           {loading ? (
-            <Button disabled className="mt-4">
+            <Button
+              variant="outline"
+              className="mt-4 disabled rounded-full hover:bg-gray-100 hover:text-black"
+            >
               <Loader2 className="mr-2 h-4 w-4 animate-spin " />
               Please wait
             </Button>
           ) : isActivityAdded ? (
-            <Button className="mt-4" disabled>
-              Added
+            <Button
+              variant="secondary"
+              className="mt-4 rounded-full"
+              onClick={handleRemoveToItinerary}
+            >
+              Remove
             </Button>
           ) : (
-            <Button className="mt-4" onClick={handleActivity}>
+            <Button
+              variant="outline"
+              className="mt-4 rounded-full"
+              onClick={handleAddToItinerary}
+            >
               Add to Itinerary
             </Button>
           )}
@@ -315,6 +302,4 @@ const ActivitySidebar = ({ onClose, activity }: any) => {
       </div>
     </div>
   );
-};
-
-export default ActivitySidebar;
+}

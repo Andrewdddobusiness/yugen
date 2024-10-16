@@ -16,26 +16,108 @@ import { Plus, Minus, Loader2 } from "lucide-react";
 
 import { itinerarySchema } from "@/schemas/createItinerarySchema";
 import { createClient } from "@/utils/supabase/client";
-import { fetchTableData, insertTableData } from "@/actions/supabase/actions";
+import { insertTableData } from "@/actions/supabase/actions";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useRouter } from "next/navigation";
+import { whitelistedLocations } from "@/lib/googleMaps/whitelistedLocations";
+import { capitalizeFirstLetterOfEachWord } from "@/utils/formatting/capitalise";
 
 export default function NewTripCreator() {
   const supabase = createClient();
   const router = useRouter();
 
+  const [user, setUser] = useState<any>(null);
+
   const [adultsCount, setAdultsCount] = useState(1);
   const [kidsCount, setKidsCount] = useState(0);
-  const [cityList, setCityList] = useState<any>([]);
-  const [destinationCity, setDestinationCity] = useState();
+
+  const [destinationLocation, setDestinationLocation] = useState<
+    string | undefined
+  >(undefined);
   const [dateRange, setDateRange] = useState<any>();
 
+  const [destinationError, setDestinationError] = useState(false);
+  const [dateRangeError, setDateRangeError] = useState(false);
+
   const [loading, setLoading] = useState<any>(false);
-  const [user, setUser] = useState<any>(null);
 
   const form = useForm<z.infer<typeof itinerarySchema>>({
     resolver: zodResolver(itinerarySchema),
   });
+
+  const handleDestinationChange = (location: any) => {
+    setDestinationLocation(location);
+    setDestinationError(false); // Reset error on change
+  };
+
+  const handleDateChange = (newDate: any) => {
+    setDateRange(newDate);
+    setDateRangeError(false); // Reset error on change
+  };
+
+  const handleCreateItinerary = async () => {
+    console.log(dateRange);
+    setLoading(true);
+
+    if (!destinationLocation) {
+      setDestinationError(true);
+    }
+    if (!dateRange) {
+      setDateRangeError(true);
+    }
+
+    if (!destinationLocation || !dateRange) {
+      setLoading(false);
+      return;
+    }
+
+    const itineraryData = {
+      user_id: user.id,
+      adults: adultsCount,
+      kids: kidsCount,
+    };
+
+    let itineraryId;
+
+    try {
+      const response = await insertTableData("itinerary", itineraryData);
+      if (response.data) {
+        itineraryId = response.data[0].itinerary_id;
+      }
+    } catch (error) {
+      console.error(error);
+      setLoading(false);
+      return;
+    }
+
+    const selectedLocation = destinationLocation.split(", ");
+    const city = selectedLocation[0];
+    const country = selectedLocation[1];
+
+    const itineraryDestinationsData = {
+      itinerary_id: itineraryId,
+      city: city,
+      country: country,
+      order_number: 1,
+      from_date: dateRange?.from,
+      to_date: dateRange?.to,
+    };
+
+    try {
+      const response = await insertTableData(
+        "itinerary_destination",
+        itineraryDestinationsData
+      );
+      if (response.success) {
+        router.push("/dashboard");
+      }
+    } catch (error) {
+      console.error(error);
+      setLoading(false);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleDecreaseCount = (type: string) => {
     if (type === "adults" && adultsCount > 1) {
@@ -53,83 +135,11 @@ export default function NewTripCreator() {
     }
   };
 
-  const handleCreateItinerary = async () => {
-    setLoading(true);
-    const itineraryData = {
-      user_id: user.id,
-      adults: adultsCount,
-      kids: kidsCount,
-    };
-
-    let itineraryId;
-    let destinationCityId;
-
-    try {
-      const response = await insertTableData("itineraries", itineraryData);
-      console.log(response);
-      if (response.data) {
-        itineraryId = response.data[0].itinerary_id;
-      }
-
-      console.log(response);
-    } catch (error) {
-      console.error(error);
-      setLoading(false);
-      return;
-    }
-
-    const selectedCity = cityList.find(
-      (city: { city_name: any }) => city.city_name === destinationCity
-    );
-    console.log(destinationCity);
-    console.log(selectedCity);
-
-    if (selectedCity) {
-      destinationCityId = selectedCity.city_id;
-    } else {
-      console.error("Assigning city id failed.");
-      setLoading(false);
-      return;
-    }
-
-    const itineraryDestinationsData = {
-      itinerary_id: itineraryId,
-      destination_city_id: destinationCityId,
-      from_date: dateRange?.from,
-      to_date: dateRange?.to,
-    };
-
-    try {
-      const response = await insertTableData(
-        "itinerary_destinations",
-        itineraryDestinationsData
-      );
-      console.log(response);
-      if (response.success) {
-        router.push("/");
-      }
-    } catch (error) {
-      console.error(error);
-      setLoading(false);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleDateChange = (newDate: any) => {
-    setDateRange(newDate);
-  };
-
-  const handleSelectionChange = (city: any) => {
-    setDestinationCity(city);
-  };
-
   useEffect(() => {
     const fetchUserData = async () => {
       try {
         const { auth } = supabase;
         const { data: user } = await auth.getUser();
-        console.log(user.user);
         if (!user.user) {
           throw new Error("User not authenticated");
         }
@@ -142,24 +152,12 @@ export default function NewTripCreator() {
     fetchUserData();
   }, [supabase]);
 
-  useEffect(() => {
-    const fetchCityData = async () => {
-      try {
-        const response = await fetchTableData("cities", "city_id, city_name");
-
-        if (response.data) {
-          setCityList(response?.data);
-        } else {
-          setCityList([]);
-        }
-      } catch (error) {
-        console.error("Error fetching city data:", error);
-        setCityList([]);
-      }
-    };
-
-    fetchCityData();
-  }, []);
+  const locationList = whitelistedLocations.map(
+    (location) =>
+      `${capitalizeFirstLetterOfEachWord(
+        location.city
+      )}, ${capitalizeFirstLetterOfEachWord(location.country)}`
+  );
 
   return (
     <DashboardLayout title="Itineraries" activePage="itineraries">
@@ -177,30 +175,31 @@ export default function NewTripCreator() {
                 Where do you want to go?
               </div>
               <div className="flex flex-row w-full gap-4 text-5xl mt-2">
-                {cityList ? (
+                {locationList ? (
                   <ComboBox
-                    selection={cityList.map(
-                      (city: { city_name: any }) => city.city_name
-                    )}
-                    onSelectionChange={handleSelectionChange}
+                    selection={locationList}
+                    onSelectionChange={handleDestinationChange}
                   />
                 ) : (
                   <Skeleton className="w-full h-[40px] rounded-md" />
                 )}
               </div>
+              {destinationError && (
+                <div className="text-sm text-red-500 mt-2">
+                  Please select a destination.
+                </div>
+              )}
               <div className="flex flex-row text-5xl mt-2">
-                <DatePickerWithRangePopover onRateChange={handleDateChange} />
+                <DatePickerWithRangePopover
+                  onDateChange={handleDateChange}
+                  fetchDateRangeProp={false}
+                />
               </div>
-              {/* <div className="flex flex-row text-5xl mt-2">
-                <Button
-                  className="rounded-full text-sm"
-                  size={"sm"}
-                  variant={"secondary"}
-                >
-                  <Plus size={12} className="mr-1" /> Add Destination
-                </Button>
-              </div> */}
-
+              {dateRangeError && (
+                <div className="text-sm text-red-500 mt-2">
+                  Please select a date range.
+                </div>
+              )}
               <div className="text-xl font-semibold mt-8">
                 How many people are going?
               </div>
@@ -256,7 +255,6 @@ export default function NewTripCreator() {
 
             {/* BUTTONS NAVIGATION */}
             <div className="flex flex-row justify-end mt-8">
-              {/* <Link href={`/itinerary/${1}/overview`}> */}
               {loading ? (
                 <Button
                   disabled
