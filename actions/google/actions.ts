@@ -69,10 +69,11 @@ function mapGooglePlaceToActivity(place: any): IActivity {
   };
 }
 
-export async function fetchNearbyActivities(
+export const fetchNearbyActivities = async (
   latitude: number,
-  longitude: number
-) {
+  longitude: number,
+  pageParam: number = 0
+) => {
   const url = `https://places.googleapis.com/v1/places:searchNearby`;
 
   const requestBody = {
@@ -123,4 +124,4 @@ export async function fetchNearbyActivities(
     console.error("Error fetching nearby activities:", error);
     throw error;
   }
-}
+};

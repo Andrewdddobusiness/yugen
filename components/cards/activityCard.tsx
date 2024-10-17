@@ -128,7 +128,7 @@ export default function ActivityCard({
 
   return (
     <Card
-      className={`flex flex-col cursor-pointer relative w-64 h-[365px] transition-all duration-300 ease-in-out ${
+      className={`flex flex-col cursor-pointer relative w-full h-[365px] transition-all duration-300 ease-in-out ${
         isHovered ? "bg-zinc-50 shadow-lg" : ""
       }`}
       onMouseEnter={() => setIsHovered(true)}
@@ -163,12 +163,10 @@ export default function ActivityCard({
           {capitalizeFirstLetterOfEachWord(activity.name)}
         </div>
         <div className="flex items-center">
-          <div className="items-center hidden md:flex">
+          <div className="items-center  md:flex">
             <Rating rating={activity.rating} />
           </div>
-          <div className="md:hidden">
-            <Star size={14} />
-          </div>
+
           <div className="ml-2 text-xs text-zinc-500">{activity.rating}</div>
         </div>
         <div className="flex flex-wrap gap-2">

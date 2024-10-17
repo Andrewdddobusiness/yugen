@@ -1,29 +1,36 @@
 import React from "react";
 import ActivityCard from "./activityCard";
-import { IActivity } from "@/store/activityStore";
+import { IActivity, IActivityWithLocation } from "@/store/activityStore";
 
-interface IActivityCardsProps {
-  activities: IActivity[];
-  onSelectActivity: (activity: any) => void;
-  onHover: (activity: any) => void;
+interface ActivityCardsProps {
+  activities: IActivityWithLocation[];
+  onSelectActivity: (activity: IActivityWithLocation) => void;
+  onHover: (coordinates: [number, number]) => void;
+  isSidebarOpen: boolean;
 }
 
-const ActivityCards: React.FC<IActivityCardsProps> = ({
+export default function ActivityCards({
   activities,
   onSelectActivity,
   onHover,
-}) => {
+  isSidebarOpen,
+}: ActivityCardsProps) {
   return (
-    <div className="h-60 flex flex-wrap gap-4 p-4">
-      {activities.map((activity: IActivity, index: number) => (
+    <div
+      className={`grid ${
+        isSidebarOpen
+          ? "grid-cols-1 2xl:grid-cols-2"
+          : "grid-cols-1 lg:grid-cols-2 2xl:grid-cols-3"
+      } gap-4 pb-8`}
+    >
+      {activities.map((activity) => (
         <ActivityCard
-          key={index}
+          key={activity.place_id}
           activity={activity}
           onClick={() => onSelectActivity(activity)}
+          onMouseEnter={() => onHover([activity.latitude, activity.longitude])}
         />
       ))}
     </div>
   );
-};
-
-export default ActivityCards;
+}

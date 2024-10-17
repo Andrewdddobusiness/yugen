@@ -1,7 +1,7 @@
 "use client";
 import React, { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useInfiniteQuery } from "@tanstack/react-query";
 
 import BuilderLayout from "@/components/layouts/builderLayout";
 import { Input } from "@/components/ui/input";
@@ -13,7 +13,7 @@ import MapBox from "@/components/map/mapbox";
 import ActivitySidebar from "@/components/sidebar/activitySideBar";
 
 import { MdMoneyOff, MdAttachMoney } from "react-icons/md";
-import { Drama, Landmark, MountainSnow, Palette } from "lucide-react";
+import { Drama, Landmark, MountainSnow, Palette, Loader2 } from "lucide-react";
 
 import {
   fetchTableData,
@@ -29,6 +29,7 @@ import {
   IItineraryActivity,
   useitineraryActivityStore,
 } from "@/store/itineraryActivityStore";
+import { InfiniteScroll } from "@/components/scroll/infiniteScroll";
 
 export default function Activities() {
   const searchParams = useSearchParams();
@@ -95,21 +96,33 @@ export default function Activities() {
     refetchOnReconnect: false,
   });
 
-  const { data: activitiesData, isLoading: isActivitiesLoading } = useQuery({
+  const {
+    data: activitiesData,
+    isLoading: isActivitiesLoading,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useInfiniteQuery({
     queryKey: [
       "nearbyActivities",
       cityCoordinates?.latitude,
       cityCoordinates?.longitude,
     ],
-    queryFn: () =>
+    queryFn: ({ pageParam = 0 }) =>
       fetchNearbyActivities(
         cityCoordinates!.latitude,
-        cityCoordinates!.longitude
+        cityCoordinates!.longitude,
+        pageParam
       ),
+    getNextPageParam: (lastPage, pages) => {
+      if ((lastPage as any[]).length < 20) return undefined;
+      return pages.length;
+    },
     enabled: !!cityCoordinates,
     staleTime: 5 * 60 * 1000, // 5 minutes
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
+    initialPageParam: 0,
   });
 
   const handleActivitySelect = (activity: any) => {
@@ -138,23 +151,28 @@ export default function Activities() {
   const filteredActivities =
     selectedFilter === ""
       ? activitiesData
-      : activitiesData?.filter((activity: any) => {
-          const types = activity.types || [];
-          switch (selectedFilter) {
-            case "Food & Drink":
-              return types.some((type: string) =>
-                ["restaurant", "cafe", "bar"].includes(type)
-              );
-            case "Historical":
-              return (
-                types.includes("museum") || types.includes("tourist_attraction")
-              );
-            case "Shopping":
-              return types.includes("shopping_mall") || types.includes("store");
-            default:
-              return true;
-          }
-        });
+      : activitiesData?.pages
+          .flatMap((page: any) => page)
+          .filter((activity: any) => {
+            const types = activity.types || [];
+            switch (selectedFilter) {
+              case "Food & Drink":
+                return types.some((type: string) =>
+                  ["restaurant", "cafe", "bar"].includes(type)
+                );
+              case "Historical":
+                return (
+                  types.includes("museum") ||
+                  types.includes("tourist_attraction")
+                );
+              case "Shopping":
+                return (
+                  types.includes("shopping_mall") || types.includes("store")
+                );
+              default:
+                return true;
+            }
+          });
 
   return (
     <BuilderLayout
@@ -171,8 +189,8 @@ export default function Activities() {
         <div className="flex flex-row flex-grow overflow-y-auto h-full relative">
           <div className="flex flex-row w-full transition-all duration-300">
             <div
-              className={`m-4 min-h-[870px] rounded-lg flex flex-col transition-all duration-300 ${
-                isSidebarOpen ? "w-3/12" : "w-1/2"
+              className={`p-4 min-h-[870px] rounded-lg flex flex-col transition-all duration-300 ${
+                isSidebarOpen ? "w-1/2 md:w-1/3 " : "w-1/2"
               }`}
             >
               <div className="flex flex-col items-center">
@@ -221,26 +239,42 @@ export default function Activities() {
                 </div>
                 <Separator className="my-4" />
               </div>
-              <ScrollArea className="flex flex-col h-full mb-4 mx-4">
-                {filteredActivities && (
-                  <ActivityCards
-                    activities={filteredActivities}
-                    onSelectActivity={handleActivitySelect}
-                    onHover={handleActivityHover}
-                  />
+              <ScrollArea className="flex flex-col h-full pb-4 px-4">
+                <div>
+                  {activitiesData?.pages.map((page, i) => (
+                    <ActivityCards
+                      key={i}
+                      activities={page as IActivityWithLocation[]}
+                      onSelectActivity={handleActivitySelect}
+                      onHover={handleActivityHover}
+                      isSidebarOpen={isSidebarOpen}
+                    />
+                  ))}
+                </div>
+                <InfiniteScroll
+                  loadMore={fetchNextPage}
+                  hasMore={!!hasNextPage}
+                />
+                {isFetchingNextPage && (
+                  <div className="flex flex-col items-center justify-center py-4">
+                    <Loader2 className="h-6 w-6 animate-spin text-gray-500 mb-2" />
+                    <p className="text-sm text-gray-500">
+                      Loading more activities...
+                    </p>
+                  </div>
                 )}
               </ScrollArea>
             </div>
             <div
               className={`border relative transition-all duration-300 ${
-                isSidebarOpen ? "w-5/12" : "w-1/2"
+                isSidebarOpen ? "w-0 md:w-1/2" : "lg:w-1/2"
               }`}
             >
               <MapBox
                 key="mapbox"
                 selectedActivity={selectedActivity}
                 setSelectedActivity={setSelectedActivity}
-                activities={activitiesData}
+                activities={activitiesData?.pages.flat()}
                 center={
                   cityCoordinates
                     ? [cityCoordinates.longitude, cityCoordinates.latitude]
@@ -251,8 +285,10 @@ export default function Activities() {
             </div>
           </div>
           <div
-            className={`absolute top-0 right-0 h-full w-4/12 z-50 transition-all duration-300 transform ${
-              isSidebarOpen ? "translate-x-0" : "translate-x-full hidden"
+            className={`absolute top-0 right-0 h-full z-50 transition-all duration-300 transform ${
+              isSidebarOpen
+                ? "w-6/12 md:w-4/12 translate-x-0"
+                : "w-4/12 translate-x-full hidden"
             }`}
           >
             {isSidebarOpen && (
