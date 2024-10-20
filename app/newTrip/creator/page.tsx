@@ -56,7 +56,6 @@ export default function NewTripCreator() {
   };
 
   const handleCreateItinerary = async () => {
-    console.log(dateRange);
     setLoading(true);
 
     if (!destinationLocation) {

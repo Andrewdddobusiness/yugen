@@ -43,7 +43,7 @@ interface IItineraryStore {
   ) => Promise<{ success: boolean; error?: any }>;
 }
 
-export const useitineraryActivityStore = create<IItineraryStore>(
+export const useItineraryActivityStore = create<IItineraryStore>(
   (set, get) => ({
     itineraryActivities: [],
     activeActivityIds: new Map<string, boolean>(),
@@ -52,12 +52,6 @@ export const useitineraryActivityStore = create<IItineraryStore>(
       destinationId: string
     ) => {
       try {
-        console.log(
-          "Fetching itinerary activities for itinerary:",
-          itineraryId,
-          "and destination:",
-          destinationId
-        );
         const result = await fetchFilteredTableData2(
           "itinerary_activity",
           `
@@ -75,7 +69,7 @@ export const useitineraryActivityStore = create<IItineraryStore>(
             destination_id: destinationId,
           }
         );
-        console.log("Fetch result:", result);
+
         if (result.success && result.data) {
           return result.data as unknown as IItineraryActivity[];
         }
@@ -217,7 +211,7 @@ export const useitineraryActivityStore = create<IItineraryStore>(
           name: activity.name,
           city_id: cityId,
         });
-
+        console.log("activity.coordinates: ", activity.coordinates);
         if (!activityExists) {
           const activityDataToInsert = {
             place_id: activity.place_id,
@@ -233,6 +227,10 @@ export const useitineraryActivityStore = create<IItineraryStore>(
             photo_names: activity.photo_names,
             duration: activity.duration,
             phone_number: activity.phone_number,
+            coordinates: [
+              Number(activity.coordinates[0].toFixed(9)),
+              Number(activity.coordinates[1].toFixed(9)),
+            ],
           };
 
           await insertTableData("activity", activityDataToInsert);
@@ -249,18 +247,15 @@ export const useitineraryActivityStore = create<IItineraryStore>(
         [activity.place_id]
       );
 
-      console.log("activityDataResponse: ", activityDataResponse);
-
       if (
         Array.isArray(activityDataResponse) &&
         activityDataResponse.length > 0
       ) {
         activityId = activityDataResponse[0]?.activity_id;
-        console.log("activityId: ", activityId);
       }
 
       // INSERT REVIEW IF IT DOESN'T EXIST
-      console.log(activityId);
+
       try {
         if (activityId) {
           const { exists: reviewExists } = await checkEntryExists("review", {

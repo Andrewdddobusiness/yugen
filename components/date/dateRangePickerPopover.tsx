@@ -9,15 +9,8 @@ import { DateRange } from "react-day-picker";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import {
-  setTableData,
-  fetchFilteredTableData,
-} from "@/actions/supabase/actions";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { setTableData, fetchFilteredTableData } from "@/actions/supabase/actions";
 import { useDateRangeStore } from "@/store/dateRangeStore";
 import { useEffect } from "react";
 
@@ -43,16 +36,19 @@ export function DatePickerWithRangePopover({
     const fetchDateRange = async () => {
       if (itineraryId && fetchDateRangeProp) {
         try {
-          const result = await fetchFilteredTableData(
-            "itinerary_destinations",
-            "from_date, to_date",
-            "itinerary_id",
-            [itineraryId]
-          );
-          if (result.success && result.data && result.data.length > 0) {
+          const result = await fetchFilteredTableData("itinerary_destinations", "from_date, to_date", "itinerary_id", [
+            itineraryId,
+          ]);
+          if (
+            result.success &&
+            result.data &&
+            result.data.length > 0 &&
+            "from_date" in result.data[0] &&
+            "to_date" in result.data[0]
+          ) {
             const { from_date, to_date } = result.data[0];
-            const startDate = new Date(from_date);
-            const endDate = new Date(to_date);
+            const startDate = new Date(from_date as string);
+            const endDate = new Date(to_date as string);
             setDate({
               from: startDate,
               to: endDate,
@@ -127,17 +123,13 @@ export function DatePickerWithRangePopover({
           <Button
             id="date"
             variant={"outline"}
-            className={cn(
-              "w-full justify-start text-left font-normal",
-              !date && "text-muted-foreground"
-            )}
+            className={cn("w-full justify-start text-left font-normal", !date && "text-muted-foreground")}
           >
             <CalendarIcon className="mr-2 h-4 w-4" />
             {date?.from ? (
               date.to ? (
                 <>
-                  {format(date.from, "LLL dd, y")} -{" "}
-                  {format(date.to, "LLL dd, y")}
+                  {format(date.from, "LLL dd, y")} - {format(date.to, "LLL dd, y")}
                 </>
               ) : (
                 format(date.from, "LLL dd, y")
@@ -159,10 +151,7 @@ export function DatePickerWithRangePopover({
           />
           {error && <p className="text-red-500 p-2 text-sm">{error}</p>}
           <div className="flex justify-end p-2">
-            <Button
-              onClick={handleSave}
-              disabled={!date?.from || !date?.to || isLoading}
-            >
+            <Button onClick={handleSave} disabled={!date?.from || !date?.to || isLoading}>
               {isLoading ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />

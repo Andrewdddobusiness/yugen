@@ -3,10 +3,7 @@ import { createClient } from "@/utils/supabase/client";
 export async function insertTableData(tableName: string, tableData: any) {
   const supabase = createClient();
 
-  const { data, error } = await supabase
-    .from(tableName)
-    .insert(tableData)
-    .select();
+  const { data, error } = await supabase.from(tableName).insert(tableData).select();
 
   if (error) {
     console.log(error);
@@ -16,11 +13,7 @@ export async function insertTableData(tableName: string, tableData: any) {
   return { success: true, message: "Insert successful", data: data };
 }
 
-export async function setTableDataWithCheck(
-  tableName: string,
-  tableData: any,
-  uniqueColumns: string[]
-) {
+export async function setTableDataWithCheck(tableName: string, tableData: any, uniqueColumns: string[]) {
   const supabase = createClient();
 
   // Separate the data used for identifying the row and the data to be updated
@@ -49,11 +42,7 @@ export async function setTableDataWithCheck(
   let result;
   if (existingData) {
     // Update existing record
-    result = await supabase
-      .from(tableName)
-      .update(updateData)
-      .match(identifyingData)
-      .select();
+    result = await supabase.from(tableName).update(updateData).match(identifyingData).select();
   } else {
     // Insert new record
     result = await supabase
@@ -70,11 +59,7 @@ export async function setTableDataWithCheck(
   return { success: true, message: "Operation successful", data: result.data };
 }
 
-export async function setTableData2(
-  tableName: string,
-  tableData: any,
-  uniqueColumns: string[]
-) {
+export async function setTableData(tableName: string, tableData: any, uniqueColumns: string[]) {
   const supabase = createClient();
 
   const { data, error } = await supabase
@@ -93,16 +78,10 @@ export async function setTableData2(
   return { success: true, message: "Upsert successful", data: data };
 }
 
-export async function deleteTableData(
-  tableName: string,
-  matchConditions: Record<string, any>
-) {
+export async function deleteTableData(tableName: string, matchConditions: Record<string, any>) {
   const supabase = createClient();
 
-  const { data, error } = await supabase
-    .from(tableName)
-    .delete()
-    .match(matchConditions);
+  const { data, error } = await supabase.from(tableName).delete().match(matchConditions);
 
   if (error) {
     console.error("Delete failed:", error);
@@ -112,10 +91,7 @@ export async function deleteTableData(
   return { success: true, message: "Delete successful", data };
 }
 
-export async function softDeleteTableData(
-  tableName: string,
-  matchConditions: Record<string, any>
-) {
+export async function softDeleteTableData(tableName: string, matchConditions: Record<string, any>) {
   const supabase = createClient();
 
   const { data, error } = await supabase
@@ -212,10 +188,7 @@ export async function fetchFilteredTableData(
 ) {
   const supabase = createClient();
 
-  const { data, error } = await supabase
-    .from(tableName)
-    .select(columnNames)
-    .in(columnFilterName, filterValues);
+  const { data, error } = await supabase.from(tableName).select(columnNames).in(columnFilterName, filterValues);
 
   if (error) {
     console.log(error);
@@ -239,8 +212,6 @@ export async function fetchFilteredTableData2(
   }
 
   const { data, error } = await query;
-
-  console.log("Query result:", data);
 
   if (error) {
     console.error("Fetch failed:", error);
@@ -391,10 +362,7 @@ export const fetchItineraryActivityDetails = async (itineraryId: any) => {
   return { data };
 };
 
-export const checkEntryExists = async (
-  tableName: string,
-  filterParams: Record<string, any>
-) => {
+export const checkEntryExists = async (tableName: string, filterParams: Record<string, any>) => {
   const supabase = createClient();
 
   // Start the query from the dynamic table name
@@ -419,11 +387,7 @@ export const checkEntryExists = async (
 export async function fetchActivityIdByPlaceId(placeId: string) {
   const supabase = createClient();
 
-  const { data, error } = await supabase
-    .from("activity")
-    .select("activity_id")
-    .eq("place_id", placeId)
-    .single();
+  const { data, error } = await supabase.from("activity").select("activity_id").eq("place_id", placeId).single();
 
   if (error) {
     console.error("Error fetching activity_id:", error);
@@ -433,11 +397,7 @@ export async function fetchActivityIdByPlaceId(placeId: string) {
   return { success: true, message: "Fetch successful", data };
 }
 
-export async function upsertTableDataWithCheck(
-  tableName: string,
-  tableData: any,
-  uniqueColumns: string[]
-) {
+export async function upsertTableDataWithCheck(tableName: string, tableData: any, uniqueColumns: string[]) {
   const supabase = createClient();
 
   // Separate the data used for identifying the row and the data to be updated
@@ -466,11 +426,7 @@ export async function upsertTableDataWithCheck(
   let result;
   if (existingData) {
     // Update existing record
-    result = await supabase
-      .from(tableName)
-      .update(updateData)
-      .match(identifyingData)
-      .select();
+    result = await supabase.from(tableName).update(updateData).match(identifyingData).select();
   } else {
     // Insert new record
     result = await supabase

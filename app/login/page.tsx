@@ -44,7 +44,6 @@ export default function LoginPage() {
     const formData = new FormData();
     formData.append("email", values.email);
     formData.append("password", values.password);
-    console.log("hi");
 
     try {
       const response = await login(formData);

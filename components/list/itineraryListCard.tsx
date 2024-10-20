@@ -14,7 +14,7 @@ import { cn } from "@/lib/utils";
 
 import { DatePickerPopover } from "../date/datePickerPopover";
 import {
-  useitineraryActivityStore,
+  useItineraryActivityStore,
   IActivity,
 } from "@/store/itineraryActivityStore";
 
@@ -29,7 +29,7 @@ export const ItineraryListCard: React.FC<ItineraryListCardProps> = ({
   dragHandleProps,
   isDragging,
 }) => {
-  const { activities } = useitineraryActivityStore();
+  const { activities } = useItineraryActivityStore();
 
   // Find the latest activity data from the store
   const latestActivity =

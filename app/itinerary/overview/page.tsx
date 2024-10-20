@@ -29,7 +29,7 @@ export default function Overview() {
       try {
         const { auth } = supabase;
         const { data: user } = await auth.getUser();
-        // console.log(user.user);
+
         if (!user.user) {
           throw new Error("User not authenticated");
         }
@@ -48,7 +48,7 @@ export default function Overview() {
         setLoading(true);
         try {
           const { data, error } = await fetchCityDetails(id);
-          console.log("data: ", data);
+
           if (error) {
             console.error("Error fetching itinerary data:", error);
           } else {

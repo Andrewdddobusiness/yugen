@@ -19,6 +19,7 @@ export interface IOpenHours {
 export interface IActivity {
   place_id: string;
   name: string;
+  coordinates: [number, number];
   types: string[];
   price_level: string;
   address: string;
@@ -31,6 +32,7 @@ export interface IActivity {
   phone_number: string;
   reviews: IReview[];
   open_hours: IOpenHours[];
+  is_top_place?: boolean;
 }
 
 export interface IActivityWithLocation extends IActivity {
@@ -42,7 +44,7 @@ export interface IActivityWithLocation extends IActivity {
 interface IActivityStore {
   activities: IActivity[];
   fetchActivities: (itineraryId: string) => Promise<any[]>;
-  fetchActivity: (activityId: string) => Promise<any>;
+  setActivities: (activities: IActivity[]) => void;
   insertActivity: (activity: any) => void;
   removeActivity: (activityId: string) => void;
 }
@@ -51,9 +53,7 @@ export const useActivitiesStore = create<IActivityStore>((set) => ({
   activities: [],
   fetchActivities: async (itineraryId: string): Promise<any[]> => {
     try {
-      const response = await fetch(
-        `/api/itineraries/${itineraryId}/activities`
-      );
+      const response = await fetch(`/api/itineraries/${itineraryId}/activities`);
       if (!response.ok) {
         throw new Error("Failed to fetch activities");
       }
@@ -65,11 +65,10 @@ export const useActivitiesStore = create<IActivityStore>((set) => ({
       return [];
     }
   },
-  fetchActivity: async (activityId: string): Promise<any> => {},
-  insertActivity: (activity: any) =>
-    set((state) => ({ activities: [...state.activities, activity] })),
+  setActivities: (activities: IActivity[]) => set({ activities }),
+  insertActivity: (activity: any) => set((state) => ({ activities: [...state.activities, activity] })),
   removeActivity: (activityId: string) =>
     set((state) => ({
-      activities: state.activities.filter((a) => a.activity_id !== activityId),
+      activities: state.activities.filter((a) => a.place_id !== activityId),
     })),
 }));

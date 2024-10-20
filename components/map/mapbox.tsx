@@ -1,270 +1,204 @@
-"use client";
+import * as React from "react";
 import { useEffect, useRef, useState } from "react";
-import mapboxgl, { LngLatLike } from "mapbox-gl";
-import MapboxGeocoder from "@mapbox/mapbox-gl-geocoder";
-import "@mapbox/mapbox-gl-geocoder/dist/mapbox-gl-geocoder.css";
+import Map, { Layer, Source, NavigationControl, Marker } from "react-map-gl";
+import type { CircleLayer } from "react-map-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
 
-const accessToken = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN || "";
-mapboxgl.accessToken = accessToken;
+import { Button } from "../ui/button";
+import { CircleMinus, CirclePlus, Earth, X } from "lucide-react";
 
-const styles = [
-  { label: "Standard", value: "mapbox://styles/mapbox/standard" },
-  { label: "Streets", value: "mapbox://styles/mapbox/streets-v12" },
-  { label: "Outdoors", value: "mapbox://styles/mapbox/outdoors-v12" },
-  { label: "Light", value: "mapbox://styles/mapbox/light-v11" },
-  { label: "Dark", value: "mapbox://styles/mapbox/dark-v11" },
-  { label: "Satellite", value: "mapbox://styles/mapbox/satellite-v9" },
-  {
-    label: "Satellite Streets",
-    value: "mapbox://styles/mapbox/satellite-streets-v12",
-  },
-  {
-    label: "Navigation Day",
-    value: "mapbox://styles/mapbox/navigation-day-v1",
-  },
-  {
-    label: "Navigation Night",
-    value: "mapbox://styles/mapbox/navigation-night-v1",
-  },
-];
+import { useActivitiesStore } from "@/store/activityStore";
+import { useMapStore } from "@/store/mapStore";
+import { Skeleton } from "../ui/skeleton";
 
-export function determineActivityType(categories: string[]) {
-  if (
-    categories.some(
-      (cat) => cat.includes("historical") || cat.includes("landmark")
-    )
-  )
-    return "historical";
-  if (
-    categories.some((cat) => cat.includes("outdoors") || cat.includes("park"))
-  )
-    return "outdoors";
-  if (categories.some((cat) => cat.includes("art") || cat.includes("museum")))
-    return "art & culture";
-  if (
-    categories.some(
-      (cat) => cat.includes("entertainment") || cat.includes("theater")
-    )
-  )
-    return "entertainment";
-  if (
-    categories.some((cat) => cat.includes("restaurant") || cat.includes("food"))
-  )
-    return "food";
-  return "other";
-}
+import * as turf from "@turf/turf";
 
-interface MapBoxProps {
-  selectedActivity: any;
-  setSelectedActivity: (activity: any) => void;
-  activities: any[] | undefined;
-  center: [number, number] | undefined;
-  onWaypointClick: (
-    setCenter: (location: [number, number] | null) => void
-  ) => void;
-}
-
-export default function MapBox({
-  selectedActivity,
-  setSelectedActivity,
-  activities = [],
-  center,
-  onWaypointClick,
-}: MapBoxProps) {
-  const mapContainer = useRef<any>(null);
-  const map = useRef<mapboxgl.Map | null>(null);
-  const [selectedStyle, setSelectedStyle] = useState(styles[0].value);
-  const [mapState, setMapState] = useState({
-    center: [151.2093, -33.8688] as [number, number], // Default to Sydney, Australia
-    zoom: 13,
-    bearing: -17.6,
-    pitch: 45,
-  });
-
-  const centerMap = (coordinates: [number, number]) => {
-    if (map.current) {
-      map.current.flyTo({
-        center: coordinates,
-        zoom: 15,
-        duration: 1000,
-      });
-    }
+export default function Mapbox({ isSidebarOpen }: { isSidebarOpen: boolean }) {
+  // Define the calculateRadiusInPixels function before using it
+  const calculateRadiusInPixels = (zoom: number, radiusInMeters: number) => {
+    const earthCircumference = 40075017; // Earth's circumference in meters
+    const metersPerPixel = earthCircumference / (256 * Math.pow(2, zoom));
+    return radiusInMeters / metersPerPixel;
   };
 
-  useEffect(() => {
-    if (!accessToken || map.current) {
-      return;
-    }
+  const { activities } = useActivitiesStore();
+  const {
+    centerCoordinates,
+    setCenterCoordinates,
+    initialZoom,
+    smallRadiusInMeters,
+    largeRadiusInMeters,
+    mapRadius,
+    setRadius,
+  } = useMapStore();
 
-    let mapCenter: [number, number] = mapState.center;
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [circleRadius, setCircleRadius] = useState(() => calculateRadiusInPixels(initialZoom, smallRadiusInMeters));
+  const [circleCenter, setCircleCenter] = useState<[number, number] | null>(null);
+  const [markerCoordinates, setMarkerCoordinates] = useState<[number, number][] | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [currentZoom, setCurrentZoom] = useState(initialZoom);
 
-    if (
-      Array.isArray(center) &&
-      center.length === 2 &&
-      typeof center[0] === "number" &&
-      typeof center[1] === "number" &&
-      !isNaN(center[0]) &&
-      !isNaN(center[1])
-    ) {
-      mapCenter = center;
-    }
-
-    map.current = new mapboxgl.Map({
-      container: mapContainer.current,
-      style: selectedStyle,
-      center: mapCenter,
-      zoom: mapState.zoom,
-      pitch: mapState.pitch,
-      bearing: mapState.bearing,
-      antialias: true,
-    });
-
-    const navigationControl = new mapboxgl.NavigationControl();
-    map.current.addControl(navigationControl, "top-left");
-    map.current.dragRotate.enable();
-
-    map.current.on("load", () => {
-      if (!map.current) return;
-
-      map.current.addLayer({
-        id: "3d-buildings",
-        source: "composite",
-        "source-layer": "building",
-        filter: ["==", "extrude", "true"],
-        type: "fill-extrusion",
-        minzoom: 15,
-        paint: {
-          "fill-extrusion-color": "#aaa",
-          "fill-extrusion-height": [
-            "interpolate",
-            ["linear"],
-            ["zoom"],
-            15,
-            0,
-            15.05,
-            ["get", "height"],
-          ],
-          "fill-extrusion-base": [
-            "interpolate",
-            ["linear"],
-            ["zoom"],
-            15,
-            0,
-            15.05,
-            ["get", "min_height"],
-          ],
-          "fill-extrusion-opacity": 0.6,
-        },
-      });
-
-      updateMarkers();
-    });
-
-    return () => {
-      if (map.current) {
-        map.current.remove();
-        map.current = null;
-      }
-    };
-  }, [accessToken]);
+  const mapRef = useRef(null);
 
   useEffect(() => {
-    if (map.current) {
-      map.current.setStyle(selectedStyle);
-      map.current.setCenter(mapState.center);
-      map.current.setZoom(mapState.zoom);
-      map.current.setBearing(mapState.bearing);
-      map.current.setPitch(mapState.pitch);
-      if (activities) {
-        updateMarkers();
-      }
+    if (centerCoordinates) {
+      setCircleCenter(centerCoordinates);
+      const initialRadius = calculateRadiusInPixels(currentZoom, mapRadius);
+      setCircleRadius(initialRadius);
+      setIsLoading(false);
     }
-  }, [selectedStyle, mapState, activities]);
+  }, [centerCoordinates, currentZoom, mapRadius]);
 
   useEffect(() => {
-    if (map.current) {
-      map.current.resize(); // Resize the map when the panel is resized
+    if (activities) {
+      console.log("activities: ", activities);
+      setMarkerCoordinates(
+        activities.map((activity) => [activity?.coordinates[0] ?? 0, activity?.coordinates[1] ?? 0])
+      );
     }
-  }, [mapContainer]);
+  }, [activities, centerCoordinates]);
 
-  useEffect(() => {
-    if (map.current && activities) {
-      updateMarkers();
-    }
-  }, [activities]);
-
-  const handleStyleChange = (value: string) => {
-    setSelectedStyle(value);
-    saveMapState();
+  const circleLayer: CircleLayer = {
+    id: "circle-layer",
+    type: "circle",
+    paint: {
+      "circle-radius": circleRadius,
+      "circle-color": "#FF0000",
+      "circle-opacity": 0.2,
+      "circle-stroke-color": "#FF0000",
+      "circle-stroke-width": 2,
+      "circle-stroke-opacity": 0.5,
+    },
+    source: "circle-source",
   };
 
-  const saveMapState = () => {
-    if (!map.current) return;
-    const center = map.current.getCenter();
-    setMapState({
-      center: [center.lng, center.lat],
-      zoom: map.current.getZoom(),
-      bearing: map.current.getBearing(),
-      pitch: map.current.getPitch(),
-    });
+  const circleData = circleCenter
+    ? turf.circle([circleCenter[1], circleCenter[0]], mapRadius / 1000, {
+        steps: 64,
+        units: "kilometers",
+      })
+    : null;
+
+  const handleSearchOpen = () => {
+    setSearchOpen(!searchOpen);
   };
 
-  const updateMarkers = () => {
-    if (!map.current || !activities) return;
-
-    // Remove existing markers
-    const existingMarkers = document.getElementsByClassName("mapboxgl-marker");
-    while (existingMarkers[0]) {
-      existingMarkers[0].remove();
-    }
-
-    // Add new markers
-    activities.forEach((activity: any) => {
-      if (activity.location) {
-        new mapboxgl.Marker()
-          .setLngLat([activity.location.longitude, activity.location.latitude])
-          .setPopup(
-            new mapboxgl.Popup({ offset: 25 }).setHTML(
-              `<h3>${activity.displayName?.text || "Activity"}</h3><p>${
-                activity.formattedAddress
-              }</p>`
-            )
-          )
-          .addTo(map.current!);
-      }
-    });
+  const handleZoom = (zoom: number, radius: number) => {
+    setCurrentZoom(zoom);
+    setRadius(radius);
   };
 
-  useEffect(() => {
-    if (
-      map.current &&
-      Array.isArray(center) &&
-      center.length === 2 &&
-      typeof center[0] === "number" &&
-      typeof center[1] === "number" &&
-      !isNaN(center[0]) &&
-      !isNaN(center[1])
-    ) {
-      map.current.setCenter(center);
+  const handleMarkerDrag = (event: any) => {
+    const newCenter = event.lngLat;
+    setCircleCenter([newCenter.lat, newCenter.lng]);
+    setCenterCoordinates([newCenter.lat, newCenter.lng]);
+    if (mapRef.current) {
+      const zoom = (mapRef.current as any).getMap().getZoom();
+      handleZoom(zoom, mapRadius);
     }
-  }, [center]);
+    // Manually refetch activities without triggering a full page reload
+    // refetchActivities();
+  };
 
-  useEffect(() => {
-    if (map.current) {
-      onWaypointClick((location: [number, number] | null) => {
-        if (location && Array.isArray(location) && location.length === 2) {
-          centerMap(location);
-        }
-      });
-    }
-  }, [onWaypointClick]);
+  if (isLoading) {
+    return (
+      <Skeleton className="flex flex-col items-center justify-center w-full h-full gap-2">
+        <Earth size={32} />
+        <div className="text-md">Loading Map...</div>
+      </Skeleton>
+    );
+  }
 
   return (
-    <div className="w-full h-full">
-      <div id="map" className="w-full h-full">
-        <div className="w-full h-full" ref={mapContainer} />
-      </div>
+    <div style={{ position: "relative", width: "100%", height: "100%" }}>
+      {circleCenter && (
+        <div style={{ position: "relative", width: "100%", height: "100%" }}>
+          <Map
+            ref={mapRef}
+            mapboxAccessToken={process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN}
+            initialViewState={{
+              latitude: circleCenter[0],
+              longitude: circleCenter[1],
+              zoom: currentZoom,
+            }}
+            mapStyle="mapbox://styles/mapbox/streets-v9"
+            style={{ width: "100%", height: "100%" }}
+            onMove={(evt) => {
+              handleZoom(evt.viewState.zoom, mapRadius);
+            }}
+          >
+            {searchOpen ? (
+              <>
+                {circleData && (
+                  <Source id="circle-source" type="geojson" data={circleData}>
+                    <Layer
+                      id="circle-layer"
+                      type="fill"
+                      paint={{
+                        "fill-color": "#FF0000",
+                        "fill-opacity": 0.2,
+                        "fill-outline-color": "#FF0000",
+                      }}
+                    />
+                  </Source>
+                )}
+                <Marker latitude={circleCenter[0]} longitude={circleCenter[1]} draggable onDragEnd={handleMarkerDrag} />
+              </>
+            ) : (
+              markerCoordinates &&
+              markerCoordinates.map((coordinate, index) => (
+                <Marker
+                  key={index}
+                  latitude={coordinate[0]}
+                  longitude={coordinate[1]}
+                  draggable
+                  onDragEnd={handleMarkerDrag}
+                />
+              ))
+            )}
+            <NavigationControl position="top-left" />
+          </Map>
+          <div className="flex flex-col absolute top-2 right-2 z-10">
+            {searchOpen ? (
+              <div className="flex flex-col gap-2 items-end">
+                <Button variant="outline" size="icon" onClick={handleSearchOpen} className="rounded-full w-10 h-10">
+                  <X size={16} />
+                </Button>
+                <div className="flex flex-col items-center">
+                  <div className="text-sm text-zinc-500">Radius</div>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() => handleZoom(currentZoom, largeRadiusInMeters)}
+                    className="rounded-b-none w-10 h-10"
+                  >
+                    <CirclePlus size={16} />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() => handleZoom(currentZoom, smallRadiusInMeters)}
+                    className="rounded-t-none w-10 h-10"
+                  >
+                    <CircleMinus size={16} />
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <Button
+                variant="outline"
+                onClick={handleSearchOpen}
+                className={`
+     ${isSidebarOpen ? "hidden md:block" : "lg:block"}
+  `}
+              >
+                Explore Activities
+              </Button>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

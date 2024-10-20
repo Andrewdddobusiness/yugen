@@ -29,7 +29,7 @@ import { format, parseISO } from "date-fns";
 import { DragOverlay } from "@dnd-kit/core";
 import { ItineraryListCardWrapper } from "./itineraryListCardWrapper";
 import { DateGroupWrapper } from "./dateGroupWrapper";
-import { useitineraryActivityStore } from "@/store/itineraryActivityStore";
+import { useItineraryActivityStore } from "@/store/itineraryActivityStore";
 
 export default function ItineraryList() {
   const searchParams = useSearchParams();
@@ -44,7 +44,7 @@ export default function ItineraryList() {
 
   const queryClient = useQueryClient();
 
-  const { activities, setActivities } = useitineraryActivityStore();
+  const { activities, setActivities } = useItineraryActivityStore();
 
   useEffect(() => {
     const fetchDateRange = async () => {

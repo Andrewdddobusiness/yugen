@@ -4,22 +4,17 @@ import { useQuery } from "@tanstack/react-query";
 import BuilderLayout from "@/components/layouts/builderLayout";
 import DragDropCalendar from "@/components/calendar/calendar";
 import { DatePickerWithRangePopover } from "@/components/date/dateRangePickerPopover";
-import {
-  ResizableHandle,
-  ResizablePanel,
-  ResizablePanelGroup,
-} from "@/components/ui/resizable";
+import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import ItineraryList from "@/components/list/itineraryList";
 import { useSearchParams } from "next/navigation";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { useitineraryActivityStore } from "@/store/itineraryActivityStore";
+import { useItineraryActivityStore } from "@/store/itineraryActivityStore";
 
 export default function Builder() {
   const searchParams = useSearchParams();
   const id = searchParams.get("i");
 
-  const { fetchItineraryActivities, setItineraryActivities } =
-    useitineraryActivityStore();
+  const { fetchItineraryActivities, setItineraryActivities } = useItineraryActivityStore();
 
   const { isLoading, error, data } = useQuery({
     queryKey: ["itineraryActivities", id],

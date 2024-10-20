@@ -23,7 +23,7 @@ import { capitalizeFirstLetterOfEachWord } from "@/utils/formatting/capitalise";
 
 import Rating from "../rating/rating";
 
-import { useitineraryActivityStore } from "@/store/itineraryActivityStore";
+import { useItineraryActivityStore } from "@/store/itineraryActivityStore";
 import { IActivityWithLocation } from "@/store/activityStore";
 import { formatOpenHours } from "@/utils/formatting/datetime";
 
@@ -56,7 +56,7 @@ export default function ActivitySidebar({
     insertItineraryActivity,
     removeItineraryActivity,
     itineraryActivities,
-  } = useitineraryActivityStore();
+  } = useItineraryActivityStore();
   const [isActivityAdded, setIsActivityAdded] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(false);
 
@@ -69,14 +69,10 @@ export default function ActivitySidebar({
           const isMatch =
             itineraryActivity.activity?.place_id === activity.place_id;
           const isActive = itineraryActivity.is_active === true;
-          console.log(
-            `Activity ${activity.name}: Match: ${isMatch}, Active: ${isActive}`
-          );
+
           return isMatch && isActive;
         });
-        console.log(
-          `Activity ${activity.name} exists in itinerary: ${activityExists}`
-        );
+
         setIsActivityAdded(activityExists);
       } catch (error) {
         console.error("Error checking activity exists: ", error);

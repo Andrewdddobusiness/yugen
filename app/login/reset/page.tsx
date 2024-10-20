@@ -28,8 +28,6 @@ export default function ResetPage() {
         throw new Error("User not authenticated");
       }
 
-      console.log(process.env.NEXT_PUBLIC_SITE_URL);
-
       const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
         redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/login/updatePassword`,
       });

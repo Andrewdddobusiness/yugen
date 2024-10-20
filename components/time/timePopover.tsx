@@ -16,7 +16,7 @@ import { Button } from "@/components/ui/button";
 import { Loader2, Clock } from "lucide-react";
 import { formatTime } from "@/utils/formatting/datetime";
 import { cn } from "@/lib/utils";
-import { useitineraryActivityStore } from "@/store/itineraryActivityStore";
+import { useItineraryActivityStore } from "@/store/itineraryActivityStore";
 
 const generateTimeOptions = () => {
   const times = [];
@@ -47,7 +47,7 @@ export default function TimePopover({
   const [isLoading, setIsLoading] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
 
-  const { updateActivity } = useitineraryActivityStore();
+  const { updateActivity } = useItineraryActivityStore();
 
   useEffect(() => {
     setStartTime(storeStartTime);

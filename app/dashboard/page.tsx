@@ -23,7 +23,7 @@ export default function Dashboard() {
         setLoadingItinerary(true);
         const { auth } = supabase;
         const { data: user } = await auth.getUser();
-        console.log(user.user);
+
         if (!user.user) {
           throw new Error("User not authenticated");
         }
@@ -46,9 +46,6 @@ export default function Dashboard() {
             "itinerary_id, destination_id, city, country, from_date, to_date"
           )) as { data: any[]; error: any }; // Type assertion with correct structure
 
-          // Log the entire response to inspect it
-          console.log("Response from fetchTableData:", response);
-
           const { data, error } = response;
 
           if (error) {
@@ -69,7 +66,6 @@ export default function Dashboard() {
 
               // Set the mapped itinerary data
               setItineraryData(mappedData);
-              console.log("mappedData: ", mappedData);
             } else {
               console.error("Unexpected data structure:", data);
               setItineraryData([]);

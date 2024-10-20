@@ -199,7 +199,7 @@ const Profile = () => {
       try {
         const { auth } = supabase;
         const { data: user } = await auth.getUser();
-        console.log(user.user);
+
         if (!user.user) {
           throw new Error("User not authenticated");
         }

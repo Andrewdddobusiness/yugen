@@ -10,7 +10,7 @@ import { Separator } from "@/components/ui/separator";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import "./calendar-custom.css";
 import { capitalizeFirstLetterOfEachWord } from "@/utils/formatting/capitalise";
-import { useitineraryActivityStore } from "@/store/itineraryActivityStore";
+import { useItineraryActivityStore } from "@/store/itineraryActivityStore";
 import { useDateRangeStore } from "@/store/dateRangeStore";
 
 const localizer = momentLocalizer(moment);
@@ -24,7 +24,7 @@ const DragDropCalendar: React.FC<CalendarProps> = ({ isLoading }) => {
   const [view, setView] = useState("week");
   const { startDate, endDate } = useDateRangeStore();
   const [date, setDate] = useState(startDate || new Date());
-  const { activities, updateActivity } = useitineraryActivityStore();
+  const { activities, updateActivity } = useItineraryActivityStore();
 
   const events = activities.map((item) => ({
     id: item.itinerary_activity_id,
@@ -47,7 +47,7 @@ const DragDropCalendar: React.FC<CalendarProps> = ({ isLoading }) => {
     };
 
     // Update local store immediately
-    useitineraryActivityStore
+    useItineraryActivityStore
       .getState()
       .setActivities(
         activities.map((a) =>
@@ -63,7 +63,7 @@ const DragDropCalendar: React.FC<CalendarProps> = ({ isLoading }) => {
     } catch (error) {
       console.error("Error updating activity:", error);
       // Revert the local change if the database update fails
-      useitineraryActivityStore.getState().setActivities(activities);
+      useItineraryActivityStore.getState().setActivities(activities);
     }
   };
 
@@ -81,7 +81,7 @@ const DragDropCalendar: React.FC<CalendarProps> = ({ isLoading }) => {
     };
 
     // Update local store immediately
-    useitineraryActivityStore
+    useItineraryActivityStore
       .getState()
       .setActivities(
         activities.map((a) =>
@@ -92,7 +92,7 @@ const DragDropCalendar: React.FC<CalendarProps> = ({ isLoading }) => {
       );
 
     // Update local store immediately
-    useitineraryActivityStore.getState().updateActivity(updatedActivity);
+    useItineraryActivityStore.getState().updateActivity(updatedActivity);
 
     // Then update the database
     try {
@@ -100,7 +100,7 @@ const DragDropCalendar: React.FC<CalendarProps> = ({ isLoading }) => {
     } catch (error) {
       console.error("Error updating activity:", error);
       // Revert the local change if the database update fails
-      useitineraryActivityStore.getState().setActivities(activities);
+      useItineraryActivityStore.getState().setActivities(activities);
     }
   };
 

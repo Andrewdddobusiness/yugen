@@ -4,6 +4,7 @@ import axios from "axios";
 import { includedTypes } from "@/lib/googleMaps/includedTypes";
 import { excludedTypes } from "@/lib/googleMaps/excludedTypes";
 import { IActivity, IReview } from "@/store/activityStore";
+import { useMapStore } from "@/store/mapStore";
 
 const GOOGLE_MAPS_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
 
@@ -24,7 +25,6 @@ export async function fetchCityCoordinates(
   }
 
   const [longitude, latitude] = geocodingData.features[0].geometry.coordinates;
-  console.log("LONG: ", longitude, "LONG: ", latitude);
 
   return { longitude, latitude };
 }
@@ -33,6 +33,7 @@ function mapGooglePlaceToActivity(place: any): IActivity {
   return {
     place_id: place.id,
     name: place.displayName?.text || "",
+    coordinates: [place.location.latitude, place.location.longitude],
     types: place.types || "",
     price_level: place.priceLevel ? place.priceLevel : "",
     address: place.formattedAddress || "",
@@ -70,10 +71,14 @@ function mapGooglePlaceToActivity(place: any): IActivity {
 }
 
 export const fetchNearbyActivities = async (
-  latitude: number,
-  longitude: number,
-  pageParam: number = 0
+  latitude: number | undefined,
+  longitude: number | undefined,
+  radiusInMeters: number
 ) => {
+  if (typeof latitude !== "number" || typeof longitude !== "number") {
+    throw new Error("Invalid coordinates provided");
+  }
+
   const url = `https://places.googleapis.com/v1/places:searchNearby`;
 
   const requestBody = {
@@ -86,7 +91,7 @@ export const fetchNearbyActivities = async (
           latitude: latitude,
           longitude: longitude,
         },
-        radius: 5000.0,
+        radius: radiusInMeters,
       },
     },
   };
@@ -113,12 +118,10 @@ export const fetchNearbyActivities = async (
         ].join(","),
       },
     });
-    // console.log("HERE: ", response.data.places[0].reviews);
-
+    // console.log("response.data.places: ", response.data.places);
     const activities: IActivity[] = response.data.places.map(
       mapGooglePlaceToActivity
     );
-    // console.log("Mapped activities:", activities[0]);
     return activities;
   } catch (error) {
     console.error("Error fetching nearby activities:", error);

@@ -16,15 +16,16 @@ import Rating from "@/components/rating/rating";
 
 import { Button } from "../ui/button";
 
-import { ChevronDown, Loader2, Star } from "lucide-react";
+import { ChevronDown, Loader2, Image as ImageIcon } from "lucide-react";
 
 import { capitalizeFirstLetterOfEachWord } from "@/utils/formatting/capitalise";
 import { formatCategoryTypeArray } from "@/utils/formatting/types";
 
 import { IActivityWithLocation } from "@/store/activityStore";
-import { useitineraryActivityStore } from "@/store/itineraryActivityStore";
+import { useItineraryActivityStore } from "@/store/itineraryActivityStore";
 import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
+import { Skeleton } from "../ui/skeleton";
 
 interface ItineraryCardProps {
   activity: IActivityWithLocation;
@@ -44,7 +45,7 @@ export default function ActivityCard({
     insertItineraryActivity,
     removeItineraryActivity,
     itineraryActivities,
-  } = useitineraryActivityStore();
+  } = useItineraryActivityStore();
   const [isActivityAdded, setIsActivityAdded] = useState<boolean>(false);
   const [isHovered, setIsHovered] = useState(false);
   const [loading, setLoading] = useState<boolean>(false);
@@ -71,14 +72,10 @@ export default function ActivityCard({
           const isMatch =
             itineraryActivity.activity?.place_id === activity.place_id;
           const isActive = itineraryActivity.is_active === true;
-          console.log(
-            `Activity ${activity.name}: Match: ${isMatch}, Active: ${isActive}`
-          );
+
           return isMatch && isActive;
         });
-        console.log(
-          `Activity ${activity.name} exists in itinerary: ${activityExists}`
-        );
+
         setIsActivityAdded(activityExists);
       } catch (error) {
         console.error("Error checking activity exists: ", error);
@@ -138,14 +135,20 @@ export default function ActivityCard({
       <div className="relative">
         {activity.photo_names ? (
           <div className="h-40 w-full rounded-t-lg object-cover">
-            <Image
-              src={`https://places.googleapis.com/v1/${activity.photo_names[0]}/media?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}&maxHeightPx=1000&maxWidthPx=1000`}
-              alt="Activity Image"
-              width={1920}
-              height={1080}
-              priority
-              className="h-40 w-full rounded-t-lg object-cover"
-            />
+            {loading && activity.photo_names[0] ? (
+              <Skeleton className=" flex items-center justify-center h-40 w-full rounded-t-lg">
+                <ImageIcon size={32} className="text-zinc-300" />
+              </Skeleton>
+            ) : (
+              <Image
+                src={`https://places.googleapis.com/v1/${activity.photo_names[0]}/media?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}&maxHeightPx=1000&maxWidthPx=1000`}
+                alt="Activity Image"
+                width={1920}
+                height={1080}
+                priority
+                className="h-40 w-full rounded-t-lg object-cover"
+              />
+            )}
           </div>
         ) : (
           <div className="h-40 w-full bg-gray-200 rounded-t-lg flex items-center justify-center">
