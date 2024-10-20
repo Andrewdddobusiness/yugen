@@ -25,27 +25,54 @@ export async function insertTopPlaces(topPlaces: TopPlace[]) {
       continue;
     }
 
-    // Step 2: Insert or update country
-    const { data: countryData, error: countryError } = await supabase
+    // Step 2: Check if country exists, if not insert it
+    let { data: countryData, error: countryError } = await supabase
       .from("country")
-      .upsert({ country_name: country })
       .select("country_id")
+      .eq("country_name", country)
       .single();
 
-    if (countryError || !countryData) {
-      console.error(`Failed to insert/update country: ${country}`, countryError);
+    if (countryError && countryError.code === "PGRST116") {
+      // Country doesn't exist, insert it
+      const { data: newCountry, error: insertCountryError } = await supabase
+        .from("country")
+        .insert({ country_name: country })
+        .select("country_id")
+        .single();
+
+      if (insertCountryError) {
+        console.error(`Failed to insert country: ${country}`, insertCountryError);
+        continue;
+      }
+      countryData = newCountry;
+    } else if (countryError) {
+      console.error(`Error checking country: ${country}`, countryError);
       continue;
     }
 
-    // Step 3: Insert or update city
-    const { data: cityData, error: cityError } = await supabase
+    // Step 3: Check if city exists, if not insert it
+    let { data: cityData, error: cityError } = await supabase
       .from("city")
-      .upsert({ city_name: city, country_id: countryData.country_id })
       .select("city_id")
+      .eq("city_name", city)
+      .eq("country_id", countryData?.country_id)
       .single();
 
-    if (cityError || !cityData) {
-      console.error(`Failed to insert/update city: ${city}`, cityError);
+    if (cityError && cityError.code === "PGRST116") {
+      // City doesn't exist, insert it
+      const { data: newCity, error: insertCityError } = await supabase
+        .from("city")
+        .insert({ city_name: city, country_id: countryData?.country_id })
+        .select("city_id")
+        .single();
+
+      if (insertCityError) {
+        console.error(`Failed to insert city: ${city}`, insertCityError);
+        continue;
+      }
+      cityData = newCity;
+    } else if (cityError) {
+      console.error(`Error checking city: ${city}`, cityError);
       continue;
     }
 
@@ -54,6 +81,7 @@ export async function insertTopPlaces(topPlaces: TopPlace[]) {
       .from("activity")
       .select("activity_id")
       .eq("place_id", placeDetails.place_id)
+      .eq("city_id", cityData?.city_id)
       .single();
 
     if (existingActivityError && existingActivityError.code !== "PGRST116") {
@@ -97,7 +125,7 @@ export async function insertTopPlaces(topPlaces: TopPlace[]) {
         .from("activity")
         .insert({
           place_id: placeDetails.place_id,
-          city_id: cityData.city_id,
+          city_id: cityData?.city_id,
           name: placeDetails.name,
           types: placeDetails.types,
           price_level: placeDetails.price_level,
@@ -120,41 +148,41 @@ export async function insertTopPlaces(topPlaces: TopPlace[]) {
         continue;
       }
       activityId = newActivity.activity_id;
-    }
 
-    // Step 5: Insert or update reviews
-    if (placeDetails.reviews && placeDetails.reviews.length > 0) {
-      const { error: reviewError } = await supabase.from("review").upsert(
-        placeDetails.reviews.map((review) => ({
-          activity_id: activityId,
-          description: review.description,
-          rating: review.rating,
-          author: review.author,
-          uri: review.uri,
-          publish_date_time: review.publish_date_time,
-        }))
-      );
+      // Step 5: Insert or update reviews
+      if (placeDetails.reviews && placeDetails.reviews.length > 0) {
+        const { error: reviewError } = await supabase.from("review").upsert(
+          placeDetails.reviews.map((review) => ({
+            activity_id: activityId,
+            description: review.description,
+            rating: review.rating,
+            author: review.author,
+            uri: review.uri,
+            publish_date_time: review.publish_date_time,
+          }))
+        );
 
-      if (reviewError) {
-        console.error(`Failed to insert/update reviews for ${activityName}`, reviewError);
+        if (reviewError) {
+          console.error(`Failed to insert/update reviews for ${activityName}`, reviewError);
+        }
       }
-    }
 
-    // Step 6: Insert or update open hours
-    if (placeDetails.open_hours && placeDetails.open_hours.length > 0) {
-      const { error: openHoursError } = await supabase.from("open_hours").upsert(
-        placeDetails.open_hours.map((hours) => ({
-          activity_id: activityId,
-          day: hours.day,
-          open_hour: hours.open_hour,
-          open_minute: hours.open_minute,
-          close_hour: hours.close_hour,
-          close_minute: hours.close_minute,
-        }))
-      );
+      // Step 6: Insert or update open hours
+      if (placeDetails.open_hours && placeDetails.open_hours.length > 0) {
+        const { error: openHoursError } = await supabase.from("open_hours").upsert(
+          placeDetails.open_hours.map((hours) => ({
+            activity_id: activityId,
+            day: hours.day,
+            open_hour: hours.open_hour,
+            open_minute: hours.open_minute,
+            close_hour: hours.close_hour,
+            close_minute: hours.close_minute,
+          }))
+        );
 
-      if (openHoursError) {
-        console.error(`Failed to insert/update open hours for ${activityName}`, openHoursError);
+        if (openHoursError) {
+          console.error(`Failed to insert/update open hours for ${activityName}`, openHoursError);
+        }
       }
     }
 

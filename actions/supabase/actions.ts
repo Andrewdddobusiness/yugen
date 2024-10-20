@@ -1,5 +1,8 @@
 import { createClient } from "@/utils/supabase/client";
 
+/*
+  INSERT
+*/
 export async function insertTableData(tableName: string, tableData: any) {
   const supabase = createClient();
 
@@ -13,52 +16,9 @@ export async function insertTableData(tableName: string, tableData: any) {
   return { success: true, message: "Insert successful", data: data };
 }
 
-export async function setTableDataWithCheck(tableName: string, tableData: any, uniqueColumns: string[]) {
-  const supabase = createClient();
-
-  // Separate the data used for identifying the row and the data to be updated
-  const identifyingData = {};
-  const updateData = {};
-  for (const key in tableData) {
-    if (uniqueColumns.includes(key)) {
-      (identifyingData as any)[key] = tableData[key];
-    } else {
-      (updateData as any)[key] = tableData[key];
-    }
-  }
-
-  // First, check if the record exists
-  const { data: existingData, error: selectError } = await supabase
-    .from(tableName)
-    .select()
-    .match(identifyingData)
-    .maybeSingle();
-
-  if (selectError) {
-    console.error("Error checking existing data:", selectError);
-    return { success: false, message: "Check failed", error: selectError };
-  }
-
-  let result;
-  if (existingData) {
-    // Update existing record
-    result = await supabase.from(tableName).update(updateData).match(identifyingData).select();
-  } else {
-    // Insert new record
-    result = await supabase
-      .from(tableName)
-      .insert({ ...identifyingData, ...updateData })
-      .select();
-  }
-
-  if (result.error) {
-    console.error("Operation failed:", result.error);
-    return { success: false, message: "Operation failed", error: result.error };
-  }
-
-  return { success: true, message: "Operation successful", data: result.data };
-}
-
+/*
+  SET
+*/
 export async function setTableData(tableName: string, tableData: any, uniqueColumns: string[]) {
   const supabase = createClient();
 
@@ -78,6 +38,51 @@ export async function setTableData(tableName: string, tableData: any, uniqueColu
   return { success: true, message: "Upsert successful", data: data };
 }
 
+export async function setTableDataWithCheck(tableName: string, tableData: any, uniqueColumns: string[]) {
+  const supabase = createClient();
+
+  const identifyingData = {};
+  const updateData = {};
+  for (const key in tableData) {
+    if (uniqueColumns.includes(key)) {
+      (identifyingData as any)[key] = tableData[key];
+    } else {
+      (updateData as any)[key] = tableData[key];
+    }
+  }
+
+  const { data: existingData, error: selectError } = await supabase
+    .from(tableName)
+    .select()
+    .match(identifyingData)
+    .maybeSingle();
+
+  if (selectError) {
+    console.error("Error checking existing data:", selectError);
+    return { success: false, message: "Check failed", error: selectError };
+  }
+
+  let result;
+  if (existingData) {
+    result = await supabase.from(tableName).update(updateData).match(identifyingData).select();
+  } else {
+    result = await supabase
+      .from(tableName)
+      .insert({ ...identifyingData, ...updateData })
+      .select();
+  }
+
+  if (result.error) {
+    console.error("Operation failed:", result.error);
+    return { success: false, message: "Operation failed", error: result.error };
+  }
+
+  return { success: true, message: "Operation successful", data: result.data };
+}
+
+/*
+  DELETE
+*/
 export async function deleteTableData(tableName: string, matchConditions: Record<string, any>) {
   const supabase = createClient();
 
@@ -110,63 +115,9 @@ export async function softDeleteTableData(tableName: string, matchConditions: Re
   return { success: true, message: "Soft delete successful", data };
 }
 
-////
-// FETCHING TABLE DATA
-////
-
-interface IFetchOptions {
-  tableName: string;
-  columns: string;
-  filters?: Record<string, any>;
-  inFilter?: { column: string; values: any[] };
-  limit?: number;
-  orderBy?: { column: string; ascending?: boolean };
-}
-
-export async function fetchTableDataUniversal({
-  tableName,
-  columns,
-  filters = {},
-  inFilter,
-  limit,
-  orderBy,
-}: IFetchOptions) {
-  const supabase = createClient();
-
-  let query = supabase.from(tableName).select(columns);
-
-  // Apply equality filters
-  for (const [key, value] of Object.entries(filters)) {
-    query = query.eq(key, value);
-  }
-
-  // Apply IN filter if provided
-  if (inFilter) {
-    query = query.in(inFilter.column, inFilter.values);
-  }
-
-  // Apply limit if provided
-  if (limit) {
-    query = query.limit(limit);
-  }
-
-  // Apply ordering if provided
-  if (orderBy) {
-    query = query.order(orderBy.column, {
-      ascending: orderBy.ascending ?? true,
-    });
-  }
-
-  const { data, error } = await query;
-
-  if (error) {
-    console.error("Fetch failed:", error);
-    return { success: false, message: "Fetch failed", error };
-  }
-
-  return { success: true, message: "Fetch successful", data };
-}
-
+/*
+  FETCH
+*/
 export async function fetchTableData(tableName: string, columnNames: string) {
   const supabase = createClient();
 
@@ -185,7 +136,7 @@ export async function fetchFilteredTableData(
   columnNames: string,
   columnFilterName: string,
   filterValues: string[]
-) {
+): Promise<{ success: boolean; message: string; data?: any[]; error?: any }> {
   const supabase = createClient();
 
   const { data, error } = await supabase.from(tableName).select(columnNames).in(columnFilterName, filterValues);
@@ -201,8 +152,8 @@ export async function fetchFilteredTableData(
 export async function fetchFilteredTableData2(
   tableName: string,
   columnNames: string,
-  filterConditions: Record<string, string>
-) {
+  filterConditions: Record<string, any>
+): Promise<{ success: boolean; message: string; data?: any[]; error?: any }> {
   const supabase = createClient();
 
   let query = supabase.from(tableName).select(columnNames);
@@ -258,44 +209,6 @@ export const fetchCityDetails = async (itineraryId: any) => {
   return { data };
 };
 
-export const fetchActivityDetails = async (itineraryId: any) => {
-  const supabase = createClient();
-
-  const { data, error } = await supabase
-    .from("itinerary_destinations")
-    .select(
-      `
-    destination_city_id,
-    cities:destination_city_id (
-      city_name,
-      activities (
-        activity_id,
-        activity_name,
-        address,
-        rating,
-        description,
-        google_maps_url,
-        activity_type,
-        activity_price,
-        website_url,
-        image_url,
-        coordinates,
-        duration,
-        reviews
-      )
-    )
-  `
-    )
-    .eq("itinerary_id", itineraryId);
-
-  if (error) {
-    console.error("Error fetching city data:", error);
-    return { error };
-  }
-
-  return { data };
-};
-
 export const fetchItineraryDestination = async (itineraryId: string) => {
   const supabase = createClient();
 
@@ -319,71 +232,6 @@ export const fetchItineraryDestination = async (itineraryId: string) => {
   return { data };
 };
 
-export const fetchItineraryActivityDetails = async (itineraryId: any) => {
-  const supabase = createClient();
-
-  const { data, error } = await supabase
-    .from("itinerary_activity")
-    .select(
-      `
-    itinerary_activity_id,
-    activity_id,
-    itinerary_id,
-    destination_id,
-    date,
-    start_time,
-    end_time,
-    activities: activity_id (
-      activity_id,
-          activity_name,
-          address,
-          rating,
-          description,
-          google_maps_url,
-          activity_type,
-          activity_price,
-          website_url,
-          image_url,
-          coordinates,
-          duration,
-          reviews
-        )
-      )
-    )
-  `
-    )
-    .eq("itinerary_id", itineraryId);
-
-  if (error) {
-    console.error("Error fetching data:", error);
-    return { error };
-  }
-
-  return { data };
-};
-
-export const checkEntryExists = async (tableName: string, filterParams: Record<string, any>) => {
-  const supabase = createClient();
-
-  // Start the query from the dynamic table name
-  let query = supabase.from(tableName).select("*");
-
-  // Dynamically add filters based on the filterParams object
-  for (const [key, value] of Object.entries(filterParams)) {
-    query = query.eq(key, value);
-  }
-
-  const { data, error } = await query.limit(1); // Limit the result to 1 as we're only checking existence
-
-  if (error) {
-    console.error("Error fetching data:", error);
-    return { exists: false, error };
-  }
-
-  // Check if any data is returned
-  return { exists: data && data.length > 0 };
-};
-
 export async function fetchActivityIdByPlaceId(placeId: string) {
   const supabase = createClient();
 
@@ -397,48 +245,24 @@ export async function fetchActivityIdByPlaceId(placeId: string) {
   return { success: true, message: "Fetch successful", data };
 }
 
-export async function upsertTableDataWithCheck(tableName: string, tableData: any, uniqueColumns: string[]) {
+/*
+  CHECK
+*/
+export const checkEntryExists = async (tableName: string, filterParams: Record<string, any>) => {
   const supabase = createClient();
 
-  // Separate the data used for identifying the row and the data to be updated
-  const identifyingData = {};
-  const updateData = {};
-  for (const key in tableData) {
-    if (uniqueColumns.includes(key)) {
-      (identifyingData as any)[key] = tableData[key];
-    } else {
-      (updateData as any)[key] = tableData[key];
-    }
+  let query = supabase.from(tableName).select("*");
+
+  for (const [key, value] of Object.entries(filterParams)) {
+    query = query.eq(key, value);
   }
 
-  // First, check if the record exists
-  const { data: existingData, error: selectError } = await supabase
-    .from(tableName)
-    .select()
-    .match(identifyingData)
-    .maybeSingle();
+  const { data, error } = await query.limit(1);
 
-  if (selectError) {
-    console.error("Error checking existing data:", selectError);
-    return { success: false, message: "Check failed", error: selectError };
+  if (error) {
+    console.error("Error fetching data:", error);
+    return { exists: false, error };
   }
 
-  let result;
-  if (existingData) {
-    // Update existing record
-    result = await supabase.from(tableName).update(updateData).match(identifyingData).select();
-  } else {
-    // Insert new record
-    result = await supabase
-      .from(tableName)
-      .insert({ ...identifyingData, ...updateData })
-      .select();
-  }
-
-  if (result.error) {
-    console.error("Operation failed:", result.error);
-    return { success: false, message: "Operation failed", error: result.error };
-  }
-
-  return { success: true, message: "Operation successful", data: result.data };
-}
+  return { exists: data && data.length > 0 };
+};

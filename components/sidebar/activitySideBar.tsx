@@ -4,12 +4,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "@/components/ui/accordion";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
@@ -28,15 +23,7 @@ import { IActivityWithLocation } from "@/store/activityStore";
 import { formatOpenHours } from "@/utils/formatting/datetime";
 
 const getDayName = (dayNumber: number) => {
-  const days = [
-    "Sunday",
-    "Monday",
-    "Tuesday",
-    "Wednesday",
-    "Thursday",
-    "Friday",
-    "Saturday",
-  ];
+  const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
   return days[dayNumber];
 };
 
@@ -45,18 +32,11 @@ interface IActivitySidebarProps {
   onClose: () => void;
 }
 
-export default function ActivitySidebar({
-  activity,
-  onClose,
-}: IActivitySidebarProps) {
+export default function ActivitySidebar({ activity, onClose }: IActivitySidebarProps) {
   const searchParams = useSearchParams();
   const itineraryId = searchParams.get("i");
 
-  const {
-    insertItineraryActivity,
-    removeItineraryActivity,
-    itineraryActivities,
-  } = useItineraryActivityStore();
+  const { insertItineraryActivity, removeItineraryActivity, itineraryActivities } = useItineraryActivityStore();
   const [isActivityAdded, setIsActivityAdded] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(false);
 
@@ -66,8 +46,7 @@ export default function ActivitySidebar({
       try {
         setLoading(true);
         const activityExists = itineraryActivities.some((itineraryActivity) => {
-          const isMatch =
-            itineraryActivity.activity?.place_id === activity.place_id;
+          const isMatch = itineraryActivity.activity?.place_id === activity.place_id;
           const isActive = itineraryActivity.is_active === true;
 
           return isMatch && isActive;
@@ -99,10 +78,7 @@ export default function ActivitySidebar({
   const handleRemoveToItinerary = async () => {
     setLoading(true);
     if (!activity || !itineraryId) return;
-    const { success } = await removeItineraryActivity(
-      activity.place_id,
-      itineraryId
-    );
+    const { success } = await removeItineraryActivity(activity.place_id, itineraryId);
     if (success) {
       setIsActivityAdded(false);
     } else {
@@ -120,11 +96,12 @@ export default function ActivitySidebar({
 
     // Check if it's open 24/7
     if (
-      periods.length === 1 &&
-      periods[0].open_hour === 0 &&
-      periods[0].open_minute === 0 &&
-      periods[0].close_hour === 23 &&
-      periods[0].close_minute === 59
+      periods.length === 0 ||
+      (periods.length === 1 &&
+        periods[0].open_hour === 0 &&
+        periods[0].open_minute === 0 &&
+        periods[0].close_hour === 23 &&
+        periods[0].close_minute === 59)
     ) {
       return (
         <div className="grid grid-cols-[120px_1fr] items-center">
@@ -170,12 +147,7 @@ export default function ActivitySidebar({
     <div className="flex flex-col w-full h-full border bg-white relative">
       <div className="flex flex-col w-full h-full border bg-white relative">
         <div className="absolute top-4 right-4 z-10">
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={onClose}
-            className="rounded-full"
-          >
+          <Button variant="outline" size="icon" onClick={onClose} className="rounded-full">
             <X size={16} className="rounded-full hover:bg-zinc-100" />
           </Button>
         </div>
@@ -185,30 +157,21 @@ export default function ActivitySidebar({
               <div className="mt-4">
                 {activity.photo_names && activity.photo_names.length > 0 && (
                   <div className="mt-4">
-                    <ImagesCarousel
-                      photoNames={activity.photo_names}
-                      showButtons={true}
-                    />
+                    <ImagesCarousel photoNames={activity.photo_names} showButtons={true} />
                   </div>
                 )}
               </div>
               <div className="mt-6">
-                <div className="font-semibold text-2xl">
-                  {capitalizeFirstLetterOfEachWord(activity.name)}
-                </div>
+                <div className="font-semibold text-2xl">{capitalizeFirstLetterOfEachWord(activity.name)}</div>
                 {activity.rating && (
                   <div className="flex flex-row space-x-1 items-center mt-2">
                     <Rating rating={activity.rating} />
-                    <div className="ml-2 text-xs text-zinc-500">
-                      {activity.rating}
-                    </div>
+                    <div className="ml-2 text-xs text-zinc-500">{activity.rating}</div>
                   </div>
                 )}
 
                 <p className="text-gray-500 text-md mt-1">{activity.address}</p>
-                {activity.description && (
-                  <p className="mt-2 text-md">{activity.description}</p>
-                )}
+                {activity.description && <p className="mt-2 text-md">{activity.description}</p>}
 
                 {activity.website_url && (
                   <>
@@ -248,9 +211,7 @@ export default function ActivitySidebar({
                   <Accordion type="single" collapsible className="w-full">
                     <AccordionItem value="item-1">
                       <AccordionTrigger>Opening Hours</AccordionTrigger>
-                      <AccordionContent className="flex flex-col w-full">
-                        {renderOpeningHours()}
-                      </AccordionContent>
+                      <AccordionContent className="flex flex-col w-full">{renderOpeningHours()}</AccordionContent>
                     </AccordionItem>
                   </Accordion>
                 </div>
@@ -270,27 +231,16 @@ export default function ActivitySidebar({
           {/* <Link href={`/itinerary/${1}/overview`}> */}
           <Separator className="mt-4" />
           {loading ? (
-            <Button
-              variant="outline"
-              className="mt-4 disabled rounded-full hover:bg-gray-100 hover:text-black"
-            >
+            <Button variant="outline" className="mt-4 disabled rounded-full hover:bg-gray-100 hover:text-black">
               <Loader2 className="mr-2 h-4 w-4 animate-spin " />
               Please wait
             </Button>
           ) : isActivityAdded ? (
-            <Button
-              variant="secondary"
-              className="mt-4 rounded-full"
-              onClick={handleRemoveToItinerary}
-            >
+            <Button variant="secondary" className="mt-4 rounded-full" onClick={handleRemoveToItinerary}>
               Remove
             </Button>
           ) : (
-            <Button
-              variant="outline"
-              className="mt-4 rounded-full"
-              onClick={handleAddToItinerary}
-            >
+            <Button variant="outline" className="mt-4 rounded-full" onClick={handleAddToItinerary}>
               Add to Itinerary
             </Button>
           )}

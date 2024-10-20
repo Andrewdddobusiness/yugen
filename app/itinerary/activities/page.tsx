@@ -14,13 +14,18 @@ import Mapbox from "@/components/map/mapbox";
 import { MdMoneyOff, MdAttachMoney } from "react-icons/md";
 import { Loader2 } from "lucide-react";
 
-import { fetchTableData, fetchItineraryDestination } from "@/actions/supabase/actions";
+import {
+  fetchTableData,
+  fetchItineraryDestination,
+  fetchFilteredTableData,
+  fetchFilteredTableData2,
+} from "@/actions/supabase/actions";
 import { fetchCityCoordinates } from "@/actions/google/actions";
 import { fetchNearbyActivities } from "@/actions/google/actions";
 import Loading from "@/components/loading/loading";
 import ActivityFilters from "@/components/filters/activityFilters";
 
-import { IActivity, IActivityWithLocation, useActivitiesStore } from "@/store/activityStore";
+import { IActivity, IActivityWithLocation, IOpenHours, useActivitiesStore } from "@/store/activityStore";
 import { IItineraryActivity, useItineraryActivityStore } from "@/store/itineraryActivityStore";
 import { InfiniteScroll } from "@/components/scroll/infiniteScroll";
 import { useMapStore } from "@/store/mapStore";
@@ -31,20 +36,25 @@ export default function Activities() {
   const itineraryId = searchParams.get("i");
   const destinationId = searchParams.get("d");
 
-  const { mapRadius } = useMapStore();
-  const { activities, setActivities } = useActivitiesStore();
+  // **** STORES ****
+  const { setActivities } = useActivitiesStore();
   const { fetchItineraryActivities, setItineraryActivities } = useItineraryActivityStore();
-  const { setCenterCoordinates, setItineraryCoordinates, itineraryCoordinates } = useMapStore();
+  const { mapRadius, setCenterCoordinates, setItineraryCoordinates, itineraryCoordinates } = useMapStore();
 
   const [searchQuery, setSearchQuery] = useState<string>("");
+
+  // **** STATES ****
   const [freeFilter, setFreeFilter] = useState<boolean>(false);
   const [paidFilter, setPaidFilter] = useState<boolean>(false);
+  const [selectedFilter, setSelectedFilter] = useState("");
+
   const [selectedActivity, setSelectedActivity] = useState<IActivity | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [sidebarKey, setSidebarKey] = useState(0);
-  const [selectedFilter, setSelectedFilter] = useState("");
+
   const [initialLoadComplete, setInitialLoadComplete] = useState(false);
 
+  // **** GET INITIAL ACTIVITIES ****
   const { data: itineraryActivities, isLoading: isItineraryActivitiesLoading } = useQuery({
     queryKey: ["itineraryActivities", itineraryId, destinationId],
     queryFn: () => fetchItineraryActivities(itineraryId as string, destinationId as string),
@@ -82,34 +92,6 @@ export default function Activities() {
     }
   }, [cityCoordinates, setCenterCoordinates, setItineraryCoordinates]);
 
-  // const {
-  //   data: activitiesData,
-  //   isLoading: isActivitiesLoading,
-  //   fetchNextPage,
-  //   hasNextPage,
-  //   isFetchingNextPage,
-  // } = useInfiniteQuery({
-  //   queryKey: [
-  //     "nearbyActivities",
-  //     cityCoordinates?.latitude,
-  //     cityCoordinates?.longitude,
-  //   ],
-  //   queryFn: ({ pageParam = 0 }) =>
-  //     fetchNearbyActivities(
-  //       cityCoordinates!.latitude,
-  //       cityCoordinates!.longitude
-  //     ),
-  //   getNextPageParam: (lastPage, pages) => {
-  //     if ((lastPage as any[]).length < 20) return undefined;
-  //     return pages.length;
-  //   },
-  //   enabled: !!cityCoordinates,
-  //   staleTime: 5 * 60 * 1000, // 5 minutes
-  //   refetchOnWindowFocus: false,
-  //   refetchOnReconnect: false,
-  //   initialPageParam: 0,
-  // });
-
   const {
     data: activitiesData,
     isLoading: isActivitiesLoading,
@@ -132,16 +114,102 @@ export default function Activities() {
   useEffect(() => {
     if (activitiesData && !initialLoadComplete) {
       setInitialLoadComplete(true);
-    }
-  }, [activitiesData, initialLoadComplete]);
-
-  useEffect(() => {
-    if (activitiesData) {
-      console.log("activitiesData: ", activitiesData);
       setActivities(activitiesData as IActivity[]);
     }
-  }, [activitiesData, setActivities]);
+  }, [activitiesData, setActivities, initialLoadComplete, setInitialLoadComplete]);
 
+  // **** GET TOP PLACES ACTIVITIES ****
+  const { data: countryData, isLoading: isCountryDataLoading } = useQuery({
+    queryKey: ["countryData", destinationData?.data?.country],
+    queryFn: async () => {
+      const result = await fetchFilteredTableData("country", "country_id", "country_name", [
+        destinationData?.data?.country as string,
+      ]);
+      if (!result.success || !result.data) {
+        throw new Error(result.message || "Failed to fetch country data");
+      }
+      return result.data;
+    },
+    enabled: !!destinationData?.data?.country,
+  });
+
+  const { data: cityData, isLoading: isCityDataLoading } = useQuery({
+    queryKey: ["cityData", destinationData?.data?.city, countryData?.[0]?.country_id],
+    queryFn: async () => {
+      if (!countryData || !countryData[0] || typeof countryData[0].country_id === "undefined") {
+        throw new Error("Country data is not available or invalid");
+      }
+      const result = await fetchFilteredTableData2("city", "city_id", {
+        city_name: destinationData?.data?.city,
+        country_id: countryData[0].country_id,
+      });
+      if ("error" in result || !result.data) {
+        throw new Error(result.error?.message || "Failed to fetch city data");
+      }
+      return result.data;
+    },
+    enabled: !!destinationData?.data?.city && !!countryData && countryData.length > 0,
+  });
+
+  const { data: topPlacesActivities, isLoading: isTopPlacesActivitiesLoading } = useQuery<IActivity[]>({
+    queryKey: ["topPlacesActivities", cityData?.[0]?.city_id],
+    queryFn: async () => {
+      if (!cityData || !cityData[0] || typeof cityData[0].city_id === "undefined") {
+        throw new Error("City data is not available or invalid");
+      }
+      const result = await fetchFilteredTableData2(
+        "activity",
+        `*,
+        review(*),
+        open_hours(*)`,
+        {
+          city_id: cityData[0].city_id,
+          is_top_place: true,
+        }
+      );
+
+      if (!result.success || !result.data) {
+        throw new Error(result.message || "Failed to fetch top places activities");
+      }
+      return result.data.map((activity: any) => ({
+        place_id: activity.place_id,
+        name: activity.name,
+        coordinates: activity.coordinates,
+        types: activity.types,
+        price_level: activity.price_level,
+        address: activity.address,
+        rating: activity.rating,
+        description: activity.description,
+        google_maps_url: activity.google_maps_url,
+        website_url: activity.website_url,
+        photo_names: activity.photo_names,
+        duration: activity.duration,
+        phone_number: activity.phone_number,
+        reviews: activity.review,
+        open_hours: activity.open_hours.map((oh: any) => ({
+          day: oh.day,
+          open_hour: oh.open_hour,
+          open_minute: oh.open_minute,
+          close_hour: oh.close_hour,
+          close_minute: oh.close_minute,
+        })),
+        is_top_place: activity.is_top_place,
+      }));
+    },
+    enabled: !!cityData && cityData.length > 0,
+  });
+
+  useEffect(() => {
+    console.log("topPlacesActivities: ", topPlacesActivities);
+  }, [topPlacesActivities, isTopPlacesActivitiesLoading]);
+
+  useEffect(() => {
+    if (itineraryActivities) {
+      setItineraryActivities(itineraryActivities as IItineraryActivity[]);
+    }
+  }, [itineraryActivities, setItineraryActivities]);
+
+  // **** HANDLERS ****
   const handleActivitySelect = (activity: any) => {
     setSelectedActivity(activity);
     setIsSidebarOpen(true);
@@ -151,11 +219,6 @@ export default function Activities() {
   const handleCloseSidebar = () => {
     setSelectedActivity(null);
     setIsSidebarOpen(false);
-
-    const manualRefetchActivities = () => {
-      refetchActivities();
-      setInitialLoadComplete(true);
-    };
   };
 
   // const filteredActivities =
@@ -189,74 +252,86 @@ export default function Activities() {
       {isCoordinatesLoading || isDestinationLoading || isActivitiesLoading || isItineraryActivitiesLoading ? (
         <Loading />
       ) : (
-        <div className="flex flex-row flex-grow overflow-y-auto h-full relative">
-          <div className="flex flex-row w-full transition-all duration-300">
-            <div
-              className={`p-4 min-h-[870px] rounded-lg flex flex-col transition-all duration-300 ${
-                isSidebarOpen ? "w-1/2 md:w-1/3 " : "w-1/2"
-              }`}
-            >
-              <div className="flex flex-col items-center">
-                <div className="text-2xl text-black font-bold flex justify-left pt-8">Explore Activities</div>
-                <div className="text-md text-zinc-500 flex justify-left">
-                  Search for activities that you want to do!
+        <div className="flex flex-row flex-grow overflow-hidden h-full relative">
+          <div
+            className={`p-4 flex flex-col transition-all duration-300 ${isSidebarOpen ? "w-1/2 md:w-1/3 " : "w-1/2"}`}
+          >
+            <div className="flex flex-col items-center">
+              <div className="text-2xl text-black font-bold flex justify-left pt-8">Explore Activities</div>
+              <div className="text-md text-zinc-500 flex justify-left">Search for activities that you want to do!</div>
+              <Input
+                type="search"
+                placeholder="Search..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full rounded-lg bg-background pl-8 md:w-[200px] lg:w-[336px] mt-2"
+              />
+              <div className="flex flex-row justify-between w-full mt-4">
+                <div className="ml-8">
+                  <Toggle
+                    variant="outline"
+                    className={`h-8 rounded-full ${freeFilter ? "bg-gray-200" : ""}`}
+                    onClick={() => setFreeFilter(!freeFilter)}
+                  >
+                    <MdMoneyOff size={16} />
+                    {!isSidebarOpen && <div className="pl-1">Free</div>}
+                  </Toggle>
+                  <Toggle
+                    variant="outline"
+                    className={`h-8 rounded-full ml-2 ${paidFilter ? "bg-gray-200" : ""}`}
+                    onClick={() => setPaidFilter(!paidFilter)}
+                  >
+                    <MdAttachMoney size={16} />
+                    {!isSidebarOpen && <div className="pl-1">Paid</div>}
+                  </Toggle>
                 </div>
-                <Input
-                  type="search"
-                  placeholder="Search..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full rounded-lg bg-background pl-8 md:w-[200px] lg:w-[336px] mt-2"
-                />
-                <div className="flex flex-row justify-between w-full mt-4">
-                  <div className="ml-8">
-                    <Toggle
-                      variant="outline"
-                      className={`h-8 rounded-full ${freeFilter ? "bg-gray-200" : ""}`}
-                      onClick={() => setFreeFilter(!freeFilter)}
-                    >
-                      <MdMoneyOff size={16} />
-                      {!isSidebarOpen && <div className="pl-1">Free</div>}
-                    </Toggle>
-                    <Toggle
-                      variant="outline"
-                      className={`h-8 rounded-full ml-2 ${paidFilter ? "bg-gray-200" : ""}`}
-                      onClick={() => setPaidFilter(!paidFilter)}
-                    >
-                      <MdAttachMoney size={16} />
-                      {!isSidebarOpen && <div className="pl-1">Paid</div>}
-                    </Toggle>
-                  </div>
-                  <div className="mr-8">
-                    <ActivityFilters selectedFilter={selectedFilter} setSelectedFilter={setSelectedFilter} />
-                  </div>
+                <div className="mr-8">
+                  <ActivityFilters selectedFilter={selectedFilter} setSelectedFilter={setSelectedFilter} />
                 </div>
-                <Separator className="my-4" />
               </div>
-              <div className="flex flex-col pb-4 px-4">
-                <Tabs defaultValue="top-places">
+              <Separator className="my-4" />
+            </div>
+            <div className="flex flex-col flex-grow overflow-hidden ">
+              <Tabs defaultValue="top-places" className="w-full h-full flex flex-col ">
+                <div className="px-4 flex-shrink-0">
                   <TabsList>
                     <TabsTrigger value="top-places">Top places</TabsTrigger>
                     <TabsTrigger value="search">Search</TabsTrigger>
                   </TabsList>
-                  <TabsContent value="top-places">Make changes to your account here.</TabsContent>
-                  <TabsContent value="search">
-                    <ScrollArea className="flex flex-col h-full w-full">
-                      {activitiesData && (
-                        <ActivityCards
-                          activities={activitiesData as IActivityWithLocation[]}
-                          onSelectActivity={handleActivitySelect}
-                          isSidebarOpen={isSidebarOpen}
-                        />
-                      )}
-                    </ScrollArea>
-                  </TabsContent>
-                </Tabs>
-              </div>
+                </div>
+
+                <TabsContent value="top-places" className="flex-grow overflow-hidden">
+                  <ScrollArea className="h-full px-4">
+                    {topPlacesActivities && (
+                      <ActivityCards
+                        activities={topPlacesActivities as IActivityWithLocation[]}
+                        onSelectActivity={handleActivitySelect}
+                        isSidebarOpen={isSidebarOpen}
+                      />
+                    )}
+                  </ScrollArea>
+                </TabsContent>
+
+                <TabsContent value="search" className="flex-grow overflow-hidden">
+                  <ScrollArea className="h-full px-4">
+                    {activitiesData && (
+                      <ActivityCards
+                        activities={activitiesData as IActivityWithLocation[]}
+                        onSelectActivity={handleActivitySelect}
+                        isSidebarOpen={isSidebarOpen}
+                      />
+                    )}
+                  </ScrollArea>
+                </TabsContent>
+              </Tabs>
             </div>
-            <div className={`border relative transition-all duration-300 ${isSidebarOpen ? "w-0 md:w-1/3" : "w-1/2"}`}>
-              {cityCoordinates && <Mapbox isSidebarOpen={isSidebarOpen} />}
-            </div>
+          </div>
+          <div
+            className={`border-x h-full relative transition-all duration-300 ${
+              isSidebarOpen ? "w-0 md:w-1/3" : "w-1/2"
+            }`}
+          >
+            {cityCoordinates && <Mapbox isSidebarOpen={isSidebarOpen} />}
           </div>
           <div
             className={`absolute top-0 right-0 h-full z-50 transition-all duration-300 transform ${
