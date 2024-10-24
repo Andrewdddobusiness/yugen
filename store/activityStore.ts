@@ -43,14 +43,20 @@ export interface IActivityWithLocation extends IActivity {
 
 interface IActivityStore {
   activities: IActivity[];
+  topPlacesActivities: IActivity[];
+  selectedActivity: IActivity | null;
   fetchActivities: (itineraryId: string) => Promise<any[]>;
   setActivities: (activities: IActivity[]) => void;
   insertActivity: (activity: any) => void;
   removeActivity: (activityId: string) => void;
+  setSelectedActivity: (activity: IActivity | null) => void;
+  setTopPlacesActivities: (topPlaces: IActivity[]) => void;
 }
 
-export const useActivitiesStore = create<IActivityStore>((set) => ({
+export const useActivitiesStore = create<IActivityStore>((set, get) => ({
   activities: [],
+  topPlacesActivities: [],
+  selectedActivity: null,
   fetchActivities: async (itineraryId: string): Promise<any[]> => {
     try {
       const response = await fetch(`/api/itineraries/${itineraryId}/activities`);
@@ -71,4 +77,6 @@ export const useActivitiesStore = create<IActivityStore>((set) => ({
     set((state) => ({
       activities: state.activities.filter((a) => a.place_id !== activityId),
     })),
+  setSelectedActivity: (activity: IActivity | null) => set({ selectedActivity: activity }),
+  setTopPlacesActivities: (topPlaces: IActivity[]) => set({ topPlacesActivities: topPlaces }),
 }));

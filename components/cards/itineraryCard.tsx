@@ -3,19 +3,9 @@ import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 
-import {
-  Card,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-} from "@/components/ui/card";
+import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 
 import { MoreHorizontal } from "lucide-react";
 
@@ -39,14 +29,7 @@ export default function ItineraryCard({ itinerary }: ItineraryCardProps) {
   const [isHovered, setIsHovered] = useState(false);
 
   return (
-    <Link
-      href={
-        `/itinerary/overview?i=${itinerary.itinerary_id}&d=${itinerary.destination_id}` ||
-        ""
-      }
-      legacyBehavior
-      passHref
-    >
+    <Link href={`/itinerary/overview?i=${itinerary.itinerary_id}&d=${itinerary.destination_id}` || ""} legacyBehavior passHref>
       <Card
         className="aspect-w-1 aspect-h-1 cursor-pointer relative"
         onMouseEnter={() => setIsHovered(true)}
@@ -74,8 +57,7 @@ export default function ItineraryCard({ itinerary }: ItineraryCardProps) {
             <>{capitalizeFirstLetter(itinerary.country || "")}</>
           </CardTitle>
           <CardDescription>
-            {formatUserFriendlyDate(itinerary.from_date)} -{" "}
-            {formatUserFriendlyDate(itinerary.to_date)}
+            {formatUserFriendlyDate(itinerary.from_date)} - {formatUserFriendlyDate(itinerary.to_date)}
           </CardDescription>
         </CardHeader>
 

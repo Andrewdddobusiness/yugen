@@ -43,3 +43,8 @@ Biege: FFF7E9
 Blue: 185ADB
 Dodger Blue: 1673e0
 Navy: 1746A2
+
+Piink: f33261
+Light Purple: c5a3ef
+Bluee: c5a3ef
+Tangy Orange: f6aa23

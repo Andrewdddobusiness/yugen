@@ -11,12 +11,12 @@ import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
 import {
   DropdownMenu,
-  DropdownMenuCheckboxItem,
+  DropdownMenuTrigger,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
-  DropdownMenuTrigger,
+  DropdownMenuGroup,
 } from "@/components/ui/dropdown-menu";
 
 import ItineraryChoiceDialog from "../dialog/itineraryChoiceDialog";
@@ -31,12 +31,7 @@ interface PageLayoutProps {
   itineraryNumber: number;
 }
 
-export default function BuilderLayout({
-  title,
-  children,
-  activePage,
-  itineraryNumber,
-}: PageLayoutProps): React.ReactElement {
+export default function BuilderLayout({ title, children, activePage, itineraryNumber }: PageLayoutProps): React.ReactElement {
   const supabase = createClient();
   const searchParams = useSearchParams();
 
@@ -119,12 +114,7 @@ export default function BuilderLayout({
             <Tooltip>
               <TooltipTrigger asChild>
                 <Link href={`/itinerary/builder?i=${itineraryId}&d=${destinationId}`}>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className={`rounded-lg ${activePage === "explore" ? "bg-muted" : ""}`}
-                    aria-label="Explore"
-                  >
+                  <Button variant="ghost" size="icon" className={`rounded-lg ${activePage === "explore" ? "bg-muted" : ""}`} aria-label="Explore">
                     <Hammer className="size-5" />
                   </Button>
                 </Link>
@@ -137,12 +127,7 @@ export default function BuilderLayout({
             <Tooltip>
               <TooltipTrigger asChild>
                 <Link href={`/itinerary/activities?i=${itineraryId}&d=${destinationId}`}>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className={`rounded-lg ${activePage === "explore" ? "bg-muted" : ""}`}
-                    aria-label="Explore"
-                  >
+                  <Button variant="ghost" size="icon" className={`rounded-lg ${activePage === "explore" ? "bg-muted" : ""}`} aria-label="Explore">
                     <Footprints className="size-5" />
                   </Button>
                 </Link>
@@ -184,31 +169,32 @@ export default function BuilderLayout({
           <h1 className="text-xl font-semibold ml-16">{title}</h1>
           <div className="ml-auto pr-4">
             <DropdownMenu>
-              <DropdownMenuTrigger>
+              <DropdownMenuTrigger asChild>
                 <Button variant="outline" size="icon" className="overflow-hidden rounded-full">
                   {profileUrl ? (
-                    <Image
-                      alt="Profile"
-                      src={profileUrl ? profileUrl : ""}
-                      width={100}
-                      height={100}
-                      className="w-10 h-10 rounded-full"
-                      priority
-                    />
+                    <Image alt="Profile" src={profileUrl ? profileUrl : ""} width={100} height={100} className="w-10 h-10 rounded-full" priority />
                   ) : (
                     <Skeleton className="h-[32px] w-[32px] rounded-full" />
                   )}
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuLabel a>My Account</DropdownMenuLabel>
+                <DropdownMenuLabel>
+                  <span>My Account</span>
+                </DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem>Settings</DropdownMenuItem>
-                <DropdownMenuItem>Support</DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem>
-                  <LogoutButton />
-                </DropdownMenuItem>
+                <DropdownMenuGroup>
+                  <DropdownMenuItem>
+                    <span>Settings</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem>
+                    <span>Support</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem>
+                    <LogoutButton />
+                  </DropdownMenuItem>
+                </DropdownMenuGroup>
               </DropdownMenuContent>
             </DropdownMenu>
           </div>

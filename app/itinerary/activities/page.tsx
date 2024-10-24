@@ -1,7 +1,7 @@
 "use client";
 import React, { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { useQuery, useInfiniteQuery } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 
 import BuilderLayout from "@/components/layouts/builderLayout";
 import { Input } from "@/components/ui/input";
@@ -12,14 +12,8 @@ import ActivityCards from "@/components/cards/activityCards";
 import ActivitySidebar from "@/components/sidebar/activitySideBar";
 import Mapbox from "@/components/map/mapbox";
 import { MdMoneyOff, MdAttachMoney } from "react-icons/md";
-import { Loader2 } from "lucide-react";
 
-import {
-  fetchTableData,
-  fetchItineraryDestination,
-  fetchFilteredTableData,
-  fetchFilteredTableData2,
-} from "@/actions/supabase/actions";
+import { fetchItineraryDestination, fetchFilteredTableData, fetchFilteredTableData2 } from "@/actions/supabase/actions";
 import { fetchCityCoordinates } from "@/actions/google/actions";
 import { fetchNearbyActivities } from "@/actions/google/actions";
 import Loading from "@/components/loading/loading";
@@ -27,9 +21,11 @@ import ActivityFilters from "@/components/filters/activityFilters";
 
 import { IActivity, IActivityWithLocation, IOpenHours, useActivitiesStore } from "@/store/activityStore";
 import { IItineraryActivity, useItineraryActivityStore } from "@/store/itineraryActivityStore";
-import { InfiniteScroll } from "@/components/scroll/infiniteScroll";
+import { useSidebarStore } from "@/store/sidebarStore";
+
 import { useMapStore } from "@/store/mapStore";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useActivityTabStore } from "@/store/activityTabStore";
 
 export default function Activities() {
   const searchParams = useSearchParams();
@@ -37,20 +33,18 @@ export default function Activities() {
   const destinationId = searchParams.get("d");
 
   // **** STORES ****
-  const { setActivities } = useActivitiesStore();
+  const { activities, setActivities, selectedActivity, setSelectedActivity, topPlacesActivities, setTopPlacesActivities } = useActivitiesStore();
   const { fetchItineraryActivities, setItineraryActivities } = useItineraryActivityStore();
-  const { mapRadius, setCenterCoordinates, setItineraryCoordinates, itineraryCoordinates } = useMapStore();
-
-  const [searchQuery, setSearchQuery] = useState<string>("");
+  const { mapRadius, setCenterCoordinates, itineraryCoordinates, setItineraryCoordinates } = useMapStore();
+  const { isSidebarOpen, setIsSidebarOpen, sidebarKey, setSidebarKey } = useSidebarStore();
+  const { selectedTab, setSelectedTab } = useActivityTabStore();
 
   // **** STATES ****
+  const [searchQuery, setSearchQuery] = useState<string>("");
+
   const [freeFilter, setFreeFilter] = useState<boolean>(false);
   const [paidFilter, setPaidFilter] = useState<boolean>(false);
   const [selectedFilter, setSelectedFilter] = useState("");
-
-  const [selectedActivity, setSelectedActivity] = useState<IActivity | null>(null);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [sidebarKey, setSidebarKey] = useState(0);
 
   const [initialLoadComplete, setInitialLoadComplete] = useState(false);
 
@@ -93,7 +87,7 @@ export default function Activities() {
   }, [cityCoordinates, setCenterCoordinates, setItineraryCoordinates]);
 
   const {
-    data: activitiesData,
+    data: fetchedActivities,
     isLoading: isActivitiesLoading,
     error: activitiesError,
     refetch: refetchActivities,
@@ -112,19 +106,17 @@ export default function Activities() {
   });
 
   useEffect(() => {
-    if (activitiesData && !initialLoadComplete) {
+    if (fetchedActivities && !initialLoadComplete) {
       setInitialLoadComplete(true);
-      setActivities(activitiesData as IActivity[]);
+      setActivities(fetchedActivities as IActivity[]);
     }
-  }, [activitiesData, setActivities, initialLoadComplete, setInitialLoadComplete]);
+  }, [fetchedActivities, setActivities, initialLoadComplete, setInitialLoadComplete]);
 
   // **** GET TOP PLACES ACTIVITIES ****
   const { data: countryData, isLoading: isCountryDataLoading } = useQuery({
     queryKey: ["countryData", destinationData?.data?.country],
     queryFn: async () => {
-      const result = await fetchFilteredTableData("country", "country_id", "country_name", [
-        destinationData?.data?.country as string,
-      ]);
+      const result = await fetchFilteredTableData("country", "country_id", "country_name", [destinationData?.data?.country as string]);
       if (!result.success || !result.data) {
         throw new Error(result.message || "Failed to fetch country data");
       }
@@ -151,7 +143,7 @@ export default function Activities() {
     enabled: !!destinationData?.data?.city && !!countryData && countryData.length > 0,
   });
 
-  const { data: topPlacesActivities, isLoading: isTopPlacesActivitiesLoading } = useQuery<IActivity[]>({
+  const { data: fetchedtopPlacesActivities, isLoading: isTopPlacesActivitiesLoading } = useQuery<IActivity[]>({
     queryKey: ["topPlacesActivities", cityData?.[0]?.city_id],
     queryFn: async () => {
       if (!cityData || !cityData[0] || typeof cityData[0].city_id === "undefined") {
@@ -200,8 +192,8 @@ export default function Activities() {
   });
 
   useEffect(() => {
-    console.log("topPlacesActivities: ", topPlacesActivities);
-  }, [topPlacesActivities, isTopPlacesActivitiesLoading]);
+    setTopPlacesActivities(fetchedtopPlacesActivities as IActivity[]);
+  }, [fetchedtopPlacesActivities, isTopPlacesActivitiesLoading, setTopPlacesActivities]);
 
   useEffect(() => {
     if (itineraryActivities) {
@@ -213,12 +205,16 @@ export default function Activities() {
   const handleActivitySelect = (activity: any) => {
     setSelectedActivity(activity);
     setIsSidebarOpen(true);
-    setSidebarKey((prevKey) => prevKey + 1);
+    setSidebarKey(sidebarKey);
   };
 
   const handleCloseSidebar = () => {
     setSelectedActivity(null);
     setIsSidebarOpen(false);
+  };
+
+  const handleTabChange = (tab: string) => {
+    setSelectedTab(tab);
   };
 
   // const filteredActivities =
@@ -253,9 +249,7 @@ export default function Activities() {
         <Loading />
       ) : (
         <div className="flex flex-row flex-grow overflow-hidden h-full relative">
-          <div
-            className={`p-4 flex flex-col transition-all duration-300 ${isSidebarOpen ? "w-1/2 md:w-1/3 " : "w-1/2"}`}
-          >
+          <div className={`p-4 flex flex-col transition-all duration-300 ${isSidebarOpen ? "w-1/2 md:w-1/3 " : "w-1/2"}`}>
             <div className="flex flex-col items-center">
               <div className="text-2xl text-black font-bold flex justify-left pt-8">Explore Activities</div>
               <div className="text-md text-zinc-500 flex justify-left">Search for activities that you want to do!</div>
@@ -292,46 +286,28 @@ export default function Activities() {
               <Separator className="my-4" />
             </div>
             <div className="flex flex-col flex-grow overflow-hidden ">
-              <Tabs defaultValue="top-places" className="w-full h-full flex flex-col ">
-                <div className="px-4 flex-shrink-0">
-                  <TabsList>
-                    <TabsTrigger value="top-places">Top places</TabsTrigger>
-                    <TabsTrigger value="search">Search</TabsTrigger>
-                  </TabsList>
-                </div>
-
-                <TabsContent value="top-places" className="flex-grow overflow-hidden">
+              <Tabs value={selectedTab} onValueChange={(value) => setSelectedTab(value as "top-places" | "search")}>
+                <TabsList>
+                  <TabsTrigger value="top-places">Top places</TabsTrigger>
+                  <TabsTrigger value="search">Search</TabsTrigger>
+                </TabsList>
+                <TabsContent value="top-places">
                   <ScrollArea className="h-full px-4">
                     {topPlacesActivities && (
-                      <ActivityCards
-                        activities={topPlacesActivities as IActivityWithLocation[]}
-                        onSelectActivity={handleActivitySelect}
-                        isSidebarOpen={isSidebarOpen}
-                      />
+                      <ActivityCards activities={topPlacesActivities as IActivityWithLocation[]} onSelectActivity={handleActivitySelect} />
                     )}
                   </ScrollArea>
                 </TabsContent>
-
-                <TabsContent value="search" className="flex-grow overflow-hidden">
+                <TabsContent value="search">
                   <ScrollArea className="h-full px-4">
-                    {activitiesData && (
-                      <ActivityCards
-                        activities={activitiesData as IActivityWithLocation[]}
-                        onSelectActivity={handleActivitySelect}
-                        isSidebarOpen={isSidebarOpen}
-                      />
-                    )}
+                    {activities && <ActivityCards activities={activities as IActivityWithLocation[]} onSelectActivity={handleActivitySelect} />}
                   </ScrollArea>
                 </TabsContent>
               </Tabs>
             </div>
           </div>
-          <div
-            className={`border-x h-full relative transition-all duration-300 ${
-              isSidebarOpen ? "w-0 md:w-1/3" : "w-1/2"
-            }`}
-          >
-            {cityCoordinates && <Mapbox isSidebarOpen={isSidebarOpen} />}
+          <div className={`border-x h-full relative transition-all duration-300 ${isSidebarOpen ? "w-0 md:w-1/3" : "w-1/2"}`}>
+            {cityCoordinates && <Mapbox />}
           </div>
           <div
             className={`absolute top-0 right-0 h-full z-50 transition-all duration-300 transform ${

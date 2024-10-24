@@ -1,20 +1,22 @@
 import React from "react";
 import ActivityCard from "./activityCard";
-import { IActivity, IActivityWithLocation } from "@/store/activityStore";
+import { IActivityWithLocation } from "@/store/activityStore";
+import { useSidebarStore } from "@/store/sidebarStore";
 
 interface IActivityCardsProps {
   activities: IActivityWithLocation[];
   onSelectActivity: (activity: IActivityWithLocation) => void;
   // onHover: (coordinates: [number, number]) => void;
-  isSidebarOpen: boolean;
 }
 
 export default function ActivityCards({
   activities,
   onSelectActivity,
-  // onHover,
-  isSidebarOpen,
-}: IActivityCardsProps) {
+}: // onHover,
+
+IActivityCardsProps) {
+  const { isSidebarOpen } = useSidebarStore();
+
   return (
     <div
       className={`grid ${
