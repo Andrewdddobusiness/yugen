@@ -4,17 +4,21 @@ import { useActivitiesStore } from "@/store/activityStore";
 import { Button } from "@/components/ui/button";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { MdMoneyOff, MdAttachMoney } from "react-icons/md";
 import { Check, ChevronsUpDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-const ActivityFilters: React.FC = () => {
-  const { selectedFilters, setSelectedFilters } = useActivitiesStore();
+const ActivityCostFilters: React.FC = () => {
+  const { selectedCostFilters, setSelectedCostFilters } = useActivitiesStore();
   const [open, setOpen] = React.useState(false);
 
-  const filters = ["Food", "Historical", "Shopping"];
+  const filters = [
+    { name: "Free", icon: <MdMoneyOff size={16} /> },
+    { name: "Paid", icon: <MdAttachMoney size={16} /> },
+  ];
 
   const handleFilterSelect = (filter: string) => {
-    setSelectedFilters((prevFilters: string[]) => {
+    setSelectedCostFilters((prevFilters: string[]) => {
       if (prevFilters.includes(filter)) {
         return prevFilters.filter((f) => f !== filter);
       } else {
@@ -29,13 +33,14 @@ const ActivityFilters: React.FC = () => {
       <div className="hidden lg:flex space-x-2">
         {filters.map((filter) => (
           <Toggle
-            key={filter}
+            key={filter.name}
             variant="outline"
-            className="h-8 rounded-full ml-2"
-            pressed={selectedFilters.includes(filter)}
-            onPressedChange={() => handleFilterSelect(filter)}
+            className={`h-8 rounded-full ${selectedCostFilters.includes(filter.name) ? "bg-gray-200" : ""}`}
+            pressed={selectedCostFilters.includes(filter.name)}
+            onPressedChange={() => handleFilterSelect(filter.name)}
           >
-            {filter}
+            {filter.icon}
+            <span className="ml-1">{filter.name}</span>
           </Toggle>
         ))}
       </div>
@@ -45,27 +50,33 @@ const ActivityFilters: React.FC = () => {
         <Popover open={open} onOpenChange={setOpen}>
           <PopoverTrigger asChild>
             <Button variant="outline" className="h-8 justify-start rounded-full">
-              {selectedFilters.length > 0 ? selectedFilters.join(", ") : "Select type"}
+              {selectedCostFilters.length > 0 ? selectedCostFilters.join(", ") : "Select cost"}
               <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
             </Button>
           </PopoverTrigger>
           <PopoverContent className="w-[200px] p-0" align="start">
             <Command>
-              <CommandInput placeholder="Search type..." />
+              <CommandInput placeholder="Search cost..." />
               <CommandList>
                 <CommandEmpty>No results found.</CommandEmpty>
                 <CommandGroup>
                   {filters.map((filter) => (
                     <CommandItem
-                      key={filter}
+                      key={filter.name}
                       onSelect={() => {
-                        handleFilterSelect(filter);
+                        handleFilterSelect(filter.name);
                       }}
                     >
                       <Check
-                        className={cn("mr-2 h-4 w-4", selectedFilters.includes(filter) ? "opacity-100" : "opacity-0")}
+                        className={cn(
+                          "mr-2 h-4 w-4",
+                          selectedCostFilters.includes(filter.name) ? "opacity-100" : "opacity-0"
+                        )}
                       />
-                      {filter}
+                      <div className="flex items-center">
+                        {filter.icon}
+                        <span className="ml-2">{filter.name}</span>
+                      </div>
                     </CommandItem>
                   ))}
                 </CommandGroup>
@@ -78,4 +89,4 @@ const ActivityFilters: React.FC = () => {
   );
 };
 
-export default ActivityFilters;
+export default ActivityCostFilters;

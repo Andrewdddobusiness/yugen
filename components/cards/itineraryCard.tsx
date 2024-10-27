@@ -5,7 +5,12 @@ import Link from "next/link";
 
 import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 import { MoreHorizontal } from "lucide-react";
 
@@ -14,7 +19,7 @@ import { formatUserFriendlyDate } from "@/utils/formatting/datetime";
 
 export interface IItineraryCard {
   itinerary_id: number;
-  destination_id: number;
+  itinerary_destination_id: number;
   city?: string;
   country: string;
   from_date: Date;
@@ -29,7 +34,11 @@ export default function ItineraryCard({ itinerary }: ItineraryCardProps) {
   const [isHovered, setIsHovered] = useState(false);
 
   return (
-    <Link href={`/itinerary/overview?i=${itinerary.itinerary_id}&d=${itinerary.destination_id}` || ""} legacyBehavior passHref>
+    <Link
+      href={`/itinerary/overview?i=${itinerary.itinerary_id}&d=${itinerary.itinerary_destination_id}` || ""}
+      legacyBehavior
+      passHref
+    >
       <Card
         className="aspect-w-1 aspect-h-1 cursor-pointer relative"
         onMouseEnter={() => setIsHovered(true)}
@@ -38,7 +47,7 @@ export default function ItineraryCard({ itinerary }: ItineraryCardProps) {
         <Image
           src={
             process.env.NEXT_PUBLIC_SUPABASE_STORAGE_BASE_URL +
-            `/storage/v1/object/public/cities/${itinerary.country.toLowerCase()}-${itinerary.city.toLowerCase()}/1.jpg`
+            `/storage/v1/object/public/cities/${itinerary.country.toLowerCase()}-${itinerary?.city?.toLowerCase()}/1.jpg`
           }
           alt="Image"
           width={1920}

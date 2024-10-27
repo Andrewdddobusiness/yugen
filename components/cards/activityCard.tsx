@@ -2,14 +2,7 @@
 import { useEffect, useState } from "react";
 import Image from "next/image";
 
-import {
-  Card,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-  CardFooter,
-  CardContent,
-} from "@/components/ui/card";
+import { Card, CardHeader, CardTitle, CardDescription, CardFooter, CardContent } from "@/components/ui/card";
 
 import { Badge } from "@/components/ui/badge";
 import Rating from "@/components/rating/rating";
@@ -34,29 +27,25 @@ interface ItineraryCardProps {
   onOptionsClick?: () => void;
 }
 
-export default function ActivityCard({
-  activity,
-  onClick,
-  onOptionsClick,
-}: ItineraryCardProps) {
+export default function ActivityCard({ activity, onClick, onOptionsClick }: ItineraryCardProps) {
   const searchParams = useSearchParams();
   const itineraryId = searchParams.get("i");
-  const {
-    insertItineraryActivity,
-    removeItineraryActivity,
-    itineraryActivities,
-  } = useItineraryActivityStore();
+  const { insertItineraryActivity, removeItineraryActivity, itineraryActivities } = useItineraryActivityStore();
   const [isActivityAdded, setIsActivityAdded] = useState<boolean>(false);
   const [isHovered, setIsHovered] = useState(false);
   const [loading, setLoading] = useState<boolean>(false);
 
   const formatPriceLevel = (priceLevel: string) => {
     switch (priceLevel) {
+      case "PRICE_LEVEL_FREE":
+        return "Free";
       case "PRICE_LEVEL_INEXPENSIVE":
-        return "$";
+        return "";
       case "PRICE_LEVEL_MODERATE":
         return "$$";
       case "PRICE_LEVEL_EXPENSIVE":
+        return "$$$";
+      case "PRICE_LEVEL_VERY_EXPENSIVE":
         return "$$$";
       default:
         return "";
@@ -69,8 +58,7 @@ export default function ActivityCard({
       try {
         setLoading(true);
         const activityExists = itineraryActivities.some((itineraryActivity) => {
-          const isMatch =
-            itineraryActivity.activity?.place_id === activity.place_id;
+          const isMatch = itineraryActivity.activity?.place_id === activity.place_id;
           const isActive = itineraryActivity.is_active === true;
 
           return isMatch && isActive;
@@ -104,10 +92,7 @@ export default function ActivityCard({
   const handleRemoveToItinerary = async () => {
     setLoading(true);
     if (!activity || !itineraryId) return;
-    const { success } = await removeItineraryActivity(
-      activity.place_id,
-      itineraryId
-    );
+    const { success } = await removeItineraryActivity(activity.place_id, itineraryId);
     if (success) {
       setIsActivityAdded(false);
     } else {
@@ -156,15 +141,11 @@ export default function ActivityCard({
           </div>
         )}
 
-        <div className="absolute top-2 left-2">
-          {priceLevelText === "" ? null : <Badge>{priceLevelText}</Badge>}
-        </div>
+        <div className="absolute top-2 left-2">{priceLevelText === "" ? null : <Badge>{priceLevelText}</Badge>}</div>
       </div>
 
       <CardContent className="flex flex-col gap-2 mt-5 flex-grow">
-        <div className="text-lg font-semibold line-clamp-1">
-          {capitalizeFirstLetterOfEachWord(activity.name)}
-        </div>
+        <div className="text-lg font-semibold line-clamp-1">{capitalizeFirstLetterOfEachWord(activity.name)}</div>
         <div className="flex items-center">
           <div className="items-center  md:flex">
             <Rating rating={activity.rating} />
@@ -177,9 +158,7 @@ export default function ActivityCard({
             <Badge key={type}>{type}</Badge>
           ))}
         </div>
-        <div className="text-sm line-clamp-2 h-10 overflow-hidden">
-          {activity.description}
-        </div>
+        <div className="text-sm line-clamp-2 h-10 overflow-hidden">{activity.description}</div>
       </CardContent>
 
       <CardFooter className="p-0 absolute bottom-0 left-0 right-0">

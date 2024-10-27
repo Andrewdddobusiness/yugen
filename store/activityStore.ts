@@ -38,25 +38,34 @@ export interface IActivity {
 export interface IActivityWithLocation extends IActivity {
   country_name: string;
   city_name: string;
-  destination_id: string;
+  itinerary_destination_id: string;
 }
 
 interface IActivityStore {
   activities: IActivity[];
   topPlacesActivities: IActivity[];
   selectedActivity: IActivity | null;
+  selectedFilters: string[];
+  selectedCostFilters: string[];
+  searchHistoryActivities: IActivity[];
   fetchActivities: (itineraryId: string) => Promise<any[]>;
   setActivities: (activities: IActivity[]) => void;
   insertActivity: (activity: any) => void;
   removeActivity: (activityId: string) => void;
   setSelectedActivity: (activity: IActivity | null) => void;
   setTopPlacesActivities: (topPlaces: IActivity[]) => void;
+  setSelectedFilters: (updater: (prev: string[]) => string[]) => void;
+  setSelectedCostFilters: (updater: (prev: string[]) => string[]) => void;
+  setSearchHistoryActivities: (searchHistory: IActivity[]) => void;
 }
 
 export const useActivitiesStore = create<IActivityStore>((set, get) => ({
   activities: [],
   topPlacesActivities: [],
   selectedActivity: null,
+  selectedFilters: [],
+  selectedCostFilters: [],
+  searchHistoryActivities: [],
   fetchActivities: async (itineraryId: string): Promise<any[]> => {
     try {
       const response = await fetch(`/api/itineraries/${itineraryId}/activities`);
@@ -79,4 +88,9 @@ export const useActivitiesStore = create<IActivityStore>((set, get) => ({
     })),
   setSelectedActivity: (activity: IActivity | null) => set({ selectedActivity: activity }),
   setTopPlacesActivities: (topPlaces: IActivity[]) => set({ topPlacesActivities: topPlaces }),
+  setSelectedFilters: (updater: (prev: string[]) => string[]) =>
+    set({ selectedFilters: updater(get().selectedFilters) }),
+  setSelectedCostFilters: (updater: (prev: string[]) => string[]) =>
+    set({ selectedCostFilters: updater(get().selectedCostFilters) }),
+  setSearchHistoryActivities: (searchHistory: IActivity[]) => set({ searchHistoryActivities: searchHistory }),
 }));

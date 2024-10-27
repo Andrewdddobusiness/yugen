@@ -12,14 +12,15 @@ import { useItineraryActivityStore } from "@/store/itineraryActivityStore";
 
 export default function Builder() {
   const searchParams = useSearchParams();
-  const id = searchParams.get("i");
+  const itineraryId = searchParams.get("i");
+  const destinationId = searchParams.get("d");
 
   const { fetchItineraryActivities, setItineraryActivities } = useItineraryActivityStore();
 
   const { isLoading, error, data } = useQuery({
-    queryKey: ["itineraryActivities", id],
-    queryFn: () => fetchItineraryActivities(id || ""),
-    enabled: !!id,
+    queryKey: ["itineraryActivities", itineraryId, destinationId],
+    queryFn: () => fetchItineraryActivities(itineraryId || "", destinationId || ""),
+    enabled: !!itineraryId && !!destinationId,
   });
 
   useEffect(() => {
@@ -38,7 +39,7 @@ export default function Builder() {
           <ResizablePanel defaultSize={50} className="p-4 border-b">
             <ScrollArea className="h-screen w-full">
               <div className="p-4 w-40">
-                <DatePickerWithRangePopover className="mb-4" itineraryId={id} />
+                <DatePickerWithRangePopover className="mb-4" itineraryId={itineraryId || ""} />
               </div>
               <ItineraryList />
             </ScrollArea>

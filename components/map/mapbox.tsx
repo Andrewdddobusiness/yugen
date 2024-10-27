@@ -28,9 +28,17 @@ export default function Mapbox() {
   };
 
   // **** STORES ****
-  const { selectedTab, setSelectedTab } = useActivityTabStore();
+  const { setSelectedTab } = useActivityTabStore();
   const { activities, setActivities } = useActivitiesStore();
-  const { centerCoordinates, setCenterCoordinates, initialZoom, smallRadiusInMeters, largeRadiusInMeters, mapRadius, setRadius } = useMapStore();
+  const {
+    centerCoordinates,
+    setCenterCoordinates,
+    initialZoom,
+    smallRadiusInMeters,
+    largeRadiusInMeters,
+    mapRadius,
+    setRadius,
+  } = useMapStore();
   const { isSidebarOpen } = useSidebarStore();
 
   const [searchOpen, setSearchOpen] = useState(false);
@@ -55,7 +63,9 @@ export default function Mapbox() {
   useEffect(() => {
     if (activities) {
       console.log("activities: ", activities);
-      setMarkerCoordinates(activities.map((activity) => [activity?.coordinates[0] ?? 0, activity?.coordinates[1] ?? 0]));
+      setMarkerCoordinates(
+        activities.map((activity) => [activity?.coordinates[0] ?? 0, activity?.coordinates[1] ?? 0])
+      );
     }
   }, [activities, centerCoordinates]);
 
@@ -210,7 +220,13 @@ export default function Mapbox() {
                     <Marker key={index} latitude={coordinate[0]} longitude={coordinate[1]} color="#2c7ce5" />
                   ))}
                 {searchOpen && (
-                  <Marker latitude={circleCenter[0]} longitude={circleCenter[1]} draggable onDragEnd={handleMarkerDrag} color="#f82553" />
+                  <Marker
+                    latitude={circleCenter[0]}
+                    longitude={circleCenter[1]}
+                    draggable
+                    onDragEnd={handleMarkerDrag}
+                    color="#f82553"
+                  />
                 )}
               </div>
               <NavigationControl position="top-left" />
@@ -219,7 +235,12 @@ export default function Mapbox() {
 
           <AnimatePresence>
             {searchOpen && (
-              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.5 }}>
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.5 }}
+              >
                 <motion.div
                   animate={{
                     background: [
@@ -258,7 +279,11 @@ export default function Mapbox() {
 
           {searchOpen ? (
             <div className="flex flex-col">
-              <div className={`flex flex-col absolute top-2 right-2 z-10 gap-2 items-end ${isSidebarOpen ? "hidden md:block" : "lg:block"}`}>
+              <div
+                className={`flex flex-col absolute top-2 right-2 z-10 gap-2 items-end ${
+                  isSidebarOpen ? "hidden md:block" : "lg:block"
+                }`}
+              >
                 <Button variant="outline" size="icon" onClick={handleSearchOpen} className="rounded-full w-10 h-10">
                   <X size={16} />
                 </Button>
@@ -282,7 +307,11 @@ export default function Mapbox() {
                   </Button>
                 </div>
               </div>
-              <div className={`absolute bottom-10 left-0 right-0 flex justify-center z-10 px-4  ${isSidebarOpen ? "hidden md:block" : "lg:block"}`}>
+              <div
+                className={`absolute bottom-10 left-0 right-0 flex justify-center z-10 px-4  ${
+                  isSidebarOpen ? "hidden md:block" : "lg:block"
+                }`}
+              >
                 {isGeneratingActivities ? (
                   <Button variant="outline" className={`w-full rounded-full flex items-center justify-center`} disabled>
                     <div className="flex items-center">
@@ -298,7 +327,12 @@ export default function Mapbox() {
               </div>
             </div>
           ) : (
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.5 }}>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.5 }}
+            >
               <div className="flex flex-col absolute top-2 right-2 z-10">
                 <Button variant="outline" onClick={handleSearchOpen}>
                   Explore Activities

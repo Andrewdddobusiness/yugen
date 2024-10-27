@@ -200,7 +200,7 @@ export default function BuilderLayout({ title, children, activePage, itineraryNu
           </div>
         </nav>
       </div>
-      <div className="pl-2 pt-16 h-screen">{children}</div>
+      <div className="ml-2 h-screen ">{children}</div>
     </div>
   );
 }
