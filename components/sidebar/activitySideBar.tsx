@@ -144,8 +144,8 @@ export default function ActivitySidebar({ activity, onClose }: IActivitySidebarP
   }
 
   return (
-    <div className="flex flex-col w-full h-full border bg-white relative">
-      <div className="flex flex-col w-full h-full border bg-white relative">
+    <div className="flex flex-col w-full h-full border-l bg-white relative">
+      <div className="flex flex-col w-full h-full bg-white relative">
         <div className="absolute top-4 right-4 z-10">
           <Button variant="outline" size="icon" onClick={onClose} className="rounded-full">
             <X size={16} className="rounded-full hover:bg-zinc-100" />

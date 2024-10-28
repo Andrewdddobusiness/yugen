@@ -250,9 +250,23 @@ export default function Activities() {
   useEffect(() => {
     const fetchActivities = async () => {
       if (searchHistoryActivitiesData && Array.isArray(searchHistoryActivitiesData.activities)) {
-        setSearchHistoryActivities(searchHistoryActivitiesData.activities);
+        const newActivities = searchHistoryActivitiesData.activities;
+
+        console.log("newActivities: ", newActivities);
+
+        // Create a Set to track existing place_ids
+        const existingPlaceIds = new Set(searchHistoryActivities.map((activity) => activity.place_id));
+
+        // Filter out duplicates from newActivities
+        const filteredNewActivities = newActivities.filter((activity) => !existingPlaceIds.has(activity.place_id));
+
+        console.log("filteredNewActivities: ", filteredNewActivities);
+
+        // Set only the filtered new activities
+        setSearchHistoryActivities(filteredNewActivities);
 
         const missingPlaceIds = searchHistoryActivitiesData.missingPlaceIds || [];
+        console.log("missingPlaceIds: ", missingPlaceIds);
 
         // Fetch missing activities
         for (const placeId of missingPlaceIds) {
@@ -279,6 +293,8 @@ export default function Activities() {
 
     fetchActivities();
   }, [searchHistoryActivitiesData, setSearchHistoryActivities]);
+
+  console.log("searchHistoryActivities: ", searchHistoryActivities);
 
   return (
     <BuilderLayout title="Activities" activePage="activities" itineraryNumber={1}>
@@ -389,14 +405,16 @@ export default function Activities() {
           </div>
           <div
             className={`border-x h-full relative transition-all duration-300 ${
-              isSidebarOpen ? "w-0 md:w-1/3" : "sm:w-1/2 w-0 hidden sm:block"
+              isSidebarOpen ? "w-0 md:w-1/3 hidden md:block" : "sm:w-1/2 w-0 hidden sm:block"
             }`}
           >
             {cityCoordinates && <Mapbox />}
           </div>
           <div
             className={`absolute top-0 right-0 h-full z-50 transition-all duration-300 transform ${
-              isSidebarOpen ? "w-6/12 md:w-4/12 translate-x-0" : "w-4/12 translate-x-full hidden"
+              isSidebarOpen
+                ? "w-[calc(50%-18px)] md:w-[calc(33.333333%-18px)] translate-x-0"
+                : "w-[calc(33.333333%-18px)] translate-x-full hidden"
             }`}
           >
             {isSidebarOpen && (

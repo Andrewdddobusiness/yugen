@@ -31,7 +31,12 @@ interface PageLayoutProps {
   itineraryNumber: number;
 }
 
-export default function BuilderLayout({ title, children, activePage, itineraryNumber }: PageLayoutProps): React.ReactElement {
+export default function BuilderLayout({
+  title,
+  children,
+  activePage,
+  itineraryNumber,
+}: PageLayoutProps): React.ReactElement {
   const supabase = createClient();
   const searchParams = useSearchParams();
 
@@ -64,11 +69,11 @@ export default function BuilderLayout({ title, children, activePage, itineraryNu
   }, [supabase]);
 
   return (
-    <div className="h-screen w-full pl-14 z-50">
+    <div className="h-screen w-full z-50">
       {/* Sidebar */}
-      <aside className="inset-y fixed left-0 z-50 flex h-full flex-col border-r">
+      <aside className="absolute left-0 z-50 flex h-full flex-col border-r">
         {/* Logo/Home Button */}
-        <div className="p-2">
+        <div className="p-2 bg-white border-b">
           <Link href="/dashboard" legacyBehavior>
             <Button variant="outline" size="icon" aria-label="Home">
               <div className="hidden sm:block max-w-[25px]">
@@ -78,7 +83,7 @@ export default function BuilderLayout({ title, children, activePage, itineraryNu
           </Link>
         </div>
 
-        <nav className="grid gap-1 p-2">
+        <nav className="grid gap-1 p-2 bg-white ">
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild className="border-b pb-1">
@@ -114,7 +119,12 @@ export default function BuilderLayout({ title, children, activePage, itineraryNu
             <Tooltip>
               <TooltipTrigger asChild>
                 <Link href={`/itinerary/builder?i=${itineraryId}&d=${destinationId}`}>
-                  <Button variant="ghost" size="icon" className={`rounded-lg ${activePage === "explore" ? "bg-muted" : ""}`} aria-label="Explore">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className={`rounded-lg ${activePage === "explore" ? "bg-muted" : ""}`}
+                    aria-label="Explore"
+                  >
                     <Hammer className="size-5" />
                   </Button>
                 </Link>
@@ -127,7 +137,12 @@ export default function BuilderLayout({ title, children, activePage, itineraryNu
             <Tooltip>
               <TooltipTrigger asChild>
                 <Link href={`/itinerary/activities?i=${itineraryId}&d=${destinationId}`}>
-                  <Button variant="ghost" size="icon" className={`rounded-lg ${activePage === "explore" ? "bg-muted" : ""}`} aria-label="Explore">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className={`rounded-lg ${activePage === "explore" ? "bg-muted" : ""}`}
+                    aria-label="Explore"
+                  >
                     <Footprints className="size-5" />
                   </Button>
                 </Link>
@@ -140,7 +155,7 @@ export default function BuilderLayout({ title, children, activePage, itineraryNu
         </nav>
 
         {/* Footer Navigation */}
-        <nav className="mt-auto grid gap-1 p-2">
+        <nav className="mt-auto grid gap-1 p-2 bg-white">
           <TooltipProvider>
             {/* Settings Button */}
             <Tooltip>
@@ -164,7 +179,7 @@ export default function BuilderLayout({ title, children, activePage, itineraryNu
         </nav>
       </aside>
 
-      <div className="flex flex-col flex-1">
+      <div className="flex flex-col flex-1 ">
         <nav className="flex items-center justify-between w-full h-16 px-4 bg-white border-b fixed top-0 left-0 z-20">
           <h1 className="text-xl font-semibold ml-16">{title}</h1>
           <div className="ml-auto pr-4">
@@ -172,7 +187,14 @@ export default function BuilderLayout({ title, children, activePage, itineraryNu
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" size="icon" className="overflow-hidden rounded-full">
                   {profileUrl ? (
-                    <Image alt="Profile" src={profileUrl ? profileUrl : ""} width={100} height={100} className="w-10 h-10 rounded-full" priority />
+                    <Image
+                      alt="Profile"
+                      src={profileUrl ? profileUrl : ""}
+                      width={100}
+                      height={100}
+                      className="w-10 h-10 rounded-full"
+                      priority
+                    />
                   ) : (
                     <Skeleton className="h-[32px] w-[32px] rounded-full" />
                   )}
@@ -200,7 +222,7 @@ export default function BuilderLayout({ title, children, activePage, itineraryNu
           </div>
         </nav>
       </div>
-      <div className="ml-2 h-screen ">{children}</div>
+      <div className="h-screen ml-14">{children}</div>
     </div>
   );
 }

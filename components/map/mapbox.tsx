@@ -1,5 +1,5 @@
 import * as React from "react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import Map, { Layer, Source, NavigationControl, Marker } from "react-map-gl";
 import type { CircleLayer, FillLayer } from "react-map-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
@@ -18,6 +18,7 @@ import { fetchNearbyActivities } from "@/actions/google/actions";
 
 import { motion, AnimatePresence } from "framer-motion";
 import { useActivityTabStore } from "@/store/activityTabStore";
+import Waypoint from "./waypoint";
 
 export default function Mapbox() {
   // Define the calculateRadiusInPixels function before using it
@@ -28,8 +29,9 @@ export default function Mapbox() {
   };
 
   // **** STORES ****
-  const { setSelectedTab } = useActivityTabStore();
-  const { activities, setActivities } = useActivitiesStore();
+  const { selectedTab, setSelectedTab } = useActivityTabStore();
+  const { activities, setActivities, topPlacesActivities, searchHistoryActivities, selectedActivity } =
+    useActivitiesStore();
   const {
     centerCoordinates,
     setCenterCoordinates,
@@ -41,6 +43,7 @@ export default function Mapbox() {
   } = useMapStore();
   const { isSidebarOpen } = useSidebarStore();
 
+  // **** STATE ****
   const [searchOpen, setSearchOpen] = useState(false);
   const [circleRadius, setCircleRadius] = useState(() => calculateRadiusInPixels(initialZoom, smallRadiusInMeters));
   const [circleCenter, setCircleCenter] = useState<[number, number] | null>(null);
@@ -51,6 +54,7 @@ export default function Mapbox() {
 
   const mapRef = useRef(null);
 
+  // **** EFFECTS ****
   useEffect(() => {
     if (centerCoordinates) {
       setCircleCenter(centerCoordinates);
@@ -61,27 +65,46 @@ export default function Mapbox() {
   }, [centerCoordinates, currentZoom, mapRadius]);
 
   useEffect(() => {
-    if (activities) {
-      console.log("activities: ", activities);
-      setMarkerCoordinates(
-        activities.map((activity) => [activity?.coordinates[0] ?? 0, activity?.coordinates[1] ?? 0])
-      );
-    }
-  }, [activities, centerCoordinates]);
+    let coordinates: [number, number][] = [];
 
-  const circleLayer: CircleLayer = {
-    id: "circle-layer",
-    type: "circle",
-    paint: {
-      "circle-radius": circleRadius,
-      "circle-color": "#FF0000",
-      "circle-opacity": 0.2,
-      "circle-stroke-color": "#FF0000",
-      "circle-stroke-width": 2,
-      "circle-stroke-opacity": 0.5,
-    },
-    source: "circle-source",
-  };
+    switch (selectedTab) {
+      case "top-places":
+        if (topPlacesActivities && Array.isArray(topPlacesActivities)) {
+          coordinates = topPlacesActivities.map((activity) => [
+            activity?.coordinates[0] ?? 0,
+            activity?.coordinates[1] ?? 0,
+          ]);
+        }
+        break;
+      case "search":
+        if (activities && Array.isArray(activities)) {
+          coordinates = activities.map((activity) => [activity?.coordinates[0] ?? 0, activity?.coordinates[1] ?? 0]);
+        }
+        break;
+      case "history":
+        if (searchHistoryActivities && Array.isArray(searchHistoryActivities)) {
+          coordinates = searchHistoryActivities.map((activity) => [
+            activity?.coordinates[0] ?? 0,
+            activity?.coordinates[1] ?? 0,
+          ]);
+        }
+        break;
+    }
+
+    setMarkerCoordinates(coordinates);
+  }, [selectedTab, activities, topPlacesActivities, searchHistoryActivities, centerCoordinates]);
+
+  useEffect(() => {
+    if (selectedActivity && mapRef.current) {
+      const map = (mapRef.current as any).getMap();
+      map.flyTo({
+        center: [selectedActivity.coordinates[1], selectedActivity.coordinates[0]],
+        zoom: 15,
+        duration: 1500,
+        essential: true,
+      });
+    }
+  }, [selectedActivity]);
 
   const circleData = circleCenter
     ? turf.circle([circleCenter[1], circleCenter[0]], mapRadius / 1000, {
@@ -125,9 +148,6 @@ export default function Mapbox() {
   const handleSearchOpen = () => {
     setSearchOpen(!searchOpen);
     setSelectedTab("search");
-  };
-  const handleSearchClose = () => {
-    setSearchOpen(!searchOpen);
   };
 
   const handleZoom = (zoom: number, radius: number) => {
@@ -193,7 +213,7 @@ export default function Mapbox() {
               </Source>
 
               <div>
-                {circleData && (
+                {circleData && selectedTab === "search" && (
                   <Source id="circle-source" type="geojson" data={circleData}>
                     <Layer
                       id="circle-fill-layer"
@@ -215,17 +235,31 @@ export default function Mapbox() {
                     />
                   </Source>
                 )}
+
                 {markerCoordinates &&
                   markerCoordinates.map((coordinate, index) => (
-                    <Marker key={index} latitude={coordinate[0]} longitude={coordinate[1]} color="#2c7ce5" />
+                    <Waypoint
+                      key={`${selectedTab}-marker-${index}`}
+                      latitude={coordinate[0]}
+                      longitude={coordinate[1]}
+                      transition={{
+                        duration: 0.3,
+                        delay: index * 0.05,
+                      }}
+                    />
                   ))}
+
                 {searchOpen && (
-                  <Marker
+                  <Waypoint
                     latitude={circleCenter[0]}
                     longitude={circleCenter[1]}
                     draggable
                     onDragEnd={handleMarkerDrag}
                     color="#f82553"
+                    transition={{
+                      duration: 0.3,
+                      delay: 0,
+                    }}
                   />
                 )}
               </div>
