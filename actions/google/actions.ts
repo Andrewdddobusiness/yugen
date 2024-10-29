@@ -1,10 +1,9 @@
 "use server";
 
 import axios from "axios";
-import { includedTypes } from "@/lib/googleMaps/includedTypes";
 import { excludedTypes } from "@/lib/googleMaps/excludedTypes";
 import { IActivity, IReview } from "@/store/activityStore";
-import { useMapStore } from "@/store/mapStore";
+import { foodTypes, shoppingTypes, historicalTypes, SearchType, includedTypes } from "@/lib/googleMaps/includedTypes";
 
 const GOOGLE_MAPS_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
 
@@ -67,16 +66,32 @@ function mapGooglePlaceToActivity(place: any): IActivity {
 export const fetchNearbyActivities = async (
   latitude: number | undefined,
   longitude: number | undefined,
-  radiusInMeters: number
+  radiusInMeters: number,
+  searchType: SearchType = "all"
 ) => {
   if (typeof latitude !== "number" || typeof longitude !== "number") {
     throw new Error("Invalid coordinates provided");
   }
 
+  let includedTypesForSearch;
+  switch (searchType) {
+    case "food":
+      includedTypesForSearch = foodTypes;
+      break;
+    case "shopping":
+      includedTypesForSearch = shoppingTypes;
+      break;
+    case "historical":
+      includedTypesForSearch = historicalTypes;
+      break;
+    default:
+      includedTypesForSearch = includedTypes;
+  }
+
   const url = `https://places.googleapis.com/v1/places:searchNearby`;
 
   const requestBody = {
-    includedTypes: includedTypes,
+    includedTypes: includedTypesForSearch,
     excludedTypes: excludedTypes,
     maxResultCount: 20,
     locationRestriction: {
@@ -112,7 +127,7 @@ export const fetchNearbyActivities = async (
         ].join(","),
       },
     });
-    // console.log("response.data: ", response.data.places[0]);
+    console.log("response.data: ", response.data.places[0]);
     const activities: IActivity[] = response.data.places.map(mapGooglePlaceToActivity);
     return activities;
   } catch (error) {

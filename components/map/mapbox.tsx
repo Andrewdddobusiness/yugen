@@ -7,7 +7,7 @@ import "mapbox-gl/dist/mapbox-gl.css";
 import * as turf from "@turf/turf";
 
 import { Button } from "../ui/button";
-import { CircleMinus, CirclePlus, Earth, Loader2, X } from "lucide-react";
+import { CircleMinus, CirclePlus, Earth, Landmark, Loader2, ShoppingCart, Utensils, X } from "lucide-react";
 
 import { useActivitiesStore } from "@/store/activityStore";
 import { useMapStore } from "@/store/mapStore";
@@ -19,6 +19,9 @@ import { fetchNearbyActivities } from "@/actions/google/actions";
 import { motion, AnimatePresence } from "framer-motion";
 import { useActivityTabStore } from "@/store/activityTabStore";
 import Waypoint from "./waypoint";
+import { Toggle } from "../ui/toggle";
+
+import { SearchType } from "@/lib/googleMaps/includedTypes";
 
 export default function Mapbox() {
   // Define the calculateRadiusInPixels function before using it
@@ -51,6 +54,7 @@ export default function Mapbox() {
   const [isLoading, setIsLoading] = useState(true);
   const [isGeneratingActivities, setIsGeneratingActivities] = useState(false);
   const [currentZoom, setCurrentZoom] = useState(initialZoom);
+  const [selectedSearchType, setSelectedSearchType] = useState<SearchType>("all");
 
   const mapRef = useRef(null);
 
@@ -167,16 +171,22 @@ export default function Mapbox() {
     // refetchActivities();
   };
 
-  const handleGenerateActivities = () => {
-    const generateActivities = async () => {
-      setIsGeneratingActivities(true);
-      if (circleCenter) {
-        const activities = await fetchNearbyActivities(circleCenter[0], circleCenter[1], mapRadius);
-        setActivities(activities);
-      }
+  const handleGenerateActivities = async () => {
+    if (!circleCenter) return;
+    setIsGeneratingActivities(true);
+    try {
+      const activities = await fetchNearbyActivities(circleCenter[0], circleCenter[1], mapRadius, selectedSearchType);
+      setActivities(activities);
+      setSelectedTab("search");
+    } catch (error) {
+      console.error("Error generating activities:", error);
+    } finally {
       setIsGeneratingActivities(false);
-    };
-    generateActivities();
+    }
+  };
+
+  const handleSearchTypeToggle = (type: SearchType) => {
+    setSelectedSearchType(type === selectedSearchType ? "all" : type);
   };
 
   if (isLoading) {
@@ -314,31 +324,73 @@ export default function Mapbox() {
           {searchOpen ? (
             <div className="flex flex-col">
               <div
-                className={`flex flex-col absolute top-2 right-2 z-10 gap-2 items-end ${
-                  isSidebarOpen ? "hidden md:block" : "lg:block"
-                }`}
+                className={`flex flex-col absolute top-2 right-2 z-10${isSidebarOpen ? "hidden md:block" : "lg:block"}`}
               >
-                <Button variant="outline" size="icon" onClick={handleSearchOpen} className="rounded-full w-10 h-10">
-                  <X size={16} />
-                </Button>
-                <div className="flex flex-col items-center">
-                  <div className="text-sm text-zinc-500">Radius</div>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={() => handleZoom(currentZoom, largeRadiusInMeters)}
-                    className="rounded-b-none w-10 h-10"
-                  >
-                    <CirclePlus size={16} />
+                <div className="flex flex-col  items-end  gap-2">
+                  <Button variant="outline" size="icon" onClick={handleSearchOpen} className="rounded-full w-10 h-10">
+                    <X size={16} />
                   </Button>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={() => handleZoom(currentZoom, smallRadiusInMeters)}
-                    className="rounded-t-none w-10 h-10"
-                  >
-                    <CircleMinus size={16} />
-                  </Button>
+                  <div className="flex flex-col items-center">
+                    <div className="text-sm text-zinc-500">Radius</div>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={() => handleZoom(currentZoom, largeRadiusInMeters)}
+                      className="rounded-b-none w-10 h-10"
+                    >
+                      <CirclePlus size={16} />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={() => handleZoom(currentZoom, smallRadiusInMeters)}
+                      className="rounded-t-none w-10 h-10"
+                    >
+                      <CircleMinus size={16} />
+                    </Button>
+                  </div>
+
+                  <div>
+                    <div className="text-sm text-zinc-500">Search</div>
+                    <div className="flex flex-col items-center gap-2">
+                      <Toggle
+                        variant="outline"
+                        pressed={selectedSearchType === "food"}
+                        onClick={() => handleSearchTypeToggle("food")}
+                        className={`w-10 h-10 transition-all border ${
+                          selectedSearchType === "food"
+                            ? "bg-zinc-900 text-white hover:bg-zinc-800 hover:text-zinc-300 border-zinc-800 shadow-lg"
+                            : "bg-white text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900 border-zinc-200"
+                        }`}
+                      >
+                        <Utensils size={16} />
+                      </Toggle>
+                      <Toggle
+                        variant="outline"
+                        pressed={selectedSearchType === "shopping"}
+                        onClick={() => handleSearchTypeToggle("shopping")}
+                        className={`w-10 h-10 transition-all border ${
+                          selectedSearchType === "shopping"
+                            ? "bg-zinc-900 text-white hover:bg-zinc-800 hover:text-zinc-300 border-zinc-800 shadow-lg"
+                            : "bg-white text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900 border-zinc-200"
+                        }`}
+                      >
+                        <ShoppingCart size={16} />
+                      </Toggle>
+                      <Toggle
+                        variant="outline"
+                        pressed={selectedSearchType === "historical"}
+                        onClick={() => handleSearchTypeToggle("historical")}
+                        className={`w-10 h-10 transition-all border ${
+                          selectedSearchType === "historical"
+                            ? "bg-zinc-900 text-white hover:bg-zinc-800 hover:text-zinc-300 border-zinc-800 shadow-lg"
+                            : "bg-white text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900 border-zinc-200"
+                        }`}
+                      >
+                        <Landmark size={16} />
+                      </Toggle>
+                    </div>
+                  </div>
                 </div>
               </div>
               <div

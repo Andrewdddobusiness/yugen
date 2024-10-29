@@ -11,7 +11,7 @@ const ActivityFilters: React.FC = () => {
   const { selectedFilters, setSelectedFilters } = useActivitiesStore();
   const [open, setOpen] = React.useState(false);
 
-  const filters = ["Food", "Historical", "Shopping"];
+  const filters = ["Food", "Shopping", "Historical"];
 
   const handleFilterSelect = (filter: string) => {
     setSelectedFilters((prevFilters: string[]) => {

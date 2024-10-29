@@ -35,7 +35,7 @@ const ActivityCostFilters: React.FC = () => {
           <Toggle
             key={filter.name}
             variant="outline"
-            className={`h-8 rounded-full ${selectedCostFilters.includes(filter.name) ? "bg-gray-200" : ""}`}
+            className={`h-8 bg-white rounded-full ${selectedCostFilters.includes(filter.name) ? "bg-gray-200" : ""}`}
             pressed={selectedCostFilters.includes(filter.name)}
             onPressedChange={() => handleFilterSelect(filter.name)}
           >
