@@ -35,7 +35,7 @@ export default function ItineraryCard({ itinerary }: ItineraryCardProps) {
 
   return (
     <Link
-      href={`/itinerary/overview?i=${itinerary.itinerary_id}&d=${itinerary.itinerary_destination_id}` || ""}
+      href={`/itinerary/${itinerary.itinerary_id}/${itinerary.itinerary_destination_id}/activities`}
       legacyBehavior
       passHref
     >

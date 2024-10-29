@@ -1,6 +1,6 @@
 "use client";
 import React, { useEffect, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 
 import BuilderLayout from "@/components/layouts/builderLayout";
@@ -39,9 +39,7 @@ import SearchField from "@/components/search/searchField";
 import ActivitySkeletonCards from "@/components/cards/activitySkeletonCards";
 
 export default function Activities() {
-  const searchParams = useSearchParams();
-  const itineraryId = searchParams.get("i");
-  const destinationId = searchParams.get("d");
+  const { itineraryId, destinationId } = useParams();
 
   // **** STORES ****
   const {
