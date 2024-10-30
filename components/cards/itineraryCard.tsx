@@ -2,6 +2,9 @@
 import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
+import { softDeleteItinerary } from "@/actions/supabase/actions";
 
 import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 
@@ -24,14 +27,38 @@ export interface IItineraryCard {
   country: string;
   from_date: Date;
   to_date: Date;
+  deleted_at: string | null;
 }
 
 interface ItineraryCardProps {
   itinerary: IItineraryCard;
+  onDelete: (itineraryId: number) => void;
 }
 
-export default function ItineraryCard({ itinerary }: ItineraryCardProps) {
+export default function ItineraryCard({ itinerary, onDelete }: ItineraryCardProps) {
   const [isHovered, setIsHovered] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const handleDelete = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    setIsDeleting(true);
+
+    try {
+      const result = await softDeleteItinerary(itinerary.itinerary_id);
+
+      if (result.success) {
+        toast.success("Itinerary deleted successfully");
+        onDelete(itinerary.itinerary_id);
+      } else {
+        throw new Error("Failed to delete itinerary");
+      }
+    } catch (error) {
+      console.error("Error deleting itinerary:", error);
+      toast.error("Failed to delete itinerary");
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   return (
     <Link
@@ -79,7 +106,9 @@ export default function ItineraryCard({ itinerary }: ItineraryCardProps) {
             <MoreHorizontal className={`h-5 w-5`} />
           </DropdownMenuTrigger>
           <DropdownMenuContent className="absolute -left-4 -bottom-10">
-            <DropdownMenuItem>Delete</DropdownMenuItem>
+            <DropdownMenuItem onClick={handleDelete} disabled={isDeleting} className="text-red-600 focus:text-red-600">
+              {isDeleting ? "Deleting..." : "Delete"}
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </Card>

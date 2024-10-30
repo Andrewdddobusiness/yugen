@@ -59,7 +59,7 @@ export default function ActivityCard({ activity, onClick, onOptionsClick }: Itin
         setLoading(true);
         const activityExists = itineraryActivities.some((itineraryActivity) => {
           const isMatch = itineraryActivity.activity?.place_id === activity.place_id;
-          const isActive = itineraryActivity.is_active === true;
+          const isActive = itineraryActivity.deleted_at === null;
 
           return isMatch && isActive;
         });

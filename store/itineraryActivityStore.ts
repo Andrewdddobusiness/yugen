@@ -18,7 +18,7 @@ export interface IItineraryActivity {
   date: string;
   start_time: string;
   end_time: string;
-  is_active: boolean;
+  deleted_at: string | null;
   activity?: IActivity & { place_id: string };
 }
 
@@ -49,7 +49,7 @@ export const useItineraryActivityStore = create<IItineraryStore>((set, get) => (
             date, 
             start_time, 
             end_time,
-            is_active,
+            deleted_at,
             activity:activity(*)
           `,
         {
@@ -89,7 +89,6 @@ export const useItineraryActivityStore = create<IItineraryStore>((set, get) => (
     const isActivityAdded = get().activeActivityIds.has(activity.place_id);
 
     if (isActivityAdded) {
-      // Activity exists, update is_active to true
       try {
         const activityResult = await fetchActivityIdByPlaceId(activity.place_id);
         if (!activityResult.success || !activityResult.data) {
@@ -102,7 +101,6 @@ export const useItineraryActivityStore = create<IItineraryStore>((set, get) => (
           {
             itinerary_id: itineraryId,
             activity_id: activityId,
-            is_active: true,
             deleted_at: null,
           },
           ["itinerary_id", "activity_id"]
@@ -110,7 +108,7 @@ export const useItineraryActivityStore = create<IItineraryStore>((set, get) => (
 
         set((state) => ({
           itineraryActivities: state.itineraryActivities.map((a) =>
-            a.activity?.place_id === activity.place_id ? { ...a, is_active: true } : a
+            a.activity?.place_id === activity.place_id ? { ...a } : a
           ),
           activeActivityIds: new Map(state.activeActivityIds.set(activity.place_id, true)),
         }));
@@ -262,20 +260,20 @@ export const useItineraryActivityStore = create<IItineraryStore>((set, get) => (
         itinerary_id: itineraryId,
         activity_id: activityId,
         itinerary_destination_id: activity.itinerary_destination_id,
-        is_active: true,
+        deleted_at: null,
       });
       set((state) => ({
         itineraryActivities: [
           ...state.itineraryActivities,
           {
-            itinerary_activity_id: "", // Set this appropriately based on your insert response
+            itinerary_activity_id: "",
             itinerary_destination_id: activity.itinerary_destination_id,
             activity_id: activityId,
-            date: "", // Set this based on your requirements
-            start_time: "", // Set this based on your requirements
-            end_time: "", // Set this based on your requirements
+            date: "",
+            start_time: "",
+            end_time: "",
             activity: activity,
-            is_active: true,
+            deleted_at: null,
           },
         ],
         activeActivityIds: new Map(state.activeActivityIds.set(activity.place_id, true)),
@@ -286,14 +284,13 @@ export const useItineraryActivityStore = create<IItineraryStore>((set, get) => (
         {
           itinerary_id: itineraryId,
           activity_id: activityId,
-          is_active: true,
           deleted_at: null,
         },
         ["itinerary_id", "activity_id"]
       );
       set((state) => ({
         itineraryActivities: state.itineraryActivities.map((a) =>
-          a.activity?.place_id === activity.place_id ? { ...a, is_active: true, deleted_at: null } : a
+          a.activity?.place_id === activity.place_id ? { ...a, deleted_at: null } : a
         ),
         activeActivityIds: new Map(state.activeActivityIds.set(activity.place_id, true)),
       }));
@@ -321,7 +318,7 @@ export const useItineraryActivityStore = create<IItineraryStore>((set, get) => (
 
       set((state) => ({
         itineraryActivities: state.itineraryActivities.map((activity) =>
-          activity.activity?.place_id === placeId ? { ...activity, is_active: false } : activity
+          activity.activity?.place_id === placeId ? { ...activity, deleted_at: new Date().toISOString() } : activity
         ),
         activeActivityIds: new Map(state.activeActivityIds.set(placeId, false)),
       }));

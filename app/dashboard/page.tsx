@@ -4,7 +4,7 @@ import Image from "next/image";
 import ItineraryCards from "@/components/cards/itineraryCards";
 import DashboardLayout from "@/components/layouts/dashboardLayout";
 
-import { fetchTableData } from "@/actions/supabase/actions";
+import { fetchTableData, fetchUserItineraries } from "@/actions/supabase/actions";
 
 import { createClient } from "@/utils/supabase/client";
 
@@ -41,35 +41,13 @@ export default function Dashboard() {
       if (user) {
         setLoadingItinerary(true);
         try {
-          const response = (await fetchTableData(
-            "itinerary_destination",
-            "itinerary_id, itinerary_destination_id, city, country, from_date, to_date"
-          )) as { data: any[]; error: any }; // Type assertion with correct structure
-
-          const { data, error } = response;
+          const { data, error } = await fetchUserItineraries(user.id);
 
           if (error) {
             console.error("Error fetching itinerary data:", error);
             setItineraryData([]);
           } else {
-            // Check if data is an array and has the expected structure
-            if (Array.isArray(data)) {
-              // Map the data to match the IItineraryCard interface
-              const mappedData: IItineraryCard[] = data.map((item) => ({
-                itinerary_destination_id: item.itinerary_destination_id,
-                itinerary_id: item.itinerary_id,
-                city: item.city,
-                country: item.country,
-                from_date: new Date(item.from_date),
-                to_date: new Date(item.to_date),
-              }));
-
-              // Set the mapped itinerary data
-              setItineraryData(mappedData);
-            } else {
-              console.error("Unexpected data structure:", data);
-              setItineraryData([]);
-            }
+            setItineraryData(data || []);
           }
         } catch (error) {
           console.error("Error fetching itinerary data:", error);
@@ -82,6 +60,10 @@ export default function Dashboard() {
 
     fetchItineraryData();
   }, [user]);
+
+  const handleDelete = (deletedItineraryId: number) => {
+    setItineraryData((current) => current.filter((itinerary) => itinerary.itinerary_id !== deletedItineraryId));
+  };
 
   return (
     <DashboardLayout title="Dashboard" activePage="home">
@@ -97,7 +79,7 @@ export default function Dashboard() {
           <div className="text-lg font-bold">My Itineraries</div>
         </div>
         <div className="flex flex-row py-4">
-          <ItineraryCards itineraries={itineraryData} loading={loadingItinerary} />
+          <ItineraryCards itineraries={itineraryData} loading={loadingItinerary} onDelete={handleDelete} />
         </div>
       </div>
     </DashboardLayout>

@@ -47,7 +47,7 @@ export default function ActivitySidebar({ activity, onClose }: IActivitySidebarP
         setLoading(true);
         const activityExists = itineraryActivities.some((itineraryActivity) => {
           const isMatch = itineraryActivity.activity?.place_id === activity.place_id;
-          const isActive = itineraryActivity.is_active === true;
+          const isActive = itineraryActivity.deleted_at === null;
 
           return isMatch && isActive;
         });

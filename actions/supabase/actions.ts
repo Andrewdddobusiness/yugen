@@ -1,3 +1,4 @@
+import { IItineraryCard } from "@/components/cards/itineraryCard";
 import { createClient } from "@/utils/supabase/client";
 
 /*
@@ -102,7 +103,6 @@ export async function softDeleteTableData(tableName: string, matchConditions: Re
   const { data, error } = await supabase
     .from(tableName)
     .update({
-      is_active: false,
       deleted_at: new Date().toISOString(),
     })
     .match(matchConditions);
@@ -115,20 +115,55 @@ export async function softDeleteTableData(tableName: string, matchConditions: Re
   return { success: true, message: "Soft delete successful", data };
 }
 
+export const softDeleteItinerary = async (itineraryId: number) => {
+  const supabase = createClient();
+
+  try {
+    const { data, error } = await supabase
+      .from("itinerary")
+      .update({ deleted_at: new Date().toISOString() })
+      .eq("itinerary_id", itineraryId)
+      .select();
+
+    if (error) throw error;
+
+    return { success: true, data };
+  } catch (error) {
+    console.error("Error soft deleting itinerary:", error);
+    return { success: false, error };
+  }
+};
+
 /*
   FETCH
 */
-export async function fetchTableData(tableName: string, columnNames: string) {
+export async function fetchTableData(
+  tableName: string,
+  columns: string = "*",
+  filterColumn?: string,
+  filterValue?: string[],
+  additionalFilter?: string
+) {
   const supabase = createClient();
 
-  const { data, error } = await supabase.from(tableName).select(columnNames);
+  let query = supabase.from(tableName).select(columns);
 
-  if (error) {
-    console.log(error);
-    return { success: false, message: "Fetch failed", error };
+  if (filterColumn && filterValue) {
+    query = query.in(filterColumn, filterValue);
   }
 
-  return { success: true, message: "Fetch successful", data: data };
+  if (additionalFilter) {
+    query = query.or(additionalFilter);
+  }
+
+  const { data, error } = await query;
+
+  if (error) {
+    console.error(`Error fetching ${tableName} data:`, error);
+    return { error };
+  }
+
+  return { data };
 }
 
 export async function fetchFilteredTableData(
@@ -335,7 +370,48 @@ export const fetchSearchHistoryActivities = async (itineraryId: string, destinat
   return { activities: mappedActivities, missingPlaceIds };
 };
 
-// actions/supabase/actions.ts
+export async function fetchUserItineraries(userId: string): Promise<{ data: IItineraryCard[] | null; error: any }> {
+  const supabase = createClient();
+
+  try {
+    const { data, error } = await supabase
+      .from("itinerary_destination")
+      .select(
+        `
+        itinerary_destination_id,
+        itinerary_id,
+        city,
+        country,
+        from_date,
+        to_date,
+        itinerary!inner (
+          deleted_at,
+          user_id
+        )
+      `
+      )
+      .eq("itinerary.user_id", userId)
+      .is("itinerary.deleted_at", null);
+
+    if (error) throw error;
+
+    const mappedData = data.map((item) => ({
+      itinerary_destination_id: item.itinerary_destination_id,
+      itinerary_id: item.itinerary_id,
+      city: item.city,
+      country: item.country,
+      from_date: new Date(item.from_date),
+      to_date: new Date(item.to_date),
+      deleted_at: null,
+    }));
+
+    return { data: mappedData, error: null };
+  } catch (error) {
+    console.error("Error fetching itineraries:", error);
+    return { data: null, error };
+  }
+}
+
 export const insertActivity = async (placeDetails: any): Promise<any> => {
   const supabase = createClient();
 
