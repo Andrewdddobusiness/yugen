@@ -37,6 +37,7 @@ import { filterActivities } from "@/utils/filters/filterActivities";
 import { activityTypeFilters, activityCostFilters } from "@/utils/filters/filters";
 import SearchField from "@/components/search/searchField";
 import ActivitySkeletonCards from "@/components/cards/activitySkeletonCards";
+import { Popup } from "react-map-gl";
 
 export default function Activities() {
   const { itineraryId, destinationId } = useParams();
@@ -61,6 +62,12 @@ export default function Activities() {
 
   // **** STATES ****
   const [initialLoadComplete, setInitialLoadComplete] = useState(false);
+
+  const [popupInfo, setPopupInfo] = useState<{
+    longitude: number;
+    latitude: number;
+    name: string;
+  } | null>(null);
 
   // **** GET INITIAL ACTIVITIES ****
   const { data: itineraryActivities, isLoading: isItineraryActivitiesLoading } = useQuery({
@@ -406,7 +413,34 @@ export default function Activities() {
               isSidebarOpen ? "w-0 md:w-1/3 hidden md:block" : "sm:w-1/2 w-0 hidden sm:block"
             }`}
           >
-            {cityCoordinates && <Mapbox />}
+            {cityCoordinates && (
+              <Mapbox
+                onWaypointHover={(activity: IActivity) => {
+                  if (activity.geometry?.location) {
+                    setPopupInfo({
+                      longitude: activity.geometry.location.lng,
+                      latitude: activity.geometry.location.lat,
+                      name: activity.name,
+                    });
+                  }
+                }}
+                onWaypointLeave={() => {
+                  setPopupInfo(null);
+                }}
+              />
+            )}
+            {popupInfo && (
+              <Popup
+                longitude={popupInfo.longitude}
+                latitude={popupInfo.latitude}
+                anchor="bottom"
+                closeButton={false}
+                closeOnClick={false}
+                className="z-50"
+              >
+                <div className="px-2 py-1 text-sm font-medium">{popupInfo.name}</div>
+              </Popup>
+            )}
           </div>
           <div
             className={`absolute top-0 right-0 h-full z-50 transition-all duration-300 transform ${

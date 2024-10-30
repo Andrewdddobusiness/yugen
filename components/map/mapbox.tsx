@@ -18,10 +18,13 @@ import { fetchNearbyActivities } from "@/actions/google/actions";
 
 import { motion, AnimatePresence } from "framer-motion";
 import { useActivityTabStore } from "@/store/activityTabStore";
-import Waypoint from "./waypoint";
+
 import { Toggle } from "../ui/toggle";
 
 import { SearchType } from "@/lib/googleMaps/includedTypes";
+
+import Waypoints from "./waypoints";
+import WaypointExplore from "./waypointExplore";
 
 export default function Mapbox() {
   // Define the calculateRadiusInPixels function before using it
@@ -33,8 +36,7 @@ export default function Mapbox() {
 
   // **** STORES ****
   const { selectedTab, setSelectedTab } = useActivityTabStore();
-  const { activities, setActivities, topPlacesActivities, searchHistoryActivities, selectedActivity } =
-    useActivitiesStore();
+  const { setActivities, selectedActivity } = useActivitiesStore();
   const {
     centerCoordinates,
     setCenterCoordinates,
@@ -48,9 +50,7 @@ export default function Mapbox() {
 
   // **** STATE ****
   const [searchOpen, setSearchOpen] = useState(false);
-  const [circleRadius, setCircleRadius] = useState(() => calculateRadiusInPixels(initialZoom, smallRadiusInMeters));
   const [circleCenter, setCircleCenter] = useState<[number, number] | null>(null);
-  const [markerCoordinates, setMarkerCoordinates] = useState<[number, number][] | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isGeneratingActivities, setIsGeneratingActivities] = useState(false);
   const [currentZoom, setCurrentZoom] = useState(initialZoom);
@@ -62,41 +62,9 @@ export default function Mapbox() {
   useEffect(() => {
     if (centerCoordinates) {
       setCircleCenter(centerCoordinates);
-      const initialRadius = calculateRadiusInPixels(currentZoom, mapRadius);
-      setCircleRadius(initialRadius);
       setIsLoading(false);
     }
   }, [centerCoordinates, currentZoom, mapRadius]);
-
-  useEffect(() => {
-    let coordinates: [number, number][] = [];
-
-    switch (selectedTab) {
-      case "top-places":
-        if (topPlacesActivities && Array.isArray(topPlacesActivities)) {
-          coordinates = topPlacesActivities.map((activity) => [
-            activity?.coordinates[0] ?? 0,
-            activity?.coordinates[1] ?? 0,
-          ]);
-        }
-        break;
-      case "search":
-        if (activities && Array.isArray(activities)) {
-          coordinates = activities.map((activity) => [activity?.coordinates[0] ?? 0, activity?.coordinates[1] ?? 0]);
-        }
-        break;
-      case "history":
-        if (searchHistoryActivities && Array.isArray(searchHistoryActivities)) {
-          coordinates = searchHistoryActivities.map((activity) => [
-            activity?.coordinates[0] ?? 0,
-            activity?.coordinates[1] ?? 0,
-          ]);
-        }
-        break;
-    }
-
-    setMarkerCoordinates(coordinates);
-  }, [selectedTab, activities, topPlacesActivities, searchHistoryActivities, centerCoordinates]);
 
   useEffect(() => {
     if (selectedActivity && mapRef.current) {
@@ -246,21 +214,10 @@ export default function Mapbox() {
                   </Source>
                 )}
 
-                {markerCoordinates &&
-                  markerCoordinates.map((coordinate, index) => (
-                    <Waypoint
-                      key={`${selectedTab}-marker-${index}`}
-                      latitude={coordinate[0]}
-                      longitude={coordinate[1]}
-                      transition={{
-                        duration: 0.3,
-                        delay: index * 0.05,
-                      }}
-                    />
-                  ))}
+                <Waypoints />
 
                 {searchOpen && (
-                  <Waypoint
+                  <WaypointExplore
                     latitude={circleCenter[0]}
                     longitude={circleCenter[1]}
                     draggable
@@ -383,7 +340,7 @@ export default function Mapbox() {
                         onClick={() => handleSearchTypeToggle("historical")}
                         className={`w-10 h-10 transition-all border ${
                           selectedSearchType === "historical"
-                            ? "bg-zinc-900 text-white hover:bg-zinc-800 hover:text-zinc-300 border-zinc-800 shadow-lg"
+                            ? "bg-zinc-900 text-white hover:bg-zinc-800  border-zinc-800 shadow-lg"
                             : "bg-white text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900 border-zinc-200"
                         }`}
                       >
