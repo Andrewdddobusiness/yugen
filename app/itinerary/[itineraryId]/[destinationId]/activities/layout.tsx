@@ -43,11 +43,11 @@ export default async function ActivitiesLayout({
 
   const { data: itinerary } = await supabase
     .from("itinerary")
-    .select("user_id")
+    .select("user_id, deleted_at")
     .eq("itinerary_id", itineraryId)
     .single();
 
-  if (!itinerary || itinerary.user_id !== user.id) {
+  if (!itinerary || itinerary.user_id !== user.id || itinerary.deleted_at !== null) {
     redirect("/dashboard");
   }
 
