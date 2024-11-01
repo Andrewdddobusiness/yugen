@@ -10,10 +10,14 @@ export interface ISearchHistoryItem {
 
 interface ISearchHistoryStore {
   history: ISearchHistoryItem[];
+  selectedSearchQuery: string;
   addToHistory: (item: ISearchHistoryItem) => void;
+  setSelectedSearchQuery: (query: string) => void;
 }
 
 export const useSearchHistoryStore = create<ISearchHistoryStore>((set) => ({
   history: [],
+  selectedSearchQuery: "",
   addToHistory: (item) => set((state) => ({ history: [item, ...state.history.slice(0, 9)] })),
+  setSelectedSearchQuery: (query) => set({ selectedSearchQuery: query }),
 }));

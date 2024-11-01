@@ -205,7 +205,7 @@ export const fetchPlaceDetails = async (placeId: string): Promise<IActivity> => 
       },
     });
 
-    console.log("response.data: ", response.data);
+    // console.log("response.data: ", response.data);
 
     const place = response.data;
     // console.log("mapGooglePlaceToActivity(place); ", mapGooglePlaceToActivity(place));

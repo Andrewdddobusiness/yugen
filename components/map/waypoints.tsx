@@ -41,6 +41,8 @@ export default function Waypoints() {
         ? activities
         : searchHistoryActivities;
 
+    if (!coordinate || !currentActivities || currentActivities.length === 0) return null;
+
     return currentActivities?.find(
       (activity) => activity?.coordinates[0] === coordinate[0] && activity?.coordinates[1] === coordinate[1]
     );

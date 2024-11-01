@@ -17,6 +17,7 @@ export interface IOpenHours {
 }
 
 export interface IActivity {
+  json(): unknown;
   place_id: string;
   name: string;
   coordinates: [number, number];
@@ -56,7 +57,7 @@ interface IActivityStore {
   setTopPlacesActivities: (topPlaces: IActivity[]) => void;
   setSelectedFilters: (updater: (prev: string[]) => string[]) => void;
   setSelectedCostFilters: (updater: (prev: string[]) => string[]) => void;
-  setSearchHistoryActivities: (searchHistory: IActivity[]) => void;
+  setSearchHistoryActivities: (searchHistory: IActivity[] | any) => void;
 }
 
 export const useActivitiesStore = create<IActivityStore>((set, get) => ({

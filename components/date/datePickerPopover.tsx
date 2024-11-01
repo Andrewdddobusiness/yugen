@@ -6,24 +6,15 @@ import { Calendar as CalendarIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import {
-  fetchFilteredTableData,
-  setTableData,
-} from "@/actions/supabase/actions";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { fetchFilteredTableData, setTableData } from "@/actions/supabase/actions";
 import { useQueryClient } from "@tanstack/react-query";
 
 interface DatePickerPopoverProps {
   itineraryActivityId: number;
 }
 
-export function DatePickerPopover({
-  itineraryActivityId,
-}: DatePickerPopoverProps) {
+export function DatePickerPopover({ itineraryActivityId }: DatePickerPopoverProps) {
   const [date, setDate] = React.useState<Date | undefined>(undefined);
   const [isLoading, setIsLoading] = React.useState(true);
   const queryClient = useQueryClient();
@@ -31,12 +22,9 @@ export function DatePickerPopover({
   React.useEffect(() => {
     const fetchExistingDate = async () => {
       try {
-        const result = await fetchFilteredTableData(
-          "itinerary_activity",
-          "date",
-          "itinerary_activity_id",
-          [itineraryActivityId.toString()]
-        );
+        const result = await fetchFilteredTableData("itinerary_activity", "date", "itinerary_activity_id", [
+          itineraryActivityId.toString(),
+        ]);
         if (result.success && result.data && result.data.length > 0) {
           const { date } = result.data[0];
           if (date) {
@@ -65,7 +53,7 @@ export function DatePickerPopover({
         ["itinerary_activity_id"]
       );
       // Invalidate and refetch the itinerary activities query
-      queryClient.invalidateQueries(["itineraryActivities"]);
+      queryClient.invalidateQueries({ queryKey: ["itineraryActivities"] });
     } catch (error) {
       console.error("Error saving date:", error);
     }
@@ -86,12 +74,7 @@ export function DatePickerPopover({
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-auto p-0" align="start">
-        <Calendar
-          mode="single"
-          selected={date}
-          onSelect={handleDateSelect}
-          initialFocus
-        />
+        <Calendar mode="single" selected={date} onSelect={handleDateSelect} initialFocus />
       </PopoverContent>
     </Popover>
   );

@@ -1,12 +1,10 @@
 "use client";
 import React, { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 
 import BuilderLayout from "@/components/layouts/builderLayout";
-import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
-import { Toggle } from "@/components/ui/toggle";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
@@ -16,6 +14,8 @@ import Mapbox from "@/components/map/mapbox";
 import Loading from "@/components/loading/loading";
 import ActivityFilters from "@/components/filters/activityFilters";
 import ActivityCostFilters from "@/components/filters/activityCostFilters";
+import SearchField from "@/components/search/searchField";
+import ActivitySkeletonCards from "@/components/cards/activitySkeletonCards";
 
 import {
   fetchItineraryDestination,
@@ -31,15 +31,15 @@ import { IActivity, IActivityWithLocation, IOpenHours, useActivitiesStore } from
 import { IItineraryActivity, useItineraryActivityStore } from "@/store/itineraryActivityStore";
 import { useSidebarStore } from "@/store/sidebarStore";
 import { useMapStore } from "@/store/mapStore";
-
 import { useActivityTabStore } from "@/store/activityTabStore";
+
 import { filterActivities } from "@/utils/filters/filterActivities";
 import { activityTypeFilters, activityCostFilters } from "@/utils/filters/filters";
-import SearchField from "@/components/search/searchField";
-import ActivitySkeletonCards from "@/components/cards/activitySkeletonCards";
+
 import { Popup } from "react-map-gl";
 
 export default function Activities() {
+  const queryClient = useQueryClient();
   const { itineraryId, destinationId } = useParams();
 
   // **** STORES ****
@@ -166,9 +166,9 @@ export default function Activities() {
     enabled: !!destinationData?.data?.city && !!countryData && countryData.length > 0,
   });
 
-  const { data: fetchedtopPlacesActivities, isLoading: isTopPlacesActivitiesLoading } = useQuery<IActivity[]>({
+  const { data: fetchedtopPlacesActivities, isLoading: isTopPlacesActivitiesLoading } = useQuery({
     queryKey: ["topPlacesActivities", cityData?.[0]?.city_id],
-    queryFn: async () => {
+    queryFn: async (): Promise<IActivity[]> => {
       if (!cityData || !cityData[0] || typeof cityData[0].city_id === "undefined") {
         throw new Error("City data is not available or invalid");
       }
@@ -209,7 +209,7 @@ export default function Activities() {
           close_minute: oh.close_minute,
         })),
         is_top_place: activity.is_top_place,
-      }));
+      })) as IActivity[];
     },
     enabled: !!cityData && cityData.length > 0,
   });
@@ -239,6 +239,7 @@ export default function Activities() {
     setSelectedTab(tab);
   };
 
+  // **** GET SEARCH HISTORY ACTIVITIES ****
   const { data: searchHistoryActivitiesData, isLoading: isSearchHistoryLoading } = useQuery<{
     activities: IActivity[];
     missingPlaceIds: string[];
@@ -252,41 +253,65 @@ export default function Activities() {
     enabled: !!itineraryId && !!destinationId,
   });
 
+  const placeDetailsQuery = async (placeId: string) => {
+    const data = await queryClient.fetchQuery({
+      queryKey: ["placeDetails", placeId],
+      queryFn: async () => {
+        try {
+          const response = await fetchPlaceDetails(placeId);
+          if (!response) {
+            throw new Error("Failed to fetch place details");
+          }
+          return response;
+        } catch (error) {
+          console.error("Error fetching place details:", error);
+          throw error;
+        }
+      },
+      staleTime: Infinity,
+    });
+    return data;
+  };
+
+  const insertActivityMutation = useMutation({
+    mutationFn: async (placeDetails: any) => {
+      return await insertActivity(placeDetails);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["searchHistoryActivities"] });
+    },
+  });
+
   useEffect(() => {
     const fetchActivities = async () => {
-      if (searchHistoryActivitiesData && Array.isArray(searchHistoryActivitiesData.activities)) {
+      if (
+        searchHistoryActivitiesData &&
+        Array.isArray(searchHistoryActivitiesData.activities) &&
+        searchHistoryActivitiesData.activities.length > 0
+      ) {
         const newActivities = searchHistoryActivitiesData.activities;
-
-        console.log("newActivities: ", newActivities);
-
-        // Create a Set to track existing place_ids
         const existingPlaceIds = new Set(searchHistoryActivities.map((activity) => activity.place_id));
-
-        // Filter out duplicates from newActivities
         const filteredNewActivities = newActivities.filter((activity) => !existingPlaceIds.has(activity.place_id));
 
-        console.log("filteredNewActivities: ", filteredNewActivities);
-
-        // Set only the filtered new activities
-        setSearchHistoryActivities(filteredNewActivities);
+        setSearchHistoryActivities(newActivities);
 
         const missingPlaceIds = searchHistoryActivitiesData.missingPlaceIds || [];
-        console.log("missingPlaceIds: ", missingPlaceIds);
 
         // Fetch missing activities
         for (const placeId of missingPlaceIds) {
           try {
-            const placeDetails = await fetchPlaceDetails(placeId);
+            const placeDetails = await placeDetailsQuery(placeId);
+
             if (placeDetails) {
-              const newActivity = await insertActivity(placeDetails);
+              const newActivity = await insertActivityMutation.mutateAsync(placeDetails);
+
               setSearchHistoryActivities((prevActivities: IActivity[]) => {
-                if (!Array.isArray(prevActivities)) {
-                  return [newActivity];
+                const currentActivities = Array.isArray(prevActivities) ? prevActivities : [];
+                if (currentActivities.some((a) => a.place_id === newActivity.place_id)) {
+                  return currentActivities;
                 }
-                if (prevActivities.some((a) => a.place_id === newActivity.place_id)) {
-                  return prevActivities;
-                }
-                return [...prevActivities, newActivity];
+
+                return [...currentActivities, newActivity];
               });
             }
           } catch (error) {
@@ -298,8 +323,6 @@ export default function Activities() {
 
     fetchActivities();
   }, [searchHistoryActivitiesData, setSearchHistoryActivities]);
-
-  console.log("searchHistoryActivities: ", searchHistoryActivities);
 
   return (
     <BuilderLayout title="Activities" activePage="activities" itineraryNumber={1}>
@@ -415,18 +438,18 @@ export default function Activities() {
           >
             {cityCoordinates && (
               <Mapbox
-                onWaypointHover={(activity: IActivity) => {
-                  if (activity.geometry?.location) {
-                    setPopupInfo({
-                      longitude: activity.geometry.location.lng,
-                      latitude: activity.geometry.location.lat,
-                      name: activity.name,
-                    });
-                  }
-                }}
-                onWaypointLeave={() => {
-                  setPopupInfo(null);
-                }}
+              // onWaypointHover={(activity: IActivity) => {
+              //   if (activity.geometry?.location) {
+              //     setPopupInfo({
+              //       longitude: activity.geometry.location.lng,
+              //       latitude: activity.geometry.location.lat,
+              //       name: activity.name,
+              //     });
+              //   }
+              // }}
+              // onWaypointLeave={() => {
+              //   setPopupInfo(null);
+              // }}
               />
             )}
             {popupInfo && (

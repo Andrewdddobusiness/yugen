@@ -1,5 +1,5 @@
 import { useState, useRef } from "react";
-import { useSearchParams } from "next/navigation";
+import { useParams } from "next/navigation";
 
 import { Input } from "../ui/input";
 
@@ -9,22 +9,21 @@ import { addSearchHistoryItem } from "@/actions/supabase/actions";
 import { useMapStore } from "@/store/mapStore";
 import { useActivityTabStore } from "@/store/activityTabStore";
 
+import { useQueryClient, useMutation } from "@tanstack/react-query";
+
 export default function SearchField() {
-  const searchParams = useSearchParams();
-  const itineraryId = searchParams.get("i");
-  const destinationId = searchParams.get("d");
+  const queryClient = useQueryClient();
+  const { itineraryId, destinationId } = useParams();
 
   // **** STORES ****
   const { setSelectedTab } = useActivityTabStore();
+  const { addToHistory, selectedSearchQuery, setSelectedSearchQuery } = useSearchHistoryStore();
+  const { itineraryCoordinates } = useMapStore();
 
   // **** STATES ****
-  const [searchQuery, setSearchQuery] = useState<string>("");
+
   const [autocompleteResults, setAutocompleteResults] = useState<Array<ISearchHistoryItem>>([]);
-
   const [isVisible, setIsVisible] = useState<boolean>(false);
-
-  const { addToHistory } = useSearchHistoryStore();
-  const { itineraryCoordinates } = useMapStore();
 
   // **** REFS ****
   const inputRef = useRef<HTMLInputElement>(null);
@@ -32,7 +31,7 @@ export default function SearchField() {
   // **** HANDLERS ****
   const handleSearchChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
-    setSearchQuery(value);
+    setSelectedSearchQuery(value);
 
     if (value.length > 2) {
       const results = await getGoogleMapsAutocomplete(
@@ -44,19 +43,34 @@ export default function SearchField() {
       setAutocompleteResults(results);
       setIsVisible(true);
     } else {
-      setAutocompleteResults([]);
       setIsVisible(false);
     }
   };
 
-  const handleAutocompleteSelect = async (item: ISearchHistoryItem) => {
-    setSearchQuery(item.mainText);
-    setAutocompleteResults([]);
-    setIsVisible(false);
-    addToHistory(item);
-    setSelectedTab("history");
+  // **** MUTATIONS ****
+  const addSearchHistoryMutation = useMutation({
+    mutationFn: async (item: ISearchHistoryItem) => {
+      return await addSearchHistoryItem(itineraryId as string, destinationId as string, item.placeId);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["searchHistoryActivities"] });
+    },
+  });
 
-    await addSearchHistoryItem(itineraryId as string, destinationId as string, item.placeId);
+  // **** HANDLERS ****
+  const handleAutocompleteSelect = async (item: ISearchHistoryItem) => {
+    try {
+      setSelectedSearchQuery(item.mainText);
+      setIsVisible(false);
+      addToHistory(item);
+      setSelectedTab("history");
+
+      if (item.placeId) {
+        await addSearchHistoryMutation.mutateAsync(item);
+      }
+    } catch (error) {
+      console.error("Error adding search history item:", error);
+    }
   };
 
   const handleInputFocus = () => {
@@ -79,7 +93,7 @@ export default function SearchField() {
         ref={inputRef}
         type="search"
         placeholder="Search..."
-        value={searchQuery}
+        value={selectedSearchQuery}
         onChange={handleSearchChange}
         onFocus={handleInputFocus}
         onBlur={handleInputBlur}
