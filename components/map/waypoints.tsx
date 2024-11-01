@@ -2,8 +2,9 @@ import { useEffect, useState } from "react";
 import { IActivity, useActivitiesStore } from "@/store/activityStore";
 import { useActivityTabStore } from "@/store/activityTabStore";
 import Waypoint from "./waypoint";
+import { colors, TColor } from "@/lib/colors/colors";
 
-export default function Waypoints() {
+export default function Waypoints({ color }: { color?: TColor }) {
   const { selectedTab } = useActivityTabStore();
   const { activities, topPlacesActivities, searchHistoryActivities } = useActivitiesStore();
   const [markerCoordinates, setMarkerCoordinates] = useState<[number, number][] | null>(null);
@@ -64,6 +65,8 @@ export default function Waypoints() {
               duration: 0.3,
               delay: index * 0.05,
             }}
+            number={index + 1}
+            color={color || (colors.Blue as TColor)}
           />
         );
       })}

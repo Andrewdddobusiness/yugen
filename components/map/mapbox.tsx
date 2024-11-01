@@ -1,39 +1,32 @@
 import * as React from "react";
-import { useEffect, useRef, useState, useCallback } from "react";
-import Map, { Layer, Source, NavigationControl, Marker } from "react-map-gl";
-import type { CircleLayer, FillLayer } from "react-map-gl";
+import { useEffect, useRef, useState } from "react";
+import Map, { Layer, Source, NavigationControl } from "react-map-gl";
+import type { FillLayer } from "react-map-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
+import { motion, AnimatePresence } from "framer-motion";
 
 import * as turf from "@turf/turf";
-
-import { Button } from "../ui/button";
-import { CircleMinus, CirclePlus, Earth, Landmark, Loader2, ShoppingCart, Utensils, X } from "lucide-react";
 
 import { useActivitiesStore } from "@/store/activityStore";
 import { useMapStore } from "@/store/mapStore";
 import { useSidebarStore } from "@/store/sidebarStore";
 
 import { Skeleton } from "../ui/skeleton";
-import { fetchNearbyActivities } from "@/actions/google/actions";
-
-import { motion, AnimatePresence } from "framer-motion";
-import { useActivityTabStore } from "@/store/activityTabStore";
-
 import { Toggle } from "../ui/toggle";
-
-import { SearchType } from "@/lib/googleMaps/includedTypes";
+import { Button } from "../ui/button";
 
 import Waypoints from "./waypoints";
 import WaypointExplore from "./waypointExplore";
 
-export default function Mapbox() {
-  // Define the calculateRadiusInPixels function before using it
-  const calculateRadiusInPixels = (zoom: number, radiusInMeters: number) => {
-    const earthCircumference = 40075017; // Earth's circumference in meters
-    const metersPerPixel = earthCircumference / (256 * Math.pow(2, zoom));
-    return radiusInMeters / metersPerPixel;
-  };
+import { fetchNearbyActivities } from "@/actions/google/actions";
 
+import { useActivityTabStore } from "@/store/activityTabStore";
+
+import { CircleMinus, CirclePlus, Earth, Landmark, Loader2, ShoppingCart, Utensils, X } from "lucide-react";
+
+import { SearchType } from "@/lib/googleMaps/includedTypes";
+
+export default function Mapbox() {
   // **** STORES ****
   const { selectedTab, setSelectedTab } = useActivityTabStore();
   const { setActivities, selectedActivity } = useActivitiesStore();
