@@ -18,8 +18,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Skeleton } from "../ui/skeleton";
 
-import ItineraryChoiceDialog from "../dialog/itineraryChoiceDialog";
 import LogoutButton from "../buttons/logoutButton";
+import PopUpCreateItinerary from "../popUp/popUpCreateItinerary";
 
 interface PageLayoutProps {
   title: string;
@@ -27,10 +27,7 @@ interface PageLayoutProps {
   activePage: string;
 }
 
-export default function DashboardLayout({
-  children,
-  activePage,
-}: PageLayoutProps): React.ReactElement {
+export default function DashboardLayout({ children, activePage }: PageLayoutProps): React.ReactElement {
   const supabase = createClient();
 
   const [profileUrl, setProfileUrl] = useState("");
@@ -43,9 +40,7 @@ export default function DashboardLayout({
         if (error || !user) {
           throw new Error("User not authenticated");
         }
-        const { data } = await supabase.storage
-          .from("avatars")
-          .getPublicUrl(user.user.id + "/profile");
+        const { data } = await supabase.storage.from("avatars").getPublicUrl(user.user.id + "/profile");
         if (error || !data) {
           throw new Error("Error fetching public URL");
         }
@@ -65,34 +60,21 @@ export default function DashboardLayout({
       <nav className="flex items-center justify-between w-full h-15 px-4 bg-white border-b fixed top-0 left-0 z-50">
         <div className="flex justify-start p-2 py-4  hover:text-zinc-500 cursor-pointer transition-all h-[60px]">
           <Link href="/" className="flex items-center justify-center">
-            <Image
-              src="/smile.svg"
-              alt="smile"
-              width={50}
-              height={50}
-              sizes="100vw"
-              className="max-w-[25px]"
-            />
-            <div className="font-Patua text-xl font-bold ml-2 hidden sm:flex">
-              Planaway
-            </div>
+            <Image src="/smile.svg" alt="smile" width={50} height={50} sizes="100vw" className="max-w-[25px]" />
+            <div className="font-Patua text-xl font-bold ml-2 hidden sm:flex">Planaway</div>
           </Link>
         </div>
         {/* <h1 className="text-xl font-semibold pl-16">{title}</h1> */}
         <div className="ml-auto pr-4">
-          <ItineraryChoiceDialog>
+          <PopUpCreateItinerary>
             <Plus className="size-3.5 mr-1" />
             <div> Create an Itinerary</div>
-          </ItineraryChoiceDialog>
+          </PopUpCreateItinerary>
         </div>
         <div className="pr-4">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button
-                variant="outline"
-                size="icon"
-                className="overflow-hidden rounded-full"
-              >
+              <Button variant="outline" size="icon" className="overflow-hidden rounded-full">
                 {profileUrl ? (
                   <Image
                     alt="Profile"

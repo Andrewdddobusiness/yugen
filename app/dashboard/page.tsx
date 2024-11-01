@@ -1,26 +1,25 @@
 "use client";
-import React, { useEffect, useState } from "react";
+import React, { Suspense, useEffect, useState } from "react";
 import Image from "next/image";
 import ItineraryCards from "@/components/cards/itineraryCards";
 import DashboardLayout from "@/components/layouts/dashboardLayout";
-
-import { fetchTableData, fetchUserItineraries } from "@/actions/supabase/actions";
-
+import { fetchUserItineraries } from "@/actions/supabase/actions";
 import { createClient } from "@/utils/supabase/client";
-
 import { IItineraryCard } from "@/components/cards/itineraryCard";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import ItinerarySkeletonCard from "@/components/cards/itinerarySkeletonCard";
 
 export default function Dashboard() {
   const supabase = createClient();
-
+  const queryClient = useQueryClient();
   const [user, setUser] = useState<any>();
-  const [loadingItinerary, setLoadingItinerary] = useState<boolean>(false);
-  const [itineraryData, setItineraryData] = useState<IItineraryCard[]>([]);
+  const [isUserLoading, setIsUserLoading] = useState(true);
 
+  // Fetch user data
   useEffect(() => {
     const fetchUserData = async () => {
+      setIsUserLoading(true);
       try {
-        setLoadingItinerary(true);
         const { auth } = supabase;
         const { data: user } = await auth.getUser();
 
@@ -30,40 +29,30 @@ export default function Dashboard() {
         setUser(user.user);
       } catch (error) {
         console.error("Error fetching user data:", error);
+      } finally {
+        setIsUserLoading(false);
       }
     };
 
     fetchUserData();
   }, [supabase]);
 
-  useEffect(() => {
-    const fetchItineraryData = async () => {
-      if (user) {
-        setLoadingItinerary(true);
-        try {
-          const { data, error } = await fetchUserItineraries(user.id);
+  // Fetch itineraries with proper typing
+  const { data: itineraryData, isLoading: isItinerariesLoading } = useQuery({
+    queryKey: ["itineraries", user?.id],
+    queryFn: async () => {
+      const response = await fetchUserItineraries(user?.id || "");
+      return response.data || [];
+    },
+    enabled: !!user?.id,
+  });
 
-          if (error) {
-            console.error("Error fetching itinerary data:", error);
-            setItineraryData([]);
-          } else {
-            setItineraryData(data || []);
-          }
-        } catch (error) {
-          console.error("Error fetching itinerary data:", error);
-          setItineraryData([]);
-        } finally {
-          setLoadingItinerary(false);
-        }
-      }
-    };
-
-    fetchItineraryData();
-  }, [user]);
-
-  const handleDelete = (deletedItineraryId: number) => {
-    setItineraryData((current) => current.filter((itinerary) => itinerary.itinerary_id !== deletedItineraryId));
+  const handleDelete = async () => {
+    await queryClient.invalidateQueries({ queryKey: ["itineraries"] });
   };
+
+  // Update the loading logic
+  const isLoading = !user ? true : isItinerariesLoading;
 
   return (
     <DashboardLayout title="Dashboard" activePage="home">
@@ -79,7 +68,11 @@ export default function Dashboard() {
           <div className="text-lg font-bold">My Itineraries</div>
         </div>
         <div className="flex flex-row py-4">
-          <ItineraryCards itineraries={itineraryData} loading={loadingItinerary} onDelete={handleDelete} />
+          {isLoading && isUserLoading ? (
+            <ItinerarySkeletonCard />
+          ) : (
+            <ItineraryCards itineraries={itineraryData || []} onDelete={handleDelete} />
+          )}
         </div>
       </div>
     </DashboardLayout>

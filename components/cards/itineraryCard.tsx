@@ -67,7 +67,7 @@ export default function ItineraryCard({ itinerary, onDelete }: ItineraryCardProp
       passHref
     >
       <Card
-        className="aspect-w-1 aspect-h-1 cursor-pointer relative"
+        className="h-60 w-60 cursor-pointer relative"
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
       >

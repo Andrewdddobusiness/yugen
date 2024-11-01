@@ -17,6 +17,56 @@ export async function insertTableData(tableName: string, tableData: any) {
   return { success: true, message: "Insert successful", data: data };
 }
 
+export async function createNewItinerary(
+  userId: string,
+  destination: string,
+  dateRange: { from: Date; to: Date },
+  adultsCount: number,
+  kidsCount: number
+) {
+  const supabase = createClient();
+
+  try {
+    // Insert itinerary data
+    const { data: itineraryData, error: itineraryError } = await supabase
+      .from("itinerary")
+      .insert([
+        {
+          user_id: userId,
+          adults: adultsCount,
+          kids: kidsCount,
+        },
+      ])
+      .select("itinerary_id")
+      .single();
+
+    if (itineraryError) throw itineraryError;
+
+    const selectedLocation = destination.split(", ");
+    const city = selectedLocation[0];
+    const country = selectedLocation[1];
+
+    // Insert destination data
+    const { error: destinationError } = await supabase.from("itinerary_destination").insert([
+      {
+        itinerary_id: itineraryData.itinerary_id,
+        city: city,
+        country: country,
+        order_number: 1,
+        from_date: dateRange.from,
+        to_date: dateRange.to,
+      },
+    ]);
+
+    if (destinationError) throw destinationError;
+
+    return { success: true };
+  } catch (error) {
+    console.error("Error creating itinerary:", error);
+    return { success: false, error };
+  }
+}
+
 /*
   SET
 */

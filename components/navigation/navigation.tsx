@@ -36,7 +36,7 @@ import {
 } from "@/components/ui/drawer";
 import { Button } from "../ui/button";
 import LogoutButton from "../buttons/logoutButton";
-import ItineraryChoiceDialog from "../dialog/itineraryChoiceDialog";
+import PopUpCreateItinerary from "../popUp/popUpCreateItinerary";
 
 export default function Navigation() {
   const supabase = createClient();
@@ -54,9 +54,7 @@ export default function Navigation() {
         setUser(user);
       }
 
-      const { data } = await supabase.storage
-        .from("avatars")
-        .getPublicUrl(user.user.id + "/profile");
+      const { data } = await supabase.storage.from("avatars").getPublicUrl(user.user.id + "/profile");
       if (error || !data) {
         throw new Error("Error fetching public URL");
       } else {
@@ -76,13 +74,7 @@ export default function Navigation() {
     <div className="fixed top-0 left-0 right-0 flex flex-row items-center justify-between p-2 px-4 sm:px-8 pt-4 shadow-sm bg-white z-50">
       <div className="flex flex-row items-center">
         <div className="hidden sm:block max-w-[35px]">
-          <Image
-            src="/smile.svg"
-            alt="smile"
-            width={100}
-            height={100}
-            sizes="100vw"
-          />
+          <Image src="/smile.svg" alt="smile" width={100} height={100} sizes="100vw" />
         </div>
         <div className="flex items-center font-Patua text-xl font-bold ml-2">
           <Link href={"/"}>Planaway</Link>
@@ -94,28 +86,21 @@ export default function Navigation() {
             <NavigationMenu className="mr-4">
               <NavigationMenuList className="flex space-x-4">
                 <NavigationMenuItem>
-                  <NavigationMenuLink
-                    href="/"
-                    className={navigationMenuTriggerStyle()}
-                  >
+                  <NavigationMenuLink href="/" className={navigationMenuTriggerStyle()}>
                     Pricing
                   </NavigationMenuLink>
                 </NavigationMenuItem>
               </NavigationMenuList>
             </NavigationMenu>
             <div className="ml-auto pr-4">
-              <ItineraryChoiceDialog>
+              <PopUpCreateItinerary>
                 <Plus className="size-3.5" />
                 <div> Create an Itinerary</div>
-              </ItineraryChoiceDialog>
+              </PopUpCreateItinerary>
             </div>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  className="overflow-hidden rounded-full"
-                >
+                <Button variant="outline" size="icon" className="overflow-hidden rounded-full">
                   <Image
                     alt="Avatar"
                     src={profileUrl ? profileUrl : ""}
@@ -146,27 +131,18 @@ export default function Navigation() {
           <NavigationMenu>
             <NavigationMenuList className="flex space-x-4">
               <NavigationMenuItem>
-                <NavigationMenuLink
-                  href="/"
-                  className={navigationMenuTriggerStyle()}
-                >
+                <NavigationMenuLink href="/" className={navigationMenuTriggerStyle()}>
                   Pricing
                 </NavigationMenuLink>
               </NavigationMenuItem>
 
               <NavigationMenuItem>
-                <NavigationMenuLink
-                  href="/login"
-                  className={navigationMenuTriggerStyle()}
-                >
+                <NavigationMenuLink href="/login" className={navigationMenuTriggerStyle()}>
                   Login
                 </NavigationMenuLink>
               </NavigationMenuItem>
               <NavigationMenuItem>
-                <NavigationMenuLink
-                  href="/signUp"
-                  className={navigationMenuTriggerStyle2()}
-                >
+                <NavigationMenuLink href="/signUp" className={navigationMenuTriggerStyle2()}>
                   Sign Up
                 </NavigationMenuLink>
               </NavigationMenuItem>
@@ -182,10 +158,7 @@ export default function Navigation() {
           <DrawerContent>
             <DrawerHeader className="text-left">
               <DrawerTitle>Edit profile</DrawerTitle>
-              <DrawerDescription>
-                Make changes to your profile here. Click save when you&aposre
-                done.
-              </DrawerDescription>
+              <DrawerDescription>Make changes to your profile here. Click save when you&aposre done.</DrawerDescription>
             </DrawerHeader>
 
             <DrawerFooter className="pt-2">
