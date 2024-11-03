@@ -1,10 +1,3 @@
-const protectedRoutes: string[] = [
-  "/dashboard",
-  "/settings",
-  "/explore",
-  "itineraries",
-  "itinerary",
-  "newTrip",
-];
+const protectedRoutes: string[] = ["/itineraries", "/settings", "/explore", "itineraries", "itinerary", "newTrip"];
 
 export default protectedRoutes;

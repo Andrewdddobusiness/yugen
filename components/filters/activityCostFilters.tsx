@@ -6,7 +6,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { MdMoneyOff, MdAttachMoney } from "react-icons/md";
 import { Check, ChevronsUpDown } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn } from "@/components/lib/utils";
 
 const ActivityCostFilters: React.FC = () => {
   const { selectedCostFilters, setSelectedCostFilters } = useActivitiesStore();

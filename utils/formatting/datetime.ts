@@ -31,11 +31,7 @@ export function formatTime(time: string): string {
  * @param minute - The minute (0-59)
  * @returns A formatted string representing the opening time or "Open 24 hours"
  */
-export function formatOpenHours(
-  day: number,
-  hour: number,
-  minute: number
-): string {
+export function formatOpenHours(day: number, hour: number, minute: number): string {
   if (hour === undefined || minute === undefined) return "";
 
   if (day === 6 && hour === 0 && minute === 0) {
@@ -98,4 +94,24 @@ export function formatUserFriendlyDate(date: Date): string {
   };
 
   return new Intl.DateTimeFormat("en-US", options).format(date);
+}
+
+/**
+ * Formats a Date object into DD-MM-YYYY format.
+ *
+ * @param date - A Date object to be formatted
+ * @returns A formatted string representing the date (e.g., "14-11-2024")
+ */
+export function formatDate(date: Date | string): string {
+  if (!date) return "Invalid date";
+
+  const dateObj = date instanceof Date ? date : new Date(date);
+
+  if (isNaN(dateObj.getTime())) return "Invalid date";
+
+  const day = dateObj.getDate().toString().padStart(2, "0");
+  const month = (dateObj.getMonth() + 1).toString().padStart(2, "0"); // +1 because months are 0-indexed
+  const year = dateObj.getFullYear();
+
+  return `${day}-${month}-${year}`;
 }

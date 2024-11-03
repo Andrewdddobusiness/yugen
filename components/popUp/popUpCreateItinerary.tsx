@@ -207,7 +207,7 @@ export default function PopUpCreateItinerary({ children, className, ...props }: 
         await queryClient.invalidateQueries({ queryKey: ["itineraries"] });
         setOpen(false);
         resetStore();
-        router.push("/dashboard");
+        router.push("/itineraries");
       } else {
         setError(error || "Failed to create itinerary");
       }
@@ -276,9 +276,6 @@ export default function PopUpCreateItinerary({ children, className, ...props }: 
     handleCreateItinerary();
   }
 
-  console.log("adultsCount :", adultsCount);
-  console.log("kidsCount :", kidsCount);
-
   const handleNext = () => {
     if (!isStepValid()) {
       return;
@@ -297,11 +294,7 @@ export default function PopUpCreateItinerary({ children, className, ...props }: 
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger
-        className={`flex items-center justify-center py-3 px-4 text-sm text-white bg-black hover:opacity-80 transition-colors duration-300 cursor-pointer rounded-lg ${className}`}
-      >
-        {children}
-      </DialogTrigger>
+      <DialogTrigger className={`inline-flex ${className}`}>{children}</DialogTrigger>
       <DialogContent className="max-w-[1000px] h-[400px] grid grid-cols-2 p-0 gap-0">
         <div className="relative w-full h-full">
           <Image src={steps[step].image} alt={steps[step].title} fill className="object-cover rounded-l-md" priority />

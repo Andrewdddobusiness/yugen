@@ -8,7 +8,7 @@ import HomeLayout from "@/components/layouts/homeLayout";
 
 import { Button } from "@/components/ui/button";
 import PopUpCreateItinerary from "@/components/popUp/popUpCreateItinerary";
-import { Loader2 } from "lucide-react";
+import { Loader2, Plus } from "lucide-react";
 
 export default function Home() {
   const supabase = createClient();
@@ -53,7 +53,10 @@ export default function Home() {
                 </Button>
               ) : user ? (
                 <PopUpCreateItinerary>
-                  <div> Create an Itinerary</div>
+                  <Button className="w-full">
+                    <Plus className="size-3.5 mr-1" />
+                    <span>Create new Itinerary</span>
+                  </Button>
                 </PopUpCreateItinerary>
               ) : (
                 <Link href="/signUp">

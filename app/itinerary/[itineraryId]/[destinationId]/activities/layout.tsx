@@ -31,14 +31,14 @@ export default async function ActivitiesLayout({
   const { itineraryId, destinationId } = params;
 
   if (!itineraryId || !destinationId) {
-    redirect("/dashboard");
+    redirect("/itineraries");
   }
 
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) {
-    redirect("/login");
+    redirect("/");
   }
 
   const { data: itinerary } = await supabase
@@ -48,7 +48,7 @@ export default async function ActivitiesLayout({
     .single();
 
   if (!itinerary || itinerary.user_id !== user.id || itinerary.deleted_at !== null) {
-    redirect("/dashboard");
+    redirect("/itineraries");
   }
 
   const { data: destination } = await supabase
@@ -59,7 +59,7 @@ export default async function ActivitiesLayout({
     .single();
 
   if (!destination) {
-    redirect("/dashboard");
+    redirect("/itineraries");
   }
 
   return <>{children}</>;

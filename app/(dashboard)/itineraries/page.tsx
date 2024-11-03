@@ -2,14 +2,14 @@
 import React, { Suspense, useEffect, useState } from "react";
 import Image from "next/image";
 import ItineraryCards from "@/components/cards/itineraryCards";
-import DashboardLayout from "@/components/layouts/dashboardLayout";
+
 import { fetchUserItineraries } from "@/actions/supabase/actions";
 import { createClient } from "@/utils/supabase/client";
 import { IItineraryCard } from "@/components/cards/itineraryCard";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import ItinerarySkeletonCard from "@/components/cards/itinerarySkeletonCard";
 
-export default function Dashboard() {
+export default function Itineraries() {
   const supabase = createClient();
   const queryClient = useQueryClient();
   const [user, setUser] = useState<any>();
@@ -55,26 +55,24 @@ export default function Dashboard() {
   const isLoading = !user ? true : isItinerariesLoading;
 
   return (
-    <DashboardLayout title="Dashboard" activePage="home">
-      <div className="m-4 border rounded-lg h-40">
-        <Image
-          src="/map2.jpg"
-          alt="Image"
-          width="1920"
-          height="1080"
-          className="h-full w-full object-cover dark:brightness-[0.2] dark:grayscale rounded-lg"
-        />
-        <div className="pt-8">
-          <div className="text-lg font-bold">My Itineraries</div>
-        </div>
-        <div className="flex flex-row py-4">
-          {isLoading && isUserLoading ? (
-            <ItinerarySkeletonCard />
-          ) : (
-            <ItineraryCards itineraries={itineraryData || []} onDelete={handleDelete} />
-          )}
-        </div>
+    <div className="m-4 border rounded-lg h-40">
+      <Image
+        src="/map2.jpg"
+        alt="Image"
+        width="1920"
+        height="1080"
+        className="h-full w-full object-cover dark:brightness-[0.2] dark:grayscale rounded-lg"
+      />
+      <div className="pt-8">
+        <div className="text-lg font-bold">My Itineraries</div>
       </div>
-    </DashboardLayout>
+      <div className="flex flex-row py-4">
+        {isLoading && isUserLoading ? (
+          <ItinerarySkeletonCard />
+        ) : (
+          <ItineraryCards itineraries={itineraryData || []} onDelete={handleDelete} />
+        )}
+      </div>
+    </div>
   );
 }

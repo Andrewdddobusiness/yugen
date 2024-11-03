@@ -74,7 +74,7 @@ export default function BuilderLayout({
       <aside className="absolute left-0 z-50 flex h-full flex-col border-r">
         {/* Logo/Home Button */}
         <div className="p-2 bg-white border-b">
-          <Link href="/dashboard" legacyBehavior>
+          <Link href="/itineraries" legacyBehavior>
             <Button variant="outline" size="icon" aria-label="Home">
               <div className="hidden sm:block max-w-[25px]">
                 <Image src="/smile.svg" alt="smile" width={50} height={50} sizes="100vw" />
@@ -87,7 +87,7 @@ export default function BuilderLayout({
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild className="border-b pb-1">
-                <Link href="/dashboard">
+                <Link href="/itineraries">
                   <Button variant="ghost" size="icon" aria-label="Back">
                     <CircleChevronLeft className="size-5" />
                   </Button>

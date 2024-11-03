@@ -31,9 +31,7 @@ export default function NewTripCreator() {
   const [adultsCount, setAdultsCount] = useState(1);
   const [kidsCount, setKidsCount] = useState(0);
 
-  const [destinationLocation, setDestinationLocation] = useState<
-    string | undefined
-  >(undefined);
+  const [destinationLocation, setDestinationLocation] = useState<string | undefined>(undefined);
   const [dateRange, setDateRange] = useState<any>();
 
   const [destinationError, setDestinationError] = useState(false);
@@ -103,12 +101,9 @@ export default function NewTripCreator() {
     };
 
     try {
-      const response = await insertTableData(
-        "itinerary_destination",
-        itineraryDestinationsData
-      );
+      const response = await insertTableData("itinerary_destination", itineraryDestinationsData);
       if (response.success) {
-        router.push("/dashboard");
+        router.push("/itineraries");
       }
     } catch (error) {
       console.error(error);
@@ -153,141 +148,85 @@ export default function NewTripCreator() {
 
   const locationList = whitelistedLocations.map(
     (location) =>
-      `${capitalizeFirstLetterOfEachWord(
-        location.city
-      )}, ${capitalizeFirstLetterOfEachWord(location.country)}`
+      `${capitalizeFirstLetterOfEachWord(location.city)}, ${capitalizeFirstLetterOfEachWord(location.country)}`
   );
 
   return (
-    <DashboardLayout title="Itineraries" activePage="itineraries">
-      <div className="grid grid-cols-2 h-screen">
-        <div className="flex flex-col items-center">
-          <div className="flex flex-col items-left w-3/4 mt-16">
-            <>
-              <div className="text-4xl font-semibold">
-                Plan your next holiday!
-              </div>
-              <div className="text-md text-zinc-500 mt-2">
-                Let&apos;s get some details...
-              </div>
-              <div className="text-xl font-semibold mt-8">
-                Where do you want to go?
-              </div>
-              <div className="flex flex-row w-full gap-4 text-5xl mt-2">
-                {locationList ? (
-                  <ComboBox
-                    selection={locationList}
-                    onSelectionChange={handleDestinationChange}
-                  />
-                ) : (
-                  <Skeleton className="w-full h-[40px] rounded-md" />
-                )}
-              </div>
-              {destinationError && (
-                <div className="text-sm text-red-500 mt-2">
-                  Please select a destination.
-                </div>
-              )}
-              <div className="flex flex-row text-5xl mt-2">
-                <DatePickerWithRangePopover
-                  onDateChange={handleDateChange}
-                  fetchDateRangeProp={false}
-                />
-              </div>
-              {dateRangeError && (
-                <div className="text-sm text-red-500 mt-2">
-                  Please select a date range.
-                </div>
-              )}
-              <div className="text-xl font-semibold mt-8">
-                How many people are going?
-              </div>
-              <div className="flex flex-row justify-between items-center text-xl mt-2 border rounded-md p-1">
-                <div className="flex justify-between items-center gap-2 text-md p-2">
-                  <div className="flex justify-center items-center rounded-md border w-10 h-10 ">
-                    {adultsCount}
-                  </div>
-                  <div>Adults</div>
-                </div>
-                <div className="flex justify-between gap-2 p-2">
-                  <Button
-                    variant={"outline"}
-                    size={"sm"}
-                    onClick={() => handleDecreaseCount("adults")}
-                  >
-                    <Minus size={12} />
-                  </Button>
-                  <Button
-                    variant={"outline"}
-                    size={"sm"}
-                    onClick={() => handleIncreaseCount("adults")}
-                  >
-                    <Plus size={12} />
-                  </Button>
-                </div>
-              </div>
-              <div className="flex flex-row justify-between items-center text-xl mt-2 border rounded-md p-1">
-                <div className="flex justify-between items-center gap-2 text-md p-2">
-                  <div className="flex justify-center items-center rounded-md border w-10 h-10">
-                    {kidsCount}
-                  </div>
-                  <div>Kids</div>
-                </div>
-                <div className="flex justify-between gap-2 p-2">
-                  <Button
-                    variant={"outline"}
-                    size={"sm"}
-                    onClick={() => handleDecreaseCount("kids")}
-                  >
-                    <Minus size={12} />
-                  </Button>
-                  <Button
-                    variant={"outline"}
-                    size={"sm"}
-                    onClick={() => handleIncreaseCount("kids")}
-                  >
-                    <Plus size={12} />
-                  </Button>
-                </div>
-              </div>
-            </>
-
-            {/* BUTTONS NAVIGATION */}
-            <div className="flex flex-row justify-end mt-8">
-              {loading ? (
-                <Button
-                  disabled
-                  size="sm"
-                  variant={"default"}
-                  className="rounded-full"
-                >
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin " />
-                  Please wait
-                </Button>
+    <div className="grid grid-cols-2 h-screen">
+      <div className="flex flex-col items-center">
+        <div className="flex flex-col items-left w-3/4 mt-16">
+          <>
+            <div className="text-4xl font-semibold">Plan your next holiday!</div>
+            <div className="text-md text-zinc-500 mt-2">Let&apos;s get some details...</div>
+            <div className="text-xl font-semibold mt-8">Where do you want to go?</div>
+            <div className="flex flex-row w-full gap-4 text-5xl mt-2">
+              {locationList ? (
+                <ComboBox selection={locationList} onSelectionChange={handleDestinationChange} />
               ) : (
-                <Button
-                  size="sm"
-                  variant={"default"}
-                  onClick={handleCreateItinerary}
-                  className={`rounded-full`}
-                >
-                  Create Itinerary
-                </Button>
+                <Skeleton className="w-full h-[40px] rounded-md" />
               )}
             </div>
+            {destinationError && <div className="text-sm text-red-500 mt-2">Please select a destination.</div>}
+            <div className="flex flex-row text-5xl mt-2">
+              <DatePickerWithRangePopover onDateChange={handleDateChange} fetchDateRangeProp={false} />
+            </div>
+            {dateRangeError && <div className="text-sm text-red-500 mt-2">Please select a date range.</div>}
+            <div className="text-xl font-semibold mt-8">How many people are going?</div>
+            <div className="flex flex-row justify-between items-center text-xl mt-2 border rounded-md p-1">
+              <div className="flex justify-between items-center gap-2 text-md p-2">
+                <div className="flex justify-center items-center rounded-md border w-10 h-10 ">{adultsCount}</div>
+                <div>Adults</div>
+              </div>
+              <div className="flex justify-between gap-2 p-2">
+                <Button variant={"outline"} size={"sm"} onClick={() => handleDecreaseCount("adults")}>
+                  <Minus size={12} />
+                </Button>
+                <Button variant={"outline"} size={"sm"} onClick={() => handleIncreaseCount("adults")}>
+                  <Plus size={12} />
+                </Button>
+              </div>
+            </div>
+            <div className="flex flex-row justify-between items-center text-xl mt-2 border rounded-md p-1">
+              <div className="flex justify-between items-center gap-2 text-md p-2">
+                <div className="flex justify-center items-center rounded-md border w-10 h-10">{kidsCount}</div>
+                <div>Kids</div>
+              </div>
+              <div className="flex justify-between gap-2 p-2">
+                <Button variant={"outline"} size={"sm"} onClick={() => handleDecreaseCount("kids")}>
+                  <Minus size={12} />
+                </Button>
+                <Button variant={"outline"} size={"sm"} onClick={() => handleIncreaseCount("kids")}>
+                  <Plus size={12} />
+                </Button>
+              </div>
+            </div>
+          </>
+
+          {/* BUTTONS NAVIGATION */}
+          <div className="flex flex-row justify-end mt-8">
+            {loading ? (
+              <Button disabled size="sm" variant={"default"} className="rounded-full">
+                <Loader2 className="mr-2 h-4 w-4 animate-spin " />
+                Please wait
+              </Button>
+            ) : (
+              <Button size="sm" variant={"default"} onClick={handleCreateItinerary} className={`rounded-full`}>
+                Create Itinerary
+              </Button>
+            )}
           </div>
         </div>
-        <div>
-          <Image
-            src="/map2.jpg"
-            alt="Image"
-            width={1920}
-            height={1080}
-            objectFit="cover"
-            className="h-full w-full object-cover"
-          />
-        </div>
       </div>
-    </DashboardLayout>
+      <div>
+        <Image
+          src="/map2.jpg"
+          alt="Image"
+          width={1920}
+          height={1080}
+          objectFit="cover"
+          className="h-full w-full object-cover"
+        />
+      </div>
+    </div>
   );
 }

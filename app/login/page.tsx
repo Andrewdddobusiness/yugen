@@ -10,14 +10,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-  Form,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormControl,
-  FormMessage,
-} from "@/components/ui/form";
+import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/components/ui/use-toast";
 
 import LoadingSpinner from "@/components/loading/loadingSpinner";
@@ -52,7 +45,7 @@ export default function LoginPage() {
           title: "Logged in.",
           description: "Welcome back traveller!",
         });
-        router.push("/dashboard");
+        router.push("/itineraries");
       }
       setLoading(false);
     } catch (error) {
@@ -76,16 +69,11 @@ export default function LoginPage() {
         <div className="mx-auto grid w-[350px] gap-6">
           <div className="grid gap-2 text-center">
             <h1 className="text-3xl font-bold">Login</h1>
-            <p className="text-muted-foreground">
-              Enter your email and password to login
-            </p>
+            <p className="text-muted-foreground">Enter your email and password to login</p>
           </div>
 
           <Form {...form}>
-            <form
-              onSubmit={form.handleSubmit(handleLogin)}
-              className="space-y-8"
-            >
+            <form onSubmit={form.handleSubmit(handleLogin)} className="space-y-8">
               <FormField
                 control={form.control}
                 name="email"
@@ -93,11 +81,7 @@ export default function LoginPage() {
                   <FormItem>
                     <FormLabel>Email</FormLabel>
                     <FormControl>
-                      <Input
-                        placeholder="example@gmail.com"
-                        type="email"
-                        {...field}
-                      />
+                      <Input placeholder="example@gmail.com" type="email" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -110,11 +94,7 @@ export default function LoginPage() {
                   <FormItem>
                     <FormLabel>Password</FormLabel>
                     <FormControl>
-                      <Input
-                        type="password"
-                        placeholder="Enter your password"
-                        {...field}
-                      />
+                      <Input type="password" placeholder="Enter your password" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

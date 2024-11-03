@@ -2,10 +2,10 @@
 
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/ui/use-toast";
-import { Button } from "@/components/ui/button";
 import { logout } from "@/actions/auth/actions";
+import { ReactNode } from "react";
 
-export default function LogoutButton() {
+export default function LogoutButton({ children }: { children: ReactNode }) {
   const router = useRouter();
   const { toast } = useToast();
 
@@ -37,8 +37,8 @@ export default function LogoutButton() {
   };
 
   return (
-    <span className="cursor-pointer" onClick={handleLogout}>
-      Logout
+    <span className="cursor-pointe w-full h-full" onClick={handleLogout}>
+      {children}
     </span>
   );
 }

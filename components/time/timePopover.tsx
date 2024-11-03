@@ -1,30 +1,18 @@
 "use client";
 import { useEffect, useState } from "react";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Loader2, Clock } from "lucide-react";
 import { formatTime } from "@/utils/formatting/datetime";
-import { cn } from "@/lib/utils";
+import { cn } from "@/components/lib/utils";
 import { useItineraryActivityStore } from "@/store/itineraryActivityStore";
 
 const generateTimeOptions = () => {
   const times = [];
   for (let i = 0; i < 24; i++) {
     for (let j = 0; j < 60; j += 30) {
-      times.push(
-        `${i.toString().padStart(2, "0")}:${j.toString().padStart(2, "0")}`
-      );
+      times.push(`${i.toString().padStart(2, "0")}:${j.toString().padStart(2, "0")}`);
     }
   }
   return times;
@@ -124,14 +112,9 @@ export default function TimePopover({
       <PopoverContent className="w-72 p-4">
         <div>
           <h3 className="font-semibold mb-2">Start Time</h3>
-          <Select
-            onValueChange={(value) => handleTimeChange("start", value)}
-            value={startTime}
-          >
+          <Select onValueChange={(value) => handleTimeChange("start", value)} value={startTime}>
             <SelectTrigger>
-              <SelectValue>
-                {startTime ? formatTime(startTime) : "Select start time"}
-              </SelectValue>
+              <SelectValue>{startTime ? formatTime(startTime) : "Select start time"}</SelectValue>
             </SelectTrigger>
             <SelectContent>
               {timeOptions.map((time, index) => (
@@ -144,14 +127,9 @@ export default function TimePopover({
         </div>
         <div className="mt-4">
           <h3 className="font-semibold mb-2">End Time</h3>
-          <Select
-            onValueChange={(value) => handleTimeChange("end", value)}
-            value={endTime}
-          >
+          <Select onValueChange={(value) => handleTimeChange("end", value)} value={endTime}>
             <SelectTrigger>
-              <SelectValue>
-                {endTime ? formatTime(endTime) : "Select end time"}
-              </SelectValue>
+              <SelectValue>{endTime ? formatTime(endTime) : "Select end time"}</SelectValue>
             </SelectTrigger>
             <SelectContent>
               {timeOptions.map((time, index) => (
@@ -164,10 +142,7 @@ export default function TimePopover({
         </div>
         {error && <p className="text-xs text-red-500 mt-2">{error}</p>}
         <div className="mt-4 flex justify-end">
-          <Button
-            onClick={handleSave}
-            disabled={!startTime || !endTime || !!error || isLoading}
-          >
+          <Button onClick={handleSave} disabled={!startTime || !endTime || !!error || isLoading}>
             {isLoading ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
