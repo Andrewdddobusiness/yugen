@@ -1,86 +1,86 @@
 "use client";
-import { useEffect, useState } from "react";
-import Link from "next/link";
-import Image from "next/image";
-import { createClient } from "@/utils/supabase/client";
-
-import HomeLayout from "@/components/layouts/homeLayout";
 
 import { Button } from "@/components/ui/button";
-import PopUpCreateItinerary from "@/components/popUp/popUpCreateItinerary";
-import { Loader2 } from "lucide-react";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Check } from "lucide-react";
+import CheckoutButton from "@/components/stripe/checkoutButton";
 
 export default function PricingPage() {
-  const supabase = createClient();
-  const [user, setUser] = useState<any>();
-  const [isUserLoading, setIsUserLoading] = useState(true);
-
-  useEffect(() => {
-    const fetchUserData = async () => {
-      setIsUserLoading(true);
-      try {
-        const { auth } = supabase;
-        const { data: user } = await auth.getUser();
-
-        if (!user.user) {
-          throw new Error("User not authenticated");
-        }
-        setUser(user.user);
-      } catch (error) {
-        console.error("Error fetching user data:", error);
-      } finally {
-        setIsUserLoading(false);
-      }
-    };
-
-    fetchUserData();
-  }, [supabase]);
-
   return (
-    <HomeLayout>
-      {/* <PageLayout> */}
-      <div className="pt-12 flex flex-col md:flex-row items-center px-8">
-        <div className="md:w-1/2">
-          <div className="text-center md:text-left">
-            <div className="text-4xl sm:text-6xl font-bold mb-4">Planning Vacations S*ck!</div>
-            <div className="text-lg mb-4">
-              Build, personalize, and optimize your itineraries with our AI trip planner.
-            </div>
-            <div className="mb-4">
-              {isUserLoading ? (
-                <Button size="lg" className="text-sm rounded-lg w-32" disabled>
-                  <Loader2 className="h-4 w-16 animate-spin" />
-                </Button>
-              ) : user ? (
-                <PopUpCreateItinerary>
-                  <Button className="w-full">
-                    <Plus className="size-3.5 mr-1" />
-                    <span>Create new Itinerary</span>
-                  </Button>
-                </PopUpCreateItinerary>
-              ) : (
-                <Link href="/signUp">
-                  <Button size="lg" className="text-sm rounded-lg w-32">
-                    Get Started
-                  </Button>
-                </Link>
-              )}
-            </div>
-          </div>
-        </div>
-        <div className="md:w-1/2 mt-8 flex justify-center">
-          <div>
-            <Image
-              src="/Globalization.png"
-              alt="globalization"
-              width={500}
-              height={500}
-              className="max-w-full h-auto"
-            />
-          </div>
-        </div>
+    <div className="flex flex-col items-center">
+      <div className="text-center mb-12">
+        <h1 className="text-6xl font-bold mb-4">Pricing</h1>
+        <p className="text-xl">Choose the plan that works for you</p>
       </div>
-      {/* </PageLayout> */}
-    </HomeLayout>
+
+      <Tabs defaultValue="monthly" className="w-full max-w-6xl">
+        <TabsList className="grid w-full max-w-md mx-auto grid-cols-2 mb-8">
+          <TabsTrigger value="monthly">Monthly</TabsTrigger>
+          <TabsTrigger value="yearly">Yearly (Save 20%)</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="monthly" className="space-y-4">
+          <div className="grid gap-8 md:grid-cols-2">
+            {/* Free Plan */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Hobby</CardTitle>
+                <CardDescription>Free</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  {["Pro two-week trial", "2000 completions", "50 slow premium requests"].map((feature) => (
+                    <div key={feature} className="flex items-center">
+                      <Check className="w-4 h-4 mr-2 text-green-500" />
+                      <span>{feature}</span>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+              <CardFooter>
+                <Button className="w-full" variant="outline">
+                  Get Started
+                </Button>
+              </CardFooter>
+            </Card>
+
+            {/* Pro Plan */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Pro</CardTitle>
+                <div className="flex items-baseline">
+                  <span className="text-3xl font-bold">$20</span>
+                  <span className="ml-1 text-sm text-muted-foreground">/ Month</span>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  {[
+                    "Unlimited completions",
+                    "500 fast premium requests per month",
+                    "Unlimited slow premium requests",
+                    "10 o1-mini uses per day",
+                  ].map((feature) => (
+                    <div key={feature} className="flex items-center">
+                      <Check className="w-4 h-4 mr-2 text-green-500" />
+                      <span>{feature}</span>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+              <CardFooter>
+                <CheckoutButton priceId={process.env.NEXT_PUBLIC_STRIPE_MONTHLY_PLAN_ID!}>Get Started</CheckoutButton>
+              </CardFooter>
+            </Card>
+          </div>
+        </TabsContent>
+
+        {/* Yearly tab content - same structure but with discounted prices */}
+        <TabsContent value="yearly">
+          {/* Copy the same grid structure but adjust prices to show yearly rates */}
+        </TabsContent>
+      </Tabs>
+    </div>
   );
 }

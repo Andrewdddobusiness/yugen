@@ -91,7 +91,7 @@ export default function Navigation() {
           <NavigationMenu className="mr-4">
             <NavigationMenuList className="flex space-x-4">
               <NavigationMenuItem>
-                <NavigationMenuLink href="/" className={navigationMenuTriggerStyle()}>
+                <NavigationMenuLink href="/pricing" className={navigationMenuTriggerStyle()}>
                   Pricing
                 </NavigationMenuLink>
               </NavigationMenuItem>

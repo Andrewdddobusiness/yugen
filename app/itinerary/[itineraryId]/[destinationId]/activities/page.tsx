@@ -325,7 +325,7 @@ export default function Activities() {
   }, [searchHistoryActivitiesData, setSearchHistoryActivities]);
 
   return (
-    <BuilderLayout title="Activities" activePage="activities" itineraryNumber={1}>
+    <>
       {isCoordinatesLoading || isDestinationLoading || isActivitiesLoading || isItineraryActivitiesLoading ? (
         <Loading />
       ) : (
@@ -487,6 +487,6 @@ export default function Activities() {
           </div>
         </div>
       )}
-    </BuilderLayout>
+    </>
   );
 }
