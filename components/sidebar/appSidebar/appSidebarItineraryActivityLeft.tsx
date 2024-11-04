@@ -46,7 +46,7 @@ export function AppSidebarItineraryActivityLeft() {
                 <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
                   <Command className="size-4" />
                 </div>
-                <div className="hidden group-data-[collapsible=icon]:group-data-[state=expanded]:flex grid flex-1 text-left text-sm leading-tight">
+                <div className=" group-data-[collapsible=icon]:group-data-[state=expanded]:flex grid flex-1 text-left text-sm leading-tight">
                   <span className="truncate font-semibold">Journey</span>
                   <span className="truncate text-xs">Free</span>
                 </div>

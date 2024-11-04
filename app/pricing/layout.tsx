@@ -10,7 +10,7 @@ export default function HomeLayout({ children }: PageLayoutProps): React.ReactEl
   return (
     <div className="flex flex-col min-h-screen">
       <Navigation />
-      <div className="flex-grow">{children}</div>
+      <div className="flex-grow mt-16">{children}</div>
       <Footer />
     </div>
   );

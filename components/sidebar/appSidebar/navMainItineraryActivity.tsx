@@ -22,7 +22,6 @@ import { formatDate } from "@/utils/formatting/datetime";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export function NavMainItineraryActivity() {
-  const { user } = useUserStore();
   const { itineraryId, destinationId } = useParams();
 
   const { data: destinationData, isLoading: isDestinationLoading } = useQuery({
@@ -35,8 +34,6 @@ export function NavMainItineraryActivity() {
   });
 
   const itinerary = destinationData?.data;
-
-  console.log("itinerary: ", itinerary);
 
   return (
     <>

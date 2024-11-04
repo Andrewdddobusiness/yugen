@@ -3,7 +3,7 @@ import Stripe from "stripe";
 import { createClient } from "@/utils/supabase/server";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: "2024-09-30.acacia",
+  apiVersion: "2024-10-28.acacia",
 });
 
 export async function createCheckoutSession(priceId: string) {
@@ -27,8 +27,8 @@ export async function createCheckoutSession(priceId: string) {
           quantity: 1,
         },
       ],
-      success_url: `${process.env.NEXT_PUBLIC_APP_URL}/settings/billing?success=true`,
-      cancel_url: `${process.env.NEXT_PUBLIC_APP_URL}/settings/billing?canceled=true`,
+      success_url: `${process.env.NEXT_PUBLIC_APP_URL}/pricing?success=true`,
+      cancel_url: `${process.env.NEXT_PUBLIC_APP_URL}/pricing?canceled=true`,
     });
 
     return { sessionId: session.id };

@@ -38,7 +38,7 @@ export default function CheckoutButton({ priceId, children }: CheckoutButtonProp
   };
 
   return (
-    <Button onClick={handleCheckout} disabled={loading}>
+    <Button className="w-full" onClick={handleCheckout} disabled={loading}>
       {loading ? "Loading..." : children}
     </Button>
   );
