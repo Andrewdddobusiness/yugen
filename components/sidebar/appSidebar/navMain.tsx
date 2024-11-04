@@ -104,9 +104,9 @@ export function NavMain() {
 
         <SidebarMenuItem>
           <SidebarMenuButton asChild>
-            <Link href={"/explore"}>
+            <Link href={"/guides"}>
               <LibraryBig />
-              <span className="text-md font-semibold">Explore</span>
+              <span className="text-md font-semibold">Guides</span>
             </Link>
           </SidebarMenuButton>
         </SidebarMenuItem>

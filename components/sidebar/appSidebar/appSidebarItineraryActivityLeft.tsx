@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 import LoadingSpinner from "@/components/loading/loadingSpinner";
+import { NavMainItineraryActivity } from "./navMainItineraryActivity";
 
 // Dynamically import PopUpCreateItinerary with no SSR
 const PopUpCreateItinerary = dynamic(() => import("@/components/popUp/popUpCreateItinerary"), {
@@ -34,9 +35,9 @@ const PopUpCreateItinerary = dynamic(() => import("@/components/popUp/popUpCreat
   ),
 });
 
-export function AppSidebarItinerary() {
+export function AppSidebarItineraryActivityLeft() {
   return (
-    <Sidebar side={"left"} variant="inset" className="shadow-md bg-white z-30">
+    <Sidebar side={"left"} variant="inset" collapsible="icon" className="shadow-md bg-white z-30">
       <SidebarHeader className="bg-white">
         <SidebarMenu>
           <SidebarMenuItem>
@@ -45,7 +46,7 @@ export function AppSidebarItinerary() {
                 <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
                   <Command className="size-4" />
                 </div>
-                <div className="grid flex-1 text-left text-sm leading-tight">
+                <div className="hidden group-data-[collapsible=icon]:group-data-[state=expanded]:flex grid flex-1 text-left text-sm leading-tight">
                   <span className="truncate font-semibold">Journey</span>
                   <span className="truncate text-xs">Free</span>
                 </div>
@@ -55,15 +56,7 @@ export function AppSidebarItinerary() {
         </SidebarMenu>
       </SidebarHeader>
       <SidebarContent className="bg-white">
-        <div className="flex w-full px-4 mt-2">
-          <PopUpCreateItinerary className="w-full">
-            <Button className="w-full">
-              <Plus className="size-3.5 mr-1" />
-              <span>Create new Itinerary</span>
-            </Button>
-          </PopUpCreateItinerary>
-        </div>
-        <NavMain />
+        <NavMainItineraryActivity />
       </SidebarContent>
 
       <SidebarFooter className="bg-white">

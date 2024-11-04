@@ -303,7 +303,9 @@ export const fetchItineraryDestination = async (itineraryId: string) => {
       `
       itinerary_destination_id,
       city,
-      country
+      country,
+      from_date,
+      to_date
     `
     )
     .eq("itinerary_id", itineraryId)

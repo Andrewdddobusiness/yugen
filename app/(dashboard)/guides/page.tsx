@@ -1,10 +1,7 @@
 import React from "react";
 import Image from "next/image";
-import ItineraryCards from "@/components/cards/itineraryCards";
 
-import DashboardLayout from "@/components/layouts/dashboardLayout";
-
-export default function Explore() {
+export default function Guides() {
   return (
     <div>
       <div className="m-4 border rounded-lg h-40">

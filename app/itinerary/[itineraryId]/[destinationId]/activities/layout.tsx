@@ -1,10 +1,7 @@
 "use client";
 
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
-import { AppSidebarItinerary } from "@/components/sidebar/appSidebar/appSidebarItinerary";
-import { AppSidebarItineraryActivity } from "@/components/sidebar/appSidebar/appSidebarItineraryActivity";
-import { useActivitiesStore } from "@/store/activityStore";
-import { useSidebarStore } from "@/store/sidebarStore";
+import { AppSidebarItineraryActivityRight } from "@/components/sidebar/appSidebar/appSidebarItineraryActivityRight";
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   return (
@@ -15,7 +12,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           <div className="Ww-full h-full">{children}</div>
         </main>
 
-        <AppSidebarItineraryActivity />
+        <AppSidebarItineraryActivityRight />
       </SidebarProvider>
     </div>
   );

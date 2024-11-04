@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useParams } from "next/navigation";
 
 import {
   Sidebar,
@@ -10,7 +10,6 @@ import {
   SidebarFooter,
   SidebarHeader,
   SidebarMenu,
-  SidebarMenuButton,
   SidebarMenuItem,
   SidebarRail,
   useSidebar,
@@ -23,14 +22,13 @@ import { Separator } from "@/components/ui/separator";
 import CommentsCarousel from "@/components/carousel/commentsCarousel";
 import ImagesCarousel from "@/components/carousel/imagesCarousel";
 import LoadingSpinner from "@/components/loading/loadingSpinner";
-import { NavMain } from "@/components/sidebar/appSidebar/navMain";
-import { NavUser } from "@/components/sidebar/appSidebar/navUser";
+
 import Rating from "@/components/rating/rating";
 import { Skeleton } from "@/components/ui/skeleton";
 
 import { toast } from "sonner";
 
-import { Command, Plus, Globe, Clock, Loader2, X, Phone } from "lucide-react";
+import { Globe, Clock, Loader2, X, Phone } from "lucide-react";
 
 import { capitalizeFirstLetterOfEachWord } from "@/utils/formatting/capitalise";
 
@@ -44,10 +42,9 @@ const getDayName = (dayNumber: number) => {
   return days[dayNumber];
 };
 
-export function AppSidebarItineraryActivity() {
-  const searchParams = useSearchParams();
-  const itineraryId = searchParams.get("i");
-
+export function AppSidebarItineraryActivityRight() {
+  let { itineraryId } = useParams();
+  itineraryId = itineraryId.toString();
   // **** STORES ****
   const { setIsSidebarRightOpen } = useSidebarStore();
   const { selectedActivity } = useActivitiesStore();
