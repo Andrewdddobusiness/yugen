@@ -6,6 +6,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
 import { useQueryClient } from "@tanstack/react-query";
+import * as VisuallyHidden from "@radix-ui/react-visually-hidden";
 
 import { Button } from "../ui/button";
 import { Plus, Minus, Loader2 } from "lucide-react";
@@ -230,9 +231,6 @@ export default function PopUpCreateItinerary({ children, className, ...props }: 
     }
   };
 
-  console.log("destinationSelected: ", destination);
-  console.log("dateRange: ", dateRange);
-
   const getStepError = () => {
     if (step === 0) {
       if (!destination) {
@@ -294,13 +292,19 @@ export default function PopUpCreateItinerary({ children, className, ...props }: 
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger className={`inline-flex ${className}`}>{children}</DialogTrigger>
+      <DialogTrigger asChild>
+        <div className={`inline-flex ${className}`}>{children}</div>
+      </DialogTrigger>
       <DialogContent className="max-w-[1000px] h-[400px] grid grid-cols-2 p-0 gap-0">
         <div className="relative w-full h-full">
           <Image src={steps[step].image} alt={steps[step].title} fill className="object-cover rounded-l-md" priority />
         </div>
 
         <DialogDescription className="flex flex-col px-8 pt-12 pb-6 h-full justify-between">
+          <VisuallyHidden.Root>
+            <DialogTitle>Create New Itinerary</DialogTitle>
+          </VisuallyHidden.Root>
+
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col h-full justify-between">
               <div className="flex flex-col gap-1">

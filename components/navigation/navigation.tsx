@@ -164,7 +164,7 @@ export default function Navigation() {
     <div className="fixed top-0 left-0 right-0 flex flex-row items-center justify-between h-16 px-4 sm:px-8 shadow-sm bg-white z-50">
       <div className="flex flex-row items-center">
         <div className="hidden sm:block max-w-[35px]">
-          <Image src="/smile.svg" alt="smile" width={100} height={100} sizes="100vw" />
+          <Image src="/smile.svg" alt="smile" width={100} height={100} sizes="100vw" priority />
         </div>
         <div className="flex items-center font-Patua text-xl font-bold ml-2">
           <Link href={"/"}>Journey</Link>

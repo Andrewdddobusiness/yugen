@@ -7,7 +7,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Check, ChevronsUpDown } from "lucide-react";
 import { cn } from "@/components/lib/utils";
 
-const ActivityFilters: React.FC = () => {
+const ActivityTypeFilters: React.FC = () => {
   const { selectedFilters, setSelectedFilters } = useActivitiesStore();
   const [open, setOpen] = React.useState(false);
 
@@ -31,7 +31,7 @@ const ActivityFilters: React.FC = () => {
           <Toggle
             key={filter}
             variant="outline"
-            className="h-8 rounded-full ml-2"
+            className="h-8 bg-white  rounded-full ml-2"
             pressed={selectedFilters.includes(filter)}
             onPressedChange={() => handleFilterSelect(filter)}
           >
@@ -78,4 +78,4 @@ const ActivityFilters: React.FC = () => {
   );
 };
 
-export default ActivityFilters;
+export default ActivityTypeFilters;

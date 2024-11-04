@@ -19,6 +19,7 @@ import { useItineraryActivityStore } from "@/store/itineraryActivityStore";
 import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { Skeleton } from "../ui/skeleton";
+import { useSidebar } from "../ui/sidebar";
 
 interface ItineraryCardProps {
   activity: IActivityWithLocation;
@@ -30,6 +31,7 @@ interface ItineraryCardProps {
 export default function ActivityCard({ activity, onClick, onOptionsClick }: ItineraryCardProps) {
   const searchParams = useSearchParams();
   const itineraryId = searchParams.get("i");
+
   const { insertItineraryActivity, removeItineraryActivity, itineraryActivities } = useItineraryActivityStore();
   const [isActivityAdded, setIsActivityAdded] = useState<boolean>(false);
   const [isHovered, setIsHovered] = useState(false);

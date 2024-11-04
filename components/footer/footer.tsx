@@ -21,6 +21,7 @@ export default function Footer() {
               height={100}
               sizes="100vw"
               className="max-w-[35px]"
+              priority
             />
 
             <div className="flex items-center font-Patua text-xl font-bold ml-2">
@@ -28,18 +29,13 @@ export default function Footer() {
             </div>
           </div>
           <div className="text-xs text-zinc-500 mt-2">
-            Turn your next trip into a hassle-free experience <br /> with
-            Planaway.
+            Turn your next trip into a hassle-free experience <br /> with Planaway.
           </div>
         </div>
         <div className="col-span-2 md:col-span-1 flex justify-center md:justify-end">
           <nav className="flex flex-wrap mt-12 md:mt-3 justify-center md:justify-end">
             {footerLinks.map((link, index) => (
-              <Link
-                key={index}
-                href={link.href}
-                className="text-xs hover:text-gray-300 px-4"
-              >
+              <Link key={index} href={link.href} className="text-xs hover:text-gray-300 px-4">
                 {link.label}
               </Link>
             ))}

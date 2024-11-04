@@ -160,9 +160,9 @@ export default function Mapbox() {
   }
 
   return (
-    <div style={{ position: "relative", width: "100%", height: "100%" }}>
+    <div className="relative w-full h-full shadow-md">
       {circleCenter && (
-        <div style={{ position: "relative", width: "100%", height: "100%" }}>
+        <div className="relative w-full h-full">
           <div style={{ width: "100%", height: "100%" }}>
             <Map
               ref={mapRef}
@@ -274,7 +274,9 @@ export default function Mapbox() {
           {searchOpen ? (
             <div className="flex flex-col">
               <div
-                className={`flex flex-col absolute top-2 right-2 z-10${isSidebarOpen ? "hidden md:block" : "lg:block"}`}
+                className={`flex flex-col absolute top-14 right-2 z-10${
+                  isSidebarOpen ? "hidden md:block" : "lg:block"
+                }`}
               >
                 <div className="flex flex-col  items-end  gap-2">
                   <Button variant="outline" size="icon" onClick={handleSearchOpen} className="rounded-full w-10 h-10">
@@ -369,7 +371,7 @@ export default function Mapbox() {
               exit={{ opacity: 0 }}
               transition={{ duration: 0.5 }}
             >
-              <div className="flex flex-col absolute top-2 right-2 z-10">
+              <div className="flex flex-col absolute top-2 right-12 z-10">
                 <Button variant="outline" onClick={handleSearchOpen}>
                   Explore Activities
                 </Button>

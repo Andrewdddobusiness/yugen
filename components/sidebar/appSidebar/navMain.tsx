@@ -37,8 +37,6 @@ export function NavMain() {
     enabled: !!user?.id,
   });
 
-  console.log("itineraryData: ", itineraryData);
-
   return (
     <SidebarGroup>
       <SidebarGroupLabel>Dashboard</SidebarGroupLabel>

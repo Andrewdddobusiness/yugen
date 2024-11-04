@@ -4,6 +4,7 @@ import { IActivity, useActivitiesStore } from "@/store/activityStore";
 import { useSidebarStore } from "@/store/sidebarStore";
 import CustomWaypoint from "./customWaypoint";
 import { TColor } from "@/lib/colors/colors";
+import { useSidebar } from "../ui/sidebar";
 
 interface IWaypointProps {
   latitude: number;
@@ -21,11 +22,15 @@ interface IWaypointProps {
 const Waypoint = ({ latitude, longitude, color, activity, number, isSelected = false }: IWaypointProps) => {
   const { setSelectedActivity } = useActivitiesStore();
   const { setIsSidebarOpen } = useSidebarStore();
+
+  const { openSidebar } = useSidebar();
+
   const [showPopup, setShowPopup] = useState(false);
 
   const handleClick = () => {
     setSelectedActivity(activity);
     setIsSidebarOpen(true);
+    openSidebar();
   };
 
   return (

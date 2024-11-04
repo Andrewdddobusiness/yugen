@@ -15,12 +15,18 @@ export default function ActivityCards({
 }: // onHover,
 
 IActivityCardsProps) {
-  const { isSidebarOpen } = useSidebarStore();
+  const { isSidebarRightOpen, isSidebarLeftOpen } = useSidebarStore();
 
   return (
     <div
       className={`grid ${
-        isSidebarOpen ? "grid-cols-1 3xl:grid-cols-2 6xl:grid-cols-3" : "grid-cols-1 lg:grid-cols-2 3xl:grid-cols-3 4xl:grid-cols-4 6xl:grid-cols-5"
+        isSidebarLeftOpen
+          ? isSidebarRightOpen
+            ? "grid-cols-1 2xl:grid-cols-2 4xl:grid-cols-3 6xl:grid-cols-4"
+            : "grid-cols-1 2xl:grid-cols-2 4xl:grid-cols-3 6xl:grid-cols-4"
+          : isSidebarRightOpen
+          ? "grid-cols-1 2xl:grid-cols-2 4xl:grid-cols-3 6xl:grid-cols-4"
+          : "grid-cols-1 lg:grid-cols-2 3xl:grid-cols-3 5xl:grid-cols-4 6xl:grid-cols-5"
       } gap-4 pb-8`}
     >
       {activities.map((activity) => (

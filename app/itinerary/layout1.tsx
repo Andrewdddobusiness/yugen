@@ -19,10 +19,9 @@ import {
   DropdownMenuGroup,
 } from "@/components/ui/dropdown-menu";
 
-import ItineraryChoiceDialog from "../dialog/itineraryChoiceDialog";
-import { Skeleton } from "../ui/skeleton";
-import LogoutButton from "../buttons/logoutButton";
-import { useSearchParams } from "next/navigation";
+import { Skeleton } from "@/components/ui/skeleton";
+import LogoutButton from "@/components/buttons/logoutButton";
+import { useParams } from "next/navigation";
 
 interface PageLayoutProps {
   title: string;
@@ -38,10 +37,7 @@ export default function BuilderLayout({
   itineraryNumber,
 }: PageLayoutProps): React.ReactElement {
   const supabase = createClient();
-  const searchParams = useSearchParams();
-
-  const itineraryId = searchParams.get("i");
-  const destinationId = searchParams.get("d");
+  const { itineraryId, destinationId } = useParams();
 
   const [profileUrl, setProfileUrl] = useState("");
 
@@ -100,7 +96,7 @@ export default function BuilderLayout({
 
             <Tooltip>
               <TooltipTrigger asChild>
-                <Link href={`/itinerary/overview?i=${itineraryId}&d=${destinationId}`}>
+                <Link href={`/itinerary/${itineraryId}/${destinationId}/overview`}>
                   <Button
                     variant="ghost"
                     size="icon"
@@ -118,7 +114,7 @@ export default function BuilderLayout({
 
             <Tooltip>
               <TooltipTrigger asChild>
-                <Link href={`/itinerary/builder?i=${itineraryId}&d=${destinationId}`}>
+                <Link href={`/itinerary/${itineraryId}/${destinationId}/builder`}>
                   <Button
                     variant="ghost"
                     size="icon"
@@ -136,7 +132,7 @@ export default function BuilderLayout({
 
             <Tooltip>
               <TooltipTrigger asChild>
-                <Link href={`/itinerary/activities?i=${itineraryId}&d=${destinationId}`}>
+                <Link href={`/itinerary/${itineraryId}/${destinationId}/activities`}>
                   <Button
                     variant="ghost"
                     size="icon"
@@ -213,9 +209,7 @@ export default function BuilderLayout({
                     <span>Support</span>
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem>
-                    <LogoutButton />
-                  </DropdownMenuItem>
+                  <DropdownMenuItem>{/* <LogoutButton /> */}</DropdownMenuItem>
                 </DropdownMenuGroup>
               </DropdownMenuContent>
             </DropdownMenu>

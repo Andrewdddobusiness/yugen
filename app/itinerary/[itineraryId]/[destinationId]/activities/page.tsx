@@ -12,7 +12,7 @@ import ActivityCards from "@/components/cards/activityCards";
 import ActivitySidebar from "@/components/sidebar/activitySideBar";
 import Mapbox from "@/components/map/mapbox";
 import Loading from "@/components/loading/loading";
-import ActivityFilters from "@/components/filters/activityFilters";
+import ActivityTypeFilters from "@/components/filters/activityTypeFilters";
 import ActivityCostFilters from "@/components/filters/activityCostFilters";
 import SearchField from "@/components/search/searchField";
 import ActivitySkeletonCards from "@/components/cards/activitySkeletonCards";
@@ -37,6 +37,7 @@ import { filterActivities } from "@/utils/filters/filterActivities";
 import { activityTypeFilters, activityCostFilters } from "@/utils/filters/filters";
 
 import { Popup } from "react-map-gl";
+import { useSidebar } from "@/components/ui/sidebar";
 
 export default function Activities() {
   const queryClient = useQueryClient();
@@ -57,8 +58,10 @@ export default function Activities() {
   } = useActivitiesStore();
   const { fetchItineraryActivities, setItineraryActivities } = useItineraryActivityStore();
   const { mapRadius, setCenterCoordinates, itineraryCoordinates, setItineraryCoordinates } = useMapStore();
-  const { isSidebarOpen, setIsSidebarOpen, sidebarKey, setSidebarKey } = useSidebarStore();
+  const { isSidebarRightOpen, setIsSidebarRightOpen, isSidebarLeftOpen } = useSidebarStore();
   const { selectedTab, setSelectedTab } = useActivityTabStore();
+
+  const { openSidebar } = useSidebar();
 
   // **** STATES ****
   const [initialLoadComplete, setInitialLoadComplete] = useState(false);
@@ -224,21 +227,6 @@ export default function Activities() {
     }
   }, [itineraryActivities, setItineraryActivities]);
 
-  // **** HANDLERS ****
-  const handleActivitySelect = (activity: IActivity) => {
-    setSelectedActivity(activity);
-    setIsSidebarOpen(true);
-    setSidebarKey(sidebarKey);
-  };
-
-  const handleCloseSidebar = () => {
-    setSelectedActivity(null);
-    setIsSidebarOpen(false);
-  };
-  const handleTabChange = (tab: "top-places" | "search" | "history") => {
-    setSelectedTab(tab);
-  };
-
   // **** GET SEARCH HISTORY ACTIVITIES ****
   const { data: searchHistoryActivitiesData, isLoading: isSearchHistoryLoading } = useQuery<{
     activities: IActivity[];
@@ -324,15 +312,32 @@ export default function Activities() {
     fetchActivities();
   }, [searchHistoryActivitiesData, setSearchHistoryActivities]);
 
+  // **** HANDLERS ****
+  const handleActivitySelect = (activity: IActivity) => {
+    setSelectedActivity(activity);
+    setIsSidebarRightOpen(true);
+    openSidebar();
+  };
+
+  const handleTabChange = (tab: "top-places" | "search" | "history") => {
+    setSelectedTab(tab);
+  };
+
   return (
     <>
       {isCoordinatesLoading || isDestinationLoading || isActivitiesLoading || isItineraryActivitiesLoading ? (
         <Loading />
       ) : (
-        <div className="flex flex-row h-full pt-[64px] overflow-hidden">
+        <div className="flex flex-row h-full overflow-hidden">
           <div
             className={`p-4 flex flex-col h-full transition-all duration-300 ${
-              isSidebarOpen ? "w-1/2 md:w-1/3 " : "w-full sm:w-1/2 "
+              isSidebarLeftOpen
+                ? isSidebarRightOpen
+                  ? "w-full xl:w-1/2"
+                  : "w-full sm:w-1/2"
+                : isSidebarRightOpen
+                ? "w-full lg:w-1/2"
+                : "w-full sm:w-1/2"
             }`}
           >
             <div className="flex flex-col items-center">
@@ -342,7 +347,7 @@ export default function Activities() {
               <div className="flex flex-row justify-between w-full pt-8 px-4">
                 <ActivityCostFilters />
 
-                <ActivityFilters />
+                <ActivityTypeFilters />
               </div>
               <Separator className="mt-8 mb-4" />
             </div>
@@ -354,7 +359,7 @@ export default function Activities() {
                 className="flex flex-col h-full"
               >
                 <div className="pl-4 pt-4 pb-2">
-                  <TabsList>
+                  <TabsList className="border">
                     <TabsTrigger value="top-places">Top Places</TabsTrigger>
                     <TabsTrigger value="search">Wide Search</TabsTrigger>
                     <TabsTrigger value="history">Search History</TabsTrigger>
@@ -432,26 +437,17 @@ export default function Activities() {
             </div>
           </div>
           <div
-            className={`border-x h-full relative transition-all duration-300 ${
-              isSidebarOpen ? "w-0 md:w-1/3 hidden md:block" : "sm:w-1/2 w-0 hidden sm:block"
+            className={`w-full h-full relative transition-all duration-300  ${
+              isSidebarLeftOpen
+                ? isSidebarRightOpen
+                  ? "w-0 xl:w-1/2 hidden xl:block"
+                  : "sm:w-1/2 w-0 hidden sm:block"
+                : isSidebarRightOpen
+                ? "w-0 lg:w-1/2 hidden lg:block"
+                : "sm:w-1/2 w-0 hidden sm:block"
             }`}
           >
-            {cityCoordinates && (
-              <Mapbox
-              // onWaypointHover={(activity: IActivity) => {
-              //   if (activity.geometry?.location) {
-              //     setPopupInfo({
-              //       longitude: activity.geometry.location.lng,
-              //       latitude: activity.geometry.location.lat,
-              //       name: activity.name,
-              //     });
-              //   }
-              // }}
-              // onWaypointLeave={() => {
-              //   setPopupInfo(null);
-              // }}
-              />
-            )}
+            {cityCoordinates && <Mapbox />}
             {popupInfo && (
               <Popup
                 longitude={popupInfo.longitude}
@@ -463,26 +459,6 @@ export default function Activities() {
               >
                 <div className="px-2 py-1 text-sm font-medium">{popupInfo.name}</div>
               </Popup>
-            )}
-          </div>
-          <div
-            className={`absolute top-0 right-0 h-full z-50 transition-all duration-300 transform ${
-              isSidebarOpen
-                ? "w-[calc(50%-18px)] md:w-[calc(33.333333%-18px)] translate-x-0"
-                : "w-[calc(33.333333%-18px)] translate-x-full hidden"
-            }`}
-          >
-            {isSidebarOpen && (
-              <ActivitySidebar
-                key={sidebarKey}
-                activity={{
-                  ...(selectedActivity as IActivityWithLocation),
-                  country_name: destinationData?.data?.country,
-                  city_name: destinationData?.data?.city,
-                  itinerary_destination_id: destinationData?.data?.itinerary_destination_id,
-                }}
-                onClose={handleCloseSidebar}
-              />
             )}
           </div>
         </div>

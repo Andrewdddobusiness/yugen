@@ -1,17 +1,15 @@
 import { create } from "zustand";
 
 interface ISidebarProps {
-  isSidebarOpen: boolean;
-  sidebarKey: number;
-  setIsSidebarOpen: (isSidebarOpen: boolean) => void;
-  getIsSidebarOpen: () => boolean;
-  setSidebarKey: (key: number) => void;
+  isSidebarRightOpen: boolean;
+  isSidebarLeftOpen: boolean;
+  setIsSidebarRightOpen: (isSidebarRightOpen: boolean) => void;
+  setIsSidebarLeftOpen: (isSidebarLeftOpen: boolean) => void;
 }
 
-export const useSidebarStore = create<ISidebarProps>((set, get) => ({
-  isSidebarOpen: false,
-  sidebarKey: 0,
-  setIsSidebarOpen: (isSidebarOpen: boolean) => set({ isSidebarOpen }),
-  getIsSidebarOpen: () => get().isSidebarOpen,
-  setSidebarKey: (key: number) => set({ sidebarKey: key + 1 }),
+export const useSidebarStore = create<ISidebarProps>((set) => ({
+  isSidebarRightOpen: false,
+  isSidebarLeftOpen: false,
+  setIsSidebarRightOpen: (isSidebarRightOpen: boolean) => set({ isSidebarRightOpen }),
+  setIsSidebarLeftOpen: (isSidebarLeftOpen: boolean) => set({ isSidebarLeftOpen }),
 }));

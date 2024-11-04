@@ -27,13 +27,7 @@ export default function Loading() {
         transition={{ duration: 1.5, repeat: Infinity, repeatType: "loop" }}
         className="flex flex-col justify-center items-center w-10 h-10"
       >
-        <Image
-          src="/smile.svg"
-          alt="smile"
-          width={50}
-          height={50}
-          className="w-12 h-12"
-        />
+        <Image src="/smile.svg" alt="smile" width={50} height={50} className="w-12 h-12" priority />
       </motion.div>
       <div className="text-sm text-zinc-500 h-6 flex items-center justify-center">
         <AnimatePresence>
