@@ -48,3 +48,35 @@ Piink: f33261
 Light Purple: c5a3ef
 Bluee: c5a3ef
 Tangy Orange: f6aa23
+
+## Supabase
+
+Requires Docker Desktop to be open.
+
+### Cleanup Deleted Accounts
+
+**Available Commands:**
+
+- delete: Delete a Function from Supabase
+- deploy: Deploy a Function to Supabase
+- download: Download a Function from Supabase
+- list: List all Functions in Supabase
+- new: Create a new Function locally
+- serve: Serve all Functions locally
+
+```bash
+supabase projects list # List projects
+supabase start --debug # Start the database
+supabase functions serve cleanup-deleted-accounts --debug # Test locally first
+supabase login
+supabase functions deploy cleanup-deleted-accounts --no-verify-jwt # Deploy the Function
+supabase functions list
+```
+
+```bash
+curl -i --request POST \
+  'https://<project-ref>.functions.supabase.co/cleanup-deleted-accounts' \
+  --header 'Authorization: Bearer YOUR_ANON_KEY' \
+  --header 'Content-Type: application/json' \
+  --data '{}'
+```

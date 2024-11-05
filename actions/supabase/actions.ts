@@ -184,6 +184,25 @@ export const softDeleteItinerary = async (itineraryId: number) => {
   }
 };
 
+export const permanentlyDeleteUser = async (userId: string) => {
+  const supabase = createClient();
+
+  try {
+    // Delete user's data from all related tables
+    await supabase.from("itinerary").delete().eq("user_id", userId);
+    // Add other table deletions as needed
+
+    // Finally delete the user account
+    const { error } = await supabase.auth.admin.deleteUser(userId);
+    if (error) throw error;
+
+    return { success: true };
+  } catch (error) {
+    console.error("Error permanently deleting user:", error);
+    return { success: false, error };
+  }
+};
+
 /*
   FETCH
 */

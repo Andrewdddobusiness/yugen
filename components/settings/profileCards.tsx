@@ -3,12 +3,24 @@ import React, { Suspense, useEffect, useState } from "react";
 import { useDropzone } from "react-dropzone";
 import Image from "next/image";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardFooter, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { toast } from "@/components/ui/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 import LoadingSpinner from "@/components/loading/loadingSpinner";
 
@@ -33,6 +45,9 @@ export default function ProfileCards() {
   const [loadingName, setNameLoading] = useState<any>(false);
   const [loadingEmail, setEmailLoading] = useState<any>(false);
   const [profileUrl, setProfileUrl] = useState("");
+
+  const [isDeleting, setIsDeleting] = useState(false);
+  const router = useRouter();
 
   const onDrop = (acceptedFiles: any) => {
     const uploadedFile = acceptedFiles[0];
@@ -211,6 +226,40 @@ export default function ProfileCards() {
 
     fetchUserData();
   }, [supabase]);
+
+  const handleDeleteAccount = async () => {
+    setIsDeleting(true);
+    try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      const { data, error } = await supabase.functions.invoke("soft-delete-user", {
+        body: { userId: user.id },
+        headers: {
+          Authorization: `Bearer ${session?.access_token}`,
+        },
+      });
+
+      if (error || !data.success) throw error || new Error("Failed to delete account");
+
+      await supabase.auth.signOut();
+      router.push("/");
+      toast({
+        title: "Account Scheduled for Deletion",
+        description: "Your account will be permanently deleted in 30 days. Sign in again to cancel deletion.",
+      });
+    } catch (error) {
+      console.error("Error deleting account:", error);
+      toast({
+        title: "Error",
+        description: "Failed to delete account. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 3xl:grid-cols-4 5xl:grid-cols-5 gap-4">
@@ -397,14 +446,35 @@ export default function ProfileCards() {
       <Card>
         <CardHeader>
           <CardTitle>Delete Your Account</CardTitle>
-          <CardDescription>Click the button below to delete your account.</CardDescription>
+          <CardDescription>Permanently delete your account and all associated data.</CardDescription>
         </CardHeader>
 
-        <CardContent className="flex flex-row justify-between min-h-[70px]" />
-
-        <CardFooter className="border-t py-4">
-          <Button variant="destructive">Delete Account</Button>
-        </CardFooter>
+        <CardContent className="flex flex-row justify-between min-h-[70px]">
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button variant="destructive">Delete Account</Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This action cannot be undone. This will permanently delete your account and remove all of your data
+                  from our servers.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={handleDeleteAccount}
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  disabled={isDeleting}
+                >
+                  {isDeleting ? "Deleting..." : "Delete Account"}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </CardContent>
       </Card>
     </div>
   );
