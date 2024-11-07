@@ -3,7 +3,7 @@ import Stripe from "stripe";
 import { createClient } from "@/utils/supabase/server";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: "2024-09-30.acacia",
+  apiVersion: "2024-10-28.acacia",
 });
 
 export async function POST(req: Request) {
@@ -22,16 +22,13 @@ export async function POST(req: Request) {
       case "checkout.session.completed": {
         const session = event.data.object as Stripe.Checkout.Session;
 
-        // Update user's subscription status in Supabase
-        if (session.customer) {
+        if (session.client_reference_id && session.customer) {
           const { error } = await supabase
-            .from("users")
+            .from("profile")
             .update({
               stripe_customer_id: session.customer,
-              subscription_status: "active",
-              subscription_plan: "pro",
             })
-            .eq("id", session.client_reference_id);
+            .eq("user_id", session.client_reference_id);
 
           if (error) throw error;
         }
@@ -42,14 +39,22 @@ export async function POST(req: Request) {
       case "customer.subscription.updated": {
         const subscription = event.data.object as Stripe.Subscription;
 
-        // Update subscription status in Supabase
-        const { error } = await supabase
-          .from("users")
-          .update({
+        // First get the profile with this stripe_customer_id
+        const { data: profile } = await supabase
+          .from("profile")
+          .select("user_id")
+          .eq("stripe_customer_id", subscription.customer)
+          .single();
+
+        if (!profile) throw new Error("No profile found for customer");
+
+        // Update subscription status in auth.users metadata
+        const { error } = await supabase.auth.admin.updateUserById(profile.user_id, {
+          user_metadata: {
             subscription_status: subscription.status,
             subscription_plan: subscription.status === "active" ? "pro" : "free",
-          })
-          .eq("stripe_customer_id", subscription.customer);
+          },
+        });
 
         if (error) throw error;
         break;

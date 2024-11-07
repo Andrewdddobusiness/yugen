@@ -2,6 +2,7 @@
 import { revalidatePath } from "next/cache";
 
 import { createClient } from "@/utils/supabase/server";
+import { handleUserSignup } from "../stripe/actions";
 
 export async function login(formData: FormData) {
   const supabase = createClient();
@@ -37,24 +38,20 @@ export async function logout() {
 export async function signup(formData: FormData) {
   const supabase = createClient();
 
+  const firstName = formData.get("first_name") as string;
+  const lastName = formData.get("last_name") as string;
+  const email = formData.get("email") as string;
+
   const signUpFormData = {
-    email: formData.get("email") as string,
+    email,
     password: formData.get("password") as string,
     options: {
       data: {
-        first_name: formData.get("first_name") as string,
-        last_name: formData.get("last_name") as string,
+        first_name: firstName,
+        last_name: lastName,
       },
     },
   };
-
-  const { auth } = supabase;
-  const { data: user } = await auth.getUser();
-
-  if (formData.get("email") === user.user?.email) {
-    console.log("Email already exists:", signUpFormData.email);
-    return { success: false, message: "Email already exists" };
-  }
 
   const { data, error } = await supabase.auth.signUp(signUpFormData);
 
@@ -62,6 +59,19 @@ export async function signup(formData: FormData) {
     console.log(error);
     return { success: false, message: "Error with sign up" };
   }
+
+  if (data?.user) {
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+
+      // Pass first and last name to handleUserSignup
+      await handleUserSignup(data.user.id, signUpFormData.email, firstName, lastName);
+    } catch (error) {
+      console.error("Error in post-signup process:", error);
+      return { success: false, message: "Error in post-signup process" };
+    }
+  }
+
   revalidatePath("/", "layout");
-  return { success: true, message: "Logout successful", data };
+  return { success: true, message: "Signup successful", data };
 }

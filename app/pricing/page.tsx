@@ -10,7 +10,13 @@ import { Check } from "lucide-react";
 
 import { freeFeatures, pricingDetails, proFeatures } from "./data";
 
+import { useStripeSubscriptionStore } from "@/store/stripeSubscriptionStore";
+import { Skeleton } from "@/components/ui/skeleton";
+import ManageSubscriptionButton from "@/components/buttons/stripe/manageSubscriptionButton";
+
 export default function PricingPage() {
+  const { subscription, isSubscriptionLoading } = useStripeSubscriptionStore();
+
   const [selectedInterval, setSelectedInterval] = useState("monthly");
 
   return (
@@ -91,9 +97,15 @@ export default function PricingPage() {
                   </div>
                 </CardContent>
                 <CardFooter>
-                  <CheckoutButton priceId={pricingDetails[selectedInterval as keyof typeof pricingDetails].priceId}>
-                    Get Started
-                  </CheckoutButton>
+                  {isSubscriptionLoading ? (
+                    <Skeleton className="h-10 w-full" />
+                  ) : subscription?.status === "active" ? (
+                    <ManageSubscriptionButton />
+                  ) : (
+                    <CheckoutButton priceId={pricingDetails[selectedInterval as keyof typeof pricingDetails].priceId}>
+                      Get Started
+                    </CheckoutButton>
+                  )}
                 </CardFooter>
               </Card>
             </div>

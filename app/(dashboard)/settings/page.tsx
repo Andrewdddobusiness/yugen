@@ -1,9 +1,23 @@
-import { Card, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+"use client";
+import { useEffect, useState } from "react";
+import Link from "next/link";
 
-import CheckoutButton from "@/components/stripe/checkoutButton";
+import { getSubscriptionDetails } from "@/actions/stripe/actions";
+
+import { Card, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import ManageSubscriptionButton from "@/components/buttons/stripe/manageSubscriptionButton";
 import ProfileCards from "@/components/settings/profileCards";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Button } from "@/components/ui/button";
+
+import { useStripeSubscriptionStore } from "@/store/stripeSubscriptionStore";
+import { capitalizeFirstLetterOfEachWord } from "@/utils/formatting/capitalise";
+import { useUserStore } from "@/store/userStore";
 
 export default function Settings() {
+  const { user } = useUserStore();
+  const { subscription, isSubscriptionLoading } = useStripeSubscriptionStore();
+
   return (
     <div className="flex flex-col mx-4 gap-8">
       <div className="flex flex-col mx-4 gap-4">
@@ -17,11 +31,45 @@ export default function Settings() {
           <Card>
             <CardHeader>
               <CardDescription>Subscription</CardDescription>
-              <CardTitle>Free</CardTitle>
+              <CardTitle>
+                {user === null || isSubscriptionLoading ? (
+                  <Skeleton className="h-6 w-24" />
+                ) : (
+                  <span className="text-lg font-bold">
+                    {subscription?.status === "active" ? (
+                      <>
+                        Pro {" - "}
+                        {capitalizeFirstLetterOfEachWord(subscription?.attrs.plan.interval)}ly
+                      </>
+                    ) : (
+                      "Free"
+                    )}
+                  </span>
+                )}
+              </CardTitle>
+              {user === null || isSubscriptionLoading ? (
+                <Skeleton className="h-2 w-32" />
+              ) : subscription !== null && subscription?.attrs && subscription?.attrs.cancel_at_period_end ? (
+                <CardDescription>Cancelled</CardDescription>
+              ) : (
+                subscription?.status === "active" && (
+                  <CardDescription>Renews on {subscription.currentPeriodEnd?.toLocaleDateString()}</CardDescription>
+                )
+              )}
             </CardHeader>
 
             <CardFooter className="border-t px-6 py-4">
-              <CheckoutButton priceId={process.env.NEXT_PUBLIC_STRIPE_PRO_PLAN_ID!}>Upgrade to Pro</CheckoutButton>
+              {user === null || isSubscriptionLoading ? (
+                <Skeleton className="h-10 w-full" />
+              ) : subscription?.status === "active" ? (
+                <ManageSubscriptionButton />
+              ) : (
+                <Link href="/pricing" className="w-full">
+                  <Button className="w-full" disabled={isSubscriptionLoading}>
+                    Upgrade to Pro
+                  </Button>
+                </Link>
+              )}
             </CardFooter>
           </Card>
         </div>
