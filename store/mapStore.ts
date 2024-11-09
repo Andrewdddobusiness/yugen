@@ -19,12 +19,10 @@ export const useMapStore = create<IMapStore>((set, get) => ({
   initialZoom: 10,
   smallRadiusInMeters: 3000,
   largeRadiusInMeters: 10000,
-  mapRadius: 3000,
-  setCenterCoordinates: (coordinates) =>
-    set({ centerCoordinates: coordinates }),
+  mapRadius: 75000,
+  setCenterCoordinates: (coordinates) => set({ centerCoordinates: coordinates }),
   getCenterCoordinates: () => get().centerCoordinates as [number, number],
-  setItineraryCoordinates: (coordinates: [number, number]) =>
-    set({ itineraryCoordinates: coordinates }),
+  setItineraryCoordinates: (coordinates: [number, number]) => set({ itineraryCoordinates: coordinates }),
   getItineraryCoordinates: () => get().itineraryCoordinates as [number, number],
   setRadius: (mapRadius: number) => set({ mapRadius }),
 }));

@@ -1,18 +1,13 @@
 import React from "react";
 import { colors, TColor } from "@/lib/colors/colors";
-interface CustomWaypointProps {
+interface CustomMarkerProps {
   number?: number;
   color?: TColor;
   size?: "sm" | "md" | "lg";
   isSelected?: boolean;
 }
 
-export default function CustomWaypoint({
-  number,
-  color = "Blue",
-  size = "md",
-  isSelected = false,
-}: CustomWaypointProps) {
+export default function CustomMarker({ number, color = "Blue", size = "md", isSelected = false }: CustomMarkerProps) {
   const sizeMap = {
     sm: { width: 28, height: 36, fontSize: "12px" },
     md: { width: 32, height: 42, fontSize: "14px" },

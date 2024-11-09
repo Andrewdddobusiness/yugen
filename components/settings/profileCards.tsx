@@ -27,10 +27,13 @@ import LoadingSpinner from "@/components/loading/loadingSpinner";
 // import { uploadToStorage } from "@/actions/file/actions";
 
 import { createClient } from "@/utils/supabase/client";
-import { Avatar, AvatarImage } from "../ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar";
+import { useUserStore } from "@/store/userStore";
 
 export default function ProfileCards() {
   const supabase = createClient();
+
+  const { profileUrl, isProfileUrlLoading } = useUserStore();
 
   const [user, setUser] = useState<any>(null);
   const [isEditingProfilePhoto, setIsEditingProfilePhoto] = useState(false);
@@ -44,7 +47,6 @@ export default function ProfileCards() {
   const [loadingProfile, setProfileLoading] = useState<any>(false);
   const [loadingName, setNameLoading] = useState<any>(false);
   const [loadingEmail, setEmailLoading] = useState<any>(false);
-  const [profileUrl, setProfileUrl] = useState("");
 
   const [isDeleting, setIsDeleting] = useState(false);
   const router = useRouter();
@@ -175,29 +177,6 @@ export default function ProfileCards() {
   };
 
   useEffect(() => {
-    const fetchPublicUrl = async () => {
-      try {
-        const { auth } = supabase;
-        const { data: user, error } = await auth.getUser();
-        if (error || !user) {
-          throw new Error("User not authenticated");
-        }
-        const { data } = await supabase.storage.from("avatars").getPublicUrl(user.user.id + "/profile");
-        if (error || !data) {
-          throw new Error("Error fetching public URL");
-        }
-        setProfileUrl(data.publicUrl);
-      } catch (error: any) {
-        console.error("Error fetching public URL:", error.message);
-      }
-    };
-
-    fetchPublicUrl();
-
-    return () => {};
-  }, [supabase]);
-
-  useEffect(() => {
     const fetchUserData = async () => {
       try {
         const { auth } = supabase;
@@ -272,8 +251,15 @@ export default function ProfileCards() {
           {!isEditingProfilePhoto ? (
             <div className="grid grid-cols-4 gap-4">
               <Avatar className="h-16 w-16 rounded-lg p-1 border border-gray-200">
-                {profileUrl ? (
+                {isProfileUrlLoading ? (
+                  <Skeleton className="h-full w-full" />
+                ) : profileUrl ? (
                   <AvatarImage src={profileUrl} className="rounded-md" />
+                ) : user ? (
+                  <AvatarFallback className="rounded-md bg-muted">
+                    {user.user_metadata.first_name?.[0]}
+                    {user.user_metadata.last_name?.[0]}
+                  </AvatarFallback>
                 ) : (
                   <Skeleton className="h-full w-full" />
                 )}
@@ -283,8 +269,15 @@ export default function ProfileCards() {
             <div className="grid grid-cols-4 gap-4">
               <div className="col-span-1">
                 <Avatar className="h-16 w-16 rounded-lg p-1 border border-gray-200">
-                  {profileUrl ? (
+                  {isProfileUrlLoading ? (
+                    <Skeleton className="h-full w-full" />
+                  ) : profileUrl ? (
                     <AvatarImage src={profileUrl} className="rounded-md" />
+                  ) : user ? (
+                    <AvatarFallback className="rounded-md bg-muted">
+                      {user.user_metadata.first_name?.[0]}
+                      {user.user_metadata.last_name?.[0]}
+                    </AvatarFallback>
                   ) : (
                     <Skeleton className="h-full w-full" />
                   )}

@@ -21,7 +21,7 @@ interface IWaypointProps {
 
 const Waypoint = ({ latitude, longitude, color, activity, number, isSelected = false }: IWaypointProps) => {
   const { setSelectedActivity } = useActivitiesStore();
-  const { setIsSidebarOpen } = useSidebarStore();
+  const { setIsSidebarRightOpen } = useSidebarStore();
 
   const { openSidebar } = useSidebar();
 
@@ -29,7 +29,7 @@ const Waypoint = ({ latitude, longitude, color, activity, number, isSelected = f
 
   const handleClick = () => {
     setSelectedActivity(activity);
-    setIsSidebarOpen(true);
+    setIsSidebarRightOpen(true);
     openSidebar();
   };
 

@@ -38,6 +38,7 @@ import { activityTypeFilters, activityCostFilters } from "@/utils/filters/filter
 
 import { Popup } from "react-map-gl";
 import { useSidebar } from "@/components/ui/sidebar";
+import GoogleMapComponent from "@/components/map/googleMap";
 
 export default function Activities() {
   const queryClient = useQueryClient();
@@ -275,11 +276,13 @@ export default function Activities() {
       if (
         searchHistoryActivitiesData &&
         Array.isArray(searchHistoryActivitiesData.activities) &&
-        searchHistoryActivitiesData.activities.length > 0
+        (searchHistoryActivitiesData.activities.length > 0 || searchHistoryActivitiesData.missingPlaceIds.length > 0)
       ) {
-        const newActivities = searchHistoryActivitiesData.activities;
-        const existingPlaceIds = new Set(searchHistoryActivities.map((activity) => activity.place_id));
-        const filteredNewActivities = newActivities.filter((activity) => !existingPlaceIds.has(activity.place_id));
+        let newActivities: IActivity[] = [];
+
+        if (searchHistoryActivitiesData.activities.length > 0) {
+          newActivities = searchHistoryActivitiesData.activities;
+        }
 
         setSearchHistoryActivities(newActivities);
 
@@ -293,14 +296,13 @@ export default function Activities() {
             if (placeDetails) {
               const newActivity = await insertActivityMutation.mutateAsync(placeDetails);
 
-              setSearchHistoryActivities((prevActivities: IActivity[]) => {
-                const currentActivities = Array.isArray(prevActivities) ? prevActivities : [];
-                if (currentActivities.some((a) => a.place_id === newActivity.place_id)) {
-                  return currentActivities;
-                }
-
-                return [...currentActivities, newActivity];
-              });
+              let currentActivities = Array.isArray(searchHistoryActivities) ? searchHistoryActivities : [];
+              if (currentActivities.some((a: IActivity) => a.place_id === newActivity.place_id)) {
+                currentActivities = currentActivities;
+              } else {
+                currentActivities = [...currentActivities, newActivity];
+              }
+              setSearchHistoryActivities(currentActivities);
             }
           } catch (error) {
             console.error("Error fetching and inserting missing activity:", error);
@@ -325,7 +327,7 @@ export default function Activities() {
 
   return (
     <>
-      {isCoordinatesLoading || isDestinationLoading || isActivitiesLoading || isItineraryActivitiesLoading ? (
+      {isCoordinatesLoading || isDestinationLoading || isItineraryActivitiesLoading ? (
         <Loading />
       ) : (
         <div className="flex flex-row h-full overflow-hidden">
@@ -343,7 +345,7 @@ export default function Activities() {
             <div className="flex flex-col items-center">
               <div className="text-2xl text-black font-bold flex justify-left pt-8">Explore Activities</div>
               <div className="text-md text-zinc-500 flex justify-left">Search for activities that you want to do!</div>
-              <SearchField />
+
               <div className="flex flex-row justify-between w-full pt-8 px-4">
                 <ActivityCostFilters />
 
@@ -447,7 +449,7 @@ export default function Activities() {
                 : "sm:w-1/2 w-0 hidden sm:block"
             }`}
           >
-            {cityCoordinates && <Mapbox />}
+            {cityCoordinates && <GoogleMapComponent />}
             {popupInfo && (
               <Popup
                 longitude={popupInfo.longitude}

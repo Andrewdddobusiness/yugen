@@ -2,9 +2,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { createClient } from "@/utils/supabase/client";
-import { Menu, Plus } from "lucide-react";
-import { Skeleton } from "@/components/ui/skeleton";
+import { useQuery } from "@tanstack/react-query";
 
 import {
   NavigationMenu,
@@ -14,17 +12,14 @@ import {
   navigationMenuTriggerStyle,
   navigationMenuTriggerStyle2,
 } from "@/components/ui/navigation-menu";
-
 import {
   DropdownMenu,
-  DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-
 import {
   Drawer,
   DrawerClose,
@@ -35,47 +30,98 @@ import {
   DrawerTitle,
   DrawerTrigger,
 } from "@/components/ui/drawer";
-import { Button } from "../ui/button";
-import LogoutButton from "../buttons/logoutButton";
-import PopUpCreateItinerary from "../popUp/popUpCreateItinerary";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Button } from "@/components/ui/button";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+
+import LogoutButton from "@/components/buttons/logoutButton";
+import PopUpCreateItinerary from "@/components/popUp/popUpCreateItinerary";
+
+import { Menu, Plus } from "lucide-react";
+
+import { useUserStore } from "@/store/userStore";
+import { ISubscriptionDetails, useStripeSubscriptionStore } from "@/store/stripeSubscriptionStore";
+
+import { getSubscriptionDetails } from "@/actions/stripe/actions";
+import { createClient } from "@/utils/supabase/client";
 
 export default function Navigation() {
-  const supabase = createClient();
-  const [user, setUser] = useState<any>();
-  const [isLoading, setIsLoading] = useState(true);
+  //***** STORES *****//
+  const { setUser, setUserLoading, setProfileUrl, setIsProfileUrlLoading } = useUserStore();
+  const { setSubscription, setIsSubscriptionLoading } = useStripeSubscriptionStore();
+
+  //***** STATES *****//
   const [open, setOpen] = useState(false);
-  const [profileUrl, setProfileUrl] = useState("");
 
-  const fetchUser = async () => {
-    setIsLoading(true);
-    try {
-      const { auth } = supabase;
-      const { data: user, error } = await auth.getUser();
-      if (error || !user) {
-        throw new Error("User not authenticated");
-      } else {
-        setUser(user);
-      }
-
-      const { data } = await supabase.storage.from("avatars").getPublicUrl(user.user.id + "/profile");
-      if (error || !data) {
-        throw new Error("Error fetching public URL");
-      } else {
-        setProfileUrl(data.publicUrl);
-      }
-    } catch (error: any) {
-      console.error("Error fetching public URL:", error.message);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  //***** GET USER *****//
+  const { data: user, isLoading: isUserLoading } = useQuery({
+    queryKey: ["user"],
+    queryFn: async () => {
+      const supabase = createClient();
+      const {
+        data: { user },
+        error,
+      } = await supabase.auth.getUser();
+      if (error || !user) throw error;
+      return user;
+    },
+  });
 
   useEffect(() => {
-    fetchUser();
-  }, []);
+    setUserLoading(isUserLoading);
+  }, [isUserLoading, setUserLoading]);
+
+  useEffect(() => {
+    if (user) {
+      setUser(user);
+    }
+  }, [user, setUser]);
+
+  //***** GET PROFILE URL *****//
+  const { data: profileUrl, isLoading: isProfileUrlLoading } = useQuery({
+    queryKey: ["profileUrl", user?.id],
+    queryFn: async () => {
+      const supabase = createClient();
+
+      // First check if the file exists
+      const { data: fileExists, error: listError } = await supabase.storage.from("avatars").list(user?.id);
+
+      if (listError) {
+        console.error("Error checking file existence:", listError);
+        return null;
+      }
+
+      // If file exists (array has items and one is named "profile")
+      if (fileExists && fileExists.some((file) => file.name === "profile")) {
+        const { data } = await supabase.storage.from("avatars").getPublicUrl(user?.id + "/profile");
+        return data.publicUrl;
+      }
+
+      // No profile picture exists
+      return null;
+    },
+    enabled: !!user,
+  });
+
+  useEffect(() => {
+    setProfileUrl(profileUrl || "");
+    setIsProfileUrlLoading(false);
+  }, [profileUrl]);
+
+  //***** GET SUBSCRIPTION DETAILS *****//
+  const { data: subscription, isLoading: isSubscriptionLoading } = useQuery({
+    queryKey: ["subscription", user?.id],
+    queryFn: getSubscriptionDetails,
+    enabled: !!user,
+  });
+
+  useEffect(() => {
+    setSubscription(subscription as ISubscriptionDetails);
+    setIsSubscriptionLoading(false);
+  }, [subscription]);
 
   const renderAuthSection = () => {
-    if (isLoading) {
+    if (isUserLoading || isProfileUrlLoading || isSubscriptionLoading) {
       return (
         <div className="flex items-center space-x-4">
           <Skeleton className="h-9 w-24" />
@@ -107,15 +153,18 @@ export default function Navigation() {
           </div>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="icon" className="overflow-hidden rounded-full">
-                <Image
-                  alt="Avatar"
-                  src={profileUrl ? profileUrl : ""}
-                  width={100}
-                  height={100}
-                  className="w-10 h-10 rounded-full"
-                />
-              </Button>
+              <Avatar className="h-12 w-12 rounded-lg p-1 border border-gray-200 cursor-pointer">
+                {isProfileUrlLoading ? (
+                  <Skeleton className="h-full w-full" />
+                ) : profileUrl ? (
+                  <AvatarImage src={profileUrl} className="rounded-md" />
+                ) : (
+                  <AvatarFallback className="rounded-md bg-muted">
+                    {user?.user_metadata.first_name?.[0]}
+                    {user?.user_metadata.last_name?.[0]}
+                  </AvatarFallback>
+                )}
+              </Avatar>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuLabel>My Account</DropdownMenuLabel>

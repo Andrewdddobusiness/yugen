@@ -1,44 +1,22 @@
 "use client";
-import { useEffect, useState } from "react";
+
 import Link from "next/link";
 import Image from "next/image";
-import { createClient } from "@/utils/supabase/client";
-
-import HomeLayout from "@/components/layouts/homeLayout";
 
 import { Button } from "@/components/ui/button";
+
+import HomeLayout from "@/components/layouts/homeLayout";
 import PopUpCreateItinerary from "@/components/popUp/popUpCreateItinerary";
+
 import { Loader2, Plus } from "lucide-react";
 
+import { useUserStore } from "@/store/userStore";
+
 export default function Home() {
-  const supabase = createClient();
-  const [user, setUser] = useState<any>();
-  const [isUserLoading, setIsUserLoading] = useState(true);
-
-  useEffect(() => {
-    const fetchUserData = async () => {
-      setIsUserLoading(true);
-      try {
-        const { auth } = supabase;
-        const { data: user } = await auth.getUser();
-
-        if (!user.user) {
-          throw new Error("User not authenticated");
-        }
-        setUser(user.user);
-      } catch (error) {
-        console.error("Error fetching user data:", error);
-      } finally {
-        setIsUserLoading(false);
-      }
-    };
-
-    fetchUserData();
-  }, [supabase]);
-
+  const { user, isUserLoading } = useUserStore();
+  console.log("user", user);
   return (
     <HomeLayout>
-      {/* <PageLayout> */}
       <div className="pt-12 flex flex-col md:flex-row items-center px-8">
         <div className="md:w-1/2">
           <div className="text-center md:text-left">
@@ -80,7 +58,6 @@ export default function Home() {
           </div>
         </div>
       </div>
-      {/* </PageLayout> */}
     </HomeLayout>
   );
 }

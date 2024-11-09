@@ -1,36 +1,23 @@
 import { create } from "zustand";
-import { createClient } from "@/utils/supabase/client";
 
 interface UserState {
   user: any | null;
-  isLoading: boolean;
+  isUserLoading: boolean;
   profileUrl: string | null;
-  fetchUser: () => Promise<void>;
+  isProfileUrlLoading: boolean;
+  setUser: (user: any | null) => void;
+  setUserLoading: (loading: boolean) => void;
+  setProfileUrl: (url: string) => void;
+  setIsProfileUrlLoading: (loading: boolean) => void;
 }
 
 export const useUserStore = create<UserState>((set) => ({
   user: null,
-  isLoading: true,
+  isUserLoading: true,
   profileUrl: null,
-  fetchUser: async () => {
-    const supabase = createClient();
-    try {
-      const {
-        data: { user },
-        error,
-      } = await supabase.auth.getUser();
-      if (error || !user) throw error;
-
-      const { data } = await supabase.storage.from("avatars").getPublicUrl(user.id + "/profile");
-
-      set({
-        user,
-        profileUrl: data?.publicUrl || null,
-        isLoading: false,
-      });
-    } catch (error) {
-      console.error("Error fetching user:", error);
-      set({ user: null, isLoading: false });
-    }
-  },
+  isProfileUrlLoading: false,
+  setUser: (user: any | null) => set({ user }),
+  setUserLoading: (loading: boolean) => set({ isUserLoading: loading }),
+  setProfileUrl: (url: string) => set({ profileUrl: url }),
+  setIsProfileUrlLoading: (loading: boolean) => set({ isProfileUrlLoading: loading }),
 }));

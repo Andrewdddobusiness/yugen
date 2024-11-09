@@ -50,6 +50,7 @@
     "@turf/turf": "^7.1.0",
     "@types/google.maps": "^3.58.1",
     "@types/mapbox-gl": "^3.4.0",
+    "@vis.gl/react-google-maps": "^1.4.0",
     "axios": "^1.7.7",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.0",

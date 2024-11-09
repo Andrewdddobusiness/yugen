@@ -1,8 +1,6 @@
 "use client";
-import Image from "next/image";
-import { BadgeCheck, Bell, ChevronsUpDown, CreditCard, LogOut, Settings, Sparkles } from "lucide-react";
+import Link from "next/link";
 
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -12,21 +10,23 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { SidebarMenu, SidebarMenuButton, SidebarMenuItem, useSidebar } from "@/components/ui/sidebar";
-import Link from "next/link";
-import LogoutButton from "@/components/buttons/logoutButton";
-import { useEffect, useState } from "react";
-import { createClient } from "@/utils/supabase/client";
 import { Skeleton } from "@/components/ui/skeleton";
+
+import LogoutButton from "@/components/buttons/logoutButton";
+
+import { BadgeCheck, ChevronsUpDown, LogOut, Settings, Sparkles } from "lucide-react";
+
 import { useUserStore } from "@/store/userStore";
+import { useStripeSubscriptionStore } from "@/store/stripeSubscriptionStore";
+
+import { cn } from "@/components/lib/utils";
 
 export function NavUser() {
-  const { user, isLoading, profileUrl } = useUserStore();
+  const { user, isUserLoading, profileUrl, isProfileUrlLoading } = useUserStore();
+  const { subscription, isSubscriptionLoading } = useStripeSubscriptionStore();
   const { isMobile } = useSidebar();
-
-  useEffect(() => {
-    useUserStore.getState().fetchUser();
-  }, []);
 
   const userDisplayName = user?.user_metadata?.first_name
     ? `${user.user_metadata.first_name} ${user.user_metadata.last_name || ""}`
@@ -40,7 +40,7 @@ export function NavUser() {
     .toUpperCase()
     .slice(0, 2);
 
-  if (isLoading) {
+  if (isUserLoading || isProfileUrlLoading || isSubscriptionLoading) {
     return (
       <SidebarMenu>
         <SidebarMenuItem>
@@ -70,7 +70,9 @@ export function NavUser() {
               className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
             >
               <Avatar className="h-8 w-8 rounded-lg">
-                {profileUrl !== null ? (
+                {isProfileUrlLoading ? (
+                  <Skeleton className="h-full w-full" />
+                ) : profileUrl ? (
                   <AvatarImage src={profileUrl} />
                 ) : (
                   <AvatarFallback className="rounded-lg">{userInitials}</AvatarFallback>
@@ -92,7 +94,13 @@ export function NavUser() {
             <DropdownMenuLabel className="p-0 font-normal">
               <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
                 <Avatar className="h-8 w-8 rounded-lg">
-                  <AvatarFallback className="rounded-lg">{userInitials}</AvatarFallback>
+                  {isProfileUrlLoading ? (
+                    <Skeleton className="h-full w-full" />
+                  ) : profileUrl ? (
+                    <AvatarImage src={profileUrl} />
+                  ) : (
+                    <AvatarFallback className="rounded-lg">{userInitials}</AvatarFallback>
+                  )}
                 </Avatar>
                 <div className="grid flex-1 text-left text-sm leading-tight">
                   <span className="truncate font-semibold">{userDisplayName}</span>
@@ -102,10 +110,33 @@ export function NavUser() {
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
-              <Link href="/pricing">
-                <DropdownMenuItem className={"cursor-pointer"}>
-                  <Sparkles className="mr-2 h-4 w-4" />
-                  Upgrade to Pro
+              <Link href={subscription?.status === "active" ? "/settings" : "/pricing"}>
+                <DropdownMenuItem
+                  className={cn(
+                    "cursor-pointer",
+                    subscription?.status === "active" && "bg-yellow-50 dark:bg-yellow-900/20"
+                  )}
+                >
+                  {isSubscriptionLoading ? (
+                    <Skeleton className="h-4 w-4" />
+                  ) : subscription?.status === "active" ? (
+                    <div className="flex items-center gap-2 w-full">
+                      <div className="flex items-center w-full">
+                        <Sparkles className="mr-2 h-4 w-4 text-yellow-500 animate-pulse" />
+                        <span className="font-medium text-yellow-700 dark:text-yellow-400">Pro Traveler</span>
+                        <span className="ml-auto flex items-center text-xs text-yellow-600 dark:text-yellow-500">
+                          <BadgeCheck className="h-3.5 w-3.5 mr-1" />
+                          {subscription.attrs.plan.interval === "month" ? "Monthly" : "Yearly"}
+                        </span>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors">
+                      <Sparkles className="mr-2 h-4 w-4" />
+                      <span>Upgrade to Pro</span>
+                      <span className="ml-auto text-xs px-1.5 py-0.5 rounded-full bg-muted">Free</span>
+                    </div>
+                  )}
                 </DropdownMenuItem>
               </Link>
             </DropdownMenuGroup>
