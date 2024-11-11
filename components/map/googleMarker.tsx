@@ -1,4 +1,4 @@
-import { AdvancedMarker } from "@vis.gl/react-google-maps";
+import { AdvancedMarker, useMap } from "@vis.gl/react-google-maps";
 import { IActivity, useActivitiesStore } from "@/store/activityStore";
 import { useSidebarStore } from "@/store/sidebarStore";
 import { useSidebar } from "../ui/sidebar";
@@ -27,8 +27,13 @@ export default function GoogleMarker({
   const { setSelectedActivity } = useActivitiesStore();
   const { setIsSidebarRightOpen } = useSidebarStore();
   const { openSidebar } = useSidebar();
+  const map = useMap("map-instance");
 
   const handleClick = () => {
+    if (map) {
+      map.panTo({ lat: latitude, lng: longitude });
+    }
+
     setSelectedActivity(activity);
     setIsSidebarRightOpen(true);
     openSidebar();

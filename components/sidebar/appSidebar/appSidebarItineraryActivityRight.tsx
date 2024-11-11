@@ -36,6 +36,7 @@ import { useItineraryActivityStore } from "@/store/itineraryActivityStore";
 import { IActivityWithLocation, useActivitiesStore } from "@/store/activityStore";
 import { formatOpenHours } from "@/utils/formatting/datetime";
 import { useSidebarStore } from "@/store/sidebarStore";
+import { useMapStore } from "@/store/mapStore";
 
 const getDayName = (dayNumber: number) => {
   const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
@@ -54,6 +55,7 @@ export function AppSidebarItineraryActivityRight() {
   const [loading, setLoading] = useState<boolean>(false);
 
   const { toggleSidebar } = useSidebar();
+  const { setTempMarker } = useMapStore();
 
   useEffect(() => {
     const checkIfActivityAdded = async () => {
@@ -153,6 +155,7 @@ export function AppSidebarItineraryActivityRight() {
   const handleCloseSidebar = () => {
     setIsSidebarRightOpen(false);
     toggleSidebar();
+    setTempMarker(null);
   };
 
   if (!selectedActivity) {
