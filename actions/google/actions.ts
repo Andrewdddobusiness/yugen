@@ -25,7 +25,7 @@ export async function fetchCityCoordinates(cityName: string, countryName: string
   return { longitude, latitude };
 }
 
-export async function mapGooglePlaceToActivity(place: any): Promise<IActivity> {
+function mapGooglePlaceToActivity(place: any) {
   return {
     place_id: place.id,
     name: place.displayName?.text || "",
@@ -69,6 +69,11 @@ export const fetchNearbyActivities = async (
   radiusInMeters: number,
   searchType: SearchType = "all"
 ) => {
+  console.log("latitude: ", latitude);
+  console.log("longitude: ", longitude);
+  console.log("radiusInMeters: ", radiusInMeters);
+  console.log("searchType: ", searchType);
+
   if (typeof latitude !== "number" || typeof longitude !== "number") {
     throw new Error("Invalid coordinates provided");
   }
@@ -127,8 +132,9 @@ export const fetchNearbyActivities = async (
         ].join(","),
       },
     });
-    console.log("response.data: ", response.data.places[0]);
+    // console.log("response.data: ", response.data.places[0]);
     const activities: IActivity[] = response.data.places.map(mapGooglePlaceToActivity);
+
     return activities;
   } catch (error) {
     console.error("Error fetching nearby activities:", error);
@@ -208,8 +214,12 @@ export const fetchPlaceDetails = async (placeId: string): Promise<IActivity> => 
     // console.log("response.data: ", response.data);
 
     const place = response.data;
-    // console.log("mapGooglePlaceToActivity(place); ", mapGooglePlaceToActivity(place));
-    return mapGooglePlaceToActivity(place);
+    const activity = mapGooglePlaceToActivity(place);
+    // Ensure coordinates is a tuple of [number, number]
+    if (!Array.isArray(activity.coordinates) || activity.coordinates.length !== 2) {
+      throw new Error("Invalid coordinates format");
+    }
+    return activity as IActivity;
   } catch (error) {
     console.error("Error fetching place details:", error);
     throw error;

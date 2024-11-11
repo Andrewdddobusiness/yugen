@@ -23,7 +23,7 @@ export default function SearchField() {
   // **** STORES ****
   const { setSelectedTab } = useActivityTabStore();
   const { addToHistory, selectedSearchQuery, setSelectedSearchQuery } = useSearchHistoryStore();
-  const { itineraryCoordinates, centerCoordinates, mapRadius, largeRadiusInMeters } = useMapStore();
+  const { itineraryCoordinates, centerCoordinates, mapRadius } = useMapStore();
   const { setActivities, isActivitiesLoading, setIsActivitiesLoading } = useActivitiesStore();
 
   // **** STATES ****
@@ -125,6 +125,7 @@ export default function SearchField() {
 
     try {
       const activities = await fetchNearbyActivities(centerCoordinates[0], centerCoordinates[1], mapRadius, type);
+      console.log("activities2: ", activities);
       setActivities(activities);
       setSelectedTab("search");
     } catch (error) {

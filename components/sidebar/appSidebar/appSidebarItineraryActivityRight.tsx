@@ -28,7 +28,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 
 import { toast } from "sonner";
 
-import { Globe, Clock, Loader2, X, Phone } from "lucide-react";
+import { Globe, Clock, Loader2, X, Phone, ImageOff } from "lucide-react";
 
 import { capitalizeFirstLetterOfEachWord } from "@/utils/formatting/capitalise";
 
@@ -164,7 +164,7 @@ export function AppSidebarItineraryActivityRight() {
         <SidebarHeader className="bg-white">
           <SidebarMenu>
             <SidebarMenuItem>
-              <div className="absolute top-1 right-1 z-10">
+              <div className="absolute top-1 right-1 z-30">
                 <Button variant="outline" size="icon" onClick={handleCloseSidebar} className="rounded-full">
                   <X size={16} className="rounded-full hover:bg-zinc-100" />
                 </Button>
@@ -223,8 +223,8 @@ export function AppSidebarItineraryActivityRight() {
       <SidebarContent className="bg-white">
         <ScrollArea className="h-full">
           <Accordion type="single" collapsible>
-            <div className="px-4 pt-16">
-              <div className="mt-4">
+            <div className="px-4 pt-16 gap-4">
+              <div>
                 {loading ? (
                   <Skeleton className="w-full h-[200px] rounded-lg" />
                 ) : selectedActivity?.photo_names?.length > 0 ? (
@@ -232,13 +232,14 @@ export function AppSidebarItineraryActivityRight() {
                     <ImagesCarousel photoNames={selectedActivity.photo_names} showButtons={true} />
                   </div>
                 ) : (
-                  <div className="w-full h-[200px] bg-gray-100 rounded-lg flex items-center justify-center">
+                  <div className="w-full h-[200px] bg-gray-100 rounded-lg flex flex-col items-center justify-center">
+                    <ImageOff size={48} />
                     <p className="text-gray-500">No images available</p>
                   </div>
                 )}
               </div>
 
-              <div className="mt-6">
+              <div className="flex flex-col pt-6 gap-2">
                 {loading ? (
                   <Skeleton className="h-8 w-3/4" />
                 ) : selectedActivity?.name ? (
@@ -250,7 +251,7 @@ export function AppSidebarItineraryActivityRight() {
                 {loading ? (
                   <Skeleton className="h-4 w-24 mt-2" />
                 ) : selectedActivity?.rating ? (
-                  <div className="flex flex-row space-x-1 items-center mt-2">
+                  <div className="flex flex-row space-x-1 items-center">
                     <Rating rating={selectedActivity.rating} />
                     <div className="ml-2 text-xs text-zinc-500">{selectedActivity.rating}</div>
                   </div>
@@ -259,13 +260,13 @@ export function AppSidebarItineraryActivityRight() {
                 {loading ? (
                   <Skeleton className="h-4 w-full mt-2" />
                 ) : selectedActivity?.description ? (
-                  <p className="mt-2 text-md">{selectedActivity.description}</p>
-                ) : (
-                  <p className="mt-2 text-md text-gray-500">No description available</p>
-                )}
+                  <p className="text-md">{selectedActivity.description}</p>
+                ) : null}
+
+                <Separator className="mt-2" />
 
                 {loading ? (
-                  <div className="mt-4">
+                  <div>
                     <Skeleton className="h-12 w-full" />
                   </div>
                 ) : selectedActivity?.website_url ? (
@@ -275,7 +276,7 @@ export function AppSidebarItineraryActivityRight() {
                         href={selectedActivity.website_url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="flex flex-row items-center hover:bg-gray-50 text-md hover:underline mt-4"
+                        className="flex flex-row items-center hover:bg-gray-50 text-md hover:underline"
                       >
                         <div className="p-4">
                           <Globe size={20} />
@@ -325,11 +326,7 @@ export function AppSidebarItineraryActivityRight() {
                   <div className="mt-4">
                     <CommentsCarousel reviews={selectedActivity.reviews} />
                   </div>
-                ) : (
-                  <div className="mt-4 p-4 bg-gray-50 rounded-lg">
-                    <p className="text-gray-500 text-center">No reviews available</p>
-                  </div>
-                )}
+                ) : null}
               </div>
             </div>
           </Accordion>

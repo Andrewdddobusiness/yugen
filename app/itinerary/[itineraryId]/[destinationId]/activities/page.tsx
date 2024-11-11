@@ -10,7 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 import ActivityCards from "@/components/cards/activityCards";
 import ActivitySidebar from "@/components/sidebar/activitySideBar";
-import Mapbox from "@/components/map/mapbox";
+
 import Loading from "@/components/loading/loading";
 import ActivityTypeFilters from "@/components/filters/activityTypeFilters";
 import ActivityCostFilters from "@/components/filters/activityCostFilters";
@@ -122,6 +122,7 @@ export default function Activities() {
       if (!itineraryCoordinates || itineraryCoordinates.length !== 2) {
         throw new Error("Invalid center coordinates");
       }
+
       return fetchNearbyActivities(itineraryCoordinates[0], itineraryCoordinates[1], mapRadius);
     },
     enabled: Array.isArray(itineraryCoordinates) && itineraryCoordinates.length === 2 && !initialLoadComplete,

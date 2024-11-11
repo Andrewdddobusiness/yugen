@@ -1,11 +1,6 @@
 import React, { useState } from "react";
 import Image from "next/image";
-import {
-  Carousel,
-  CarouselContent,
-  CarouselItem,
-  CarouselApi,
-} from "../ui/carousel";
+import { Carousel, CarouselContent, CarouselItem, CarouselApi } from "../ui/carousel";
 import { Button } from "../ui/button";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
@@ -14,10 +9,7 @@ interface IImageCarouselProps {
   showButtons?: boolean;
 }
 
-const ImageCarousel: React.FC<IImageCarouselProps> = ({
-  photoNames,
-  showButtons = false,
-}) => {
+const ImageCarousel: React.FC<IImageCarouselProps> = ({ photoNames, showButtons = false }) => {
   const [api, setApi] = useState<CarouselApi>();
 
   const scrollPrev = () => api?.scrollPrev();
@@ -30,7 +22,7 @@ const ImageCarousel: React.FC<IImageCarouselProps> = ({
           <Button
             variant="outline"
             size="icon"
-            className="absolute left-2 top-1/2 transform -translate-y-1/2 z-10 h-10 w-10"
+            className="absolute left-2 top-1/2 transform -translate-y-1/2 z-10 h-10 w-10 opacity-50 hover:opacity-90 transition-opacity duration-300"
             onClick={scrollPrev}
           >
             <ChevronLeft className="h-4 w-4" />
@@ -53,7 +45,7 @@ const ImageCarousel: React.FC<IImageCarouselProps> = ({
           <Button
             variant="outline"
             size="icon"
-            className="absolute right-2 top-1/2 transform -translate-y-1/2 z-10 h-10 w-10"
+            className="absolute right-2 top-1/2 transform -translate-y-1/2 z-10 h-10 w-10 opacity-50 hover:opacity-90 transition-opacity duration-300"
             onClick={scrollNext}
           >
             <ChevronRight className="h-4 w-4" />

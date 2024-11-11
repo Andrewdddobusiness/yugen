@@ -1,13 +1,13 @@
 // Define exact mappings between zoom levels and radius values
 export const zoomRadiusMap = {
-  10: 75000, // City level
-  11: 40000,
-  12: 20000,
-  13: 10000,
-  14: 5000,
-  15: 2500,
-  16: 1250,
-  17: 600, // Street level
+  10: 20000, // City level
+  11: 16000,
+  12: 13000,
+  13: 6000,
+  14: 2500,
+  15: 1500,
+  16: 600,
+  17: 300, // Street level
 } as const;
 
 // Helper functions

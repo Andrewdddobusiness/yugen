@@ -13,7 +13,7 @@ import GoogleMapController from "./googleMapController";
 import { colors, TColor } from "@/lib/colors/colors";
 
 export default function GoogleMapComponent() {
-  const { centerCoordinates, initialZoom, setRadius, tempMarker } = useMapStore();
+  const { centerCoordinates, initialZoom, mapRadius, setRadius, tempMarker, setCenterCoordinates } = useMapStore();
 
   const center = centerCoordinates
     ? { lat: centerCoordinates[0], lng: centerCoordinates[1] }
@@ -23,12 +23,24 @@ export default function GoogleMapComponent() {
     if (e.detail) {
       const zoom = e.detail.zoom;
       const radius = getRadiusForZoom(zoom);
+      console.log("RADIUS: ", radius);
+      console.log("centerCoordinates: ", centerCoordinates);
 
       requestAnimationFrame(() => {
         setRadius(radius);
       });
     }
   };
+
+  const handleCenterChanged = (e: google.maps.MapMouseEvent) => {
+    if (e.detail) {
+      const newCenter = e.detail.center;
+      if (newCenter) {
+        setCenterCoordinates([newCenter.lat, newCenter.lng]);
+      }
+    }
+  };
+  console.log("centerCoordinates: ", centerCoordinates);
 
   return (
     <div className="relative w-full h-full shadow-md">
@@ -41,6 +53,7 @@ export default function GoogleMapComponent() {
           gestureHandling="greedy"
           disableDefaultUI={true}
           onZoomChanged={handleZoomChanged}
+          onCenterChanged={handleCenterChanged}
           options={{
             mapTypeControl: false,
             fullscreenControl: false,

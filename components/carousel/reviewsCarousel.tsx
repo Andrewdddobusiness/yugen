@@ -39,7 +39,11 @@ export default function ReviewsCarousel({ reviews }: IReviewsCarouselProps) {
   const review = reviews[currentIndex];
   const isExpanded = expandedReviews.has(currentIndex);
   const reviewText = review.description;
-  const shouldTruncate = reviewText.length > 200;
+  let shouldTruncate = false;
+
+  if (reviewText) {
+    shouldTruncate = reviewText.length > 200;
+  }
 
   return (
     <div className="flex flex-col gap-2">

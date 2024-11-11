@@ -10,24 +10,18 @@ interface IWaypointProps {
   longitude: number;
   activity: IActivity;
   number?: number;
-  isSelected?: boolean;
   color?: TColor;
   size?: "sm" | "md" | "lg";
 }
 
-export default function GoogleMarker({
-  latitude,
-  longitude,
-  activity,
-  number,
-  isSelected = false,
-  color,
-  size = "md",
-}: IWaypointProps) {
-  const { setSelectedActivity } = useActivitiesStore();
+export default function GoogleMarker({ latitude, longitude, activity, number, color, size = "md" }: IWaypointProps) {
+  const { setSelectedActivity, selectedActivity } = useActivitiesStore();
   const { setIsSidebarRightOpen } = useSidebarStore();
   const { openSidebar } = useSidebar();
   const map = useMap("map-instance");
+
+  // Check if this marker's activity is the selected one
+  const isActiveMarker = selectedActivity?.place_id === activity.place_id;
 
   const handleClick = () => {
     if (map) {
@@ -41,7 +35,7 @@ export default function GoogleMarker({
 
   return (
     <AdvancedMarker position={{ lat: latitude, lng: longitude }} onClick={handleClick} title={activity.name}>
-      <CustomMarker number={number} color={color} size={size} isSelected={isSelected} />
+      <CustomMarker number={number} color={color} size={isActiveMarker ? "lg" : size} isSelected={isActiveMarker} />
     </AdvancedMarker>
   );
 }
