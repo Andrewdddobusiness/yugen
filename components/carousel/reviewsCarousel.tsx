@@ -12,18 +12,14 @@ interface IReviewsCarouselProps {
 
 export default function ReviewsCarousel({ reviews }: IReviewsCarouselProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [expandedReviews, setExpandedReviews] = useState<Set<number>>(
-    new Set()
-  );
+  const [expandedReviews, setExpandedReviews] = useState<Set<number>>(new Set());
 
   const nextReview = () => {
     setCurrentIndex((prevIndex) => (prevIndex + 1) % reviews.length);
   };
 
   const prevReview = () => {
-    setCurrentIndex(
-      (prevIndex) => (prevIndex - 1 + reviews.length) % reviews.length
-    );
+    setCurrentIndex((prevIndex) => (prevIndex - 1 + reviews.length) % reviews.length);
   };
 
   const toggleExpand = (index: number) => {
@@ -37,7 +33,7 @@ export default function ReviewsCarousel({ reviews }: IReviewsCarouselProps) {
   };
 
   if (!reviews || reviews.length === 0) {
-    return <div>No reviews available.</div>;
+    return null;
   }
 
   const review = reviews[currentIndex];
@@ -51,22 +47,11 @@ export default function ReviewsCarousel({ reviews }: IReviewsCarouselProps) {
         <h3 className="font-semibold">Reviews</h3>
       </div>
       <div className="flex flex-row justify-between items-center gap-4">
-        <Button
-          variant="outline"
-          size="icon"
-          onClick={prevReview}
-          className="p-2"
-        >
+        <Button variant="outline" size="icon" onClick={prevReview} className="p-2">
           <ChevronLeft className="h-4 w-4" />
         </Button>
         <div>
-          <div
-            className={`text-sm text-zinc-500 italic ${
-              isExpanded ? "" : "line-clamp-4"
-            }`}
-          >
-            {reviewText}
-          </div>
+          <div className={`text-sm text-zinc-500 italic ${isExpanded ? "" : "line-clamp-4"}`}>{reviewText}</div>
           {shouldTruncate && (
             <button
               className="text-blue-500 hover:text-blue-700 text-sm mt-1"
@@ -79,22 +64,12 @@ export default function ReviewsCarousel({ reviews }: IReviewsCarouselProps) {
             <Rating rating={review.rating} />
             <p className="text-xs text-gray-500">{review.rating}.0</p>
           </div>
-          <Link
-            className="text-sm hover:underline text-blue-500 hover:text-blue-700"
-            href={review.uri}
-          >
+          <Link className="text-sm hover:underline text-blue-500 hover:text-blue-700" href={review.uri}>
             {review.author} - Google Review
           </Link>
-          <p className="text-xs text-gray-500">
-            {formatDateTime(review.publish_date_time)}
-          </p>
+          <p className="text-xs text-gray-500">{formatDateTime(review.publish_date_time)}</p>
         </div>
-        <Button
-          variant="outline"
-          size="icon"
-          onClick={nextReview}
-          className="p-2"
-        >
+        <Button variant="outline" size="icon" onClick={nextReview} className="p-2">
           <ChevronRight className="h-4 w-4" />
         </Button>
       </div>

@@ -1,20 +1,21 @@
 import React from "react";
 import { colors, TColor } from "@/lib/colors/colors";
-interface CustomMarkerProps {
+
+interface ICustomMarker {
   number?: number;
   color?: TColor;
   size?: "sm" | "md" | "lg";
   isSelected?: boolean;
 }
 
-export default function CustomMarker({ number, color = "Blue", size = "md", isSelected = false }: CustomMarkerProps) {
+export default function CustomMarker({ number, color = "Blue", size = "md", isSelected = false }: ICustomMarker) {
   const sizeMap = {
-    sm: { width: 28, height: 36, fontSize: "12px" },
-    md: { width: 32, height: 42, fontSize: "14px" },
-    lg: { width: 36, height: 48, fontSize: "16px" },
-  };
+    sm: { width: 28, height: 36, fontSize: "12px", dotSize: 7 },
+    md: { width: 32, height: 42, fontSize: "14px", dotSize: 9 },
+    lg: { width: 48, height: 60, fontSize: "22px", dotSize: 14 },
+  } as const;
 
-  const { width, height, fontSize } = sizeMap[size];
+  const { width, height, fontSize, dotSize } = sizeMap[size];
 
   return (
     <div className="relative inline-flex items-center justify-center">
@@ -56,15 +57,28 @@ export default function CustomMarker({ number, color = "Blue", size = "md", isSe
         />
       </svg>
 
-      {number !== undefined && (
-        <div
-          className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-[60%] font-semibold text-white"
-          style={{
-            fontSize,
-            textShadow: "0 1px 2px rgba(0,0,0,0.2)",
-          }}
-        >
-          {number}
+      {number !== undefined ? (
+        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-[60%]">
+          <span
+            className="font-semibold text-white"
+            style={{
+              fontSize,
+              textShadow: "0 1px 2px rgba(0,0,0,0.2)",
+            }}
+          >
+            {number}
+          </span>
+        </div>
+      ) : (
+        <div className={`absolute left-1/2 transform -translate-x-1/2 -translate-y-[50%]`}>
+          <div
+            className="rounded-full bg-white"
+            style={{
+              width: dotSize,
+              height: dotSize,
+              boxShadow: "0 1px 2px rgba(0,0,0,0.2)",
+            }}
+          />
         </div>
       )}
     </div>

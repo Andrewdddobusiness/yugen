@@ -19,7 +19,7 @@ import { Button } from "@/components/ui/button";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
-import CommentsCarousel from "@/components/carousel/commentsCarousel";
+import CommentsCarousel from "@/components/carousel/reviewsCarousel";
 import ImagesCarousel from "@/components/carousel/imagesCarousel";
 import LoadingSpinner from "@/components/loading/loadingSpinner";
 

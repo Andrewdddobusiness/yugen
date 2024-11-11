@@ -25,7 +25,7 @@ export async function fetchCityCoordinates(cityName: string, countryName: string
   return { longitude, latitude };
 }
 
-function mapGooglePlaceToActivity(place: any): IActivity {
+export async function mapGooglePlaceToActivity(place: any): Promise<IActivity> {
   return {
     place_id: place.id,
     name: place.displayName?.text || "",

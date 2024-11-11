@@ -12,6 +12,7 @@ interface IWaypointProps {
   number?: number;
   isSelected?: boolean;
   color?: TColor;
+  size?: "sm" | "md" | "lg";
 }
 
 export default function GoogleMarker({
@@ -21,6 +22,7 @@ export default function GoogleMarker({
   number,
   isSelected = false,
   color,
+  size = "md",
 }: IWaypointProps) {
   const { setSelectedActivity } = useActivitiesStore();
   const { setIsSidebarRightOpen } = useSidebarStore();
@@ -34,7 +36,7 @@ export default function GoogleMarker({
 
   return (
     <AdvancedMarker position={{ lat: latitude, lng: longitude }} onClick={handleClick} title={activity.name}>
-      <CustomMarker number={number} color={color} size="md" isSelected={isSelected} />
+      <CustomMarker number={number} color={color} size={size} isSelected={isSelected} />
     </AdvancedMarker>
   );
 }
