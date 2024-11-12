@@ -431,7 +431,7 @@ export default function Activities() {
                 </TabsContent>
                 <TabsContent value="history" className="flex-grow overflow-hidden">
                   <div className="flex flex-col h-full gap-4">
-                    <div className="flex flex-row justify-between w-full px-4">
+                    <div className="flex flex-row justify-between w-full px-4 items-center">
                       <div className="flex flex-row gap-2">
                         <ActivityCostFilters />
                         <ActivityTypeFilters />

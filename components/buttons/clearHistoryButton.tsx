@@ -44,7 +44,7 @@ export default function ClearHistoryButton({ onClearHistory }: ClearHistoryButto
   return (
     <AlertDialog>
       <AlertDialogTrigger asChild>
-        <Button variant="outline" size="sm" className="gap-2">
+        <Button variant="ghost" size="sm" className="gap-2 hover:text-red-500 h-8">
           <Trash2 className="h-4 w-4" />
           Clear History
         </Button>
