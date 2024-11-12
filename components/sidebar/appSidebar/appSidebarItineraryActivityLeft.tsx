@@ -25,15 +25,7 @@ import { Button } from "@/components/ui/button";
 import LoadingSpinner from "@/components/loading/loadingSpinner";
 import { NavMainItineraryActivity } from "./navMainItineraryActivity";
 
-// Dynamically import PopUpCreateItinerary with no SSR
-const PopUpCreateItinerary = dynamic(() => import("@/components/popUp/popUpCreateItinerary"), {
-  ssr: false,
-  loading: () => (
-    <Button disabled className="w-full">
-      <LoadingSpinner />
-    </Button>
-  ),
-});
+
 
 export function AppSidebarItineraryActivityLeft() {
   return (

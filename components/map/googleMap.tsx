@@ -38,7 +38,6 @@ export default function GoogleMapComponent() {
       }
     }
   };
-  console.log("centerCoordinates: ", centerCoordinates);
 
   return (
     <div className="relative w-full h-full shadow-md">

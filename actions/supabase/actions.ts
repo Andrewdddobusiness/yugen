@@ -1,3 +1,4 @@
+"use server";
 import { IItineraryCard } from "@/components/cards/itineraryCard";
 import { createClient } from "@/utils/supabase/client";
 
@@ -129,6 +130,37 @@ export async function setTableDataWithCheck(tableName: string, tableData: any, u
   }
 
   return { success: true, message: "Operation successful", data: result.data };
+}
+
+export async function setItineraryDestinationDateRange(
+  itineraryId: string,
+  destinationId: string,
+  dateRange: { from: Date; to: Date }
+) {
+  const supabase = createClient();
+
+  // Format dates to YYYY-MM-DD
+  const formatDate = (date: Date) => {
+    return date.toLocaleDateString("en-CA"); // Returns YYYY-MM-DD format
+  };
+
+  const { data, error } = await supabase
+    .from("itinerary_destination")
+    .update({
+      from_date: formatDate(dateRange.from),
+      to_date: formatDate(dateRange.to),
+    })
+    .eq("itinerary_id", itineraryId)
+    .eq("itinerary_destination_id", destinationId);
+
+  console.log("data: ", data);
+
+  if (error) {
+    console.error("Error setting date range:", error);
+    return { success: false, message: "Set date range failed", error };
+  }
+
+  return { success: true, message: "Set date range successful", data };
 }
 
 /*

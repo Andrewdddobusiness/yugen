@@ -17,11 +17,7 @@ interface DatePickerWithRangeProps extends React.HTMLAttributes<HTMLDivElement> 
   onDateRangeConfirm: (dateRange: DateRange | undefined) => void;
 }
 
-export function DatePickerWithRangePopover2({
-  className,
-  selectedDateRange,
-  onDateRangeConfirm,
-}: DatePickerWithRangeProps) {
+export function DatePickerWithRangePopover3({ selectedDateRange, onDateRangeConfirm }: DatePickerWithRangeProps) {
   // Local state for the calendar selection
   const [date, setDate] = useState<DateRange | undefined>(selectedDateRange);
   const [isOpen, setIsOpen] = useState(false);
@@ -45,13 +41,16 @@ export function DatePickerWithRangePopover2({
   return (
     <div className={cn("grid gap-2")}>
       <Popover open={isOpen} onOpenChange={setIsOpen}>
-        <PopoverTrigger asChild className={className}>
+        <PopoverTrigger asChild>
           <Button
             id="date"
             variant={"outline"}
-            className={cn("w-full justify-start text-left font-normal", !date && "text-muted-foreground")}
+            className={cn(
+              "w-full justify-start text-left font-normal text-xs rounded-full h-8",
+              !date && "text-muted-foreground"
+            )}
           >
-            <CalendarIcon className="mr-2 h-4 w-4" />
+            <CalendarIcon className="mr-2 w-4 h-3.5" />
             {date?.from ? (
               date.to ? (
                 <>
@@ -80,7 +79,7 @@ export function DatePickerWithRangePopover2({
               Cancel
             </Button>
             <Button size="sm" onClick={handleConfirm} disabled={!date?.from || !date?.to}>
-              Confirm
+              Update
             </Button>
           </div>
         </PopoverContent>

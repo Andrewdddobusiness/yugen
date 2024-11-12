@@ -69,10 +69,10 @@ export const fetchNearbyActivities = async (
   radiusInMeters: number,
   searchType: SearchType = "all"
 ) => {
-  console.log("latitude: ", latitude);
-  console.log("longitude: ", longitude);
-  console.log("radiusInMeters: ", radiusInMeters);
-  console.log("searchType: ", searchType);
+  // console.log("latitude: ", latitude);
+  // console.log("longitude: ", longitude);
+  // console.log("radiusInMeters: ", radiusInMeters);
+  // console.log("searchType: ", searchType);
 
   if (typeof latitude !== "number" || typeof longitude !== "number") {
     throw new Error("Invalid coordinates provided");
@@ -173,7 +173,7 @@ export async function getGoogleMapsAutocomplete(
         },
       }
     );
-    console.log("response.data: ", response.data.suggestions[0].placePrediction);
+    // console.log("response.data: ", response.data.suggestions[0].placePrediction);
 
     return response.data.suggestions.map((suggestion: any) => ({
       placeId: suggestion.placePrediction.place,
