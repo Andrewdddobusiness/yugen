@@ -23,8 +23,6 @@ export default function GoogleMapComponent() {
     if (e.detail) {
       const zoom = e.detail.zoom;
       const radius = getRadiusForZoom(zoom);
-      console.log("RADIUS: ", radius);
-      console.log("centerCoordinates: ", centerCoordinates);
 
       requestAnimationFrame(() => {
         setRadius(radius);

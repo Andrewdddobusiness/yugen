@@ -17,7 +17,6 @@ export interface IOpenHours {
 }
 
 export interface IActivity {
-  // json(): unknown;
   place_id: string;
   name: string;
   coordinates: [number, number];

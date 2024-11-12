@@ -30,12 +30,14 @@ const ActivityCostFilters: React.FC = () => {
   return (
     <>
       {/* Toggle buttons for larger screens */}
-      <div className="hidden lg:flex space-x-2">
+      {/* <div className="hidden lg:flex space-x-2">
         {filters.map((filter) => (
           <Toggle
             key={filter.name}
             variant="outline"
-            className={`h-8 bg-white rounded-full ${selectedCostFilters.includes(filter.name) ? "bg-gray-200" : ""}`}
+            className={`h-8 bg-white w-20 rounded-full ${
+              selectedCostFilters.includes(filter.name) ? "bg-gray-200" : ""
+            }`}
             pressed={selectedCostFilters.includes(filter.name)}
             onPressedChange={() => handleFilterSelect(filter.name)}
           >
@@ -43,10 +45,10 @@ const ActivityCostFilters: React.FC = () => {
             <span className="ml-1">{filter.name}</span>
           </Toggle>
         ))}
-      </div>
+      </div> */}
 
       {/* Combobox for small screens */}
-      <div className="lg:hidden">
+      <div>
         <Popover open={open} onOpenChange={setOpen}>
           <PopoverTrigger asChild>
             <Button variant="outline" className="h-8 justify-start rounded-full">

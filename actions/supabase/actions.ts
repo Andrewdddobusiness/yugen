@@ -203,6 +203,23 @@ export const permanentlyDeleteUser = async (userId: string) => {
   }
 };
 
+export const deleteItinerarySearchHistory = async (itineraryId: string, itineraryDestinationId: string) => {
+  const supabase = createClient();
+
+  try {
+    await supabase
+      .from("itinerary_search_history")
+      .delete()
+      .eq("itinerary_id", itineraryId)
+      .eq("itinerary_destination_id", itineraryDestinationId);
+
+    return { success: true };
+  } catch (error) {
+    console.error("Error deleting search history:", error);
+    return { success: false, error };
+  }
+};
+
 /*
   FETCH
 */
