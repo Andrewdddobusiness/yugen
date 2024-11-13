@@ -11,9 +11,15 @@ import { useUserStore } from "@/store/userStore";
 import { useStripeSubscriptionStore, ISubscriptionDetails } from "@/store/stripeSubscriptionStore";
 import { createClient } from "@/utils/supabase/client";
 
+import { Button } from "@/components/ui/button";
+import { cn } from "@/components/lib/utils";
+import { LayoutList } from "lucide-react";
+import { useCartStore } from "@/store/cartStore";
+
 export default function Layout({ children }: { children: React.ReactNode }) {
   const { setUser, setUserLoading, setProfileUrl, setIsProfileUrlLoading } = useUserStore();
   const { setSubscription, setIsSubscriptionLoading } = useStripeSubscriptionStore();
+  const { setIsCartOpen, isCartOpen } = useCartStore();
 
   //***** GET USER *****//
   const { data: user, isLoading: isUserLoading } = useQuery({
@@ -88,7 +94,30 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         <AppSidebarItineraryActivityLeft />
 
         <main className="flex flex-col flex-1 min-h-[calc(100vh_-_theme(spacing.16))] bg-muted relative">
-          <SidebarTrigger className="mt-2 shadow-md rounded-l-none bg-white absolute top-0 left-0 z-10" />
+          <SidebarTrigger
+            className={cn(
+              "mt-2 -ml-[1px] bg-white absolute top-0 z-20 transition-all duration-300 rounded-l-none",
+              "shadow-[2px_2px_5px_rgba(0,0,0,0.1)]",
+              isCartOpen ? "left-[400px]" : "left-0"
+            )}
+          />
+          <div
+            className={cn(
+              "mt-2 -ml-[1px] bg-white absolute top-12 z-20 transition-all duration-300 rounded-r-md",
+              "shadow-[2px_2px_5px_rgba(0,0,0,0.1)]",
+              isCartOpen ? "left-[400px]" : "left-0"
+            )}
+          >
+            <Button
+              variant="ghost"
+              size="icon"
+              className={cn("w-10 h-10 rounded-l-none", "[&>svg]:h-5 [&>svg]:w-5")}
+              onClick={() => setIsCartOpen(!isCartOpen)}
+            >
+              <LayoutList size={20} />
+              <span className="sr-only">Toggle Activity Cart</span>
+            </Button>
+          </div>
           {children}
         </main>
       </SidebarProvider>

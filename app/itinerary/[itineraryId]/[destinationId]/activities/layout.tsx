@@ -9,6 +9,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       <SidebarProvider panelType={"right"} defaultOpen={false}>
         <main className="flex flex-col flex-1 h-screen bg-muted relative">
           <SidebarTrigger className="mt-2 shadow-md rounded-r-none bg-white absolute top-0 right-0 z-20" />
+
           <div className="Ww-full h-full">{children}</div>
         </main>
 

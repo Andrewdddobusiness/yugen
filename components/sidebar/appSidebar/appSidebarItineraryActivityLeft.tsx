@@ -24,12 +24,14 @@ import {
 import { Button } from "@/components/ui/button";
 import LoadingSpinner from "@/components/loading/loadingSpinner";
 import { NavMainItineraryActivity } from "./navMainItineraryActivity";
-
-
+import { ActivityCartSidebar } from "@/components/sidebar/activityCartSidebar";
+import { useCartStore } from "@/store/cartStore";
 
 export function AppSidebarItineraryActivityLeft() {
+  const { isCartOpen } = useCartStore();
+
   return (
-    <Sidebar side={"left"} variant="inset" collapsible="icon" className="shadow-md bg-white z-30">
+    <Sidebar side={"left"} variant="inset" collapsible="icon" className="shadow-md bg-white">
       <SidebarHeader className="bg-white">
         <SidebarMenu>
           <SidebarMenuItem>
@@ -55,6 +57,8 @@ export function AppSidebarItineraryActivityLeft() {
         <NavUser />
       </SidebarFooter>
       <SidebarRail />
+
+      <ActivityCartSidebar />
     </Sidebar>
   );
 }
