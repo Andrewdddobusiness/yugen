@@ -41,6 +41,7 @@ import { Popup } from "react-map-gl";
 import { useSidebar } from "@/components/ui/sidebar";
 import GoogleMapComponent from "@/components/map/googleMap";
 import ClearHistoryButton from "@/components/buttons/clearHistoryButton";
+import ActivityOrderFilters from "@/components/filters/activityOrderFilters";
 
 export default function Activities() {
   const queryClient = useQueryClient();
@@ -374,6 +375,10 @@ export default function Activities() {
                       <div className="flex flex-row gap-2">
                         <ActivityCostFilters />
                         <ActivityTypeFilters />
+                        <ActivityOrderFilters
+                          activities={topPlacesActivities as IActivityWithLocation[]}
+                          setActivities={setTopPlacesActivities}
+                        />
                       </div>
                     </div>
                     <ScrollArea className="h-full px-4">
@@ -404,6 +409,10 @@ export default function Activities() {
                       <div className="flex flex-row gap-2">
                         <ActivityCostFilters />
                         <ActivityTypeFilters />
+                        <ActivityOrderFilters
+                          activities={activities as IActivityWithLocation[]}
+                          setActivities={setActivities}
+                        />
                       </div>
                     </div>
 
@@ -435,6 +444,10 @@ export default function Activities() {
                       <div className="flex flex-row gap-2">
                         <ActivityCostFilters />
                         <ActivityTypeFilters />
+                        <ActivityOrderFilters
+                          activities={searchHistoryActivities as IActivityWithLocation[]}
+                          setActivities={setSearchHistoryActivities}
+                        />
                       </div>
                       <ClearHistoryButton onClearHistory={handleClearHistory} />
                     </div>
