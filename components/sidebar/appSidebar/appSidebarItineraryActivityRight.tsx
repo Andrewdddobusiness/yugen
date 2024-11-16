@@ -44,50 +44,39 @@ const getDayName = (dayNumber: number) => {
 };
 
 export function AppSidebarItineraryActivityRight() {
-  let { itineraryId } = useParams();
+  let { itineraryId, destinationId } = useParams();
   itineraryId = itineraryId.toString();
+  destinationId = destinationId.toString();
+
   // **** STORES ****
   const { setIsSidebarRightOpen } = useSidebarStore();
   const { selectedActivity } = useActivitiesStore();
+  const { insertItineraryActivity, removeItineraryActivity, isActivityAdded } = useItineraryActivityStore();
 
-  const { insertItineraryActivity, removeItineraryActivity, itineraryActivities } = useItineraryActivityStore();
-  const [isActivityAdded, setIsActivityAdded] = useState<boolean>(false);
+  const isAdded = isActivityAdded(selectedActivity?.place_id || "");
+
+  // **** STATES ****
+
   const [loading, setLoading] = useState<boolean>(false);
 
-  const { toggleSidebar } = useSidebar();
+  const { open, toggleSidebar } = useSidebar();
   const { setTempMarker } = useMapStore();
+  const { isSidebarRightOpen } = useSidebarStore();
 
   useEffect(() => {
-    const checkIfActivityAdded = async () => {
-      if (!selectedActivity || !itineraryId) return;
-      try {
-        setLoading(true);
-        const activityExists = itineraryActivities.some((itineraryActivity) => {
-          const isMatch = itineraryActivity.activity?.place_id === selectedActivity.place_id;
-          const isActive = itineraryActivity.deleted_at === null;
-
-          return isMatch && isActive;
-        });
-
-        setIsActivityAdded(activityExists);
-      } catch (error) {
-        console.error("Error checking activity exists: ", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    checkIfActivityAdded();
-  }, [selectedActivity, itineraryId, itineraryActivities]);
+    if (isSidebarRightOpen && open === false) {
+      toggleSidebar();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isSidebarRightOpen]);
 
   const handleAddToItinerary = async () => {
     setLoading(true);
-    if (!selectedActivity || !itineraryId) return;
-    const { success } = await insertItineraryActivity(selectedActivity as IActivityWithLocation, itineraryId);
-    if (success) {
-      setIsActivityAdded(true);
+    if (!selectedActivity || !itineraryId || !destinationId) return;
+    if (Array.isArray(itineraryId)) {
+      await insertItineraryActivity(selectedActivity as IActivityWithLocation, itineraryId, destinationId);
     } else {
-      toast.error("Failed to add activity to itinerary");
+      await insertItineraryActivity(selectedActivity as IActivityWithLocation, itineraryId, destinationId);
     }
     setLoading(false);
   };
@@ -95,17 +84,16 @@ export function AppSidebarItineraryActivityRight() {
   const handleRemoveToItinerary = async () => {
     setLoading(true);
     if (!selectedActivity || !itineraryId) return;
-    const { success } = await removeItineraryActivity(selectedActivity.place_id, itineraryId);
-    if (success) {
-      setIsActivityAdded(false);
+    if (Array.isArray(itineraryId)) {
+      await removeItineraryActivity(selectedActivity.place_id, itineraryId);
     } else {
-      toast.error("Failed to remove activity from itinerary");
+      await removeItineraryActivity(selectedActivity.place_id, itineraryId);
     }
     setLoading(false);
   };
 
   const renderOpeningHours = () => {
-    if (!selectedActivity) {
+    if (!selectedActivity || !selectedActivity.open_hours) {
       return <p>Opening hours not available</p>;
     }
 
@@ -342,7 +330,7 @@ export function AppSidebarItineraryActivityRight() {
               <Loader2 className="mr-2 h-4 w-4 animate-spin " />
               Please wait
             </Button>
-          ) : isActivityAdded ? (
+          ) : isAdded ? (
             <Button variant="secondary" className="mt-4 rounded-full" onClick={handleRemoveToItinerary}>
               Remove
             </Button>

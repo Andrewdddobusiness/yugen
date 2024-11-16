@@ -23,21 +23,26 @@ export interface IItineraryActivity {
 }
 
 interface IItineraryStore {
-  itineraryActivities: IItineraryActivity[]; // Source of truth of fetched itinerary activities
-  activeActivityIds: Map<string, boolean>; // Allows for immediate UI updates for added activities
+  itineraryActivities: IItineraryActivity[];
+  isActivityAdded: (placeId: string) => boolean;
   fetchItineraryActivities: (itineraryId: string, destinationId: string) => Promise<IItineraryActivity[]>;
   updateItineraryActivity: (activity: Partial<IItineraryActivity>) => Promise<void>;
   setItineraryActivities: (activities: IItineraryActivity[]) => void;
   insertItineraryActivity: (
     activity: IActivityWithLocation,
-    itineraryId: string
+    itineraryId: string,
+    destinationId: string
   ) => Promise<{ success: boolean; error?: string }>;
   removeItineraryActivity: (activityId: string, itineraryId: string) => Promise<{ success: boolean; error?: any }>;
 }
 
 export const useItineraryActivityStore = create<IItineraryStore>((set, get) => ({
   itineraryActivities: [],
-  activeActivityIds: new Map<string, boolean>(),
+  isActivityAdded: (placeId: string) => {
+    return get().itineraryActivities.some(
+      (activity) => activity.activity?.place_id === placeId && activity.deleted_at === null
+    );
+  },
   fetchItineraryActivities: async (itineraryId: string, destinationId: string) => {
     try {
       const result = await fetchFilteredTableData2(
@@ -82,35 +87,39 @@ export const useItineraryActivityStore = create<IItineraryStore>((set, get) => (
     }
   },
   setItineraryActivities: (activities: IItineraryActivity[]) => set({ itineraryActivities: activities }),
-  insertItineraryActivity: async (activity: IActivityWithLocation, itineraryId: string) => {
+  insertItineraryActivity: async (activity: IActivityWithLocation, itineraryId: string, destinationId: string) => {
     if (!activity || !itineraryId) return { success: false, error: undefined };
 
     // Check if the activity has been added before
-    const isActivityAdded = get().activeActivityIds.has(activity.place_id);
+    const isActivityAdded = get().isActivityAdded(activity.place_id);
+
+    console.log("isActivityAdded: ", isActivityAdded);
 
     if (isActivityAdded) {
       try {
         const activityResult = await fetchActivityIdByPlaceId(activity.place_id);
+        console.log("activityResult: ", activityResult);
         if (!activityResult.success || !activityResult.data) {
           throw new Error(activityResult.message || "Activity not found");
         }
         const activityId = activityResult.data.activity_id;
+        console.log("activityId: ", activityId);
 
         await setTableDataWithCheck(
           "itinerary_activity",
           {
             itinerary_id: itineraryId,
+            itinerary_destination_id: destinationId,
             activity_id: activityId,
             deleted_at: null,
           },
-          ["itinerary_id", "activity_id"]
+          ["itinerary_id", "itinerary_destination_id", "activity_id"]
         );
 
         set((state) => ({
           itineraryActivities: state.itineraryActivities.map((a) =>
             a.activity?.place_id === activity.place_id ? { ...a } : a
           ),
-          activeActivityIds: new Map(state.activeActivityIds.set(activity.place_id, true)),
         }));
 
         return { success: true, error: undefined };
@@ -141,6 +150,7 @@ export const useItineraryActivityStore = create<IItineraryStore>((set, get) => (
     } catch (error) {
       console.error("Error handling country:", error);
     }
+    console.log("countryId: ", countryId);
 
     // INSERT CITY IF IT DOESN'T EXIST
     let cityId: string | undefined;
@@ -163,6 +173,7 @@ export const useItineraryActivityStore = create<IItineraryStore>((set, get) => (
     } catch (error) {
       console.error("Error handling city:", error);
     }
+    console.log("cityId: ", cityId);
 
     // INSERT ACTIVITY IF IT DOESN'T EXIST
     let activityId: string | undefined; // Allow activityId to be undefined
@@ -171,7 +182,7 @@ export const useItineraryActivityStore = create<IItineraryStore>((set, get) => (
         name: activity.name,
         city_id: cityId,
       });
-      console.log("activity.coordinates: ", activity.coordinates);
+      console.log("activityExists: ", activityExists);
       if (!activityExists) {
         const activityDataToInsert = {
           place_id: activity.place_id,
@@ -200,18 +211,19 @@ export const useItineraryActivityStore = create<IItineraryStore>((set, get) => (
     const { data: activityDataResponse }: any = await fetchFilteredTableData("activity", "activity_id", "place_id", [
       activity.place_id,
     ]);
+    console.log("activityDataResponse: ", activityDataResponse);
 
     if (Array.isArray(activityDataResponse) && activityDataResponse.length > 0) {
       activityId = activityDataResponse[0]?.activity_id;
     }
 
     // INSERT REVIEW IF IT DOESN'T EXIST
-
     try {
       if (activityId) {
         const { exists: reviewExists } = await checkEntryExists("review", {
           activity_id: activityId,
         });
+        console.log("reviewExists: ", reviewExists);
 
         if (!reviewExists) {
           await insertTableData("review", {
@@ -234,6 +246,7 @@ export const useItineraryActivityStore = create<IItineraryStore>((set, get) => (
         const { exists: openHoursExists } = await checkEntryExists("open_hours", {
           activity_id: activityId,
         });
+        console.log("openHoursExists: ", openHoursExists);
 
         if (!openHoursExists && activity.open_hours && activity.open_hours.length > 0) {
           await insertTableData("open_hours", {
@@ -250,50 +263,53 @@ export const useItineraryActivityStore = create<IItineraryStore>((set, get) => (
       console.error("Error handling open hours:", error);
     }
 
-    const { exists: itineraryActivityExists } = await checkEntryExists("itinerary_activity", {
-      itinerary_id: itineraryId,
-      activity_id: activityId,
-    });
-
-    if (!itineraryActivityExists && activityId) {
-      await insertTableData("itinerary_activity", {
+    try {
+      const { exists: itineraryActivityExists } = await checkEntryExists("itinerary_activity", {
         itinerary_id: itineraryId,
         activity_id: activityId,
-        itinerary_destination_id: activity.itinerary_destination_id,
-        deleted_at: null,
       });
-      set((state) => ({
-        itineraryActivities: [
-          ...state.itineraryActivities,
-          {
-            itinerary_activity_id: "",
-            itinerary_destination_id: activity.itinerary_destination_id,
-            activity_id: activityId,
-            date: "",
-            start_time: "",
-            end_time: "",
-            activity: activity,
-            deleted_at: null,
-          },
-        ],
-        activeActivityIds: new Map(state.activeActivityIds.set(activity.place_id, true)),
-      }));
-    } else {
-      await setTableDataWithCheck(
-        "itinerary_activity",
-        {
+      console.log("itineraryActivityExists: ", itineraryActivityExists);
+      if (!itineraryActivityExists && activityId) {
+        await insertTableData("itinerary_activity", {
           itinerary_id: itineraryId,
           activity_id: activityId,
+          itinerary_destination_id: destinationId,
           deleted_at: null,
-        },
-        ["itinerary_id", "activity_id"]
-      );
-      set((state) => ({
-        itineraryActivities: state.itineraryActivities.map((a) =>
-          a.activity?.place_id === activity.place_id ? { ...a, deleted_at: null } : a
-        ),
-        activeActivityIds: new Map(state.activeActivityIds.set(activity.place_id, true)),
-      }));
+        });
+        set((state) => ({
+          itineraryActivities: [
+            ...state.itineraryActivities,
+            {
+              itinerary_activity_id: "",
+              itinerary_destination_id: activity.itinerary_destination_id,
+              activity_id: activityId,
+              date: "",
+              start_time: "",
+              end_time: "",
+              activity: activity,
+              deleted_at: null,
+            },
+          ],
+        }));
+      } else {
+        await setTableDataWithCheck(
+          "itinerary_activity",
+          {
+            itinerary_id: itineraryId,
+            itinerary_destination_id: destinationId,
+            activity_id: activityId,
+            deleted_at: null,
+          },
+          ["itinerary_id", "itinerary_destination_id", "activity_id"]
+        );
+        set((state) => ({
+          itineraryActivities: state.itineraryActivities.map((a) =>
+            a.activity?.place_id === activity.place_id ? { ...a, deleted_at: null } : a
+          ),
+        }));
+      }
+    } catch (error) {
+      console.error("Error inserting itinerary activity:", error);
     }
     return { success: true, error: undefined };
   },
@@ -320,7 +336,6 @@ export const useItineraryActivityStore = create<IItineraryStore>((set, get) => (
         itineraryActivities: state.itineraryActivities.map((activity) =>
           activity.activity?.place_id === placeId ? { ...activity, deleted_at: new Date().toISOString() } : activity
         ),
-        activeActivityIds: new Map(state.activeActivityIds.set(placeId, false)),
       }));
 
       return { success: true };

@@ -30,7 +30,6 @@ export default function GoogleMarker({ latitude, longitude, activity, number, co
 
     setSelectedActivity(activity);
     setIsSidebarRightOpen(true);
-    openSidebar();
   };
 
   return (

@@ -1,36 +1,40 @@
 import React from "react";
-import ActivityCard from "./activityCard";
+import ActivityCardHorizontal from "./activityCardHorizontal";
 import { IActivityWithLocation } from "@/store/activityStore";
 import { useSidebarStore } from "@/store/sidebarStore";
 
 interface IActivityCardsProps {
   activities: IActivityWithLocation[];
-  onSelectActivity: (activity: IActivityWithLocation) => void;
+  onSelectActivity?: (activity: IActivityWithLocation) => void;
+  variant?: "full" | "simple";
   // onHover: (coordinates: [number, number]) => void;
 }
 
-export default function ActivityCards({ activities, onSelectActivity }: IActivityCardsProps) {
+export default function ActivityCardsHorizontal({
+  activities,
+  onSelectActivity,
+  variant = "full",
+}: IActivityCardsProps) {
   const { isSidebarRightOpen, isSidebarLeftOpen } = useSidebarStore();
-  console.log("isSidebarRightOpen: ", isSidebarRightOpen);
-  console.log("isSidebarLeftOpen: ", isSidebarLeftOpen);
 
   return (
     <div
       className={`grid ${
         isSidebarLeftOpen
           ? isSidebarRightOpen
-            ? "grid-cols-1 2xl:grid-cols-2 4xl:grid-cols-3 6xl:grid-cols-4"
-            : "grid-cols-1 xl:grid-cols-2 3xl:grid-cols-3 5xl:grid-cols-4"
+            ? "grid-cols-1"
+            : "grid-cols-1"
           : isSidebarRightOpen
-          ? "grid-cols-1 2xl:grid-cols-2 4xl:grid-cols-3 6xl:grid-cols-4"
-          : "grid-cols-1 lg:grid-cols-2 3xl:grid-cols-3 5xl:grid-cols-4 6xl:grid-cols-5"
+          ? "grid-cols-1"
+          : "grid-cols-1"
       } gap-4 pb-8`}
     >
       {activities.map((activity) => (
-        <ActivityCard
+        <ActivityCardHorizontal
           key={activity.place_id}
           activity={activity}
-          onClick={() => onSelectActivity(activity)}
+          onClick={() => onSelectActivity?.(activity)}
+          variant={variant}
           // onMouseEnter={() => onHover([activity.latit ude, activity.longitude])}
         />
       ))}

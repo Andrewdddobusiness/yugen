@@ -128,6 +128,7 @@ const SidebarProvider = React.forwardRef<
         handleMobileStateChange(true);
         return setOpenMobile(true);
       }
+
       return setOpen(true);
     }, [isMobile, handleMobileStateChange, setOpen]);
 

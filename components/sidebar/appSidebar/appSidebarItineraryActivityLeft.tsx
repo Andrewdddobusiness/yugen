@@ -28,8 +28,6 @@ import { ActivityCartSidebar } from "@/components/sidebar/activityCartSidebar";
 import { useCartStore } from "@/store/cartStore";
 
 export function AppSidebarItineraryActivityLeft() {
-  const { isCartOpen } = useCartStore();
-
   return (
     <Sidebar side={"left"} variant="inset" collapsible="icon" className="shadow-md bg-white">
       <SidebarHeader className="bg-white">

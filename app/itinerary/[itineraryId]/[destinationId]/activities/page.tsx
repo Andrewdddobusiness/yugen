@@ -9,12 +9,10 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 import ActivityCards from "@/components/cards/activityCards";
-import ActivitySidebar from "@/components/sidebar/activitySideBar";
 
 import Loading from "@/components/loading/loading";
 import ActivityTypeFilters from "@/components/filters/activityTypeFilters";
 import ActivityCostFilters from "@/components/filters/activityCostFilters";
-import SearchField from "@/components/search/searchField";
 import ActivitySkeletonCards from "@/components/cards/activitySkeletonCards";
 
 import {
@@ -51,7 +49,6 @@ export default function Activities() {
   const {
     activities,
     setActivities,
-    selectedActivity,
     setSelectedActivity,
     topPlacesActivities,
     setTopPlacesActivities,
@@ -322,7 +319,6 @@ export default function Activities() {
   const handleActivitySelect = (activity: IActivity) => {
     setSelectedActivity(activity);
     setIsSidebarRightOpen(true);
-    openSidebar();
   };
 
   const handleTabChange = (tab: "top-places" | "search" | "history") => {

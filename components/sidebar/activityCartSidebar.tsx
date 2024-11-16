@@ -1,24 +1,49 @@
-import React from "react";
+import React, { useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { useParams } from "next/navigation";
+
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
-import { X } from "lucide-react";
-import { cn } from "@/components/lib/utils";
-import { useItineraryActivityStore } from "@/store/itineraryActivityStore";
-import { useCartStore } from "@/store/cartStore";
 import { useSidebar } from "@/components/ui/sidebar";
 
+import ActivityCardsHorizontal from "@/components/cards/activityCardsHorizontal";
+
+import { cn } from "@/components/lib/utils";
+
+import { X } from "lucide-react";
+
+import { useCartStore } from "@/store/cartStore";
+import { useItineraryActivityStore } from "@/store/itineraryActivityStore";
+import { IActivity, IActivityWithLocation, useActivitiesStore } from "@/store/activityStore";
+import { useSidebarStore } from "@/store/sidebarStore";
+
 export function ActivityCartSidebar() {
-  const { itineraryActivities } = useItineraryActivityStore();
+  // **** STORES ****
+  const { setSelectedActivity } = useActivitiesStore();
+  const { setIsSidebarRightOpen, openRightSidebar } = useSidebarStore();
   const { isCartOpen, setIsCartOpen } = useCartStore();
+  const { itineraryActivities } = useItineraryActivityStore();
   const { state } = useSidebar();
 
   const sidebarWidth = state === "expanded" ? "16rem" : "4rem";
 
+  // filter activities that are active and not deleted with delete_at
+  const itineraryActivitiesOnlyActivities = itineraryActivities
+    .filter((itineraryActivity) => itineraryActivity.deleted_at === null)
+    .map((activity) => activity.activity)
+    .filter(Boolean) as IActivityWithLocation[];
+
+  // **** HANDLERS ****
+  const handleActivitySelect = (activity: IActivity) => {
+    setSelectedActivity(activity);
+    setIsSidebarRightOpen(true);
+  };
+
   return (
     <div
       className={cn(
-        "absolute top-0 h-full bg-white transition-all duration-300 ease-in-out",
+        "absolute top-0 h-full bg-white transition-all duration-300 ease-in-out border-l border-zinc-200",
         "shadow-[2px_2px_5px_rgba(0,0,0,0.1)]",
         isCartOpen ? "w-[400px] opacity-100 visible" : "w-0 opacity-0 invisible"
       )}
@@ -36,21 +61,20 @@ export function ActivityCartSidebar() {
 
         <Separator />
 
-        <ScrollArea className="flex-1 px-4">
-          {itineraryActivities.map((activity) => (
-            <div key={activity.itinerary_activity_id} className="p-4 border rounded-lg mb-4 mt-4">
-              <h3 className="font-medium">{activity.activity?.name}</h3>
-              <p className="text-sm text-gray-500 mt-2">{activity.activity?.description}</p>
-              {activity.date && (
-                <p className="text-sm text-gray-500 mt-2">Date: {new Date(activity.date).toLocaleDateString()}</p>
-              )}
-            </div>
-          ))}
-        </ScrollArea>
-
+        <div className="flex-grow overflow-hidden px-2 py-4">
+          <ScrollArea className="flex flex-col h-full px-4">
+            <ActivityCardsHorizontal
+              activities={itineraryActivitiesOnlyActivities}
+              onSelectActivity={handleActivitySelect}
+              variant="simple"
+            />
+          </ScrollArea>
+        </div>
         <div className="bg-white p-4">
           <Separator className="mb-4" />
-          <div className="text-sm text-gray-500">{itineraryActivities.length} activities in itinerary</div>
+          <div className="text-sm text-gray-500">
+            {itineraryActivitiesOnlyActivities.length} activities in itinerary
+          </div>
         </div>
       </div>
     </div>

@@ -153,8 +153,6 @@ export async function setItineraryDestinationDateRange(
     .eq("itinerary_id", itineraryId)
     .eq("itinerary_destination_id", destinationId);
 
-  console.log("data: ", data);
-
   if (error) {
     console.error("Error setting date range:", error);
     return { success: false, message: "Set date range failed", error };
@@ -391,6 +389,23 @@ export async function fetchActivityIdByPlaceId(placeId: string) {
   const supabase = createClient();
 
   const { data, error } = await supabase.from("activity").select("activity_id").eq("place_id", placeId).single();
+
+  if (error) {
+    console.error("Error fetching activity_id:", error);
+    return { success: false, message: "Fetch failed", error };
+  }
+
+  return { success: true, message: "Fetch successful", data };
+}
+
+export async function fetchItineraryActivities(itineraryId: string, destinationId: string) {
+  const supabase = createClient();
+
+  const { data, error } = await supabase
+    .from("itinerary_activity")
+    .select("*")
+    .eq("itinerary_id", itineraryId)
+    .eq("itinerary_destination_id", destinationId);
 
   if (error) {
     console.error("Error fetching activity_id:", error);

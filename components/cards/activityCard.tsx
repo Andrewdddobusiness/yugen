@@ -1,13 +1,14 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Image from "next/image";
+import { useParams } from "next/navigation";
 
-import { Card, CardHeader, CardTitle, CardDescription, CardFooter, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 
+import { Card, CardFooter, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import Rating from "@/components/rating/rating";
-
-import { Button } from "../ui/button";
 
 import { ChevronDown, Loader2, Image as ImageIcon } from "lucide-react";
 
@@ -16,10 +17,6 @@ import { formatCategoryTypeArray } from "@/utils/formatting/types";
 
 import { IActivityWithLocation } from "@/store/activityStore";
 import { useItineraryActivityStore } from "@/store/itineraryActivityStore";
-import { useSearchParams } from "next/navigation";
-import { toast } from "sonner";
-import { Skeleton } from "../ui/skeleton";
-import { useSidebar } from "../ui/sidebar";
 
 interface ItineraryCardProps {
   activity: IActivityWithLocation;
@@ -29,13 +26,19 @@ interface ItineraryCardProps {
 }
 
 export default function ActivityCard({ activity, onClick, onOptionsClick }: ItineraryCardProps) {
-  const searchParams = useSearchParams();
-  const itineraryId = searchParams.get("i");
+  let { itineraryId, destinationId } = useParams();
+  itineraryId = itineraryId.toString();
+  destinationId = destinationId.toString();
 
-  const { insertItineraryActivity, removeItineraryActivity, itineraryActivities } = useItineraryActivityStore();
-  const [isActivityAdded, setIsActivityAdded] = useState<boolean>(false);
+  // **** STORES ****
+  const { insertItineraryActivity, removeItineraryActivity, isActivityAdded, itineraryActivities } =
+    useItineraryActivityStore();
+
+  // **** STATES ****
   const [isHovered, setIsHovered] = useState(false);
   const [loading, setLoading] = useState<boolean>(false);
+
+  const isAdded = isActivityAdded(activity.place_id);
 
   const formatPriceLevel = (priceLevel: string) => {
     switch (priceLevel) {
@@ -54,39 +57,15 @@ export default function ActivityCard({ activity, onClick, onOptionsClick }: Itin
     }
   };
 
-  useEffect(() => {
-    const checkIfActivityAdded = async () => {
-      if (!activity || !itineraryId) return;
-      try {
-        setLoading(true);
-        const activityExists = itineraryActivities.some((itineraryActivity) => {
-          const isMatch = itineraryActivity.activity?.place_id === activity.place_id;
-          const isActive = itineraryActivity.deleted_at === null;
-
-          return isMatch && isActive;
-        });
-
-        setIsActivityAdded(activityExists);
-      } catch (error) {
-        console.error("Error checking activity exists: ", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    checkIfActivityAdded();
-  }, [activity, itineraryId, itineraryActivities]);
-
   let priceLevelText = formatPriceLevel(activity.price_level);
 
   const handleAddToItinerary = async () => {
     setLoading(true);
-    if (!activity || !itineraryId) return;
-    const { success } = await insertItineraryActivity(activity, itineraryId);
-    if (success) {
-      setIsActivityAdded(true);
+    if (!activity || !itineraryId || !destinationId) return;
+    if (Array.isArray(itineraryId)) {
+      await insertItineraryActivity(activity, itineraryId.toString(), destinationId.toString());
     } else {
-      toast.error("Failed to add activity to itinerary");
+      await insertItineraryActivity(activity, itineraryId.toString(), destinationId.toString());
     }
     setLoading(false);
   };
@@ -94,11 +73,10 @@ export default function ActivityCard({ activity, onClick, onOptionsClick }: Itin
   const handleRemoveToItinerary = async () => {
     setLoading(true);
     if (!activity || !itineraryId) return;
-    const { success } = await removeItineraryActivity(activity.place_id, itineraryId);
-    if (success) {
-      setIsActivityAdded(false);
+    if (Array.isArray(itineraryId)) {
+      await removeItineraryActivity(activity.place_id, itineraryId[0]);
     } else {
-      toast.error("Failed to remove activity from itinerary");
+      await removeItineraryActivity(activity.place_id, itineraryId);
     }
     setLoading(false);
   };
@@ -174,7 +152,7 @@ export default function ActivityCard({ activity, onClick, onOptionsClick }: Itin
               <Loader2 className="mr-2 h-4 w-4 animate-spin " />
               Please wait
             </Button>
-          ) : isActivityAdded ? (
+          ) : isAdded ? (
             <Button
               variant="secondary"
               className="flex w-3/4 px-4 py-1 text-sm font-medium rounded-tl-none rounded-r-none hover:bg-gray-100 hover:text-black"
