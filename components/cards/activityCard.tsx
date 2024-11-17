@@ -59,7 +59,8 @@ export default function ActivityCard({ activity, onClick, onOptionsClick }: Itin
 
   let priceLevelText = formatPriceLevel(activity.price_level);
 
-  const handleAddToItinerary = async () => {
+  const handleAddToItinerary = async (e: React.MouseEvent) => {
+    e.stopPropagation();
     setLoading(true);
     if (!activity || !itineraryId || !destinationId) return;
     if (Array.isArray(itineraryId)) {
@@ -70,7 +71,8 @@ export default function ActivityCard({ activity, onClick, onOptionsClick }: Itin
     setLoading(false);
   };
 
-  const handleRemoveToItinerary = async () => {
+  const handleRemoveToItinerary = async (e: React.MouseEvent) => {
+    e.stopPropagation();
     setLoading(true);
     if (!activity || !itineraryId) return;
     if (Array.isArray(itineraryId)) {
@@ -141,7 +143,7 @@ export default function ActivityCard({ activity, onClick, onOptionsClick }: Itin
         <div className="text-sm line-clamp-2 h-10 overflow-hidden">{activity.description}</div>
       </CardContent>
 
-      <CardFooter className="p-0 absolute bottom-0 left-0 right-0">
+      <CardFooter className="p-0 absolute bottom-0 left-0 right-0 z-20">
         <div className="inline-flex shadow-sm w-full" role="group">
           {loading ? (
             <Button

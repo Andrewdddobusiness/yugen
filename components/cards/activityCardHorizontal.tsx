@@ -65,7 +65,8 @@ export default function ActivityCardHorizontal({
 
   let priceLevelText = formatPriceLevel(activity.price_level);
 
-  const handleAddToItinerary = async () => {
+  const handleAddToItinerary = async (e: React.MouseEvent) => {
+    e.stopPropagation();
     setLoading(true);
     if (!activity || !itineraryId || !destinationId) return;
     if (Array.isArray(itineraryId)) {
@@ -76,7 +77,8 @@ export default function ActivityCardHorizontal({
     setLoading(false);
   };
 
-  const handleRemoveToItinerary = async () => {
+  const handleRemoveToItinerary = async (e: React.MouseEvent) => {
+    e.stopPropagation();
     setLoading(true);
     if (!activity || !itineraryId) return;
     if (Array.isArray(itineraryId)) {
