@@ -71,7 +71,7 @@ export default function Overview() {
         {cityData ? (
           <Image
             src={
-              process.env.NEXT_PUBLIC_SUPABASE_STORAGE_BASE_URL +
+              process.env.NEXT_PUBLIC_SUPABASE_URL +
               `/storage/v1/object/public/cities/co1_c${cityData.destination_city_id}/1.jpg`
             }
             alt="Image"

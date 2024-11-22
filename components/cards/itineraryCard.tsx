@@ -73,7 +73,7 @@ export default function ItineraryCard({ itinerary, onDelete }: ItineraryCardProp
       >
         <Image
           src={
-            process.env.NEXT_PUBLIC_SUPABASE_STORAGE_BASE_URL +
+            process.env.NEXT_PUBLIC_SUPABASE_URL +
             `/storage/v1/object/public/cities/${itinerary.country.toLowerCase()}-${itinerary?.city?.toLowerCase()}/1.jpg`
           }
           alt="Image"

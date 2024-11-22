@@ -11,9 +11,17 @@ interface IImageCarouselProps {
 
 const ImageCarousel: React.FC<IImageCarouselProps> = ({ photoNames, showButtons = false }) => {
   const [api, setApi] = useState<CarouselApi>();
+  const [imageError, setImageError] = useState<{ [key: string]: boolean }>({});
 
   const scrollPrev = () => api?.scrollPrev();
   const scrollNext = () => api?.scrollNext();
+
+  // Function to generate proper Google Places photo URL
+  const getPhotoUrl = (photoName: string) => {
+    const baseUrl = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_URL || "https://places.googleapis.com/v1";
+    const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+    return `${baseUrl}/${photoName}/media?key=${apiKey}&maxHeightPx=1000&maxWidthPx=1000`;
+  };
 
   return (
     <div className="relative w-full">
@@ -31,13 +39,26 @@ const ImageCarousel: React.FC<IImageCarouselProps> = ({ photoNames, showButtons 
         <CarouselContent>
           {photoNames.map((photoName: string, index: number) => (
             <CarouselItem key={index}>
-              <Image
-                src={`https://places.googleapis.com/v1/${photoName}/media?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}&maxHeightPx=1000&maxWidthPx=1000`}
-                alt={`Image ${index}`}
-                width={1000}
-                height={1000}
-                className="h-80 w-full rounded-md object-cover"
-              />
+              <div className="relative h-80 w-full">
+                <Image
+                  src={getPhotoUrl(photoName)}
+                  alt={`Image ${index + 1}`}
+                  fill
+                  className="rounded-md object-cover"
+                  onError={() => {
+                    setImageError((prev) => ({ ...prev, [photoName]: true }));
+                    console.error(`Failed to load image: ${photoName}`);
+                  }}
+                  unoptimized // Bypass Next.js image optimization for external URLs
+                  // Add referrer policy
+                  referrerPolicy="strict-origin-when-cross-origin"
+                />
+                {imageError[photoName] && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-gray-100 rounded-md">
+                    <p className="text-gray-500">Image failed to load</p>
+                  </div>
+                )}
+              </div>
             </CarouselItem>
           ))}
         </CarouselContent>

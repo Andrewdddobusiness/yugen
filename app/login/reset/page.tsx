@@ -29,14 +29,13 @@ export default function ResetPage() {
       }
 
       const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/login/updatePassword`,
+        redirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/login/updatePassword`,
       });
 
       if (data && !error) {
         toast({
           title: "Success",
-          description:
-            "Please check your email to continue resetting your password.",
+          description: "Please check your email to continue resetting your password.",
         });
         setSuccess(true);
       } else {
@@ -64,28 +63,17 @@ export default function ResetPage() {
     <HomeLayout>
       <div className="flex flex-col w-full h-screen justify-center items-center relative">
         <div className="absolute inset-0 -z-50 blur-sm">
-          <Image
-            src="/map.jpg"
-            alt="Background Image"
-            layout="fill"
-            objectFit="cover"
-          />
+          <Image src="/map.jpg" alt="Background Image" layout="fill" objectFit="cover" />
         </div>
         <div className="flex flex-col justify-start p-8 bg-white rounded-md shadow-md gap-2">
           {success ? (
             <>
               <div className="text-2xl font-bold">You&apos;re on your way!</div>
-              <div className="text-sm mb-2">
-                Please check your email to reset your password.
-              </div>
+              <div className="text-sm mb-2">Please check your email to reset your password.</div>
               <Separator />
               <div className="flex flex-row items-center text-zinc-500">
                 <div className="text-sm">Didn&apos;t get an email?</div>
-                <Button
-                  variant={"link"}
-                  className={"underline"}
-                  onClick={handleTryAgain}
-                >
+                <Button variant={"link"} className={"underline"} onClick={handleTryAgain}>
                   Try again.
                 </Button>
               </div>
@@ -97,9 +85,8 @@ export default function ResetPage() {
                 password?
               </div>
               <div className="text-sm">
-                Please enter your current email linked to your account. <br />{" "}
-                Don’t worry, we’ll send you a message to help you <br /> reset
-                your password.
+                Please enter your current email linked to your account. <br /> Don’t worry, we’ll send you a message to
+                help you <br /> reset your password.
               </div>
               <div>
                 <Input

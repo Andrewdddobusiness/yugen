@@ -3,7 +3,6 @@ import React, { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 
-import BuilderLayout from "@/components/layouts/builderLayout";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
