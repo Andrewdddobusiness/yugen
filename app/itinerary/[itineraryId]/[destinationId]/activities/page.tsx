@@ -39,6 +39,8 @@ import { useSidebar } from "@/components/ui/sidebar";
 import GoogleMapComponent from "@/components/map/googleMap";
 import ClearHistoryButton from "@/components/buttons/clearHistoryButton";
 import ActivityOrderFilters from "@/components/filters/activityOrderFilters";
+import { Skeleton } from "@/components/ui/skeleton";
+import { EarthIcon } from "lucide-react";
 
 export default function Activities() {
   const queryClient = useQueryClient();
@@ -485,7 +487,17 @@ export default function Activities() {
                 : "sm:w-1/2 w-0 hidden sm:block"
             }`}
           >
-            {cityCoordinates && <GoogleMapComponent />}
+            {isCoordinatesLoading ? (
+              <div className="w-full h-full bg-zinc-50 rounded-lg flex items-center justify-center">
+                <div className="space-y-3 w-full h-full">
+                  <Skeleton className="flex items-center justify-center w-full h-full rounded-lg bg-zinc-200">
+                    <EarthIcon className="w-[20%] h-[20%] text-zinc-300" />
+                  </Skeleton>
+                </div>
+              </div>
+            ) : cityCoordinates ? (
+              <GoogleMapComponent />
+            ) : null}
             {popupInfo && (
               <Popup
                 longitude={popupInfo.longitude}

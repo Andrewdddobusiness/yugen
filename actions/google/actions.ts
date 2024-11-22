@@ -6,21 +6,22 @@ import { IActivity, IReview } from "@/store/activityStore";
 import { foodTypes, shoppingTypes, historicalTypes, SearchType, includedTypes } from "@/lib/googleMaps/includedTypes";
 
 const GOOGLE_MAPS_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+const GOOGLE_MAPS_GEOCODING_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_GEOCODING_API_KEY;
 
 export async function fetchCityCoordinates(cityName: string, countryName: string) {
   const searchQuery = `${cityName}, ${countryName}`;
-  const geocodingUrl = `https://api.mapbox.com/search/searchbox/v1/forward?q=${encodeURIComponent(
+  const geocodingUrl = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(
     searchQuery
-  )}&access_token=${process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN}`;
+  )}&key=${GOOGLE_MAPS_GEOCODING_API_KEY}`;
 
   const geocodingResponse = await fetch(geocodingUrl);
   const geocodingData = await geocodingResponse.json();
 
-  if (!geocodingData.features || geocodingData.features.length === 0) {
+  if (!geocodingData.results || geocodingData.results.length === 0) {
     throw new Error(`No results found for: ${searchQuery}`);
   }
 
-  const [longitude, latitude] = geocodingData.features[0].geometry.coordinates;
+  const { lng: longitude, lat: latitude } = geocodingData.results[0].geometry.location;
 
   return { longitude, latitude };
 }
