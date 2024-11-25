@@ -4,9 +4,6 @@
 const nextConfig = {
   // Keep existing configurations
   transpilePackages: ["@radix-ui/react-slot", "@radix-ui/react-dialog", "framer-motion"],
-  experimental: {
-    optimizeCss: true,
-  },
 
   // TypeScript and ESLint configurations
   typescript: {
