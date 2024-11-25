@@ -1,6 +1,6 @@
 "use client";
 import { useEffect } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebarItineraryActivityLeft } from "@/components/sidebar/appSidebar/appSidebarItineraryActivityLeft";
@@ -15,8 +15,16 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/components/lib/utils";
 import { LayoutList } from "lucide-react";
 import { useCartStore } from "@/store/cartStore";
+import { fetchItineraryActivities } from "@/actions/supabase/actions";
+import { IItineraryActivity, useItineraryActivityStore } from "@/store/itineraryActivityStore";
+import { useParams } from "next/navigation";
 
 export default function Layout({ children }: { children: React.ReactNode }) {
+  const queryClient = useQueryClient();
+  const { itineraryId, destinationId } = useParams();
+
+  //**** STORES ****//
+  const { fetchItineraryActivities, setItineraryActivities } = useItineraryActivityStore();
   const { setUser, setUserLoading, setProfileUrl, setIsProfileUrlLoading } = useUserStore();
   const { setSubscription, setIsSubscriptionLoading } = useStripeSubscriptionStore();
   const { setIsCartOpen, isCartOpen } = useCartStore();
@@ -87,6 +95,20 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     setSubscription(subscription as ISubscriptionDetails);
     setIsSubscriptionLoading(false);
   }, [subscription]);
+
+  //**** GET ITINERARY ACTIVITIES ****//
+  const { data: itineraryActivities, isLoading: isItineraryActivitiesLoading } = useQuery({
+    queryKey: ["itineraryActivities", itineraryId, destinationId],
+    queryFn: () => fetchItineraryActivities(itineraryId as string, destinationId as string),
+    enabled: !!itineraryId && !!destinationId,
+    staleTime: 0, // Always check for updates
+  });
+
+  useEffect(() => {
+    if (itineraryActivities) {
+      setItineraryActivities(itineraryActivities as IItineraryActivity[]);
+    }
+  }, [itineraryActivities, setItineraryActivities]);
 
   return (
     <div className="flex w-full">

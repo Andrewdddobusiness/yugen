@@ -1,11 +1,11 @@
 "use client";
-import React, { Suspense, useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import Image from "next/image";
 import ItineraryCards from "@/components/cards/itineraryCards";
 
 import { fetchUserItineraries } from "@/actions/supabase/actions";
 import { createClient } from "@/utils/supabase/client";
-import { IItineraryCard } from "@/components/cards/itineraryCard";
+
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import ItinerarySkeletonCard from "@/components/cards/itinerarySkeletonCard";
 

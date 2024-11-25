@@ -74,18 +74,18 @@ export default function Activities() {
     name: string;
   } | null>(null);
 
-  // **** GET INITIAL ACTIVITIES ****
-  const { data: itineraryActivities, isLoading: isItineraryActivitiesLoading } = useQuery({
-    queryKey: ["itineraryActivities", itineraryId, destinationId],
-    queryFn: () => fetchItineraryActivities(itineraryId as string, destinationId as string),
-    enabled: !!itineraryId && !!destinationId,
-  });
+  // // **** GET INITIAL ACTIVITIES ****
+  // const { data: itineraryActivities, isLoading: isItineraryActivitiesLoading } = useQuery({
+  //   queryKey: ["itineraryActivities", itineraryId, destinationId],
+  //   queryFn: () => fetchItineraryActivities(itineraryId as string, destinationId as string),
+  //   enabled: !!itineraryId && !!destinationId,
+  // });
 
-  useEffect(() => {
-    if (itineraryActivities) {
-      setItineraryActivities(itineraryActivities as IItineraryActivity[]);
-    }
-  }, [itineraryActivities, setItineraryActivities]);
+  // useEffect(() => {
+  //   if (itineraryActivities) {
+  //     setItineraryActivities(itineraryActivities as IItineraryActivity[]);
+  //   }
+  // }, [itineraryActivities, setItineraryActivities]);
 
   const { data: destinationData, isLoading: isDestinationLoading } = useQuery({
     queryKey: ["itineraryDestination", itineraryId],
@@ -224,11 +224,11 @@ export default function Activities() {
     setTopPlacesActivities(fetchedtopPlacesActivities as IActivity[]);
   }, [fetchedtopPlacesActivities, isTopPlacesActivitiesLoading, setTopPlacesActivities]);
 
-  useEffect(() => {
-    if (itineraryActivities) {
-      setItineraryActivities(itineraryActivities as IItineraryActivity[]);
-    }
-  }, [itineraryActivities, setItineraryActivities]);
+  // useEffect(() => {
+  //   if (itineraryActivities) {
+  //     setItineraryActivities(itineraryActivities as IItineraryActivity[]);
+  //   }
+  // }, [itineraryActivities, setItineraryActivities]);
 
   // **** GET SEARCH HISTORY ACTIVITIES ****
   const { data: searchHistoryActivitiesData, isLoading: isSearchHistoryLoading } = useQuery<{
@@ -330,7 +330,7 @@ export default function Activities() {
     await deleteItinerarySearchHistory(itineraryId as string, destinationId as string);
   };
 
-  if (isCoordinatesLoading || isDestinationLoading || isItineraryActivitiesLoading) return <Loading />;
+  if (isCoordinatesLoading || isDestinationLoading) return <Loading />;
 
   return (
     <>

@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
-import Image from "next/image";
 import { useParams } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -28,6 +28,8 @@ interface ItineraryCardProps {
 }
 
 export default function ActivityCard({ activity, onClick, onOptionsClick }: ItineraryCardProps) {
+  const queryClient = useQueryClient();
+
   let { itineraryId, destinationId } = useParams();
   itineraryId = itineraryId.toString();
   destinationId = destinationId.toString();
@@ -63,25 +65,38 @@ export default function ActivityCard({ activity, onClick, onOptionsClick }: Itin
   const handleAddToItinerary = async (e: React.MouseEvent) => {
     e.stopPropagation();
     setLoading(true);
-    if (!activity || !itineraryId || !destinationId) return;
-    if (Array.isArray(itineraryId)) {
+    try {
       await insertItineraryActivity(activity, itineraryId.toString(), destinationId.toString());
-    } else {
-      await insertItineraryActivity(activity, itineraryId.toString(), destinationId.toString());
-    }
-    setLoading(false);
-  };
 
+      queryClient.invalidateQueries({
+        queryKey: ["itineraryActivities", itineraryId, destinationId],
+        exact: true,
+      });
+    } catch (error) {
+      console.error("Error adding activity:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+  const { itineraryActivities } = useItineraryActivityStore();
   const handleRemoveToItinerary = async (e: React.MouseEvent) => {
     e.stopPropagation();
     setLoading(true);
-    if (!activity || !itineraryId) return;
-    if (Array.isArray(itineraryId)) {
+    try {
+      if (!activity || !itineraryId) return;
+
       await removeItineraryActivity(activity.place_id, itineraryId[0]);
-    } else {
-      await removeItineraryActivity(activity.place_id, itineraryId);
+
+      queryClient.invalidateQueries({
+        queryKey: ["itineraryActivities", itineraryId, destinationId],
+        exact: true,
+      });
+    } catch (error) {
+      console.error("Error removing activity:", error);
+    } finally {
+      console.log("itineraryActivities: ", itineraryActivities);
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const handleOptionsClick = (e: React.MouseEvent) => {

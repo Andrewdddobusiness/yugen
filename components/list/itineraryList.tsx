@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useQueryClient, useMutation } from "@tanstack/react-query";
+import { useQueryClient, useMutation, useQuery } from "@tanstack/react-query";
 import {
   DndContext,
   closestCenter,
@@ -28,7 +28,7 @@ import { ItineraryListCardWrapper } from "./itineraryListCardWrapper";
 import { DateGroupWrapper } from "./dateGroupWrapper";
 import { useItineraryActivityStore } from "@/store/itineraryActivityStore";
 
-export default function ItineraryList() {
+export default function handleAddToItineraryItineraryList() {
   const { itineraryId } = useParams();
   const itinId = itineraryId.toString();
 
@@ -39,23 +39,33 @@ export default function ItineraryList() {
 
   const { itineraryActivities, setItineraryActivities } = useItineraryActivityStore();
 
-  useEffect(() => {
-    const fetchDateRange = async () => {
+  const { data: dateRangeData } = useQuery({
+    queryKey: ["itineraryDateRange", itinId],
+    queryFn: async () => {
       const dateRangeResult = await fetchFilteredTableData(
         "itinerary_destinations",
         "from_date, to_date",
         "itinerary_id",
-        [itinId || ""]
+        [itinId]
       );
 
       if (dateRangeResult.success && dateRangeResult.data && dateRangeResult.data.length > 0) {
         const { from_date, to_date } = dateRangeResult.data[0];
-        setDateRange({ from: new Date(from_date), to: new Date(to_date) });
+        return {
+          from: new Date(from_date),
+          to: new Date(to_date),
+        };
       }
-    };
+      return null;
+    },
+    enabled: !!itinId,
+  });
 
-    fetchDateRange();
-  }, [itineraryId]);
+  useEffect(() => {
+    if (dateRangeData) {
+      setDateRange(dateRangeData);
+    }
+  }, [dateRangeData]);
 
   useEffect(() => {
     if (itineraryActivities.length > 0) {
