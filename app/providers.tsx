@@ -1,10 +1,8 @@
 "use client";
 
-import { QueryClient } from "@tanstack/react-query";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 import { useState, ReactNode } from "react";
-import { createSyncStoragePersister } from "@tanstack/query-sync-storage-persister";
-import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
 
 export default function Providers({ children }: { children: ReactNode }) {
   const [queryClient] = useState(
@@ -12,8 +10,7 @@ export default function Providers({ children }: { children: ReactNode }) {
       new QueryClient({
         defaultOptions: {
           queries: {
-            staleTime: Infinity,
-            gcTime: 1000 * 60 * 60 * 24,
+            staleTime: 5 * 60 * 1000, // 5 minutes
             refetchOnWindowFocus: false,
             refetchOnMount: false,
             refetchOnReconnect: false,
@@ -22,21 +19,10 @@ export default function Providers({ children }: { children: ReactNode }) {
       })
   );
 
-  const persister = createSyncStoragePersister({
-    storage: typeof window !== "undefined" ? window.localStorage : undefined,
-  });
-
   return (
-    <PersistQueryClientProvider
-      client={queryClient}
-      persistOptions={{
-        persister,
-        maxAge: 1000 * 60 * 60 * 24,
-        buster: "v1",
-      }}
-    >
+    <QueryClientProvider client={queryClient}>
       {children}
       <ReactQueryDevtools initialIsOpen={false} />
-    </PersistQueryClientProvider>
+    </QueryClientProvider>
   );
 }

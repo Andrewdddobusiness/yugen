@@ -39,6 +39,9 @@ export function ActivityCartSidebar() {
     setSelectedActivity(activity);
     setIsSidebarRightOpen(true);
   };
+  console.log("itineraryActivities: ", itineraryActivities);
+
+  console.log("itineraryActivitiesOnlyActivities: ", itineraryActivitiesOnlyActivities);
 
   return (
     <div
