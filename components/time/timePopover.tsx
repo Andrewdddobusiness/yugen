@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Loader2, Clock } from "lucide-react";
 import { formatTime } from "@/utils/formatting/datetime";
 import { cn } from "@/components/lib/utils";
-import { useItineraryActivityStore } from "@/store/itineraryActivityStore";
+import { setItineraryActivityDateTimes } from "@/actions/supabase/actions";
 
 const generateTimeOptions = () => {
   const times = [];
@@ -24,18 +24,20 @@ export default function TimePopover({
   itineraryActivityId,
   storeStartTime,
   storeEndTime,
+  showText = true,
+  styled = true,
 }: {
   itineraryActivityId: number;
   storeStartTime: string;
   storeEndTime: string;
+  showText?: boolean;
+  styled?: boolean;
 }) {
   const [startTime, setStartTime] = useState(storeStartTime);
   const [endTime, setEndTime] = useState(storeEndTime);
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
-
-  const { updateActivity } = useItineraryActivityStore();
 
   useEffect(() => {
     setStartTime(storeStartTime);
@@ -75,11 +77,7 @@ export default function TimePopover({
 
     setIsLoading(true);
     try {
-      await updateActivity({
-        itinerary_activity_id: itineraryActivityId,
-        start_time: startTime,
-        end_time: endTime,
-      });
+      await setItineraryActivityDateTimes(itineraryActivityId.toString(), date, startTime, endTime);
       setIsOpen(false);
     } catch (error) {
       console.error("Error saving times:", error);
@@ -93,19 +91,22 @@ export default function TimePopover({
     <Popover open={isOpen} onOpenChange={setIsOpen}>
       <PopoverTrigger>
         <Button
-          variant="outline"
+          variant={styled ? "outline" : "ghost"}
           className={cn(
-            "w-full min-w-40 justify-start text-left font-normal text-xs text-muted-foreground",
-            "text-muted-foreground"
+            styled && "w-full min-w-40 justify-start text-left font-normal text-xs",
+            styled && "text-muted-foreground",
+            !styled && "flex justify-center items-center p-0 h-auto "
           )}
         >
           <div className="flex items-center gap-2">
             <Clock size={16} />
-            <p>
-              {storeStartTime && storeEndTime
-                ? `${formatTime(storeStartTime)} - ${formatTime(storeEndTime)}`
-                : "Set Time"}
-            </p>
+            {showText && (
+              <p>
+                {storeStartTime && storeEndTime
+                  ? `${formatTime(storeStartTime)} - ${formatTime(storeEndTime)}`
+                  : "Set Time"}
+              </p>
+            )}
           </div>
         </Button>
       </PopoverTrigger>

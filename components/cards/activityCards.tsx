@@ -11,8 +11,6 @@ interface IActivityCardsProps {
 
 export default function ActivityCards({ activities, onSelectActivity }: IActivityCardsProps) {
   const { isSidebarRightOpen, isSidebarLeftOpen } = useSidebarStore();
-  console.log("isSidebarRightOpen: ", isSidebarRightOpen);
-  console.log("isSidebarLeftOpen: ", isSidebarLeftOpen);
 
   return (
     <div

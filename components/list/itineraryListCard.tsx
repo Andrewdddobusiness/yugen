@@ -2,92 +2,88 @@
 
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import Image from "next/image";
-import { GripVertical, Loader2 } from "lucide-react";
+import { GripVertical, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { capitalizeFirstLetterOfEachWord } from "@/utils/formatting/capitalise";
-import { Carousel, CarouselContent, CarouselItem } from "../ui/carousel";
 import TimePopover from "../time/timePopover";
-import { Button } from "@/components/ui/button";
-
 import { cn } from "@/components/lib/utils";
-
 import { DatePickerPopover } from "../date/datePickerPopover";
-import { useItineraryActivityStore, IActivity } from "@/store/itineraryActivityStore";
+import { useItineraryActivityStore, IItineraryActivity } from "@/store/itineraryActivityStore";
 
 interface ItineraryListCardProps {
-  activity: IActivity;
+  activity: IItineraryActivity;
   dragHandleProps: any;
   isDragging: boolean;
 }
 
 export const ItineraryListCard: React.FC<ItineraryListCardProps> = ({ activity, dragHandleProps, isDragging }) => {
-  const { activities } = useItineraryActivityStore();
-
-  // Find the latest activity data from the store
-  const latestActivity = activities.find((a) => a.itinerary_activity_id === activity.itinerary_activity_id) || activity;
-
+  const { itineraryActivities } = useItineraryActivityStore();
+  const latestActivity =
+    itineraryActivities.find((a) => a.itinerary_activity_id === activity.itinerary_activity_id) || activity;
   const [isHovered, setIsHovered] = useState(false);
 
   return (
-    <div
-      className={cn(
-        "relative flex flex-row gap-4 rounded-lg transition-all duration-300",
-        isDragging ? "opacity-50" : ""
-      )}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
-    >
-      {/* Left column for grip - only this part is draggable */}
-      <div className="flex items-center justify-center h-full w-12 cursor-grab" {...dragHandleProps}>
-        <span className="p-1 rounded-md border bg-white">
-          <GripVertical size={20} />
-        </span>
+    <div className="relative w-full" onMouseEnter={() => setIsHovered(true)} onMouseLeave={() => setIsHovered(false)}>
+      {/* Draggable content */}
+      <div
+        className={cn(
+          "flex flex-row w-full gap-4 transition-all duration-300 items-center",
+          isDragging ? "opacity-50" : ""
+        )}
+        {...dragHandleProps}
+      >
+        {/* Left column for grip */}
+        <div
+          className={cn(
+            "flex h-full cursor-grab transition-all duration-200 hover:text-zinc-500 hover:scale-110",
+            isHovered ? "opacity-100" : "opacity-0"
+          )}
+        >
+          <span className="rounded-md">
+            <GripVertical size={20} />
+          </span>
+        </div>
+
+        {/* Card content */}
+        <div className="flex flex-row flex-grow justify-between gap-4 bg-white py-2 px-4 rounded-lg">
+          <h3
+            className={cn(
+              "flex-1 min-w-[200px] text-md font-medium line-clamp-1 transition-all duration-200",
+              isHovered ? "text-zinc-500" : ""
+            )}
+          >
+            {capitalizeFirstLetterOfEachWord(activity.activity?.name || "")}
+          </h3>
+        </div>
+
+        {/* Delete button */}
+        <div
+          className={cn(
+            "flex-shrink-0 cursor-pointer transition-all duration-200 hover:text-red-500 hover:scale-110",
+            isHovered ? "opacity-100" : "opacity-0"
+          )}
+        >
+          <span className="rounded-md">
+            <Trash2 size={16} />
+          </span>
+        </div>
       </div>
 
-      {/* Right column for the card content */}
-      <div className="flex flex-col flex-grow p-4">
-        <div className="flex xs:flex-col md:flex-row gap-4">
-          <Carousel>
-            <CarouselContent>
-              {activity.activities?.image_url?.length > 0 ? (
-                activity.activities.image_url.map((image: string, index: number) => (
-                  <CarouselItem key={index}>
-                    <Image
-                      src={image}
-                      alt={activity.activities.activity_name}
-                      width={200}
-                      height={200}
-                      priority={true}
-                      className="xs:min-w-60 md:min-w-48 max-h-32 object-cover rounded-md"
-                    />
-                  </CarouselItem>
-                ))
-              ) : (
-                <CarouselItem>
-                  <div className="xs:min-w-60 md:min-w-48 h-[200px] flex items-center justify-center bg-gray-200 rounded-md">
-                    No image available
-                  </div>
-                </CarouselItem>
-              )}
-            </CarouselContent>
-          </Carousel>
-          <div className="flex flex-col gap-2">
-            <h3 className="text-lg font-semibold mt-2">
-              {capitalizeFirstLetterOfEachWord(activity.activities.activity_name)}
-            </h3>
-            <p className="text-gray-600 text-md">{activity.activities.description}</p>
-            <div className="flex flex-row gap-4">
-              <TimePopover
-                itineraryActivityId={latestActivity.itinerary_activity_id}
-                storeStartTime={latestActivity.start_time}
-                storeEndTime={latestActivity.end_time}
-              />
+      {/* Non-draggable overlay elements */}
+      <div className="absolute right-8 top-1/2 -translate-y-1/2 flex flex-row gap-4 items-center pr-4">
+        <TimePopover
+          itineraryActivityId={Number(latestActivity.itinerary_activity_id)}
+          storeStartTime={latestActivity.start_time}
+          storeEndTime={latestActivity.end_time}
+          showText={false}
+          styled={false}
+        />
 
-              <DatePickerPopover itineraryActivityId={activity.itinerary_activity_id} />
-            </div>
-          </div>
-        </div>
+        <DatePickerPopover
+          itineraryActivityId={Number(activity.itinerary_activity_id)}
+          showText={false}
+          styled={false}
+        />
       </div>
     </div>
   );

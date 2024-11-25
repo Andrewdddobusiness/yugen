@@ -120,18 +120,18 @@ export function NavMainItineraryActivity() {
 
           <SidebarMenuItem>
             <SidebarMenuButton asChild>
-              <Link href={`/itinerary/${itineraryId}/${destinationId}/builder`}>
-                <NotebookPen />
-                <span className="text-md font-semibold">Build & Organise</span>
+              <Link href={`/itinerary/${itineraryId}/${destinationId}/activities`}>
+                <Binoculars />
+                <span className="text-md font-semibold">Explore</span>
               </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>
 
           <SidebarMenuItem>
             <SidebarMenuButton asChild>
-              <Link href={`/itinerary/${itineraryId}/${destinationId}/activities`}>
-                <Binoculars />
-                <span className="text-md font-semibold">Explore</span>
+              <Link href={`/itinerary/${itineraryId}/${destinationId}/builder`}>
+                <NotebookPen />
+                <span className="text-md font-semibold">Build & Organise</span>
               </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>

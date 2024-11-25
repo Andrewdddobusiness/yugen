@@ -18,6 +18,8 @@ import { formatCategoryTypeArray } from "@/utils/formatting/types";
 import { IActivityWithLocation } from "@/store/activityStore";
 import { useItineraryActivityStore } from "@/store/itineraryActivityStore";
 
+import { ActivityImage } from "@/components/images/activityImage";
+
 interface ItineraryCardProps {
   activity: IActivityWithLocation;
   onClick?: () => void;
@@ -31,8 +33,7 @@ export default function ActivityCard({ activity, onClick, onOptionsClick }: Itin
   destinationId = destinationId.toString();
 
   // **** STORES ****
-  const { insertItineraryActivity, removeItineraryActivity, isActivityAdded, itineraryActivities } =
-    useItineraryActivityStore();
+  const { insertItineraryActivity, removeItineraryActivity, isActivityAdded } = useItineraryActivityStore();
 
   // **** STATES ****
   const [isHovered, setIsHovered] = useState(false);
@@ -107,14 +108,7 @@ export default function ActivityCard({ activity, onClick, onOptionsClick }: Itin
                 <ImageIcon size={32} className="text-zinc-300" />
               </Skeleton>
             ) : (
-              <Image
-                src={`https://places.googleapis.com/v1/${activity.photo_names[0]}/media?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}&maxHeightPx=1000&maxWidthPx=1000`}
-                alt="Activity Image"
-                width={1920}
-                height={1080}
-                priority
-                className="h-40 w-full rounded-t-lg object-cover"
-              />
+              <ActivityImage photoNames={activity.photo_names} alt="Activity Image" priority />
             )}
           </div>
         ) : (

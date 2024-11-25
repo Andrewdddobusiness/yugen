@@ -695,7 +695,7 @@ const SidebarMenuSubButton = React.forwardRef<
       data-size={size}
       data-active={isActive}
       className={cn(
-        "flex h-full w-full min-w-0 -translate-x-px gap-2 overflow-hidden rounded-md text-sidebar-foreground outline-none ring-sidebar-ring",
+        "flex h-full w-full  min-w-0 -translate-x-px gap-2 overflow-hidden rounded-md text-sidebar-foreground outline-none ring-sidebar-ring",
         // Hover state
         "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
         // Active/Click state

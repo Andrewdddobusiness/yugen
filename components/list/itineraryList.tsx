@@ -20,11 +20,8 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 
-import { useSearchParams } from "next/navigation";
-import {
-  fetchFilteredTableData,
-  setTableData,
-} from "@/actions/supabase/actions";
+import { useParams } from "next/navigation";
+import { fetchFilteredTableData, setTableData } from "@/actions/supabase/actions";
 import { format, parseISO } from "date-fns";
 import { DragOverlay } from "@dnd-kit/core";
 import { ItineraryListCardWrapper } from "./itineraryListCardWrapper";
@@ -32,19 +29,15 @@ import { DateGroupWrapper } from "./dateGroupWrapper";
 import { useItineraryActivityStore } from "@/store/itineraryActivityStore";
 
 export default function ItineraryList() {
-  const searchParams = useSearchParams();
-  const id = searchParams.get("i");
+  const { itineraryId } = useParams();
+  const itinId = itineraryId.toString();
 
-  const [dateRange, setDateRange] = useState<{ from: Date; to: Date } | null>(
-    null
-  );
+  const [dateRange, setDateRange] = useState<{ from: Date; to: Date } | null>(null);
   const [activeId, setActiveId] = useState(null);
   const [overDateId, setOverDateId] = useState<string | null>(null);
   const [overItemId, setOverItemId] = useState<string | null>(null);
 
-  const queryClient = useQueryClient();
-
-  const { activities, setActivities } = useItineraryActivityStore();
+  const { itineraryActivities, setItineraryActivities } = useItineraryActivityStore();
 
   useEffect(() => {
     const fetchDateRange = async () => {
@@ -52,37 +45,27 @@ export default function ItineraryList() {
         "itinerary_destinations",
         "from_date, to_date",
         "itinerary_id",
-        [id || ""]
+        [itinId || ""]
       );
 
-      if (
-        dateRangeResult.success &&
-        dateRangeResult.data &&
-        dateRangeResult.data.length > 0
-      ) {
+      if (dateRangeResult.success && dateRangeResult.data && dateRangeResult.data.length > 0) {
         const { from_date, to_date } = dateRangeResult.data[0];
         setDateRange({ from: new Date(from_date), to: new Date(to_date) });
       }
     };
 
     fetchDateRange();
-  }, [id]);
+  }, [itineraryId]);
 
   useEffect(() => {
-    if (activities.length > 0) {
-      const sortedActivities = sortActivities(activities);
-      setActivities(sortedActivities);
+    if (itineraryActivities.length > 0) {
+      const sortedActivities = sortActivities(itineraryActivities);
+      setItineraryActivities(sortedActivities);
     }
-  }, [activities, setActivities]);
+  }, [itineraryActivities, setItineraryActivities]);
 
   const updateActivityMutation = useMutation({
-    mutationFn: async ({
-      activityId,
-      newDate,
-    }: {
-      activityId: number;
-      newDate: string | null;
-    }) => {
+    mutationFn: async ({ activityId, newDate }: { activityId: number; newDate: string | null }) => {
       return setTableData(
         "itinerary_activity",
         {
@@ -93,9 +76,9 @@ export default function ItineraryList() {
       );
     },
     onSuccess: (_, variables) => {
-      setActivities(
-        activities.map((activity) =>
-          activity.itinerary_activity_id === variables.activityId
+      setItineraryActivities(
+        itineraryActivities.map((activity) =>
+          activity.itinerary_activity_id === variables.activityId.toString()
             ? { ...activity, date: variables.newDate || "" }
             : activity
         )
@@ -129,28 +112,22 @@ export default function ItineraryList() {
     setActiveId(null);
 
     if (over && active.id !== over.id) {
-      const oldIndex = activities.findIndex(
-        (item) => item.itinerary_activity_id === active.id
-      );
-      const newIndex = activities.findIndex(
-        (item) => item.itinerary_activity_id === over.id
-      );
+      const oldIndex = itineraryActivities.findIndex((item) => item.itinerary_activity_id === active.id);
+      const newIndex = itineraryActivities.findIndex((item) => item.itinerary_activity_id === over.id);
 
       if (oldIndex !== -1 && newIndex !== -1) {
-        const updatedActivities = arrayMove(activities, oldIndex, newIndex);
-        setActivities(updatedActivities);
+        const updatedActivities = arrayMove(itineraryActivities, oldIndex, newIndex);
+        setItineraryActivities(updatedActivities);
       } else {
-        const updatedActivities = [...activities];
-        const movedItem = updatedActivities[oldIndex];
+        const updatedActivities = [...itineraryActivities];
+        let movedItem: any = updatedActivities[oldIndex];
         updatedActivities.splice(oldIndex, 1);
 
         const newDateString = over.id.toString().replace("date_", "");
         movedItem.date = newDateString === "unscheduled" ? null : newDateString;
 
         const insertIndex = updatedActivities.findIndex(
-          (item) =>
-            item.date === movedItem.date &&
-            (item.time || "") > (movedItem.time || "")
+          (item) => item.date === movedItem.date && (item.time || "") > (movedItem.time || "")
         );
 
         if (insertIndex === -1) {
@@ -191,10 +168,7 @@ export default function ItineraryList() {
     setOverItemId(null);
   };
 
-  const updateActivityDate = async (
-    activityId: number,
-    newDate: string | null
-  ) => {
+  const updateActivityDate = async (activityId: number, newDate: string | null) => {
     try {
       await updateActivityMutation.mutateAsync({ activityId, newDate });
     } catch (error) {
@@ -213,7 +187,7 @@ export default function ItineraryList() {
   };
 
   return (
-    <div className="flex flex-col p-2 px-4 sm:px-8 pt-4 shadow-sm">
+    <div className="flex flex-col shadow-sm ">
       <DndContext
         sensors={sensors}
         collisionDetection={closestCenter}
@@ -224,56 +198,46 @@ export default function ItineraryList() {
       >
         {dateRange && (
           <SortableContext
-            items={generateDateRange(dateRange.from, dateRange.to).map(
-              (date) => `date_${format(date, "yyyy-MM-dd")}`
-            )}
+            items={generateDateRange(dateRange.from, dateRange.to).map((date) => `date_${format(date, "yyyy-MM-dd")}`)}
             strategy={verticalListSortingStrategy}
           >
-            {generateDateRange(dateRange.from, dateRange.to).map(
-              (date, index) => {
-                const activitiesForDate = activities.filter(
-                  (activity) => activity.date === format(date, "yyyy-MM-dd")
-                );
+            {generateDateRange(dateRange.from, dateRange.to).map((date, index) => {
+              const activitiesForDate = itineraryActivities.filter(
+                (activity) => activity.date === format(date, "yyyy-MM-dd") && !activity.deleted_at
+              );
 
-                return (
-                  <SortableContext
-                    key={date.toISOString()}
-                    items={activitiesForDate.map(
-                      (item) => item.itinerary_activity_id
-                    )}
-                    strategy={verticalListSortingStrategy}
-                  >
-                    <DateGroupWrapper
-                      date={date}
-                      activities={activitiesForDate}
-                      isUnscheduled={false}
-                      index={index}
-                      onDateUpdate={updateActivityDate}
-                      activeId={activeId}
-                      overDateId={overDateId}
-                      overItemId={overItemId}
-                    />
-                  </SortableContext>
-                );
-              }
-            )}
+              return (
+                <SortableContext
+                  key={date.toISOString()}
+                  items={activitiesForDate.map((item) => item.itinerary_activity_id)}
+                  strategy={verticalListSortingStrategy}
+                >
+                  <DateGroupWrapper
+                    date={date}
+                    activities={activitiesForDate}
+                    isUnscheduled={false}
+                    index={index}
+                    onDateUpdate={updateActivityDate}
+                    activeId={activeId}
+                    overDateId={overDateId}
+                    overItemId={overItemId}
+                  />
+                </SortableContext>
+              );
+            })}
           </SortableContext>
         )}
         <SortableContext
-          items={activities
-            .filter((activity) => !activity.date)
+          items={itineraryActivities
+            .filter((activity) => !activity.date && !activity.deleted_at)
             .map((item) => item.itinerary_activity_id)}
           strategy={verticalListSortingStrategy}
         >
           <DateGroupWrapper
             date={new Date()}
-            activities={activities.filter((activity) => !activity.date)}
+            activities={itineraryActivities.filter((activity) => !activity.date && !activity.deleted_at)}
             isUnscheduled={true}
-            index={
-              dateRange
-                ? generateDateRange(dateRange.from, dateRange.to).length
-                : 0
-            }
+            index={dateRange ? generateDateRange(dateRange.from, dateRange.to).length : 0}
             onDateUpdate={updateActivityDate}
             activeId={activeId}
             overDateId={overDateId}
@@ -283,9 +247,7 @@ export default function ItineraryList() {
         <DragOverlay>
           {activeId ? (
             <ItineraryListCardWrapper
-              activity={activities.find(
-                (item) => item.itinerary_activity_id === activeId
-              )}
+              activity={itineraryActivities.find((item) => item.itinerary_activity_id === activeId)}
             />
           ) : null}
         </DragOverlay>

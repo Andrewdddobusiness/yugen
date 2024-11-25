@@ -161,6 +161,31 @@ export async function setItineraryDestinationDateRange(
   return { success: true, message: "Set date range successful", data };
 }
 
+export async function setItineraryActivityDateTimes(
+  itineraryActivityId: string,
+  date: string,
+  startTime: string,
+  endTime: string
+) {
+  const supabase = createClient();
+
+  const { data, error } = await supabase
+    .from("itinerary_activity")
+    .update({
+      date: date,
+      start_time: startTime,
+      end_time: endTime,
+    })
+    .eq("itinerary_activity_id", itineraryActivityId);
+
+  if (error) {
+    console.error("Error setting date range:", error);
+    return { success: false, message: "Set date range failed", error };
+  }
+
+  return { success: true, message: "Set date range successful", data };
+}
+
 /*
   DELETE
 */

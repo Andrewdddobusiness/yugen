@@ -4,25 +4,18 @@ import { CSS } from "@dnd-kit/utilities";
 import { ItineraryListCard } from "./itineraryListCard";
 
 const ItineraryListCardWrapper = ({ activity }: { activity: any }) => {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: activity.itinerary_activity_id,
   });
 
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
-    opacity: isDragging ? 0.5 : 1,
+    width: "100%",
   };
 
   return (
-    <div style={style}>
+    <div style={style} className="w-full">
       <ItineraryListCard
         activity={activity}
         dragHandleProps={{ ref: setNodeRef, ...attributes, ...listeners }}

@@ -12,6 +12,7 @@ import "./calendar-custom.css";
 import { capitalizeFirstLetterOfEachWord } from "@/utils/formatting/capitalise";
 import { useItineraryActivityStore } from "@/store/itineraryActivityStore";
 import { useDateRangeStore } from "@/store/dateRangeStore";
+import { setItineraryActivityDateTimes } from "@/actions/supabase/actions";
 
 const localizer = momentLocalizer(moment);
 const DnDCalendar = withDragAndDrop(Calendar);
@@ -24,19 +25,16 @@ const DragDropCalendar: React.FC<CalendarProps> = ({ isLoading }) => {
   const [view, setView] = useState("week");
   const { startDate, endDate } = useDateRangeStore();
   const [date, setDate] = useState(startDate || new Date());
-  const { activities, updateActivity } = useItineraryActivityStore();
+  const { itineraryActivities, setItineraryActivities } = useItineraryActivityStore();
 
-  const events = activities.map((item) => ({
+  const events = itineraryActivities.map((item) => ({
     id: item.itinerary_activity_id,
-    title: capitalizeFirstLetterOfEachWord(item.activities.activity_name),
+    title: capitalizeFirstLetterOfEachWord(item.activity?.name || ""),
     start: new Date(`${item.date}T${item.start_time}`),
     end: new Date(`${item.date}T${item.end_time}`),
   }));
-
   const handleEventDrop = async ({ event, start, end }: any) => {
-    const activityToUpdate = activities.find(
-      (activity) => activity.itinerary_activity_id === event.id
-    );
+    const activityToUpdate = itineraryActivities.find((activity: any) => activity.itinerary_activity_id === event.id);
     if (!activityToUpdate) return;
 
     const updatedActivity = {
@@ -49,28 +47,29 @@ const DragDropCalendar: React.FC<CalendarProps> = ({ isLoading }) => {
     // Update local store immediately
     useItineraryActivityStore
       .getState()
-      .setActivities(
-        activities.map((a) =>
-          a.itinerary_activity_id === updatedActivity.itinerary_activity_id
-            ? updatedActivity
-            : a
+      .setItineraryActivities(
+        itineraryActivities.map((a) =>
+          a.itinerary_activity_id === updatedActivity.itinerary_activity_id ? updatedActivity : a
         )
       );
 
     // Then update the database
     try {
-      await updateActivity(updatedActivity);
+      await setItineraryActivityDateTimes(
+        updatedActivity.itinerary_activity_id,
+        updatedActivity.date,
+        updatedActivity.start_time,
+        updatedActivity.end_time
+      );
     } catch (error) {
       console.error("Error updating activity:", error);
       // Revert the local change if the database update fails
-      useItineraryActivityStore.getState().setActivities(activities);
+      setItineraryActivities(itineraryActivities);
     }
   };
 
   const handleEventResize = async ({ event, start, end }: any) => {
-    const activityToUpdate = activities.find(
-      (activity) => activity.itinerary_activity_id === event.id
-    );
+    const activityToUpdate = itineraryActivities.find((activity) => activity.itinerary_activity_id === event.id);
     if (!activityToUpdate) return;
 
     const updatedActivity = {
@@ -83,24 +82,27 @@ const DragDropCalendar: React.FC<CalendarProps> = ({ isLoading }) => {
     // Update local store immediately
     useItineraryActivityStore
       .getState()
-      .setActivities(
-        activities.map((a) =>
-          a.itinerary_activity_id === updatedActivity.itinerary_activity_id
-            ? updatedActivity
-            : a
+      .setItineraryActivities(
+        itineraryActivities.map((a) =>
+          a.itinerary_activity_id === updatedActivity.itinerary_activity_id ? updatedActivity : a
         )
       );
 
     // Update local store immediately
-    useItineraryActivityStore.getState().updateActivity(updatedActivity);
+    useItineraryActivityStore.getState().updateItineraryActivity(updatedActivity);
 
     // Then update the database
     try {
-      await updateActivity(updatedActivity);
+      await setItineraryActivityDateTimes(
+        updatedActivity.itinerary_activity_id,
+        updatedActivity.date,
+        updatedActivity.start_time,
+        updatedActivity.end_time
+      );
     } catch (error) {
       console.error("Error updating activity:", error);
       // Revert the local change if the database update fails
-      useItineraryActivityStore.getState().setActivities(activities);
+      setItineraryActivities(itineraryActivities);
     }
   };
 
@@ -124,11 +126,7 @@ const DragDropCalendar: React.FC<CalendarProps> = ({ isLoading }) => {
     if (view === "day") {
       return null;
     } else {
-      return (
-        <div className="text-sm font-semibold text-gray-800 p-1 text-center h-10">
-          {label}
-        </div>
-      );
+      return <div className="text-sm font-semibold text-gray-800 p-1 text-center h-10">{label}</div>;
     }
   };
 
@@ -152,28 +150,32 @@ const DragDropCalendar: React.FC<CalendarProps> = ({ isLoading }) => {
             <Button
               className="h-8 px-4 py-2 rounded-l-lg rounded-r-none flex items-center"
               onClick={() =>
-                handleNavigate(moment(date).subtract(1, view).toDate())
+                handleNavigate(
+                  moment(date)
+                    .subtract(1, view === "week" ? "weeks" : "days")
+                    .toDate()
+                )
               }
             >
               <ChevronLeft size={12} />
             </Button>
-            <Button
-              className="h-8 px-4 py-2 rounded-none text-xs"
-              onClick={() => setDate(new Date())}
-            >
+            <Button className="h-8 px-4 py-2 rounded-none text-xs" onClick={() => setDate(new Date())}>
               Today
             </Button>
             <Button
               className="h-8 px-4 py-2 rounded-r-lg rounded-l-none flex items-center"
-              onClick={() => handleNavigate(moment(date).add(1, view).toDate())}
+              onClick={() =>
+                handleNavigate(
+                  moment(date)
+                    .add(1, view === "week" ? "weeks" : "days")
+                    .toDate()
+                )
+              }
             >
               <ChevronRight size={12} />
             </Button>
           </div>
-          <Separator
-            orientation="vertical"
-            className="h-6 m==][x-4 border-zinc-200"
-          />
+          <Separator orientation="vertical" className="h-6 m==][x-4 border-zinc-200" />
 
           <Button
             className="text-xs px-4 h-8 rounded-lg"
@@ -200,21 +202,12 @@ const DragDropCalendar: React.FC<CalendarProps> = ({ isLoading }) => {
           onEventResize={handleEventResize}
           resizable
           components={{
-            timeSlotWrapper: ({ children }: any) => (
-              <div className="text-xs font-medium text-gray-600">
-                {children}
-              </div>
-            ),
-            eventWrapper: ({ event, children }: any) => (
-              <div className="text-xs">{children}</div>
-            ),
+            timeSlotWrapper: ({ children }: any) => <div className="text-xs font-medium text-gray-600">{children}</div>,
+            eventWrapper: ({ event, children }: any) => <div className="text-xs">{children}</div>,
             header: CustomHeader,
           }}
           dayPropGetter={(date: Date) => ({
-            className:
-              date.getDay() === 0 || date.getDay() === 6
-                ? "bg-gray-100"
-                : "bg-white",
+            className: date.getDay() === 0 || date.getDay() === 6 ? "bg-gray-100" : "bg-white",
           })}
           eventPropGetter={(event: any) => ({
             style: {

@@ -12,9 +12,11 @@ import { useQueryClient } from "@tanstack/react-query";
 
 interface DatePickerPopoverProps {
   itineraryActivityId: number;
+  showText?: boolean;
+  styled?: boolean;
 }
 
-export function DatePickerPopover({ itineraryActivityId }: DatePickerPopoverProps) {
+export function DatePickerPopover({ itineraryActivityId, showText = true, styled = true }: DatePickerPopoverProps) {
   const [date, setDate] = React.useState<Date | undefined>(undefined);
   const [isLoading, setIsLoading] = React.useState(true);
   const queryClient = useQueryClient();
@@ -61,16 +63,19 @@ export function DatePickerPopover({ itineraryActivityId }: DatePickerPopoverProp
 
   return (
     <Popover>
-      <PopoverTrigger asChild>
+      <PopoverTrigger>
         <Button
-          variant={"outline"}
+          variant={styled ? "outline" : "ghost"}
           className={cn(
-            "w-full min-w-40 justify-start text-left font-normal text-xs",
-            !date && "text-muted-foreground"
+            styled && "w-full min-w-40 justify-start text-left font-normal text-xs",
+            styled && !date && "text-muted-foreground",
+            !styled && "flex justify-center items-center p-0 h-auto "
           )}
         >
-          <CalendarIcon className="mr-2 h-4 w-4" />
-          {date ? format(date, "PPP") : <span>Pick a date</span>}
+          <div className="flex items-center gap-2">
+            <CalendarIcon size={16} />
+            {showText && (date ? format(date, "PPP") : <span>Pick a date</span>)}
+          </div>
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-auto p-0" align="start">
