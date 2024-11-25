@@ -27,7 +27,6 @@ export const ActivityImage = ({
   } = useQuery({
     queryKey: ["placePhoto", photoNames[0]],
     queryFn: async () => {
-      console.log("Cache miss - fetching photo:", photoNames[0]);
       if (!photoNames.length) return null;
 
       for (const photoName of photoNames) {
