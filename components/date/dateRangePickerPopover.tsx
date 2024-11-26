@@ -36,7 +36,7 @@ export function DatePickerWithRangePopover({
     const fetchDateRange = async () => {
       if (itineraryId && fetchDateRangeProp) {
         try {
-          const result = await fetchFilteredTableData("itinerary_destinations", "from_date, to_date", "itinerary_id", [
+          const result = await fetchFilteredTableData("itinerary_destination", "from_date, to_date", "itinerary_id", [
             itineraryId,
           ]);
           if (
@@ -88,7 +88,7 @@ export function DatePickerWithRangePopover({
       if (fetchDateRangeProp) {
         if (!itineraryId) return;
         const result = await setTableData(
-          "itinerary_destinations",
+          "itinerary_destination",
           {
             itinerary_id: itineraryId,
             from_date: format(date.from, "yyyy-MM-dd"),

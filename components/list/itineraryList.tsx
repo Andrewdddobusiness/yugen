@@ -43,7 +43,7 @@ export default function handleAddToItineraryItineraryList() {
     queryKey: ["itineraryDateRange", itinId],
     queryFn: async () => {
       const dateRangeResult = await fetchFilteredTableData(
-        "itinerary_destinations",
+        "itinerary_destination",
         "from_date, to_date",
         "itinerary_id",
         [itinId]
@@ -197,7 +197,7 @@ export default function handleAddToItineraryItineraryList() {
   };
 
   return (
-    <div className="flex flex-col shadow-sm ">
+    <div className="flex flex-col shadow-sm">
       <DndContext
         sensors={sensors}
         collisionDetection={closestCenter}

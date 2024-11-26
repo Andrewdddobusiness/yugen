@@ -15,10 +15,10 @@ const ItineraryListCardWrapper = ({ activity }: { activity: any }) => {
   };
 
   return (
-    <div style={style} className="w-full">
+    <div ref={setNodeRef} style={style} className="w-full px-4">
       <ItineraryListCard
         activity={activity}
-        dragHandleProps={{ ref: setNodeRef, ...attributes, ...listeners }}
+        dragHandleProps={{ ...attributes, ...listeners }}
         isDragging={isDragging}
       />
     </div>

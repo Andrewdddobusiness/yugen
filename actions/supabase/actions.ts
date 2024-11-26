@@ -352,11 +352,11 @@ export const fetchCityDetails = async (itineraryId: any) => {
   const supabase = createClient();
 
   const { data, error } = await supabase
-    .from("itinerary_destinations")
+    .from("itinerary_destination")
     .select(
       `
       destination_city_id,
-      cities!itinerary_destinations_destination_city_id_fkey (
+      cities!itinerary_destination_destination_city_id_fkey (
         city_name,
         city_description,
         broadband_speed,

@@ -46,24 +46,23 @@ export function DateGroup({
     <div
       ref={setNodeRef}
       data-date={dateString}
-      className={`p-4 rounded-lg ${isOver ? "bg-blue-100" : ""} transition-colors duration-200`}
+      className={`p-4  rounded-lg ${isOver ? "bg-blue-100" : ""} transition-colors duration-200`}
     >
-      {index > 0 && <Separator className="my-6" />}
       <div className="flex items-center mb-2">
-        <Button variant="ghost" size="icon" className="rounded-full" onClick={toggleOpen}>
+        <Button variant="ghost" size="icon" className="rounded-full " onClick={toggleOpen}>
           {isOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
         </Button>
         <h2 className="text-2xl font-semibold">{isUnscheduled ? "Unscheduled" : format(date, "MMMM d, yyyy")}</h2>
       </div>
 
       {isOpen && (
-        <div className="space-y-4">
+        <div className="flex flex-col justify-center items-center space-y-4">
           {sortedActivities.length > 0 ? (
             sortedActivities.map((activity) => (
               <ItineraryListCardWrapper key={activity.itinerary_activity_id} activity={activity} />
             ))
           ) : (
-            <div className="text-gray-500 italic min-h-[100px] border-2 border-dashed border-gray-300 rounded-md p-4 flex items-center justify-center">
+            <div className="flex w-5/6 text-gray-500 italic min-h-[100px] border-2 border-dashed border-gray-300 rounded-lg items-center justify-center">
               No activities scheduled
             </div>
           )}

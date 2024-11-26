@@ -77,7 +77,7 @@ export default function ActivityCardHorizontal({
     setLoading(false);
   };
 
-  const handleRemoveToItinerary = async (e: React.MouseEvent) => {
+  const handleRemoveFromItinerary = async (e: React.MouseEvent) => {
     e.stopPropagation();
     setLoading(true);
     if (!activity || !itineraryId) return;
@@ -146,7 +146,7 @@ export default function ActivityCardHorizontal({
                   <Loader2 className="h-4 w-4 animate-spin" />
                 </Button>
               ) : isAdded ? (
-                <Button variant="secondary" className="h-8" onClick={handleRemoveToItinerary}>
+                <Button variant="secondary" className="h-8" onClick={handleRemoveFromItinerary}>
                   Remove
                 </Button>
               ) : (
@@ -186,7 +186,7 @@ export default function ActivityCardHorizontal({
                 <Loader2 className="h-4 w-4 animate-spin" />
               </Button>
             ) : isAdded ? (
-              <Button variant="secondary" className="h-8 min-w-16 rounded-r-none" onClick={handleRemoveToItinerary}>
+              <Button variant="secondary" className="h-8 min-w-16 rounded-r-none" onClick={handleRemoveFromItinerary}>
                 Remove
               </Button>
             ) : (
