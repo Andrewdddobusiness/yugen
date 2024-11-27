@@ -140,15 +140,17 @@ export async function setItineraryDestinationDateRange(
   const supabase = createClient();
 
   // Format dates to YYYY-MM-DD
-  const formatDate = (date: Date) => {
-    return date.toLocaleDateString("en-CA"); // Returns YYYY-MM-DD format
-  };
+  // const formatDate = (date: Date) => {
+  //   return date.toLocaleDateString("en-CA"); // Returns YYYY-MM-DD format
+  // };
+  console.log("dateRange.from:", dateRange.from);
+  console.log("dateRange.to:", dateRange.to);
 
   const { data, error } = await supabase
     .from("itinerary_destination")
     .update({
-      from_date: formatDate(dateRange.from),
-      to_date: formatDate(dateRange.to),
+      from_date: dateRange.from,
+      to_date: dateRange.to,
     })
     .eq("itinerary_id", itineraryId)
     .eq("itinerary_destination_id", destinationId);

@@ -22,17 +22,36 @@ export function DatePickerWithRangePopover3({ selectedDateRange, onDateRangeConf
   const [date, setDate] = useState<DateRange | undefined>(selectedDateRange);
   const [isOpen, setIsOpen] = useState(false);
 
+  console.log("selectedDateRange:", selectedDateRange);
+  console.log("date:", date);
+
   // Update local state when prop changes
   useEffect(() => {
     setDate(selectedDateRange);
   }, [selectedDateRange]);
 
   const handleSelect = (newDate: DateRange | undefined) => {
-    setDate(newDate);
+    if (newDate?.from || newDate?.to) {
+      const formattedRange = {
+        from: newDate.from ? new Date(format(newDate.from, "yyyy-MM-dd")) : undefined,
+        to: newDate.to ? new Date(format(newDate.to, "yyyy-MM-dd")) : undefined,
+      };
+      setDate(formattedRange);
+    } else {
+      setDate(newDate);
+    }
   };
 
   const handleConfirm = () => {
-    onDateRangeConfirm(date);
+    if (date?.from || date?.to) {
+      const formattedRange = {
+        from: date.from ? new Date(format(date.from, "yyyy-MM-dd")) : undefined,
+        to: date.to ? new Date(format(date.to, "yyyy-MM-dd")) : undefined,
+      };
+      onDateRangeConfirm(formattedRange);
+    } else {
+      onDateRangeConfirm(date);
+    }
     setIsOpen(false);
   };
 

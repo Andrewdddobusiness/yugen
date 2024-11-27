@@ -14,13 +14,7 @@ import {
 
 import { Binoculars, NotebookPen, SquareChevronLeft, TextSearch } from "lucide-react";
 
-import { useUserStore } from "@/store/userStore";
-
-import {
-  fetchItineraryDestination,
-  fetchUserItineraries,
-  setItineraryDestinationDateRange,
-} from "@/actions/supabase/actions";
+import { fetchItineraryDestination, setItineraryDestinationDateRange } from "@/actions/supabase/actions";
 
 import { formatDate } from "@/utils/formatting/datetime";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -49,6 +43,8 @@ export function NavMainItineraryActivity() {
 
   useEffect(() => {
     if (itinerary) {
+      console.log("itinerary.from_date:", itinerary.from_date);
+      console.log("itinerary.to_date:", itinerary.to_date);
       setDateRange({ from: itinerary.from_date as Date, to: itinerary.to_date as Date });
     }
   }, [itinerary]);
@@ -61,10 +57,10 @@ export function NavMainItineraryActivity() {
           from: dateRange.from,
           to: dateRange.to,
         });
-        console.log("result: ", result);
+
         if (result.success) {
           queryClient.invalidateQueries({ queryKey: ["itineraryDestination", itineraryId] });
-          console.log("Date range updated successfully");
+          queryClient.invalidateQueries({ queryKey: ["itineraryDateRange", itineraryId] });
         } else {
           console.error("Error updating date range:", result.message);
         }
