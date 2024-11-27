@@ -65,7 +65,7 @@ export function DatePickerWithRangePopover3({ selectedDateRange, onDateRangeConf
             id="date"
             variant={"outline"}
             className={cn(
-              "w-full justify-start text-left font-normal text-xs rounded-full h-8",
+              "w-full justify-start text-left font-normal text-xs rounded-lg h-8",
               !date && "text-muted-foreground"
             )}
           >

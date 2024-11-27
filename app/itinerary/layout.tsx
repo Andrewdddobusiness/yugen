@@ -1,6 +1,7 @@
 "use client";
 import { useEffect } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
+import { usePathname } from "next/navigation";
 
 import { SidebarProvider, SidebarTrigger, SidebarInset } from "@/components/ui/sidebar";
 import { AppSidebarItineraryActivityLeft } from "@/components/sidebar/appSidebar/appSidebarItineraryActivityLeft2";
@@ -20,17 +21,14 @@ import { useUserStore } from "@/store/userStore";
 import { useStripeSubscriptionStore, ISubscriptionDetails } from "@/store/stripeSubscriptionStore";
 import { createClient } from "@/utils/supabase/client";
 
-import { Button } from "@/components/ui/button";
-import { cn } from "@/components/lib/utils";
-import { LayoutList } from "lucide-react";
 import { useCartStore } from "@/store/cartStore";
-import { fetchItineraryActivities } from "@/actions/supabase/actions";
+
 import { IItineraryActivity, useItineraryActivityStore } from "@/store/itineraryActivityStore";
 import { useParams } from "next/navigation";
 
 export default function Layout({ children }: { children: React.ReactNode }) {
-  const queryClient = useQueryClient();
   const { itineraryId, destinationId } = useParams();
+  const pathname = usePathname();
 
   //**** STORES ****//
   const { fetchItineraryActivities, setItineraryActivities } = useItineraryActivityStore();
@@ -119,6 +117,17 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     }
   }, [itineraryActivities, setItineraryActivities]);
 
+  const getBreadcrumbText = () => {
+    if (pathname.includes("/builder")) {
+      return "Builder";
+    } else if (pathname.includes("/activities")) {
+      return "Explore Activities";
+    } else if (pathname.includes("/overview")) {
+      return "Overview";
+    }
+    return "Builder"; // default fallback
+  };
+
   return (
     <div className="flex h-screen">
       <SidebarProvider
@@ -140,7 +149,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 </BreadcrumbItem>
                 <BreadcrumbSeparator />
                 <BreadcrumbItem>
-                  <BreadcrumbPage>Builder</BreadcrumbPage>
+                  <BreadcrumbPage>{getBreadcrumbText()}</BreadcrumbPage>
                 </BreadcrumbItem>
               </BreadcrumbList>
             </Breadcrumb>

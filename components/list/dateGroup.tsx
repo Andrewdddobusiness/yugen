@@ -4,7 +4,7 @@ import { format } from "date-fns";
 import { ItineraryListCardWrapper } from "./itineraryListCardWrapper";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
-import { ChevronDown, ChevronRight } from "lucide-react";
+import { CalendarX, ChevronDown, ChevronRight } from "lucide-react";
 
 interface DateGroupProps {
   date: Date;
@@ -54,8 +54,11 @@ export function DateGroup({ date, activities, isUnscheduled }: DateGroupProps) {
               <ItineraryListCardWrapper key={activity.itinerary_activity_id} activity={activity} />
             ))
           ) : (
-            <div className="flex w-9/12 text-gray-500 italic min-h-[100px] border-2 border-dashed border-gray-300 rounded-lg items-center justify-center">
-              No activities scheduled
+            <div className="flex w-full px-12">
+              <div className="flex flex-col w-full text-gray-500 min-h-[100px] border-2 border-dashed border-gray-300 rounded-lg items-center justify-center gap-2">
+                <CalendarX size={24} className="text-gray-400" />
+                <p className="text-gray-400 text-sm">No activities scheduled</p>
+              </div>
             </div>
           )}
         </div>
