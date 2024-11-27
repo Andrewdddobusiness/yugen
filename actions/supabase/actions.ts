@@ -139,13 +139,6 @@ export async function setItineraryDestinationDateRange(
 ) {
   const supabase = createClient();
 
-  // Format dates to YYYY-MM-DD
-  // const formatDate = (date: Date) => {
-  //   return date.toLocaleDateString("en-CA"); // Returns YYYY-MM-DD format
-  // };
-  console.log("dateRange.from:", dateRange.from);
-  console.log("dateRange.to:", dateRange.to);
-
   const { data, error } = await supabase
     .from("itinerary_destination")
     .update({
@@ -175,6 +168,25 @@ export async function setItineraryActivityDateTimes(
     .from("itinerary_activity")
     .update({
       date: date,
+      start_time: startTime,
+      end_time: endTime,
+    })
+    .eq("itinerary_activity_id", itineraryActivityId);
+
+  if (error) {
+    console.error("Error setting date range:", error);
+    return { success: false, message: "Set date range failed", error };
+  }
+
+  return { success: true, message: "Set date range successful", data };
+}
+
+export async function setItineraryActivityTimes(itineraryActivityId: string, startTime: string, endTime: string) {
+  const supabase = createClient();
+
+  const { data, error } = await supabase
+    .from("itinerary_activity")
+    .update({
       start_time: startTime,
       end_time: endTime,
     })

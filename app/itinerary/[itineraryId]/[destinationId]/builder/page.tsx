@@ -36,15 +36,17 @@ export default function Builder() {
 
   return (
     <ResizablePanelGroup direction="horizontal" className="h-screen">
-      <ResizablePanel defaultSize={40} className="flex flex-col min-h-0">
-        <div className="flex flex-col items-center justify-between px-16 flex-shrink-0">
+      <ResizablePanel defaultSize={40} minSize={33} className="flex flex-col py-8 min-h-0 gap-2">
+        <div className="flex flex-col items-center justify-between px-12 flex-shrink-0">
           <h3 className="w-full text-4xl font-bold">Itinerary</h3>
         </div>
-        <Tabs defaultValue="list" className="flex flex-col flex-grow min-h-0">
-          <TabsList className="flex flex-row px-16 flex-shrink-0">
-            <TabsTrigger value="list">List</TabsTrigger>
-            <TabsTrigger value="table">Table</TabsTrigger>
-          </TabsList>
+        <Tabs defaultValue="list" className="flex flex-col">
+          <div className="flex flex-row pr-8 justify-end">
+            <TabsList className="border">
+              <TabsTrigger value="list">List</TabsTrigger>
+              <TabsTrigger value="table">Table</TabsTrigger>
+            </TabsList>
+          </div>
           <TabsContent value="list" className="flex-grow min-h-0">
             <ScrollArea className="h-full w-full">
               <ItineraryList />

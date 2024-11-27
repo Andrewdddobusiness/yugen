@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Loader2, Clock } from "lucide-react";
 import { formatTime } from "@/utils/formatting/datetime";
 import { cn } from "@/components/lib/utils";
-import { setItineraryActivityDateTimes } from "@/actions/supabase/actions";
+import { setItineraryActivityTimes } from "@/actions/supabase/actions";
 
 const generateTimeOptions = () => {
   const times = [];
@@ -77,7 +77,9 @@ export default function TimePopover({
 
     setIsLoading(true);
     try {
-      await setItineraryActivityDateTimes(itineraryActivityId.toString(), date, startTime, endTime);
+      console.log("startTime: ", startTime);
+      console.log("endTime: ", endTime);
+      await setItineraryActivityTimes(itineraryActivityId.toString(), startTime, endTime);
       setIsOpen(false);
     } catch (error) {
       console.error("Error saving times:", error);

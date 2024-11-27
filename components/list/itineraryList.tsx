@@ -197,7 +197,7 @@ export default function handleAddToItineraryItineraryList() {
   };
 
   return (
-    <div className="flex flex-col shadow-sm">
+    <div className="flex flex-col">
       <DndContext
         sensors={sensors}
         collisionDetection={closestCenter}

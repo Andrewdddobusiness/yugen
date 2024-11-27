@@ -68,7 +68,7 @@ export const ItineraryListCard: React.FC<ItineraryListCardProps> = ({ activity, 
         <div className="flex flex-row flex-grow justify-between gap-4 bg-white py-2 px-4 rounded-lg">
           <h3
             className={cn(
-              "flex-1 min-w-[200px] text-md font-medium line-clamp-1 transition-all duration-200",
+              "flex-1 text-md font-medium line-clamp-1 transition-all duration-200",
               isHovered ? "text-zinc-500" : ""
             )}
           >
