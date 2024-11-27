@@ -41,10 +41,14 @@ export default function Builder() {
           <h3 className="w-full text-4xl font-bold">Itinerary</h3>
         </div>
         <Tabs defaultValue="list" className="flex flex-col">
-          <div className="flex flex-row pr-8 justify-end">
-            <TabsList className="border">
-              <TabsTrigger value="list">List</TabsTrigger>
-              <TabsTrigger value="table">Table</TabsTrigger>
+          <div className="flex flex-row px-12 ">
+            <TabsList className="border w-full flex">
+              <TabsTrigger value="list" className="w-full flex">
+                List
+              </TabsTrigger>
+              <TabsTrigger value="table" className="w-full flex">
+                Table
+              </TabsTrigger>
             </TabsList>
           </div>
           <TabsContent value="list" className="flex-grow min-h-0">
