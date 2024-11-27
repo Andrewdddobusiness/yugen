@@ -141,11 +141,11 @@ const DragDropCalendar: React.FC<CalendarProps> = ({ isLoading }) => {
   }
 
   return (
-    <div className="w-full h-full rounded-xl border border-zinc-200 relative pb-14">
-      <div className="w-full h-[50px] bg-zinc-100 rounded-t-xl border-b border-zinc-200 flex items-center justify-between">
-        <div className="text-sm font-bold ml-4">{formatHeaderDate()}</div>
+    <div className="w-full h-full flex flex-col">
+      <div className="w-full bg-zinc-100 flex items-center justify-between p-4">
+        <div className="text-sm font-bold">{formatHeaderDate()}</div>
 
-        <div className="mr-4 flex flex-row items-center">
+        <div className="flex flex-row items-center">
           <div className="overflow-hidden flex flex-row">
             <Button
               className="h-8 px-4 py-2 rounded-l-lg rounded-r-none flex items-center"
@@ -175,7 +175,7 @@ const DragDropCalendar: React.FC<CalendarProps> = ({ isLoading }) => {
               <ChevronRight size={12} />
             </Button>
           </div>
-          <Separator orientation="vertical" className="h-6 m==][x-4 border-zinc-200" />
+          <Separator orientation="vertical" className="h-6 " />
 
           <Button
             className="text-xs px-4 h-8 rounded-lg"
@@ -186,15 +186,15 @@ const DragDropCalendar: React.FC<CalendarProps> = ({ isLoading }) => {
         </div>
       </div>
 
-      <div className="h-[calc(100%-50px)] overflow-y-auto">
+      <div className="flex-1 min-h-0">
         <DnDCalendar
+          className="h-full "
           localizer={localizer}
           events={events}
           view={view as View}
           onView={handleViewChange}
           date={date}
           onNavigate={handleNavigate}
-          style={{ height: "100%" }}
           toolbar={false}
           popup
           draggableAccessor={(event: any) => true}
@@ -208,15 +208,6 @@ const DragDropCalendar: React.FC<CalendarProps> = ({ isLoading }) => {
           }}
           dayPropGetter={(date: Date) => ({
             className: date.getDay() === 0 || date.getDay() === 6 ? "bg-gray-100" : "bg-white",
-          })}
-          eventPropGetter={(event: any) => ({
-            style: {
-              backgroundColor: "#171717",
-              color: "white",
-              borderRadius: "4px",
-              border: "none",
-              fontSize: "0.65rem",
-            },
           })}
         />
       </div>

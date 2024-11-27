@@ -7,6 +7,7 @@ import { Loader2, Clock } from "lucide-react";
 import { formatTime } from "@/utils/formatting/datetime";
 import { cn } from "@/components/lib/utils";
 import { setItineraryActivityTimes } from "@/actions/supabase/actions";
+import { useQueryClient } from "@tanstack/react-query";
 
 const generateTimeOptions = () => {
   const times = [];
@@ -33,6 +34,8 @@ export default function TimePopover({
   showText?: boolean;
   styled?: boolean;
 }) {
+  const queryClient = useQueryClient();
+
   const [startTime, setStartTime] = useState(storeStartTime);
   const [endTime, setEndTime] = useState(storeEndTime);
   const [error, setError] = useState("");
@@ -77,9 +80,8 @@ export default function TimePopover({
 
     setIsLoading(true);
     try {
-      console.log("startTime: ", startTime);
-      console.log("endTime: ", endTime);
       await setItineraryActivityTimes(itineraryActivityId.toString(), startTime, endTime);
+      queryClient.invalidateQueries({ queryKey: ["itineraryActivities"] });
       setIsOpen(false);
     } catch (error) {
       console.error("Error saving times:", error);

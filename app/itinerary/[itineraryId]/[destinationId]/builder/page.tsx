@@ -66,7 +66,9 @@ export default function Builder() {
       <ResizableHandle withHandle />
       <ResizablePanel defaultSize={60} className="min-h-0">
         <ScrollArea className="h-full w-full">
-          <DragDropCalendar isLoading={isLoading} />
+          <div className="flex flex-col items-center justify-center h-full w-full p-4">
+            <DragDropCalendar isLoading={isLoading} />
+          </div>
         </ScrollArea>
       </ResizablePanel>
     </ResizablePanelGroup>
