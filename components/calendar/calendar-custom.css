@@ -7,6 +7,7 @@
 .rbc-time-content {
   border-top: 1px solid #ddd;
   height: calc(100% - 30px) !important; /* Adjust this value as needed */
+  border-left: none;
 }
 
 /* Remove extra borders */
@@ -35,6 +36,7 @@
 .rbc-time-view {
   display: flex;
   flex-direction: column;
+  border-left: none;
 }
 
 .rbc-time-header {
@@ -53,4 +55,27 @@
 /* Adjust the content to take full height in day view */
 .rbc-time-view.rbc-day-view .rbc-time-content {
   height: 100% !important;
+}
+
+/* Remove left border from time column */
+.rbc-time-gutter {
+  border-right: none;
+}
+
+.rbc-time-view {
+  border-left: none;
+}
+
+/* Remove other left borders if they exist */
+.rbc-time-content {
+  border-left: none;
+}
+
+.rbc-today {
+  border-left: none;
+}
+
+/* Remove border below header dates */
+.rbc-header {
+  border-bottom: none !important;
 }

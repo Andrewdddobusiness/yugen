@@ -35,42 +35,10 @@ export default function Builder() {
   if (error) return <div>An error occurred: {error.message}</div>;
 
   return (
-    <ResizablePanelGroup direction="horizontal" className="h-screen">
-      <ResizablePanel defaultSize={40} minSize={33} className="flex flex-col py-8 min-h-0 gap-2">
-        <div className="flex flex-col items-center justify-between px-12 flex-shrink-0">
-          <h3 className="w-full text-4xl font-bold">Itinerary</h3>
-        </div>
-        <Tabs defaultValue="list" className="flex flex-col">
-          <div className="flex flex-row px-12 ">
-            <TabsList className="border w-full flex">
-              <TabsTrigger value="list" className="w-full flex">
-                List
-              </TabsTrigger>
-              <TabsTrigger value="table" className="w-full flex">
-                Table
-              </TabsTrigger>
-            </TabsList>
-          </div>
-          <TabsContent value="list" className="flex-grow min-h-0">
-            <ScrollArea className="h-full w-full">
-              <ItineraryList />
-            </ScrollArea>
-          </TabsContent>
-          <TabsContent value="table" className="flex-grow min-h-0">
-            <ScrollArea className="h-full w-full">
-              <ItineraryList />
-            </ScrollArea>
-          </TabsContent>
-        </Tabs>
-      </ResizablePanel>
-      <ResizableHandle withHandle />
-      <ResizablePanel defaultSize={60} className="min-h-0">
-        <ScrollArea className="h-full w-full">
-          <div className="flex flex-col items-center justify-center h-full w-full p-4">
-            <DragDropCalendar isLoading={isLoading} />
-          </div>
-        </ScrollArea>
-      </ResizablePanel>
-    </ResizablePanelGroup>
+    <ScrollArea className="h-full w-full">
+      <div className="flex flex-col items-center justify-center h-full w-full">
+        <DragDropCalendar isLoading={isLoading} />
+      </div>
+    </ScrollArea>
   );
 }

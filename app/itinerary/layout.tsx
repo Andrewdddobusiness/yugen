@@ -2,8 +2,17 @@
 import { useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 
-import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
-import { AppSidebarItineraryActivityLeft } from "@/components/sidebar/appSidebar/appSidebarItineraryActivityLeft";
+import { SidebarProvider, SidebarTrigger, SidebarInset } from "@/components/ui/sidebar";
+import { AppSidebarItineraryActivityLeft } from "@/components/sidebar/appSidebar/appSidebarItineraryActivityLeft2";
+import { Separator } from "@/components/ui/separator";
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from "@/components/ui/breadcrumb";
 
 import { getSubscriptionDetails } from "@/actions/stripe/actions";
 
@@ -111,37 +120,33 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   }, [itineraryActivities, setItineraryActivities]);
 
   return (
-    <div className="flex w-full">
-      <SidebarProvider panelType={"left"}>
+    <div className="flex h-screen">
+      <SidebarProvider
+        style={
+          {
+            "--sidebar-width": "350px",
+          } as React.CSSProperties
+        }
+      >
         <AppSidebarItineraryActivityLeft />
-
-        <main className="flex flex-col flex-1 min-h-[calc(100vh_-_theme(spacing.16))] bg-muted relative">
-          <SidebarTrigger
-            className={cn(
-              "mt-2 -ml-[1px] bg-white absolute top-0 z-20 transition-all duration-300 rounded-l-none",
-              "shadow-[2px_2px_5px_rgba(0,0,0,0.1)]",
-              isCartOpen ? "left-[400px]" : "left-0"
-            )}
-          />
-          <div
-            className={cn(
-              "mt-2 -ml-[1px] bg-white absolute top-12 z-20 transition-all duration-300 rounded-r-md",
-              "shadow-[2px_2px_5px_rgba(0,0,0,0.1)]",
-              isCartOpen ? "left-[400px]" : "left-0"
-            )}
-          >
-            <Button
-              variant="ghost"
-              size="icon"
-              className={cn("w-10 h-10 rounded-l-none", "[&>svg]:h-5 [&>svg]:w-5")}
-              onClick={() => setIsCartOpen(!isCartOpen)}
-            >
-              <LayoutList size={20} />
-              <span className="sr-only">Toggle Activity Cart</span>
-            </Button>
-          </div>
-          {children}
-        </main>
+        <SidebarInset>
+          <header className="sticky top-0 flex shrink-0 items-center gap-2 border-b bg-background p-2">
+            <SidebarTrigger className="-ml-1" />
+            <Separator orientation="vertical" className="mr-2 h-4" />
+            <Breadcrumb>
+              <BreadcrumbList>
+                <BreadcrumbItem>
+                  <BreadcrumbLink href="/itineraries">Itineraries</BreadcrumbLink>
+                </BreadcrumbItem>
+                <BreadcrumbSeparator />
+                <BreadcrumbItem>
+                  <BreadcrumbPage>Builder</BreadcrumbPage>
+                </BreadcrumbItem>
+              </BreadcrumbList>
+            </Breadcrumb>
+          </header>
+          <main className="flex-1 overflow-auto">{children}</main>
+        </SidebarInset>
       </SidebarProvider>
     </div>
   );
