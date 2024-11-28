@@ -160,7 +160,7 @@ export function AppSidebarItineraryActivityLeft() {
       </Sidebar>
 
       {/* Content Sidebar */}
-      <Sidebar collapsible="none" className="hidden flex-1 md:flex gap-4">
+      <Sidebar collapsible="none" className="hidden flex-1 md:flex gap-4 ">
         <SidebarHeader className="px-12 pt-8 pb-4">
           {itinerary ? (
             <div className="flex flex-col gap-2">

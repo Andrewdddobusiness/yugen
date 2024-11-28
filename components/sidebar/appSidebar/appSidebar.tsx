@@ -36,7 +36,7 @@ const PopUpCreateItinerary = dynamic(() => import("@/components/popUp/popUpCreat
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   return (
-    <Sidebar variant="inset" {...props} className="shadow-md bg-white">
+    <Sidebar variant="inset" {...props} className="shadow-md bg-white" sidebarWidth="18rem">
       <SidebarHeader className="bg-white">
         <SidebarMenu>
           <SidebarMenuItem>

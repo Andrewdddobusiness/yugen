@@ -44,7 +44,7 @@ export function DateGroup({ date, activities, isUnscheduled }: DateGroupProps) {
         <Button variant="ghost" size="icon" className="rounded-full " onClick={toggleOpen}>
           {isOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
         </Button>
-        <h2 className="text-2xl font-semibold">{isUnscheduled ? "Unscheduled" : format(date, "MMMM d, yyyy")}</h2>
+        <h2 className="text-lg font-semibold">{isUnscheduled ? "Unscheduled" : format(date, "MMMM d, yyyy")}</h2>
       </div>
 
       {isOpen && (

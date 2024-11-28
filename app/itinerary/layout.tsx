@@ -131,9 +131,12 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex h-screen">
       <SidebarProvider
+        defaultOpen={true}
         style={
           {
             "--sidebar-width": "350px",
+            "--sidebar-width-icon": "48px", // Width when collapsed
+            "--sidebar-width-mobile": "280px",
           } as React.CSSProperties
         }
       >
