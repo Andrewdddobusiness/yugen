@@ -136,7 +136,6 @@ export function AppSidebarItineraryActivityLeft() {
                         children: item.title,
                         hidden: false,
                       }}
-                      onClick={() => setOpen(true)}
                       asChild
                       className={cn(
                         pathname === item.href && "bg-sidebar-accent text-sidebar-accent-foreground",
