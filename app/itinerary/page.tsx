@@ -1,5 +1,5 @@
-import { redirect } from "next/navigation";
+import ErrorPage from "../error/page";
 
 export default function Itinerary() {
-  redirect("/itinerary/1/overview");
+  return <ErrorPage />;
 }

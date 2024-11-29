@@ -1,5 +1,5 @@
 "use client";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { usePathname } from "next/navigation";
 
@@ -14,6 +14,14 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 import { getSubscriptionDetails } from "@/actions/stripe/actions";
 
@@ -25,6 +33,9 @@ import { useCartStore } from "@/store/cartStore";
 
 import { IItineraryActivity, useItineraryActivityStore } from "@/store/itineraryActivityStore";
 import { useParams } from "next/navigation";
+import { Button } from "@/components/ui/button";
+import { Download, Share, Users } from "lucide-react";
+import { ExportDialog } from "@/components/share/exportDialog";
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   const { itineraryId, destinationId } = useParams();
@@ -128,6 +139,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     return "Builder"; // default fallback
   };
 
+  const [exportDialogOpen, setExportDialogOpen] = useState(false);
+
   return (
     <div className="flex h-screen">
       <SidebarProvider
@@ -143,23 +156,50 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         <AppSidebarItineraryActivityLeft />
         <SidebarInset>
           <header className="sticky top-0 flex shrink-0 items-center gap-2 border-b bg-background p-2">
-            <SidebarTrigger className="-ml-1" />
-            <Separator orientation="vertical" className="mr-2 h-4" />
-            <Breadcrumb>
-              <BreadcrumbList>
-                <BreadcrumbItem>
-                  <BreadcrumbLink href="/itineraries">Itineraries</BreadcrumbLink>
-                </BreadcrumbItem>
-                <BreadcrumbSeparator />
-                <BreadcrumbItem>
-                  <BreadcrumbPage>{getBreadcrumbText()}</BreadcrumbPage>
-                </BreadcrumbItem>
-              </BreadcrumbList>
-            </Breadcrumb>
+            <div className="flex items-center gap-2 flex-1">
+              <SidebarTrigger className="-ml-1" />
+              <Separator orientation="vertical" className="mr-2 h-4" />
+              <Breadcrumb>
+                <BreadcrumbList>
+                  <BreadcrumbItem>
+                    <BreadcrumbLink href="/itineraries">Itineraries</BreadcrumbLink>
+                  </BreadcrumbItem>
+                  <BreadcrumbSeparator />
+                  <BreadcrumbItem>
+                    <BreadcrumbPage>{getBreadcrumbText()}</BreadcrumbPage>
+                  </BreadcrumbItem>
+                </BreadcrumbList>
+              </Breadcrumb>
+            </div>
+
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="default"
+                  className="gap-2 transition-colors active:scale-95 active:bg-accent hover:bg-accent/80"
+                >
+                  <Share className="size-4" />
+                  <span>Share</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent>
+                <DropdownMenuItem className="cursor-pointer">
+                  <Users className="size-4" />
+                  <span>Invite Collaborators</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem className="cursor-pointer" onClick={() => setExportDialogOpen(true)}>
+                  <Download className="size-4" />
+                  <span>Export</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </header>
           <main className="flex-1 overflow-auto">{children}</main>
         </SidebarInset>
       </SidebarProvider>
+
+      <ExportDialog open={exportDialogOpen} onOpenChange={setExportDialogOpen} itineraryId={itineraryId as string} />
     </div>
   );
 }
