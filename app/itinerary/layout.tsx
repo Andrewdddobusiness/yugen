@@ -36,6 +36,7 @@ import { useParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Download, Share, Users } from "lucide-react";
 import { ExportDialog } from "@/components/share/exportDialog";
+import Loading from "@/components/loading/loading";
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   const { itineraryId, destinationId } = useParams();
@@ -140,6 +141,10 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   };
 
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
+
+  if (!itineraryId || !destinationId) {
+    return <Loading />;
+  }
 
   return (
     <div className="flex h-screen">
