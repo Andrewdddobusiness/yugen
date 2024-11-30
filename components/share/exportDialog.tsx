@@ -13,6 +13,10 @@ import {
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
+import { exportToPDF } from "@/utils/export/pdfExport";
+import { useQuery } from "@tanstack/react-query";
+import { fetchItineraryDestination, fetchItineraryActivities } from "@/actions/supabase/actions";
+import { useItineraryActivityStore } from "@/store/itineraryActivityStore";
 
 interface ExportOption {
   id: string;
@@ -29,6 +33,8 @@ interface ExportDialogProps {
 }
 
 export function ExportDialog({ open, onOpenChange, itineraryId }: ExportDialogProps) {
+  const { itineraryActivities } = useItineraryActivityStore();
+
   const exportOptions: ExportOption[] = [
     {
       id: "pdf",
@@ -53,12 +59,34 @@ export function ExportDialog({ open, onOpenChange, itineraryId }: ExportDialogPr
     },
   ];
 
+  // Fetch itinerary details
+  const { data: destinationData } = useQuery({
+    queryKey: ["itineraryDestination", itineraryId],
+    queryFn: () => fetchItineraryDestination(itineraryId as string),
+    enabled: !!itineraryId,
+  });
+
+  // Fetch activities
+  //   const { data: activities } = useQuery({
+  //     queryKey: ["itineraryActivities", itineraryId],
+  //     queryFn: () => fetchItineraryActivities(itineraryId as string, itineraryId as string),
+  //     enabled: !!itineraryId,
+  //   });
+
   const handleExport = async (type: string) => {
     try {
       switch (type) {
         case "pdf":
-          // Implement PDF export logic
-          console.log("Exporting as PDF...");
+          if (destinationData?.data && itineraryActivities) {
+            const itineraryDetails = {
+              city: destinationData.data.city,
+              country: destinationData.data.country,
+              fromDate: new Date(destinationData.data.from_date),
+              toDate: new Date(destinationData.data.to_date),
+              activities: itineraryActivities,
+            };
+            await exportToPDF(itineraryDetails);
+          }
           break;
         case "maps":
           // Implement Google Maps export logic
