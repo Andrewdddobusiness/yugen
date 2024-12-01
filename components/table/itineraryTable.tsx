@@ -1,154 +1,90 @@
 "use client";
 import { useState } from "react";
-import {
-  Table,
-  TableBody,
-  TableCaption,
-  TableCell,
-  TableFooter,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
-  DropdownMenu,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-  DropdownMenuContent,
-} from "@/components/ui/dropdown-menu";
-import { Edit, Trash } from "lucide-react";
-import TimePopover from "../time/timePopover";
 
-const itinerary = [
-  {
-    day: "Monday",
-    date: "2024-06-17",
-    activities: [
-      {
-        title: "Visit Royal Botanic Gardens",
-        description: "Explore the beautiful gardens and greenhouse.",
-        timePeriod: "09:00 AM - 11:00 AM",
-        cost: "$0.00",
-      },
-      {
-        title: "Lunch at Local Cafe",
-        description: "Enjoy a delicious meal at the nearby cafe.",
-        timePeriod: "12:00 PM - 01:00 PM",
-        cost: "$20.00",
-      },
-    ],
-  },
-  {
-    day: "Tuesday",
-    date: "2024-06-18",
-    activities: [
-      {
-        title: "National Gallery Visit",
-        description: "Admire the artworks and exhibitions.",
-        timePeriod: "10:00 AM - 12:00 PM",
-        cost: "$15.00",
-      },
-      {
-        title: "City Tour",
-        description: "Take a guided tour around the city.",
-        timePeriod: "02:00 PM - 04:00 PM",
-        cost: "$30.00",
-      },
-    ],
-  },
-  // Add more mock data as needed
-];
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
-export default function ItineraryTable() {
-  const [currentDay, setCurrentDay] = useState("Monday");
+import TimePopover from "@/components/time/timePopover";
+import { Badge } from "@/components/ui/badge";
+import { DatePickerPopover } from "@/components/date/datePickerPopover";
 
-  const handleDayChange = (day: any) => {
-    setCurrentDay(day);
+import { formatCategoryType } from "@/utils/formatting/types";
+
+import { useItineraryActivityStore } from "@/store/itineraryActivityStore";
+import { Textarea } from "../ui/textarea";
+import { NotesPopover } from "@/components/popover/notesPopover";
+
+export function ItineraryTableView() {
+  const { itineraryActivities } = useItineraryActivityStore();
+  const [notes, setNotes] = useState<{ [key: string]: string }>({});
+
+  const handleNotesChange = (id: string, value: string) => {
+    setNotes((prev) => ({ ...prev, [id]: value }));
+    // You might want to save this to your database
   };
 
-  const handleDelete = (activity: any) => {
-    // Handle delete activity logic here
-  };
-
-  const handleTimePeriodClick = (activity: any) => {
-    // Handle time period adjustment logic here
+  const getTypeBadgeVariant = (type: string) => {
+    switch (type?.toLowerCase()) {
+      case "restaurant":
+        return "default";
+      case "attraction":
+        return "secondary";
+      default:
+        return "default";
+    }
   };
 
   return (
-    <div className="flex flex-col p-2 px-4 sm:px-8 pt-4">
-      {itinerary.map((dayPlan, index) => (
-        <div key={index} className="mb-8">
-          <Table className="w-full">
-            <TableHeader>
-              <TableRow>
-                <TableHead colSpan={5} className="text-left text-lg">
-                  <div className="flex items-center justify-between">
-                    <span>{`${dayPlan.day}, ${dayPlan.date}`}</span>
-                  </div>
-                </TableHead>
-              </TableRow>
-              <TableRow>
-                <TableHead>Title</TableHead>
-                <TableHead>Description</TableHead>
-                <TableHead>Time Period</TableHead>
-                <TableHead>Day</TableHead>
-                <TableHead className="text-right">Cost</TableHead>
-
-                <TableHead></TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {dayPlan.activities.map((activity, activityIndex) => (
-                <TableRow key={activityIndex}>
-                  <TableCell className="font-medium">
-                    {activity.title}
-                  </TableCell>
-                  <TableCell>{activity.description}</TableCell>
-                  <TableCell>
-                    <button onClick={() => handleTimePeriodClick(activity)}>
-                      <TimePopover />
-                      {/* {activity.timePeriod} */}
-                    </button>
-                  </TableCell>
-                  <TableCell>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger>
-                        <button className="text-blue-500">{dayPlan.day}</button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent>
-                        {[
-                          "Monday",
-                          "Tuesday",
-                          "Wednesday",
-                          "Thursday",
-                          "Friday",
-                          "Saturday",
-                          "Sunday",
-                        ].map((day) => (
-                          <DropdownMenuItem
-                            key={day}
-                            onClick={() => handleDayChange(day)}
-                          >
-                            {day}
-                          </DropdownMenuItem>
-                        ))}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
-                  <TableCell className="text-right">{activity.cost}</TableCell>
-
-                  <TableCell>
-                    <Trash
-                      className="cursor-pointer h-5 w-5 text-red-500"
-                      onClick={() => handleDelete(activity)}
-                    />
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
-      ))}
+    <div className="rounded-md">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Activity Name</TableHead>
+            <TableHead>Type</TableHead>
+            <TableHead>Address</TableHead>
+            <TableHead>Time</TableHead>
+            <TableHead>Date</TableHead>
+            <TableHead className="w-[300px]">Notes</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody className="">
+          {itineraryActivities.map((activity) => (
+            <TableRow key={activity.itinerary_activity_id}>
+              <TableCell>{activity.activity?.name}</TableCell>
+              <TableCell>
+                {activity.activity?.types && (
+                  <Badge variant={getTypeBadgeVariant(activity?.activity.types[0])}>
+                    <span className="line-clamp-1">{formatCategoryType(activity?.activity.types[0])}</span>
+                  </Badge>
+                )}
+              </TableCell>
+              <TableCell>{activity.activity?.address}</TableCell>
+              <TableCell>
+                <TimePopover
+                  itineraryActivityId={Number(activity.itinerary_activity_id)}
+                  storeStartTime={activity.start_time}
+                  storeEndTime={activity.end_time}
+                  showText={true}
+                  styled={true}
+                />
+              </TableCell>
+              <TableCell>
+                <DatePickerPopover
+                  itineraryActivityId={Number(activity.itinerary_activity_id)}
+                  showText={true}
+                  styled={true}
+                />
+              </TableCell>
+              <TableCell>
+                <NotesPopover
+                  id={activity.itinerary_activity_id}
+                  value={notes[activity.itinerary_activity_id] || ""}
+                  onChange={handleNotesChange}
+                />
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
     </div>
   );
 }

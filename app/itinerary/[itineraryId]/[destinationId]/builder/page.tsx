@@ -1,7 +1,7 @@
 "use client";
 import React, { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
-
+import { Calendar, Table2 } from "lucide-react";
 import DragDropCalendar from "@/components/calendar/calendar";
 import { DatePickerWithRangePopover } from "@/components/date/dateRangePickerPopover";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
@@ -12,6 +12,8 @@ import { useItineraryActivityStore } from "@/store/itineraryActivityStore";
 import Loading from "@/components/loading/loading";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useDateRangeStore } from "@/store/dateRangeStore";
+import { ItineraryTableView } from "@/components/table/itineraryTable";
+import { cn } from "@/lib/utils";
 
 export default function Builder() {
   const { itineraryId, destinationId } = useParams();
@@ -40,10 +42,36 @@ export default function Builder() {
   if (error) return <div>An error occurred: {error.message}</div>;
 
   return (
-    <ScrollArea className="h-full w-full">
-      <div className="flex flex-col items-center justify-center h-full w-full">
-        <DragDropCalendar isLoading={isLoading} />
-      </div>
-    </ScrollArea>
+    <div className="flex flex-col h-full w-full overflow-hidden">
+      <Tabs defaultValue="calendar" className="flex flex-col h-full">
+        <div className="p-4 flex-none flex justify-end">
+          <TabsList className="grid w-[90px] grid-cols-2 border">
+            <TabsTrigger value="calendar" className="p-2">
+              <Calendar className="h-4 w-4" />
+            </TabsTrigger>
+            <TabsTrigger value="table" className="p-2">
+              <Table2 className="h-4 w-4" />
+            </TabsTrigger>
+          </TabsList>
+        </div>
+
+        <div className="flex-1 min-h-0 overflow-hidden">
+          <TabsContent value="calendar" className="h-full m-0">
+            <ScrollArea className="h-full">
+              <div className="flex flex-col h-full">
+                <DragDropCalendar isLoading={isLoading} />
+              </div>
+            </ScrollArea>
+          </TabsContent>
+          <TabsContent value="table" className="h-full m-0">
+            <ScrollArea className="h-full">
+              <div className="h-full">
+                <ItineraryTableView />
+              </div>
+            </ScrollArea>
+          </TabsContent>
+        </div>
+      </Tabs>
+    </div>
   );
 }

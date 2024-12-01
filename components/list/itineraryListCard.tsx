@@ -34,8 +34,6 @@ export const ItineraryListCard: React.FC<ItineraryListCardProps> = ({ activity, 
   /* HANDLERS */
   const handleRemoveFromItinerary = async (e: React.MouseEvent) => {
     setLoading(true);
-    console.log("activity:", activity);
-    console.log("itineraryId:", itineraryId);
     if (!activity || !itineraryId) return;
 
     await removeItineraryActivity(activity?.activity?.place_id || "", itineraryId);

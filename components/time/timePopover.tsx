@@ -97,7 +97,7 @@ export default function TimePopover({
         <Button
           variant={styled ? "outline" : "ghost"}
           className={cn(
-            styled && "w-full min-w-40 justify-start text-left font-normal text-xs",
+            styled && "w-full min-w-40 justify-start text-left font-normal text-xs rounded-lg",
             styled && "text-muted-foreground",
             !styled && "flex justify-center items-center p-0 h-auto "
           )}

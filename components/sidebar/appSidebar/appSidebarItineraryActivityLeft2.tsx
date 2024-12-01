@@ -53,8 +53,6 @@ export function AppSidebarItineraryActivityLeft() {
 
   useEffect(() => {
     if (itinerary) {
-      console.log("itinerary.from_date:", itinerary.from_date);
-      console.log("itinerary.to_date:", itinerary.to_date);
       setDateRange({ from: itinerary.from_date as Date, to: itinerary.to_date as Date });
     }
   }, [itinerary]);

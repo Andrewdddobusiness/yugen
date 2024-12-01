@@ -67,7 +67,7 @@ export function DatePickerPopover({ itineraryActivityId, showText = true, styled
         <Button
           variant={styled ? "outline" : "ghost"}
           className={cn(
-            styled && "w-full min-w-40 justify-start text-left font-normal text-xs",
+            styled && "w-full text-muted-foreground min-w-40 justify-start text-left font-normal text-xs",
             styled && !date && "text-muted-foreground",
             !styled && "flex justify-center items-center p-0 h-auto "
           )}

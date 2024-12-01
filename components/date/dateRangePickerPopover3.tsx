@@ -22,9 +22,6 @@ export function DatePickerWithRangePopover3({ selectedDateRange, onDateRangeConf
   const [date, setDate] = useState<DateRange | undefined>(selectedDateRange);
   const [isOpen, setIsOpen] = useState(false);
 
-  console.log("selectedDateRange:", selectedDateRange);
-  console.log("date:", date);
-
   // Update local state when prop changes
   useEffect(() => {
     setDate(selectedDateRange);
