@@ -126,7 +126,7 @@ const DragDropCalendar: React.FC<CalendarProps> = ({ isLoading }) => {
     if (view === "day") {
       return null;
     } else {
-      return <div className="text-sm font-semibold text-gray-800 p-1 text-center h-10">{label}</div>;
+      return <div className="text-sm font-semibold text-gray-800 p-1 text-center h-10 ">{label}</div>;
     }
   };
 
@@ -141,8 +141,8 @@ const DragDropCalendar: React.FC<CalendarProps> = ({ isLoading }) => {
   }
 
   return (
-    <div className="w-full h-full flex flex-col">
-      <div className="w-full bg-zinc-100 flex items-center justify-between p-4">
+    <div className="w-full h-full flex flex-col bg-white">
+      <div className="w-full bg-white flex items-center justify-between p-4">
         <div className="text-sm font-bold">{formatHeaderDate()}</div>
 
         <div className="flex flex-row items-center">
@@ -186,9 +186,9 @@ const DragDropCalendar: React.FC<CalendarProps> = ({ isLoading }) => {
         </div>
       </div>
 
-      <div className="flex-1 min-h-0">
+      <div className="flex-1 min-h-0 bg-white">
         <DnDCalendar
-          className="h-full "
+          className="h-full"
           localizer={localizer}
           events={events}
           view={view as View}

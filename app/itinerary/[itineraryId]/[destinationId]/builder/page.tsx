@@ -14,6 +14,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useDateRangeStore } from "@/store/dateRangeStore";
 import { ItineraryTableView } from "@/components/table/itineraryTable";
 import { cn } from "@/lib/utils";
+import ErrorPage from "@/app/error/page";
+import { Separator } from "@/components/ui/separator";
 
 export default function Builder() {
   const { itineraryId, destinationId } = useParams();
@@ -39,12 +41,12 @@ export default function Builder() {
   }, [data, setItineraryActivities, setDateRange]);
 
   if (isLoading) return <Loading />;
-  if (error) return <div>An error occurred: {error.message}</div>;
+  if (error) return <ErrorPage />;
 
   return (
     <div className="flex flex-col h-full w-full overflow-hidden">
       <Tabs defaultValue="calendar" className="flex flex-col h-full">
-        <div className="p-4 flex-none flex justify-end">
+        <div className="p-2 flex-none flex justify-end">
           <TabsList className="grid w-[90px] grid-cols-2 border">
             <TabsTrigger value="calendar" className="p-2">
               <Calendar className="h-4 w-4" />
@@ -54,6 +56,8 @@ export default function Builder() {
             </TabsTrigger>
           </TabsList>
         </div>
+
+        <Separator />
 
         <div className="flex-1 min-h-0 overflow-hidden">
           <TabsContent value="calendar" className="h-full m-0">
@@ -65,7 +69,7 @@ export default function Builder() {
           </TabsContent>
           <TabsContent value="table" className="h-full m-0">
             <ScrollArea className="h-full">
-              <div className="h-full">
+              <div className="h-full ">
                 <ItineraryTableView />
               </div>
             </ScrollArea>
