@@ -13,6 +13,9 @@ import { useItineraryActivityStore } from "@/store/itineraryActivityStore";
 import { exportToMyMaps } from "@/utils/export/mapsExport";
 import { generateKML } from "@/utils/export/kmlExport";
 import { Button } from "@/components/ui/button";
+import { exportToExcel } from "@/utils/export/excelExport";
+import { ExportDownloadState } from "@/components/share/exportDownloadState";
+import { useState } from "react";
 
 interface ExportOption {
   id: string;
@@ -30,7 +33,8 @@ interface ExportDialogProps {
 
 export function ExportDialog({ open, onOpenChange, itineraryId }: ExportDialogProps) {
   const { itineraryActivities } = useItineraryActivityStore();
-  const [showInstructions, setShowInstructions] = React.useState(false);
+  const [showInstructions, setShowInstructions] = useState(false);
+  const [showDownloadState, setShowDownloadState] = useState<"pdf" | "excel" | null>(null);
   const [kmlData, setKmlData] = React.useState<{ content: string; fileName: string } | null>(null);
 
   const exportOptions: ExportOption[] = [
@@ -39,7 +43,7 @@ export function ExportDialog({ open, onOpenChange, itineraryId }: ExportDialogPr
       title: "PDF Document",
       description: "Export your itinerary as a detailed PDF document",
       icon: FileText,
-      onClick: () => handleExport("pdf"),
+      onClick: () => setShowDownloadState("pdf"),
     },
     {
       id: "maps",
@@ -56,7 +60,7 @@ export function ExportDialog({ open, onOpenChange, itineraryId }: ExportDialogPr
       title: "Excel Spreadsheet",
       description: "Export your itinerary as an Excel spreadsheet",
       icon: FileSpreadsheet,
-      onClick: () => handleExport("excel"),
+      onClick: () => setShowDownloadState("excel"),
     },
   ];
 
@@ -99,88 +103,43 @@ export function ExportDialog({ open, onOpenChange, itineraryId }: ExportDialogPr
     }
   };
 
-  const handleExport = async (type: string) => {
-    try {
-      switch (type) {
-        case "pdf":
-          if (destinationData?.data && itineraryActivities) {
-            const itineraryDetails = {
-              city: destinationData.data.city,
-              country: destinationData.data.country,
-              fromDate: new Date(destinationData.data.from_date),
-              toDate: new Date(destinationData.data.to_date),
-              activities: itineraryActivities,
-            };
-            await exportToPDF(itineraryDetails);
-          }
-          break;
-        case "maps":
-          if (itineraryActivities && destinationData?.data) {
-            const locations = itineraryActivities
-              .filter(
-                (activity): activity is typeof activity & { activity: { coordinates: [number, number] } } =>
-                  !!activity.activity?.place_id &&
-                  Array.isArray(activity.activity?.coordinates) &&
-                  activity.activity.coordinates.length === 2
-              )
-              .map((activity) => ({
-                name: activity.activity?.name || "",
-                placeId: activity.activity?.place_id || "",
-                coordinates: activity.activity.coordinates,
-                description: activity.activity?.description || "",
-                address: activity.activity?.address || "",
-              }));
+  const executeExport = async () => {
+    if (!showDownloadState || !destinationData?.data || !itineraryActivities) return;
 
-            if (locations.length > 0) {
-              const kmlContent = generateKML(locations, `${destinationData.data.city} Itinerary`);
-              setShowInstructions(true);
-              exportToMyMaps(kmlContent, `${destinationData.data.city}_itinerary`);
-              if (onOpenChange) onOpenChange(false); // Close the export dialog
-            }
-          }
-          break;
-        case "excel":
-          // Implement Excel export logic
-          console.log("Exporting as Excel...");
-          break;
+    try {
+      const itineraryDetails = {
+        city: destinationData.data.city,
+        country: destinationData.data.country,
+        fromDate: new Date(destinationData.data.from_date),
+        toDate: new Date(destinationData.data.to_date),
+        activities: itineraryActivities,
+      };
+
+      if (showDownloadState === "pdf") {
+        await exportToPDF(itineraryDetails);
+      } else if (showDownloadState === "excel") {
+        await exportToExcel(itineraryDetails);
       }
     } catch (error) {
-      console.error(`Error exporting as ${type}:`, error);
+      console.error("Error in executeExport:", error);
+      throw error;
     }
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[425px]">
-        {!showInstructions ? (
-          <>
-            <DialogHeader>
-              <DialogTitle>Export Itinerary</DialogTitle>
-              <DialogDescription>Choose a format to export your itinerary</DialogDescription>
-            </DialogHeader>
-            <ScrollArea className="max-h-[60vh]">
-              <div className="flex flex-col gap-4 p-4">
-                {exportOptions.map((option, index) => (
-                  <React.Fragment key={option.id}>
-                    {index > 0 && <Separator />}
-                    <button
-                      onClick={option.onClick}
-                      className="flex items-start gap-4 hover:bg-accent p-2 rounded-lg transition-colors"
-                    >
-                      <div className="rounded-md bg-primary/10 p-2">
-                        <option.icon className="h-6 w-6 text-primary" />
-                      </div>
-                      <div className="flex flex-col items-start">
-                        <div className="text-sm font-semibold">{option.title}</div>
-                        <div className="text-sm text-muted-foreground">{option.description}</div>
-                      </div>
-                    </button>
-                  </React.Fragment>
-                ))}
-              </div>
-            </ScrollArea>
-          </>
-        ) : (
+        {showDownloadState ? (
+          <ExportDownloadState
+            type={showDownloadState}
+            onBack={() => setShowDownloadState(null)}
+            onClose={() => {
+              setShowDownloadState(null);
+              if (onOpenChange) onOpenChange(false);
+            }}
+            onExport={executeExport}
+          />
+        ) : showInstructions ? (
           <>
             <DialogHeader>
               <div className="flex items-center">
@@ -222,6 +181,34 @@ export function ExportDialog({ open, onOpenChange, itineraryId }: ExportDialogPr
                 </ol>
               </DialogDescription>
             </DialogHeader>
+          </>
+        ) : (
+          <>
+            <DialogHeader>
+              <DialogTitle>Export Itinerary</DialogTitle>
+              <DialogDescription>Choose a format to export your itinerary</DialogDescription>
+            </DialogHeader>
+            <ScrollArea className="max-h-[60vh]">
+              <div className="flex flex-col gap-4 p-4">
+                {exportOptions.map((option, index) => (
+                  <React.Fragment key={option.id}>
+                    {index > 0 && <Separator />}
+                    <button
+                      onClick={option.onClick}
+                      className="flex items-start gap-4 hover:bg-accent p-2 rounded-lg transition-colors"
+                    >
+                      <div className="rounded-md bg-primary/10 p-2">
+                        <option.icon className="h-6 w-6 text-primary" />
+                      </div>
+                      <div className="flex flex-col items-start">
+                        <div className="text-sm font-semibold">{option.title}</div>
+                        <div className="text-sm text-muted-foreground">{option.description}</div>
+                      </div>
+                    </button>
+                  </React.Fragment>
+                ))}
+              </div>
+            </ScrollArea>
           </>
         )}
       </DialogContent>
