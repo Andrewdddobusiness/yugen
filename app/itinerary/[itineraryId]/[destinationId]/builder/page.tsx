@@ -13,7 +13,7 @@ import Loading from "@/components/loading/loading";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useDateRangeStore } from "@/store/dateRangeStore";
 import { ItineraryTableView } from "@/components/table/itineraryTable";
-import { cn } from "@/lib/utils";
+
 import ErrorPage from "@/app/error/page";
 import { Separator } from "@/components/ui/separator";
 
@@ -69,7 +69,7 @@ export default function Builder() {
           </TabsContent>
           <TabsContent value="table" className="h-full m-0">
             <ScrollArea className="h-full">
-              <div className="h-full ">
+              <div className="flex flex-col w-full h-full">
                 <ItineraryTableView />
               </div>
             </ScrollArea>
