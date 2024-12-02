@@ -20,7 +20,8 @@ const SIDEBAR_COOKIE_NAME = "sidebar:state";
 const SIDEBAR_COOKIE_MAX_AGE = 60 * 60 * 24 * 7;
 const SIDEBAR_WIDTH = "24rem";
 const SIDEBAR_WIDTH_RIGHT = "24rem";
-const SIDEBAR_WIDTH_MOBILE = "20rem";
+const SIDEBAR_WIDTH_MOBILE_LEFT = "20rem";
+const SIDEBAR_WIDTH_MOBILE_RIGHT = "24rem";
 const SIDEBAR_WIDTH_ICON = "3rem";
 const SIDEBAR_KEYBOARD_SHORTCUT = "b";
 
@@ -248,6 +249,8 @@ const Sidebar = React.forwardRef<
     }
 
     if (isMobile) {
+      const mobileWidth = side === "right" ? SIDEBAR_WIDTH_MOBILE_RIGHT : SIDEBAR_WIDTH_MOBILE_LEFT;
+
       return (
         <Sheet open={openMobile} onOpenChange={handleOpenChange} {...props}>
           <SheetContent
@@ -256,7 +259,7 @@ const Sidebar = React.forwardRef<
             className="w-[--sidebar-width] bg-sidebar p-0 text-sidebar-foreground [&>button]:hidden"
             style={
               {
-                "--sidebar-width": SIDEBAR_WIDTH_MOBILE,
+                "--sidebar-width": mobileWidth,
               } as React.CSSProperties
             }
             side={side}
