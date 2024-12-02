@@ -26,7 +26,7 @@ import { fetchCityCoordinates, fetchPlaceDetails } from "@/actions/google/action
 import { fetchNearbyActivities } from "@/actions/google/actions";
 
 import { IActivity, IActivityWithLocation, IOpenHours, useActivitiesStore } from "@/store/activityStore";
-import { IItineraryActivity, useItineraryActivityStore } from "@/store/itineraryActivityStore";
+import { useItineraryActivityStore } from "@/store/itineraryActivityStore";
 import { useSidebarStore } from "@/store/sidebarStore";
 import { useMapStore } from "@/store/mapStore";
 import { useActivityTabStore } from "@/store/activityTabStore";
@@ -73,19 +73,6 @@ export default function Activities() {
     latitude: number;
     name: string;
   } | null>(null);
-
-  // // **** GET INITIAL ACTIVITIES ****
-  // const { data: itineraryActivities, isLoading: isItineraryActivitiesLoading } = useQuery({
-  //   queryKey: ["itineraryActivities", itineraryId, destinationId],
-  //   queryFn: () => fetchItineraryActivities(itineraryId as string, destinationId as string),
-  //   enabled: !!itineraryId && !!destinationId,
-  // });
-
-  // useEffect(() => {
-  //   if (itineraryActivities) {
-  //     setItineraryActivities(itineraryActivities as IItineraryActivity[]);
-  //   }
-  // }, [itineraryActivities, setItineraryActivities]);
 
   const { data: destinationData, isLoading: isDestinationLoading } = useQuery({
     queryKey: ["itineraryDestination", itineraryId],
@@ -223,12 +210,6 @@ export default function Activities() {
   useEffect(() => {
     setTopPlacesActivities(fetchedtopPlacesActivities as IActivity[]);
   }, [fetchedtopPlacesActivities, isTopPlacesActivitiesLoading, setTopPlacesActivities]);
-
-  // useEffect(() => {
-  //   if (itineraryActivities) {
-  //     setItineraryActivities(itineraryActivities as IItineraryActivity[]);
-  //   }
-  // }, [itineraryActivities, setItineraryActivities]);
 
   // **** GET SEARCH HISTORY ACTIVITIES ****
   const { data: searchHistoryActivitiesData, isLoading: isSearchHistoryLoading } = useQuery<{

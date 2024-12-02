@@ -33,7 +33,6 @@ import { Separator } from "@/components/ui/separator";
 
 export function AppSidebarItineraryActivityLeft() {
   const { itineraryId, destinationId } = useParams();
-  const { setOpen } = useSidebar();
   const pathname = usePathname();
 
   const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
@@ -142,6 +141,7 @@ export function AppSidebarItineraryActivityLeft() {
                     >
                       <Link href={item.href}>
                         <item.icon className="h-4 w-4" />
+                        <span>{item.title}</span>
                       </Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>

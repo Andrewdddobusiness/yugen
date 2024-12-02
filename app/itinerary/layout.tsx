@@ -18,8 +18,6 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
@@ -73,7 +71,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   }, [user, setUser]);
 
   //***** GET PROFILE URL *****//
-  const { data: profileUrl, isLoading: isProfileUrlLoading } = useQuery({
+  const { data: profileUrl } = useQuery({
     queryKey: ["profileUrl", user?.id],
     queryFn: async () => {
       const supabase = createClient();
