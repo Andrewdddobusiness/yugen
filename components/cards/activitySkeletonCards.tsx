@@ -11,14 +11,18 @@ interface IActivityCardsProps {
 }
 
 export default function ActivitySkeletonCards() {
-  const { isSidebarOpen } = useSidebarStore();
+  const { isSidebarLeftOpen, isSidebarRightOpen } = useSidebarStore();
 
   return (
     <div
       className={`grid ${
-        isSidebarOpen
-          ? "grid-cols-1 3xl:grid-cols-2 6xl:grid-cols-3"
-          : "grid-cols-1 lg:grid-cols-2 3xl:grid-cols-3 4xl:grid-cols-4 6xl:grid-cols-5"
+        isSidebarLeftOpen
+          ? isSidebarRightOpen
+            ? "grid-cols-1 3xl:grid-cols-2 6xl:grid-cols-3"
+            : "grid-cols-1 lg:grid-cols-2 3xl:grid-cols-3 4xl:grid-cols-4 6xl:grid-cols-5"
+          : isSidebarRightOpen
+          ? "grid-cols-1 lg:grid-cols-2 3xl:grid-cols-3 4xl:grid-cols-4 6xl:grid-cols-5"
+          : "grid-cols-1"
       } gap-4 pb-8`}
     >
       <ActivitySkeletonCard />

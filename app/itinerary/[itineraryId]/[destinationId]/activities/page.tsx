@@ -313,6 +313,7 @@ export default function Activities() {
 
   if (isCoordinatesLoading || isDestinationLoading) return <Loading />;
 
+  console.log(isSidebarLeftOpen, isSidebarRightOpen);
   return (
     <>
       <div className="flex flex-row h-full overflow-hidden">
@@ -321,7 +322,7 @@ export default function Activities() {
             isSidebarLeftOpen
               ? isSidebarRightOpen
                 ? "w-full xl:w-1/2"
-                : "w-full sm:w-1/2"
+                : "w-full"
               : isSidebarRightOpen
               ? "w-full lg:w-1/2"
               : "w-full sm:w-1/2"
@@ -457,14 +458,14 @@ export default function Activities() {
           </div>
         </div>
         <div
-          className={`w-full h-full relative transition-all duration-300  ${
+          className={`w-full h-full relative transition-all duration-300 ${
             isSidebarLeftOpen
               ? isSidebarRightOpen
                 ? "w-0 xl:w-1/2 hidden xl:block"
-                : "sm:w-1/2 w-0 hidden sm:block"
+                : "w-0 hidden xl:block xl:w-1/2"
               : isSidebarRightOpen
               ? "w-0 lg:w-1/2 hidden lg:block"
-              : "sm:w-1/2 w-0 hidden sm:block"
+              : "w-0 sm:w-1/2 hidden sm:block"
           }`}
         >
           {isCoordinatesLoading ? (

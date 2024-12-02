@@ -48,6 +48,16 @@ function useSidebar() {
   return context;
 }
 
+const calculateSidebarWidth = (width: string, adjustment?: string) => {
+  if (!adjustment) return width;
+
+  const numericWidth = parseFloat(width);
+  const numericAdjustment = parseFloat(adjustment);
+  const unit = width.replace(numericWidth.toString(), "");
+
+  return `${numericWidth - numericAdjustment}${unit}`;
+};
+
 const SidebarProvider = React.forwardRef<
   HTMLDivElement,
   React.ComponentProps<"div"> & {
@@ -256,7 +266,7 @@ const Sidebar = React.forwardRef<
           <SheetContent
             data-sidebar="sidebar"
             data-mobile="true"
-            className="w-[--sidebar-width] bg-sidebar p-0 text-sidebar-foreground [&>button]:hidden"
+            className="w-[--sidebar-width] bg-sidebar p-0 text-sidebar-foreground  [&>button]:hidden"
             style={
               {
                 "--sidebar-width": mobileWidth,
@@ -287,9 +297,16 @@ const Sidebar = React.forwardRef<
             "group-data-[collapsible=offcanvas]:w-0",
             "group-data-[side=right]:rotate-180",
             variant === "floating" || variant === "inset"
-              ? "group-data-[collapsible=icon]:w-[calc(var(--sidebar-width-icon)_+_theme(spacing.4))]"
-              : "group-data-[collapsible=icon]:w-[--sidebar-width-icon]"
+              ? `group-data-[collapsible=icon]:w-[calc(${SIDEBAR_WIDTH_RIGHT}_+_${SIDEBAR_WIDTH_ICON}_-_theme(spacing.4))]`
+              : `group-data-[collapsible=icon]:w-[${SIDEBAR_WIDTH_RIGHT}]`,
+            "group-data-[side=right]:ml-auto"
           )}
+          style={
+            {
+              "--sidebar-width": side === "right" ? calculateSidebarWidth(SIDEBAR_WIDTH_RIGHT, "1rem") : SIDEBAR_WIDTH,
+              "--sidebar-width-icon": SIDEBAR_WIDTH_ICON,
+            } as React.CSSProperties
+          }
         />
         <div
           className={cn(
