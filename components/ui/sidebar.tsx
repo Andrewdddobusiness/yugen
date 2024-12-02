@@ -48,16 +48,6 @@ function useSidebar() {
   return context;
 }
 
-const calculateSidebarWidth = (width: string, adjustment?: string) => {
-  if (!adjustment) return width;
-
-  const numericWidth = parseFloat(width);
-  const numericAdjustment = parseFloat(adjustment);
-  const unit = width.replace(numericWidth.toString(), "");
-
-  return `${numericWidth - numericAdjustment}${unit}`;
-};
-
 const SidebarProvider = React.forwardRef<
   HTMLDivElement,
   React.ComponentProps<"div"> & {
@@ -247,12 +237,7 @@ const Sidebar = React.forwardRef<
 
     if (collapsible === "none") {
       return (
-        <div
-          className={cn("flex h-full w-[--sidebar-width] flex-col bg-sidebar text-sidebar-foreground", className)}
-          style={{ "--sidebar-width": sidebarWidth2 } as React.CSSProperties}
-          ref={ref}
-          {...props}
-        >
+        <div className={cn("flex h-full flex-col bg-sidebar text-sidebar-foreground", className)} ref={ref} {...props}>
           {children}
         </div>
       );
@@ -266,7 +251,7 @@ const Sidebar = React.forwardRef<
           <SheetContent
             data-sidebar="sidebar"
             data-mobile="true"
-            className="w-[--sidebar-width] bg-sidebar p-0 text-sidebar-foreground  [&>button]:hidden"
+            className="bg-sidebar p-0 text-sidebar-foreground  [&>button]:hidden"
             style={
               {
                 "--sidebar-width": mobileWidth,
@@ -288,25 +273,18 @@ const Sidebar = React.forwardRef<
         data-collapsible={state === "collapsed" ? collapsible : ""}
         data-variant={variant}
         data-side={side}
-        style={{ "--sidebar-width": sidebarWidth2 } as React.CSSProperties}
       >
         {/* This is what handles the sidebar gap on desktop */}
         <div
           className={cn(
-            "duration-200 relative h-svh w-[--sidebar-width] bg-transparent transition-[width] ease-linear",
+            "duration-200 relative h-svh bg-transparent transition-[width] ease-linear",
+            side === "right" ? "w-[calc(var(--sidebar-width)_-_1rem)]" : "w-[var(--sidebar-width)]",
             "group-data-[collapsible=offcanvas]:w-0",
             "group-data-[side=right]:rotate-180",
             variant === "floating" || variant === "inset"
-              ? `group-data-[collapsible=icon]:w-[calc(${SIDEBAR_WIDTH_RIGHT}_+_${SIDEBAR_WIDTH_ICON}_-_theme(spacing.4))]`
-              : `group-data-[collapsible=icon]:w-[${SIDEBAR_WIDTH_RIGHT}]`,
-            "group-data-[side=right]:ml-auto"
+              ? "group-data-[collapsible=icon]:w-[calc(var(--sidebar-width-icon)_+_theme(spacing.4))]"
+              : "group-data-[collapsible=icon]:w-[--sidebar-width-icon]"
           )}
-          style={
-            {
-              "--sidebar-width": side === "right" ? calculateSidebarWidth(SIDEBAR_WIDTH_RIGHT, "1rem") : SIDEBAR_WIDTH,
-              "--sidebar-width-icon": SIDEBAR_WIDTH_ICON,
-            } as React.CSSProperties
-          }
         />
         <div
           className={cn(
