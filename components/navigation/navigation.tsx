@@ -44,6 +44,7 @@ import { ISubscriptionDetails, useStripeSubscriptionStore } from "@/store/stripe
 
 import { getSubscriptionDetails } from "@/actions/stripe/actions";
 import { createClient } from "@/utils/supabase/client";
+import { cn } from "@/lib/utils";
 
 export default function Navigation() {
   //***** STORES *****//
@@ -52,6 +53,17 @@ export default function Navigation() {
 
   //***** STATES *****//
   const [open, setOpen] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      const isScrolled = window.scrollY > 10;
+      setScrolled(isScrolled);
+    };
+
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
 
   //***** GET USER *****//
   const { data: user, isLoading: isUserLoading } = useQuery({
@@ -123,11 +135,32 @@ export default function Navigation() {
   const renderAuthSection = () => {
     if (isUserLoading || isProfileUrlLoading || isSubscriptionLoading) {
       return (
-        <div className="flex items-center space-x-4">
-          <Skeleton className="h-9 w-24" />
-          <Skeleton className="h-9 w-36" />
-          <Skeleton className="h-10 w-10 rounded-full" />
-        </div>
+        <NavigationMenu>
+          <NavigationMenuList className="flex space-x-4">
+            <NavigationMenuItem>
+              <NavigationMenuLink
+                href="/pricing"
+                className={cn(
+                  navigationMenuTriggerStyle(),
+                  "text-[#FFBE0B]",
+                  "hover:text-[#FFBE0B]/80",
+                  "focus:text-[#FFBE0B]",
+                  "active:text-[#FFBE0B]",
+                  "focus:border-[#FFBE0B]",
+                  scrolled && "text-[#fff] hover:text-[#fff]/80"
+                )}
+              >
+                Pricing
+              </NavigationMenuLink>
+            </NavigationMenuItem>
+            <NavigationMenuItem>
+              <Skeleton className="h-9 w-[60px]" />
+            </NavigationMenuItem>
+            <NavigationMenuItem>
+              <Skeleton className="h-9 w-[70px]" />
+            </NavigationMenuItem>
+          </NavigationMenuList>
+        </NavigationMenu>
       );
     }
 
@@ -137,7 +170,18 @@ export default function Navigation() {
           <NavigationMenu className="mr-4">
             <NavigationMenuList className="flex space-x-4">
               <NavigationMenuItem>
-                <NavigationMenuLink href="/pricing" className={navigationMenuTriggerStyle()}>
+                <NavigationMenuLink
+                  href="/pricing"
+                  className={cn(
+                    navigationMenuTriggerStyle(),
+                    "text-[#FFBE0B]",
+                    "hover:text-[#FFBE0B]/80",
+                    "focus:text-[#FFBE0B]",
+                    "active:text-[#FFBE0B]",
+                    "focus:border-[#FFBE0B]",
+                    scrolled && "text-[#fff] hover:text-[#fff]/80"
+                  )}
+                >
                   Pricing
                 </NavigationMenuLink>
               </NavigationMenuItem>
@@ -145,9 +189,15 @@ export default function Navigation() {
           </NavigationMenu>
           <div className="ml-auto pr-4">
             <PopUpCreateItinerary>
-              <Button className="w-full">
+              <Button
+                className={cn(
+                  "w-full rounded-xl",
+
+                  "text-[#fff] bg-[#3A86FF] hover:bg-[#3A86FF]/80 hover:scale-105 shadow-lg transition-all duration-300 h-9"
+                )}
+              >
                 <Plus className="size-3.5 mr-1" />
-                <span>Create new Itinerary</span>
+                <span>Create New Itinerary</span>
               </Button>
             </PopUpCreateItinerary>
           </div>
@@ -190,17 +240,50 @@ export default function Navigation() {
       <NavigationMenu>
         <NavigationMenuList className="flex space-x-4">
           <NavigationMenuItem>
-            <NavigationMenuLink href="/" className={navigationMenuTriggerStyle()}>
+            <NavigationMenuLink
+              href="/pricing"
+              className={cn(
+                navigationMenuTriggerStyle(),
+                "text-[#FFBE0B]",
+                "hover:text-[#FFBE0B]/80",
+                scrolled && "text-[#fff] hover:text-[#fff]/80"
+              )}
+            >
               Pricing
             </NavigationMenuLink>
           </NavigationMenuItem>
           <NavigationMenuItem>
-            <NavigationMenuLink href="/login" className={navigationMenuTriggerStyle()}>
+            <NavigationMenuLink
+              href="/login"
+              className={cn(
+                navigationMenuTriggerStyle(),
+                "text-[#FF006E]",
+                "hover:text-[#FF006E]/80",
+                "focus:text-[#FF006E]",
+                "active:text-[#FF006E]",
+                "focus:border-[#FF006E]",
+                scrolled && "text-[#fff] hover:text-[#fff]/80"
+              )}
+            >
               Login
             </NavigationMenuLink>
           </NavigationMenuItem>
           <NavigationMenuItem>
-            <NavigationMenuLink href="/signUp" className={navigationMenuTriggerStyle2()}>
+            <NavigationMenuLink
+              href="/signUp"
+              className={cn(
+                navigationMenuTriggerStyle2(),
+                "bg-[#3A86FF]",
+                "text-white",
+                "hover:text-white/80",
+                "focus:text-white",
+                "active:text-white",
+                "focus:bg-[#3A86FF]",
+                "active:bg-[#3A86FF]",
+                "h-9",
+                "shadow-lg"
+              )}
+            >
               Sign Up
             </NavigationMenuLink>
           </NavigationMenuItem>
@@ -210,32 +293,106 @@ export default function Navigation() {
   };
 
   return (
-    <div className="fixed top-0 left-0 right-0 flex flex-row items-center justify-between h-16 px-4 sm:px-8 shadow-sm bg-white z-50">
-      <div className="flex flex-row items-center">
-        <div className="hidden sm:block max-w-[35px]">
-          <Image src="/smile.svg" alt="smile" width={100} height={100} sizes="100vw" priority />
-        </div>
-        <div className="flex items-center font-Patua text-xl font-bold ml-2">
-          <Link href={"/"}>Journey</Link>
-        </div>
+    <div
+      className={cn(
+        "fixed top-0 left-0 right-0 flex flex-row items-center justify-between h-16 px-4 sm:px-32 z-50 pt-8 transition-all duration-300",
+        scrolled && "bg-[#032bc0]"
+      )}
+    >
+      {/* Glass wave effect */}
+      <div
+        className={cn(
+          "absolute bottom-0 left-0 w-full h-[40px] transition-all duration-300 opacity-0 translate-y-full",
+          scrolled && "opacity-100"
+        )}
+      >
+        <Image
+          src="/home/blueWave.svg"
+          alt="Wave Border"
+          width={1920}
+          height={120}
+          className="absolute inset-0 w-full h-full rotate-180"
+        />
       </div>
-      <div className="hidden sm:flex flex-row items-center">{renderAuthSection()}</div>
+
+      <Link href="/" className="flex items-center relative z-10">
+        <div className="hidden sm:block w-[35px] h-[35px] group cursor-pointer select-none ">
+          <Image
+            className="w-full h-full transition-transform duration-500 ease-in-out transform group-hover:rotate-45"
+            src="/journey1.svg"
+            alt="Journey Logo"
+            width={100}
+            height={100}
+            priority
+            draggable={false}
+          />
+        </div>
+      </Link>
+
+      <div className="hidden sm:flex flex-row items-center relative z-10">{renderAuthSection()}</div>
+
       <div className="sm:hidden">
         <Drawer open={open} onOpenChange={setOpen}>
           <DrawerTrigger asChild>
             <Menu className="h-6 w-6" />
           </DrawerTrigger>
-          <DrawerContent>
-            <DrawerHeader className="text-left">
-              <DrawerTitle>Edit profile</DrawerTitle>
-              <DrawerDescription>Make changes to your profile here. Click save when you&aposre done.</DrawerDescription>
-            </DrawerHeader>
+          <DrawerContent className="h-[98%] bg-primary text-white">
+            <div className="flex flex-col h-full px-6 py-10">
+              {/* Navigation Links */}
+              <div className="space-y-6 text-4xl font-semibold">
+                <Link href="/" className="block hover:opacity-70 transition-opacity">
+                  Home
+                </Link>
+                <Link href="/pricing" className="block hover:opacity-70 transition-opacity">
+                  Pricing
+                </Link>
+                {user ? (
+                  <>
+                    <Link href="/itineraries" className="block hover:opacity-70 transition-opacity">
+                      Dashboard
+                    </Link>
+                    <Link href="/settings" className="block hover:opacity-70 transition-opacity">
+                      Settings
+                    </Link>
+                    <div className="block hover:opacity-70 transition-opacity">Support</div>
+                  </>
+                ) : (
+                  <>
+                    <Link href="/login" className="block hover:opacity-70 transition-opacity">
+                      Login
+                    </Link>
+                    <Link href="/signUp" className="block hover:opacity-70 transition-opacity ">
+                      Sign Up
+                    </Link>
+                  </>
+                )}
+              </div>
 
-            <DrawerFooter className="pt-2">
-              <DrawerClose asChild>
-                <Button variant="outline">Cancel</Button>
-              </DrawerClose>
-            </DrawerFooter>
+              {/* Bottom Section */}
+              {user && (
+                <div className="mt-auto">
+                  <div className="flex items-center gap-4 mb-6">
+                    <Avatar className="h-12 w-12">
+                      {profileUrl ? (
+                        <AvatarImage src={profileUrl} />
+                      ) : (
+                        <AvatarFallback className="bg-white/10">
+                          {user?.user_metadata.first_name?.[0]}
+                          {user?.user_metadata.last_name?.[0]}
+                        </AvatarFallback>
+                      )}
+                    </Avatar>
+                    <div>
+                      <div className="font-medium">
+                        {user?.user_metadata.first_name} {user?.user_metadata.last_name}
+                      </div>
+                      <div className="text-sm text-white/70">{user?.email}</div>
+                    </div>
+                  </div>
+                  <LogoutButton className="text-white/70 hover:text-white transition-colors">Logout</LogoutButton>
+                </div>
+              )}
+            </div>
           </DrawerContent>
         </Drawer>
       </div>

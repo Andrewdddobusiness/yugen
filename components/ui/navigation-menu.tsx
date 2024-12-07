@@ -35,11 +35,11 @@ NavigationMenuList.displayName = NavigationMenuPrimitive.List.displayName;
 const NavigationMenuItem: any = NavigationMenuPrimitive.Item;
 
 const navigationMenuTriggerStyle = cva(
-  "group inline-flex h-10 w-max items-center justify-center rounded-md bg-background px-4 py-2 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground focus:outline-none disabled:pointer-events-none disabled:opacity-50 data-[active]:bg-accent/50 data-[state=open]:bg-accent/50"
+  "border border-transparent group inline-flex h-8 w-max items-center justify-center rounded-xl px-4 py-2 text-sm font-medium transition-all duration-300 ease-in-out hover:border-current hover:text-accent-foreground focus:text-accent-foreground focus:outline-none focus-visible:outline-none active:scale-105 disabled:pointer-events-none disabled:opacity-50 hover:cursor-pointer hover:scale-110"
 );
 
 const navigationMenuTriggerStyle2 = cva(
-  "border group inline-flex h-10 w-max items-center justify-center rounded-md bg-background px-4 py-2 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground focus:outline-none disabled:pointer-events-none disabled:opacity-50 data-[active]:bg-accent/50 data-[state=open]:bg-accent/50"
+  "bg-white shadow-lg group inline-flex h-8 w-max items-center justify-center rounded-xl px-4 py-2 text-sm font-medium transition-all duration-300 ease-in-out hover:text-accent-foreground focus:text-accent-foreground focus:outline-none focus-visible:outline-none active:scale-105 disabled:pointer-events-none disabled:opacity-50 hover:cursor-pointer hover:scale-110"
 );
 
 const NavigationMenuTrigger: any = React.forwardRef<

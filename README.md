@@ -49,6 +49,12 @@ Light Purple: c5a3ef
 Bluee: c5a3ef
 Tangy Orange: f6aa23
 
+84cfd2
+ff9a9e
+98d786
+bbbaf6
+f5cc8e
+
 ## Supabase
 
 Requires Docker Desktop to be open.
