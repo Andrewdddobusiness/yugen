@@ -77,6 +77,10 @@ export default function Navigation() {
       if (error || !user) throw error;
       return user;
     },
+    staleTime: Infinity,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
   });
 
   useEffect(() => {
@@ -113,6 +117,10 @@ export default function Navigation() {
       return null;
     },
     enabled: !!user,
+    staleTime: Infinity,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
   });
 
   useEffect(() => {
@@ -123,8 +131,12 @@ export default function Navigation() {
   //***** GET SUBSCRIPTION DETAILS *****//
   const { data: subscription, isLoading: isSubscriptionLoading } = useQuery({
     queryKey: ["subscription", user?.id],
-    queryFn: getSubscriptionDetails,
-    enabled: !!user,
+    queryFn: () => getSubscriptionDetails(user?.id as string),
+    enabled: !!user?.id,
+    staleTime: Infinity,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
   });
 
   useEffect(() => {
@@ -154,10 +166,10 @@ export default function Navigation() {
               </NavigationMenuLink>
             </NavigationMenuItem>
             <NavigationMenuItem>
-              <Skeleton className="h-9 w-[60px]" />
+              <Skeleton className="h-9 w-[60px] rounded-xl" />
             </NavigationMenuItem>
             <NavigationMenuItem>
-              <Skeleton className="h-9 w-[70px]" />
+              <Skeleton className="h-9 w-[70px] rounded-xl" />
             </NavigationMenuItem>
           </NavigationMenuList>
         </NavigationMenu>
@@ -203,13 +215,13 @@ export default function Navigation() {
           </div>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Avatar className="h-12 w-12 rounded-lg p-1 border border-gray-200 cursor-pointer">
+              <Avatar className="h-12 w-12 rounded-2xl p-1 border border-gray-200 cursor-pointer">
                 {isProfileUrlLoading ? (
-                  <Skeleton className="h-full w-full" />
+                  <Skeleton className="h-full w-full rounded-xl" />
                 ) : profileUrl ? (
-                  <AvatarImage src={profileUrl} className="rounded-md" />
+                  <AvatarImage src={profileUrl} className="rounded-xl" />
                 ) : (
-                  <AvatarFallback className="rounded-md bg-muted">
+                  <AvatarFallback className="rounded-xl bg-muted">
                     {user?.user_metadata.first_name?.[0]}
                     {user?.user_metadata.last_name?.[0]}
                   </AvatarFallback>
@@ -357,11 +369,13 @@ export default function Navigation() {
               {user && (
                 <div className="mt-auto">
                   <div className="flex items-center gap-4 mb-6">
-                    <Avatar className="h-12 w-12">
-                      {profileUrl ? (
+                    <Avatar className="h-12 w-12 rounded-2xl p-1 border border-gray-200 cursor-pointer">
+                      {isProfileUrlLoading ? (
+                        <Skeleton className="h-full w-full rounded-xl" />
+                      ) : profileUrl ? (
                         <AvatarImage src={profileUrl} />
                       ) : (
-                        <AvatarFallback className="bg-white/10">
+                        <AvatarFallback className="bg-white/10 rounded-xl">
                           {user?.user_metadata.first_name?.[0]}
                           {user?.user_metadata.last_name?.[0]}
                         </AvatarFallback>

@@ -65,7 +65,7 @@ export default function Home() {
         {/* <div className="absolute inset-0 bg-gradient-to-b from-transparent via-[#1746A2]/30 to-[#1673e0]" /> */}
 
         {/* Main content */}
-        <div className="relative z-10 max-w-2xl mx-auto text-center text-[#3A86FF] mt-32 px-4">
+        <div className="relative z-10 max-w-3xl mx-auto text-center text-[#3A86FF] mt-32 px-4">
           {/* Plan SVG - Hide on mobile */}
           <div className="absolute z-0 -top-20 sm:-top-10 left-20 sm:-left-10 -translate-x-3/4 w-24 h-24 sm:w-32 sm:h-32 -rotate-12 ">
             <Image
