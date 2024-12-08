@@ -67,18 +67,26 @@ export default function Home() {
         {/* Main content */}
         <div className="relative z-10 max-w-2xl mx-auto text-center text-[#3A86FF] mt-32 px-4">
           {/* Plan SVG - Hide on mobile */}
-          <div className="absolute z-0 -top-10 -left-10 -translate-x-3/4 w-32 h-32 -rotate-12 hidden sm:block">
-            <Image src="/home/discover.svg" alt="Plan Icon" width={64} height={64} className="w-full h-full" priority />
+          <div className="absolute z-0 -top-20 sm:-top-10 left-20 sm:-left-10 -translate-x-3/4 w-24 h-24 sm:w-32 sm:h-32 -rotate-12 ">
+            <Image
+              src="/home/discover.svg"
+              alt="Discover Icon"
+              width={64}
+              height={64}
+              className="w-full h-full"
+              priority
+            />
           </div>
-          <div className="absolute -top-32 left-1/2 -translate-x-1/2 w-28 h-28 rotate-6 hidden sm:block">
+          <div className="absolute -top-36 sm:-top-32 left-1/2 -translate-x-1/2 w-24 h-24 sm:w-28 sm:h-28 rotate-6 ">
             <Image src="/home/organise.svg" alt="Plan Icon" width={64} height={64} className="w-full h-full" priority />
           </div>
-          <div className="absolute -top-10 -right-10 translate-x-3/4 w-40 h-40 rotate-12 hidden sm:block">
-            <Image src="/home/travel.svg" alt="Plan Icon" width={64} height={64} className="w-full h-full" priority />
+          <div className="absolute -top-20 sm:-top-10 right-20 sm:-right-10 translate-x-3/4 w-24 h-24 sm:w-40 sm:h-40 rotate-12 ">
+            <Image src="/home/travel.svg" alt="Travel Icon" width={64} height={64} className="w-full h-full" priority />
           </div>
 
-          <h1 className="text-4xl sm:text-5xl md:text-7xl font-medium mb-8 tracking-tight leading-tight px-4">
-            Your Ultimate <br /> <span className="text-[#032bc0] font-semibold">Travel Itinerary Planner.</span>
+          <h1 className="text-4xl sm:text-5xl md:text-7xl font-light sm:font-medium mb-8 tracking-tight leading-tight px-4">
+            Your Ultimate <br />{" "}
+            <span className="text-[#032bc0] font-bold sm:font-semibold">Travel Itinerary Planner.</span>
           </h1>
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
