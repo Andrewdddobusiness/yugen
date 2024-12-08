@@ -321,7 +321,7 @@ export default function Navigation() {
           <DrawerTrigger asChild>
             <Menu className="h-6 w-6 text-white" />
           </DrawerTrigger>
-          <DrawerContent className="h-[98%] bg-primary text-white">
+          <DrawerContent className="h-[98%] bg-primary text-white bg-[#032bc0] bg-opacity-70">
             <div className="flex flex-col h-full px-6 py-10">
               {/* Navigation Links */}
               <div className="space-y-6 text-4xl font-semibold">
