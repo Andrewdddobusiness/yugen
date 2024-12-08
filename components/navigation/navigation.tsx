@@ -315,23 +315,8 @@ export default function Navigation() {
         />
       </div>
 
-      <Link href="/" className="flex items-center relative z-10">
-        <div className="hidden sm:block w-[35px] h-[35px] group cursor-pointer select-none ">
-          <Image
-            className="w-full h-full transition-transform duration-500 ease-in-out transform group-hover:rotate-45"
-            src="/journey1.svg"
-            alt="Journey Logo"
-            width={100}
-            height={100}
-            priority
-            draggable={false}
-          />
-        </div>
-      </Link>
-
-      <div className="hidden sm:flex flex-row items-center relative z-10">{renderAuthSection()}</div>
-
-      <div className="sm:hidden">
+      {/* Mobile Menu Button - Left Side */}
+      <div className="sm:hidden relative z-10">
         <Drawer open={open} onOpenChange={setOpen}>
           <DrawerTrigger asChild>
             <Menu className="h-6 w-6" />
@@ -361,7 +346,7 @@ export default function Navigation() {
                     <Link href="/login" className="block hover:opacity-70 transition-opacity">
                       Login
                     </Link>
-                    <Link href="/signUp" className="block hover:opacity-70 transition-opacity ">
+                    <Link href="/signUp" className="block hover:opacity-70 transition-opacity">
                       Sign Up
                     </Link>
                   </>
@@ -396,6 +381,30 @@ export default function Navigation() {
           </DrawerContent>
         </Drawer>
       </div>
+
+      {/* Logo - Centered on mobile, left-aligned on desktop */}
+      <Link
+        href="/"
+        className="flex items-center justify-center z-10 absolute left-1/2 -translate-x-1/2 sm:relative sm:left-0 sm:translate-x-0"
+      >
+        <div className="w-[35px] h-[35px] group cursor-pointer select-none">
+          <Image
+            className="w-full h-full transition-transform duration-500 ease-in-out transform group-hover:rotate-45"
+            src="/journey1.svg"
+            alt="Journey Logo"
+            width={100}
+            height={100}
+            priority
+            draggable={false}
+          />
+        </div>
+      </Link>
+
+      {/* Desktop Navigation - Right Side */}
+      <div className="hidden sm:flex flex-row items-center relative z-10">{renderAuthSection()}</div>
+
+      {/* Empty div for mobile layout balance */}
+      <div className="w-6 sm:hidden relative z-10"></div>
     </div>
   );
 }
