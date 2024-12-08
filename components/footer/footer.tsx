@@ -79,7 +79,7 @@ export default function Footer() {
                   support@journey.com
                 </a>
               </li>
-              <li className="flex space-x-4 mt-4">
+              <li className="flex space-x-4 pt-4">
                 <a href="#" className="text-white/80 hover:text-white transition-colors">
                   <Twitter className="h-6 w-6" />
                 </a>
@@ -94,15 +94,15 @@ export default function Footer() {
           </div>
         </div>
 
-        <div className="flex flex-row items-center justify-between border-t border-white/10 mt-8 ext-center text-white/60">
-          <p>&copy; {new Date().getFullYear()} Journey. All rights reserved.</p>
-          <div className="hidden sm:block w-[200px] h-[200px] group cursor-pointer select-none">
+        <div className="flex flex-col sm:flex-row items-center justify-between border-t border-white/10 mt-8 text-white/60 pt-8">
+          <p className="hidden sm:block text-sm">&copy; {new Date().getFullYear()} Journey. All rights reserved.</p>
+          <div className="flex justify-center w-full sm:w-[200px] h-[35px] group cursor-pointer select-none">
             <Image
               className="w-full h-full transition-transform duration-500 ease-in-out transform group-hover:rotate-12 invert brightness-0"
               src="/theTravelCompanyLogo.svg"
               alt="The Travel Company Logo"
-              width={500}
-              height={500}
+              width={100}
+              height={100}
               priority
               draggable={false}
             />
