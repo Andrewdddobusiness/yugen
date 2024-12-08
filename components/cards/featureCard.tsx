@@ -14,8 +14,8 @@ export function FeatureCard({ title, description, icon, onHover }: FeatureCardPr
       <div className="flex items-center gap-4">
         <div className="p-2 bg-white/10 rounded-lg text-white">{icon}</div>
         <div>
-          <h3 className="text-xl font-semibold text-white">{title}</h3>
-          <p className="text-white/80 mt-1">{description}</p>
+          <h3 className="text-lg sm:text-xl font-semibold text-white">{title}</h3>
+          <p className="text-sm sm:text-md text-white/80 mt-1">{description}</p>
         </div>
       </div>
     </div>

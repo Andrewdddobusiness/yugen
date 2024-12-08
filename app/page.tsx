@@ -161,6 +161,16 @@ export default function Home() {
                 Search for things to do in any city, district, or region.
               </h3>
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 sm:gap-12 items-center">
+                <div className="relative aspect-video block sm:hidden">
+                  <Image
+                    src={`/features/${activeImage}.png`}
+                    alt="Feature Preview"
+                    width={800}
+                    height={450}
+                    className="rounded-xl shadow-2xl border-4 border-white/10 transition-all duration-300"
+                  />
+                </div>
+
                 {/* Left Column - Feature Cards */}
                 <div className="space-y-6">
                   <FeatureCard
@@ -184,7 +194,7 @@ export default function Home() {
                 </div>
 
                 {/* Right Column - Feature Image */}
-                <div className="relative aspect-video">
+                <div className="relative aspect-video hidden sm:block">
                   <Image
                     src={`/features/${activeImage}.png`}
                     alt="Feature Preview"
@@ -205,10 +215,10 @@ export default function Home() {
               className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-32"
             >
               <div className="flex flex-row gap-2 justify-center items-center">
-                <NotebookPen className="w-8 h-8 text-white" />
-                <h2 className="text-4xl font-bold text-white text-center">Organize Your Perfect Trip.</h2>
+                <NotebookPen className="w-6 h-6 sm:w-8 sm:h-8 text-white" />
+                <h2 className="text-3xl sm:text-4xl font-bold text-white text-center">Organize Your Perfect Trip.</h2>
               </div>
-              <h3 className="text-xl font-light text-white mb-12 text-center">
+              <h3 className="text-lg sm:text-xl font-light text-white mb-12 text-center">
                 Tools for the <span className="underline italic">meticulous</span> planner so you don&apos;t miss out on
                 anything.
               </h3>
@@ -256,13 +266,24 @@ export default function Home() {
               className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-64"
             >
               <div className="flex flex-row gap-2 justify-center items-center">
-                <Plane className="w-8 h-8 text-white" />
-                <h2 className="text-4xl font-bold text-white text-center">Export & Travel</h2>
+                <Plane className="w-6 h-6 sm:w-8 sm:h-8 text-white" />
+                <h2 className="text-3xl sm:text-4xl font-bold text-white text-center">Export & Travel</h2>
               </div>
-              <h3 className="text-xl font-light text-white mb-12 text-center">
+              <h3 className="text-lg sm:text-xl font-light text-white mb-12 text-center">
                 We get it... you want to plan your trip and get travelling.
               </h3>
+
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+                <div className="relative aspect-video block sm:hidden">
+                  <Image
+                    src={`/features/${activeImage}.png`}
+                    alt="Feature Preview"
+                    width={800}
+                    height={450}
+                    className="rounded-xl shadow-2xl border-4 border-white/10 transition-all duration-300"
+                  />
+                </div>
+
                 {/* Left Column - Feature Cards */}
                 <div className="space-y-6">
                   <FeatureCard
@@ -286,7 +307,7 @@ export default function Home() {
                 </div>
 
                 {/* Right Column - Feature Image */}
-                <div className="relative aspect-video">
+                <div className="relative aspect-video hidden sm:block">
                   <Image
                     src={`/features/${activeImage}.png`}
                     alt="Feature Preview"
@@ -326,7 +347,7 @@ export default function Home() {
             <h2 className="text-3xl sm:text-4xl font-bold text-[#FF006E] mb-2 text-center px-4">
               Organize every detail of your trip, and get travelling.
             </h2>
-            <h3 className="text-lg sm:text-xl font-light text-gray-500 mb-12 text-center px-4">
+            <h3 className="text-lg sm:text-xl font-light text-gray-500 text-center px-4">
               Journey was built by travellers who know the pain of planning and know that it could be{" "}
               <span className="underline italic">better</span>.
             </h3>

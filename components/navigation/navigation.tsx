@@ -295,14 +295,14 @@ export default function Navigation() {
   return (
     <div
       className={cn(
-        "fixed top-0 left-0 right-0 flex flex-row items-center justify-between h-16 px-4 sm:px-32 z-50 pt-8 transition-all duration-300",
+        "fixed top-0 left-0 right-0 flex flex-row items-center justify-between h-16 px-4 sm:px-32 pb-8 sm:pb-0 z-50 pt-8 transition-all duration-300",
         scrolled && "bg-[#032bc0]"
       )}
     >
       {/* Glass wave effect */}
       <div
         className={cn(
-          "absolute bottom-0 left-0 w-full h-[40px] transition-all duration-300 opacity-0 translate-y-full",
+          "absolute bottom-0 left-0 w-full h-[40px] transition-all duration-300 opacity-0 translate-y-full hidden sm:block",
           scrolled && "opacity-100"
         )}
       >
@@ -319,7 +319,7 @@ export default function Navigation() {
       <div className="sm:hidden relative z-10">
         <Drawer open={open} onOpenChange={setOpen}>
           <DrawerTrigger asChild>
-            <Menu className="h-6 w-6" />
+            <Menu className="h-6 w-6 text-white" />
           </DrawerTrigger>
           <DrawerContent className="h-[98%] bg-primary text-white">
             <div className="flex flex-col h-full px-6 py-10">
