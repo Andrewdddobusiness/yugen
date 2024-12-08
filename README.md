@@ -37,23 +37,14 @@ Check out our [Next.js deployment documentation](https://nextjs.org/docs/deploym
 
 ## Colors
 
-Orange: FF731D
-Yellow: FFC947
-Biege: FFF7E9
-Blue: 185ADB
-Dodger Blue: 1673e0
-Navy: 1746A2
-
-Piink: f33261
-Light Purple: c5a3ef
-Bluee: c5a3ef
-Tangy Orange: f6aa23
-
-84cfd2
-ff9a9e
-98d786
-bbbaf6
-f5cc8e
+Dark Blue: #032bc0
+Blue: #3A86FF
+Pink: #FF006E
+Purple: #8338EC
+Orange: #**FB5607**
+Yellow: #FFBE0B
+Green: #5AD63E
+Gray: #808080
 
 ## Supabase
 

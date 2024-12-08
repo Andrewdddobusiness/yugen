@@ -140,17 +140,6 @@ export default function Home() {
 
         {/* Wave and content section */}
         <div className="relative w-full mt-20 overflow-hidden">
-          {/* Blue Wave SVG */}
-          {/* <div className="w-screen relative left-[50%] right-[50%] -mx-[50vw]">
-            <Image
-              src="/home/lightBlueWave.svg"
-              alt="Wave Divider"
-              width={1980}
-              height={40}
-              className="w-full h-auto"
-            />
-          </div> */}
-
           {/* Blue background section */}
           <div className="w-screen relative bg-[#3A86FF]">
             {/* Discover Section */}
