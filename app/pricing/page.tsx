@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -18,6 +18,15 @@ export default function PricingPage() {
   const { subscription, isSubscriptionLoading } = useStripeSubscriptionStore();
 
   const [selectedInterval, setSelectedInterval] = useState("monthly");
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  if (!isMounted) {
+    return null;
+  }
 
   return (
     <div className="flex flex-col items-center my-16">
@@ -69,7 +78,10 @@ export default function PricingPage() {
                     </div>
                   </CardContent>
                   <CardFooter>
-                    <Button className="w-full" variant="outline">
+                    <Button
+                      className="w-full rounded-xl shadow-lg hover:scale-105 transition-all duration-300"
+                      variant="outline"
+                    >
                       Get Started
                     </Button>
                   </CardFooter>
