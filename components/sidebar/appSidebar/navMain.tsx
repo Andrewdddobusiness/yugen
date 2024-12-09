@@ -45,7 +45,7 @@ export function NavMain() {
           <SidebarMenuButton asChild>
             <Link href={"/"}>
               <Home />
-              <span className="text-md font-semibold">Home</span>
+              <span className="text-md font-semibold text-gray-800">Home</span>
             </Link>
           </SidebarMenuButton>
         </SidebarMenuItem>
@@ -55,7 +55,7 @@ export function NavMain() {
             <SidebarMenuButton asChild>
               <Link href={"/itineraries"}>
                 <NotebookText />
-                <span className="text-md font-semibold">Itineraries</span>
+                <span className="text-md font-semibold text-gray-800">Itineraries</span>
               </Link>
             </SidebarMenuButton>
             {isItinerariesLoading ? (
@@ -106,7 +106,7 @@ export function NavMain() {
           <SidebarMenuButton asChild>
             <Link href={"/guides"}>
               <LibraryBig />
-              <span className="text-md font-semibold">Guides</span>
+              <span className="text-md font-semibold text-gray-800">Guides</span>
             </Link>
           </SidebarMenuButton>
         </SidebarMenuItem>

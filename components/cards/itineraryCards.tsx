@@ -10,7 +10,7 @@ interface ItineraryCardsProps {
 
 export default function ItineraryCards({ itineraries, onDelete }: ItineraryCardsProps) {
   return (
-    <div className="h-60 flex flex-wrap gap-4">
+    <div className="flex h-full w-full flex-wrap gap-4">
       {itineraries.map((itinerary: IItineraryCard) => (
         <ItineraryCard key={itinerary.itinerary_id} itinerary={itinerary} onDelete={onDelete} />
       ))}

@@ -234,10 +234,11 @@ const Sidebar = React.forwardRef<
     };
 
     const sidebarWidth2 = side === "right" ? SIDEBAR_WIDTH_RIGHT : sidebarWidth;
+    console.log(sidebarWidth2);
 
     if (collapsible === "none") {
       return (
-        <div className={cn("flex h-full flex-col bg-sidebar text-sidebar-foreground", className)} ref={ref} {...props}>
+        <div className={cn("flex h-full flex-col bg-sidebar text-sidebar-foreground ", className)} ref={ref} {...props}>
           {children}
         </div>
       );
@@ -278,7 +279,7 @@ const Sidebar = React.forwardRef<
         <div
           className={cn(
             "duration-200 relative h-svh bg-transparent transition-[width] ease-linear",
-            side === "right" ? "w-[calc(var(--sidebar-width)_-_1rem)]" : "w-[var(--sidebar-width)]",
+            side === "right" ? `w-[calc(${sidebarWidth2}_-_1rem)]` : `w-[${sidebarWidth2}]`,
             "group-data-[collapsible=offcanvas]:w-0",
             "group-data-[side=right]:rotate-180",
             variant === "floating" || variant === "inset"
@@ -288,7 +289,7 @@ const Sidebar = React.forwardRef<
         />
         <div
           className={cn(
-            "duration-200 fixed inset-y-0 z-30 hidden h-svh w-[--sidebar-width] transition-[left,right,width] ease-linear md:flex",
+            `duration-200 fixed inset-y-0 z-30 hidden h-svh w-[${sidebarWidth2}] transition-[left,right,width] ease-linear md:flex`,
             side === "left"
               ? "left-0 group-data-[collapsible=offcanvas]:left-[calc(var(--sidebar-width)*-1)]"
               : "right-0 group-data-[collapsible=offcanvas]:right-[calc(var(--sidebar-width)*-1)]",

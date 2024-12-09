@@ -1,13 +1,13 @@
 "use client";
 
 import * as React from "react";
-import { useEffect, useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import dynamic from "next/dynamic";
-import { useQuery } from "@tanstack/react-query";
-import { createClient } from "@/utils/supabase/client";
 
 import { Command, Plus } from "lucide-react";
+
+import { useStripeSubscriptionStore } from "@/store/stripeSubscriptionStore";
 
 import { NavMain } from "@/components/sidebar/appSidebar/navMain";
 import { NavUser } from "@/components/sidebar/appSidebar/navUser";
@@ -28,13 +28,18 @@ import LoadingSpinner from "@/components/loading/loadingSpinner";
 const PopUpCreateItinerary = dynamic(() => import("@/components/popUp/popUpCreateItinerary"), {
   ssr: false,
   loading: () => (
-    <Button disabled className="w-full">
+    <Button
+      disabled
+      className="w-full bg-[#3A86FF] text-white rounded-xl shadow-md hover:bg-[#3A86FF]/80 transition-all duration-300 active:scale-95"
+    >
       <LoadingSpinner />
     </Button>
   ),
 });
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+  const { subscription } = useStripeSubscriptionStore();
+
   return (
     <Sidebar variant="inset" {...props} className="shadow-md bg-white" sidebarWidth="18rem">
       <SidebarHeader className="bg-white">
@@ -42,12 +47,24 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           <SidebarMenuItem>
             <SidebarMenuButton size="lg" asChild>
               <Link href="/">
-                <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
-                  <Command className="size-4" />
+                <div className="flex items-center justify-center">
+                  <div className="w-[35px] h-[35px] ">
+                    <Image
+                      className="w-full h-full"
+                      src="/journey1.svg"
+                      alt="Journey Logo"
+                      width={100}
+                      height={100}
+                      priority
+                      draggable={false}
+                    />
+                  </div>
                 </div>
                 <div className="grid flex-1 text-left text-sm leading-tight">
-                  <span className="truncate font-semibold">Journey</span>
-                  <span className="truncate text-xs">Free</span>
+                  <span className="truncate text-sm font-bold text-[#3A86FF]">Journey</span>
+                  <span className="truncate text-xs text-gray-500">
+                    {subscription?.status === "active" ? "Pro Traveler" : "Free"}
+                  </span>
                 </div>
               </Link>
             </SidebarMenuButton>
@@ -57,7 +74,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       <SidebarContent className="bg-white">
         <div className="flex w-full px-4 mt-2">
           <PopUpCreateItinerary className="w-full">
-            <Button className="w-full">
+            <Button className="w-full bg-[#3A86FF] text-white rounded-xl shadow-md hover:bg-[#3A86FF]/80 transition-all duration-300 active:scale-95">
               <Plus className="size-3.5 mr-1" />
               <span>Create new Itinerary</span>
             </Button>

@@ -1,5 +1,6 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { createClient } from "@supabase/supabase-js";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -15,10 +16,11 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-import { MoreHorizontal } from "lucide-react";
+import { ImageIcon, MoreHorizontal } from "lucide-react";
 
 import { capitalizeFirstLetter } from "@/utils/formatting/capitalise";
 import { formatUserFriendlyDate } from "@/utils/formatting/datetime";
+import { Skeleton } from "../ui/skeleton";
 
 export interface IItineraryCard {
   itinerary_id: number;
@@ -38,6 +40,40 @@ interface ItineraryCardProps {
 export default function ItineraryCard({ itinerary, onDelete }: ItineraryCardProps) {
   const [isHovered, setIsHovered] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [imageExists, setImageExists] = useState(false);
+  const [isImageLoading, setIsImageLoading] = useState(true);
+
+  // Check if image exists in Supabase storage
+  useEffect(() => {
+    const checkImageExists = async () => {
+      if (!itinerary.city) return;
+
+      try {
+        const supabase = createClient(
+          process.env.NEXT_PUBLIC_SUPABASE_URL!,
+          process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+        );
+
+        // Try to fetch the image directly
+        const { data, error } = await supabase.storage
+          .from("cities")
+          .download(`${itinerary.country.toLowerCase()}-${itinerary.city.toLowerCase()}/1.jpg`);
+
+        if (data && !error) {
+          setImageExists(true);
+        } else {
+          setImageExists(false);
+        }
+      } catch (error) {
+        console.error("Error checking image:", error);
+        setImageExists(false);
+      } finally {
+        setIsImageLoading(false);
+      }
+    };
+
+    checkImageExists();
+  }, [itinerary.city, itinerary.country]);
 
   const handleDelete = async (e: React.MouseEvent) => {
     e.preventDefault();
@@ -67,23 +103,33 @@ export default function ItineraryCard({ itinerary, onDelete }: ItineraryCardProp
       passHref
     >
       <Card
-        className="h-60 w-60 cursor-pointer relative"
+        className="h-60 w-full sm:w-60 cursor-pointer relative backdrop-blur-lg shadow-lg hover:scale-105 transition-all duration-300 active:scale-95 rounded-xl"
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
       >
-        <Image
-          src={
-            process.env.NEXT_PUBLIC_SUPABASE_URL +
-            `/storage/v1/object/public/cities/${itinerary.country.toLowerCase()}-${itinerary?.city?.toLowerCase()}/1.jpg`
-          }
-          alt="Image"
-          width={1920}
-          height={1080}
-          priority={true}
-          className="h-40 w-60 rounded-t-lg"
-        />
+        {isImageLoading ? (
+          <Skeleton className="flex items-center justify-center h-40 w-full rounded-t-lg">
+            <ImageIcon size={32} className="text-zinc-300" />
+          </Skeleton>
+        ) : imageExists ? (
+          <Image
+            src={`${
+              process.env.NEXT_PUBLIC_SUPABASE_URL
+            }/storage/v1/object/public/cities/${itinerary.country.toLowerCase()}-${itinerary.city.toLowerCase()}/1.jpg`}
+            alt="City Image"
+            width={1920}
+            height={1080}
+            priority={true}
+            className="h-40 w-full object-cover rounded-t-xl"
+            onError={() => setImageExists(false)}
+          />
+        ) : (
+          <Skeleton className="flex items-center justify-center h-40 w-full rounded-t-lg">
+            <ImageIcon size={32} className="text-zinc-300" />
+          </Skeleton>
+        )}
         <CardHeader>
-          <CardTitle>
+          <CardTitle className="text-gray-800">
             {itinerary.city && (
               <>
                 {capitalizeFirstLetter(itinerary.city || "")}
@@ -99,8 +145,8 @@ export default function ItineraryCard({ itinerary, onDelete }: ItineraryCardProp
 
         <DropdownMenu>
           <DropdownMenuTrigger
-            className={`absolute z-50 top-2 right-2 p-1 bg-gray-200 rounded transition-opacity duration-300 text-black hover:text-white ${
-              isHovered ? "opacity-100 hover:bg-black" : "opacity-0"
+            className={`absolute z-50 top-2 right-2 p-1 bg-white rounded-lg transition-opacity duration-300 text-gray-500 hover:text-white ${
+              isHovered ? "opacity-100 hover:bg-[#3A86FF]" : "opacity-0"
             }`}
           >
             <MoreHorizontal className={`h-5 w-5`} />
