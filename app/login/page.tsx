@@ -1,5 +1,4 @@
 "use client";
-import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
@@ -59,17 +58,32 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="w-full lg:grid lg:min-h-screen lg:grid-cols-2">
+    <div className="flex flex-col items-center justify-center w-full h-full min-h-screen">
       <div className="absolute top-4 left-4">
         <Link href="/">
-          <Button variant="outline">Back</Button>
+          <Button variant="outline" className="rounded-xl shadow-lg hover:scale-105 transition-all duration-300">
+            Back
+          </Button>
         </Link>
       </div>
-      <div className="flex items-center justify-center py-12 mt-10 sm:t-0">
+
+      {/* Noise texture overlay */}
+      <div className="fixed inset-0 pointer-events-none z-0 opacity-50">
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          viewBox="0 0 1000 1000"
+          preserveAspectRatio="xMidYMid slice"
+          className="absolute w-full h-full opacity-[0.5] mix-blend-overlay"
+        >
+          <image href="/home/noise.svg" width="100%" height="100%" />
+        </svg>
+      </div>
+
+      <div className="flex items-center justify-center z-50">
         <div className="mx-auto grid w-[350px] gap-6">
           <div className="grid gap-2 text-center">
-            <h1 className="text-3xl font-bold">Login</h1>
-            <p className="text-muted-foreground">Enter your email and password to login</p>
+            <h1 className="text-4xl font-bold text-[#3A86FF]">Login</h1>
+            <p className="text-muted-foreground text-lg">Let's get back to planning your next trip!</p>
           </div>
 
           <Form {...form}>
@@ -79,7 +93,7 @@ export default function LoginPage() {
                 name="email"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Email</FormLabel>
+                    <FormLabel className="text-[#3A86FF]">Email</FormLabel>
                     <FormControl>
                       <Input placeholder="example@gmail.com" type="email" {...field} />
                     </FormControl>
@@ -92,7 +106,7 @@ export default function LoginPage() {
                 name="password"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Password</FormLabel>
+                    <FormLabel className="text-[#3A86FF]">Password</FormLabel>
                     <FormControl>
                       <Input type="password" placeholder="Enter your password" {...field} />
                     </FormControl>
@@ -104,30 +118,24 @@ export default function LoginPage() {
               {loading ? (
                 <LoadingSpinner />
               ) : (
-                <Button type="submit" disabled={loading}>
+                <Button
+                  type="submit"
+                  disabled={loading}
+                  className="rounded-xl shadow-lg hover:scale-105 transition-all duration-300 bg-[#032bc0] text-white hover:bg-[#3A86FF]"
+                >
                   Login
                 </Button>
               )}
             </form>
           </Form>
 
-          <div className="mt-4 text-center text-sm">
+          <div className="mt-4 text-center text-sm text-gray-500">
             Don&apos;t have an account?{" "}
-            <Link href="/signUp" className="underline">
+            <Link href="/signUp" className="underline text-[#FF006E]">
               Sign up
             </Link>
           </div>
         </div>
-      </div>
-
-      <div className="hidden bg-muted lg:block">
-        <Image
-          src="/map2.jpg"
-          alt="Background image"
-          width="1920"
-          height="1080"
-          className="h-full w-full object-cover dark:brightness-[0.2] dark:grayscale"
-        />
       </div>
     </div>
   );

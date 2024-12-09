@@ -41,7 +41,7 @@ Dark Blue: #032bc0
 Blue: #3A86FF
 Pink: #FF006E
 Purple: #8338EC
-Orange: #**FB5607**
+Orange: #FB5607
 Yellow: #FFBE0B
 Green: #5AD63E
 Gray: #808080
