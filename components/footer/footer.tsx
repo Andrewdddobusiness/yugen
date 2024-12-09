@@ -101,8 +101,8 @@ export default function Footer() {
               className="w-full h-full transition-transform duration-500 ease-in-out transform group-hover:rotate-12 invert brightness-0"
               src="/theTravelCompanyLogo.svg"
               alt="The Travel Company Logo"
-              width={100}
-              height={100}
+              width={500}
+              height={500}
               priority
               draggable={false}
             />
