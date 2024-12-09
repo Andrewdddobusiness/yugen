@@ -295,12 +295,12 @@ export default function PopUpCreateItinerary({ children, className, ...props }: 
       <DialogTrigger asChild>
         <div className={`inline-flex ${className}`}>{children}</div>
       </DialogTrigger>
-      <DialogContent className="max-w-[1000px] h-[400px] grid grid-cols-2 p-0 gap-0">
-        <div className="relative w-full h-full">
+      <DialogContent className="w-[90%] sm:w-full max-w-[1000px] h-[400px] grid grid-cols-1 sm:grid-cols-2 p-4 sm:p-0 gap-0 rounded-xl">
+        <div className="relative w-full h-full hidden sm:block">
           <Image src={steps[step].image} alt={steps[step].title} fill className="object-cover rounded-l-md" priority />
         </div>
 
-        <DialogDescription className="flex flex-col px-8 pt-12 pb-6 h-full justify-between">
+        <DialogDescription className="flex flex-col px-4 sm:px-6 pt-8 sm:pt-10 pb-6 h-full justify-between">
           <VisuallyHidden.Root>
             <DialogTitle>Create New Itinerary</DialogTitle>
           </VisuallyHidden.Root>
@@ -308,15 +308,17 @@ export default function PopUpCreateItinerary({ children, className, ...props }: 
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col h-full justify-between">
               <div className="flex flex-col gap-1">
-                <DialogTitle className="text-3xl text-black">Let&apos;s build your next vacation!</DialogTitle>
-                <div className="text-xl font-medium text-zinc-800">{steps[step].title}</div>
+                <DialogTitle className="text-2xl sm:text-3xl text-black">
+                  Let&apos;s build your next vacation!
+                </DialogTitle>
+                <div className="text-lg sm:text-xl font-medium text-zinc-800">{steps[step].title}</div>
                 <div className="mt-4">{steps[step].content}</div>
               </div>
 
               <div className="flex flex-row mt-4 justify-between">
                 <Button
                   type="button"
-                  className="flex w-28"
+                  className="flex w-28 rounded-xl shadow-lg"
                   variant={"outline"}
                   onClick={handleBack}
                   disabled={step === 0}
@@ -331,7 +333,12 @@ export default function PopUpCreateItinerary({ children, className, ...props }: 
                     />
                   ))}
                 </div>
-                <Button type="button" className="flex w-28" onClick={handleNext} disabled={!isStepValid() || loading}>
+                <Button
+                  type="button"
+                  className="flex w-28 bg-[#3A86FF] rounded-xl shadow-md shadow-[#3A86FF] text-white hover:bg-[#3A86FF]/90 active:scale-95 transition-all duration-300"
+                  onClick={handleNext}
+                  disabled={!isStepValid() || loading}
+                >
                   {loading ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
                   ) : step < steps.length - 1 ? (

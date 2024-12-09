@@ -76,7 +76,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           <PopUpCreateItinerary className="w-full">
             <Button className="w-full bg-[#3A86FF] text-white rounded-xl shadow-md hover:bg-[#3A86FF]/80 transition-all duration-300 active:scale-95">
               <Plus className="size-3.5 mr-1" />
-              <span>Create new Itinerary</span>
+              <span>Create New Itinerary</span>
             </Button>
           </PopUpCreateItinerary>
         </div>
