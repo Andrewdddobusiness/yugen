@@ -21,12 +21,12 @@ export default function Settings() {
   return (
     <div className="flex flex-col mx-4 gap-8">
       <div className="flex flex-col mx-4 gap-4">
-        <p className="text-2xl font-bold">Account</p>
+        <p className="text-2xl font-bold text-gray-800">Account</p>
         <ProfileCards />
       </div>
 
       <div className="flex flex-col mx-4 gap-4">
-        <p className="text-2xl font-bold">Billing</p>
+        <p className="text-2xl font-bold text-gray-800">Billing</p>
         <div className="grid grid-cols-1 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 3xl:grid-cols-4 5xl:grid-cols-5 gap-4">
           <Card>
             <CardHeader>
@@ -65,7 +65,10 @@ export default function Settings() {
                 <ManageSubscriptionButton />
               ) : (
                 <Link href="/pricing" className="w-full">
-                  <Button className="w-full" disabled={isSubscriptionLoading}>
+                  <Button
+                    className="w-full bg-[#3A86FF] rounded-xl shadow-lg text-white hover:bg-[#3A86FF]/90 active:scale-95 transition-all duration-300"
+                    disabled={isSubscriptionLoading}
+                  >
                     Upgrade to Pro
                   </Button>
                 </Link>

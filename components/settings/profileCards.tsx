@@ -245,7 +245,7 @@ export default function ProfileCards() {
       {/* Profile Photo Section */}
       <Card>
         <CardHeader>
-          <CardTitle>Profile Photo</CardTitle>
+          <CardTitle className="text-gray-800">Profile Photo</CardTitle>
         </CardHeader>
         <CardContent className="flex flex-row justify-between min-h-[100px]">
           {!isEditingProfilePhoto ? (
@@ -303,15 +303,29 @@ export default function ProfileCards() {
         </CardContent>
         <CardFooter className="border-t py-4">
           {!isEditingProfilePhoto ? (
-            <Button onClick={() => toggleEditingProfilePhoto()}>Edit</Button>
+            <Button
+              onClick={() => toggleEditingProfilePhoto()}
+              className="bg-[#3A86FF] rounded-xl shadow-lg text-white hover:bg-[#3A86FF]/90 active:scale-95 transition-all duration-300"
+            >
+              Edit
+            </Button>
           ) : (
             <>
               {loadingProfile ? (
                 <LoadingSpinner />
               ) : (
                 <>
-                  <Button onClick={handleProfileSave}>Save</Button>
-                  <Button onClick={() => toggleEditingProfilePhoto()} variant={"outline"} className="ml-4">
+                  <Button
+                    onClick={handleProfileSave}
+                    className="bg-[#3A86FF] rounded-xl shadow-lg text-white hover:bg-[#3A86FF]/90 active:scale-95 transition-all duration-300"
+                  >
+                    Save
+                  </Button>
+                  <Button
+                    onClick={() => toggleEditingProfilePhoto()}
+                    variant={"outline"}
+                    className="ml-4 rounded-xl shadow-lg"
+                  >
                     Back
                   </Button>
                 </>
@@ -324,7 +338,7 @@ export default function ProfileCards() {
       {/* Name Section */}
       <Card>
         <CardHeader>
-          <CardTitle>Name</CardTitle>
+          <CardTitle className="text-gray-800">Name</CardTitle>
         </CardHeader>
         <CardContent className="flex flex-row justify-between min-h-[100px]">
           {!isEditingName ? (
@@ -362,15 +376,25 @@ export default function ProfileCards() {
         </CardContent>
         <CardFooter className="border-t py-4">
           {!isEditingName ? (
-            <Button onClick={() => toggleEditingName()}>Edit</Button>
+            <Button
+              onClick={() => toggleEditingName()}
+              className="bg-[#3A86FF] rounded-xl shadow-lg text-white hover:bg-[#3A86FF]/90 active:scale-95 transition-all duration-300"
+            >
+              Edit
+            </Button>
           ) : (
             <>
               {loadingName ? (
                 <LoadingSpinner />
               ) : (
                 <>
-                  <Button onClick={handleNameSave}>Save</Button>
-                  <Button onClick={() => toggleEditingName()} variant={"outline"} className="ml-4">
+                  <Button
+                    onClick={handleNameSave}
+                    className="bg-[#3A86FF] rounded-xl shadow-lg text-white hover:bg-[#3A86FF]/90 active:scale-95 transition-all duration-300"
+                  >
+                    Save
+                  </Button>
+                  <Button onClick={() => toggleEditingName()} variant={"outline"} className="ml-4 rounded-xl shadow-lg">
                     Back
                   </Button>
                 </>
@@ -383,7 +407,7 @@ export default function ProfileCards() {
       {/* Email Section */}
       <Card>
         <CardHeader>
-          <CardTitle>Email</CardTitle>
+          <CardTitle className="text-gray-800">Email</CardTitle>
         </CardHeader>
         <CardContent className="flex flex-row justify-between min-h-[100px]">
           {user ? (
@@ -400,15 +424,29 @@ export default function ProfileCards() {
         </CardContent>
         <CardFooter className="border-t py-4">
           {!isEditingEmail ? (
-            <Button onClick={() => toggleEditingEmail()}>Edit</Button>
+            <Button
+              onClick={() => toggleEditingEmail()}
+              className="bg-[#3A86FF] rounded-xl shadow-lg text-white hover:bg-[#3A86FF]/90 active:scale-95 transition-all duration-300"
+            >
+              Edit
+            </Button>
           ) : (
             <>
               {loadingEmail ? (
                 <LoadingSpinner />
               ) : (
                 <>
-                  <Button onClick={handleEmailSave}>Save</Button>
-                  <Button onClick={() => toggleEditingEmail()} variant={"outline"} className="ml-4">
+                  <Button
+                    onClick={handleEmailSave}
+                    className="bg-[#3A86FF] rounded-xl shadow-lg text-white hover:bg-[#3A86FF]/90 active:scale-95 transition-all duration-300"
+                  >
+                    Save
+                  </Button>
+                  <Button
+                    onClick={() => toggleEditingEmail()}
+                    variant={"outline"}
+                    className="ml-4 rounded-xl shadow-lg"
+                  >
                     Back
                   </Button>
                 </>
@@ -421,7 +459,7 @@ export default function ProfileCards() {
       {/* Password Section */}
       <Card>
         <CardHeader>
-          <CardTitle>Password</CardTitle>
+          <CardTitle className="text-gray-800">Password</CardTitle>
         </CardHeader>
 
         <CardContent className="flex flex-row justify-between min-h-[100px]">
@@ -430,7 +468,9 @@ export default function ProfileCards() {
 
         <CardFooter className="border-t py-4">
           <Link href="/login/reset">
-            <Button>Reset Password</Button>
+            <Button className="bg-[#3A86FF] rounded-xl shadow-lg text-white hover:bg-[#3A86FF]/90 active:scale-95 transition-all duration-300">
+              Reset Password
+            </Button>
           </Link>
         </CardFooter>
       </Card>
@@ -438,14 +478,16 @@ export default function ProfileCards() {
       {/* Delete Account Section */}
       <Card>
         <CardHeader>
-          <CardTitle>Delete Your Account</CardTitle>
+          <CardTitle className="text-gray-800">Delete Your Account</CardTitle>
           <CardDescription>Permanently delete your account and all associated data.</CardDescription>
         </CardHeader>
 
         <CardContent className="flex flex-row justify-between min-h-[70px]">
           <AlertDialog>
             <AlertDialogTrigger asChild>
-              <Button variant="destructive">Delete Account</Button>
+              <Button variant="destructive" className="rounded-xl shadow-xl">
+                Delete Account
+              </Button>
             </AlertDialogTrigger>
             <AlertDialogContent>
               <AlertDialogHeader>
@@ -456,10 +498,10 @@ export default function ProfileCards() {
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
-                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogCancel className="rounded-xl shadow-xl">Cancel</AlertDialogCancel>
                 <AlertDialogAction
                   onClick={handleDeleteAccount}
-                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90 rounded-xl shadow-xl"
                   disabled={isDeleting}
                 >
                   {isDeleting ? "Deleting..." : "Delete Account"}

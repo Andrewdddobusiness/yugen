@@ -3,8 +3,8 @@ import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/ca
 
 export default function ItinerarySkeletonCard() {
   return (
-    <Card className="h-60 w-60 relative">
-      <Skeleton className="w-full h-40 rounded-t-lg rounded-b-none" />
+    <Card className="h-60 w-full relative rounded-xl shadow-lg">
+      <Skeleton className="w-full h-40 rounded-t-xl rounded-b-none" />
       <CardHeader>
         <CardTitle>
           <Skeleton className="w-[100px] h-[15px] rounded-lg" />

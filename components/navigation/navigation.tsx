@@ -331,7 +331,7 @@ export default function Navigation() {
       <div className="sm:hidden relative z-10">
         <Drawer open={open} onOpenChange={setOpen}>
           <DrawerTrigger asChild>
-            <Menu className="h-6 w-6 text-white" />
+            <Menu className={cn("h-6 w-6 text-[#3A86FF]", scrolled && "text-white")} />
           </DrawerTrigger>
           <DrawerContent className="h-[98%] bg-primary text-white bg-[#032bc0] bg-opacity-70">
             <div className="flex flex-col h-full px-6 py-10">
