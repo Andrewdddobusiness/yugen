@@ -84,10 +84,20 @@ export function DatePickerWithRangePopover2({
             />
           </div>
           <div className="flex justify-end gap-2 p-3 border-t">
-            <Button variant="outline" size="sm" onClick={() => setIsOpen(false)} className="min-h-[36px]">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setIsOpen(false)}
+              className="min-h-[36px] rounded-xl shadow-lg text-gray-800"
+            >
               Cancel
             </Button>
-            <Button size="sm" onClick={handleConfirm} disabled={!date?.from || !date?.to} className="min-h-[36px]">
+            <Button
+              size="sm"
+              onClick={handleConfirm}
+              disabled={!date?.from || !date?.to}
+              className="min-h-[36px] bg-[#3A86FF] rounded-xl shadow-lg text-white hover:bg-[#3A86FF]/90 active:scale-95 transition-all duration-300"
+            >
               Confirm
             </Button>
           </div>
