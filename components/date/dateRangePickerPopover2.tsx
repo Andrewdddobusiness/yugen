@@ -43,13 +43,18 @@ export function DatePickerWithRangePopover2({
   const today = new Date();
 
   return (
-    <div className={cn("grid gap-2")}>
+    <div className={cn("grid gap-2 relative")}>
       <Popover open={isOpen} onOpenChange={setIsOpen}>
-        <PopoverTrigger asChild className={className}>
+        <PopoverTrigger asChild>
           <Button
             id="date"
             variant={"outline"}
-            className={cn("w-full justify-start text-left font-normal", !date && "text-muted-foreground")}
+            className={cn(
+              "w-full justify-start text-left font-normal min-h-[44px]",
+              "active:scale-95 transition-transform duration-200",
+              "touch-manipulation",
+              !date && "text-muted-foreground"
+            )}
           >
             <CalendarIcon className="mr-2 h-4 w-4" />
             {date?.from ? (
@@ -65,21 +70,24 @@ export function DatePickerWithRangePopover2({
             )}
           </Button>
         </PopoverTrigger>
-        <PopoverContent className="w-auto p-0" align="start">
-          <Calendar
-            initialFocus
-            mode="range"
-            defaultMonth={date?.from}
-            selected={date}
-            onSelect={handleSelect}
-            numberOfMonths={2}
-            fromDate={today}
-          />
-          <div className="flex justify-end gap-2 p-2 border-t">
-            <Button variant="outline" size="sm" onClick={() => setIsOpen(false)}>
+        <PopoverContent className="w-auto p-0 z-[100]" align="start" sideOffset={4} side="bottom">
+          <div className="flex flex-col sm:flex-row">
+            <Calendar
+              initialFocus
+              mode="range"
+              defaultMonth={date?.from}
+              selected={date}
+              onSelect={handleSelect}
+              numberOfMonths={1}
+              fromDate={today}
+              className="rounded-md border-0"
+            />
+          </div>
+          <div className="flex justify-end gap-2 p-3 border-t">
+            <Button variant="outline" size="sm" onClick={() => setIsOpen(false)} className="min-h-[36px]">
               Cancel
             </Button>
-            <Button size="sm" onClick={handleConfirm} disabled={!date?.from || !date?.to}>
+            <Button size="sm" onClick={handleConfirm} disabled={!date?.from || !date?.to} className="min-h-[36px]">
               Confirm
             </Button>
           </div>
