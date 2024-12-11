@@ -43,8 +43,8 @@ export function DatePickerWithRangePopover2({
   const today = new Date();
 
   return (
-    <div className={cn("grid gap-2 relative")}>
-      <Popover open={isOpen} onOpenChange={setIsOpen}>
+    <div className={cn("grid gap-2 relative z-50")}>
+      <Popover modal={true} open={isOpen} onOpenChange={setIsOpen}>
         <PopoverTrigger asChild>
           <Button
             id="date"
@@ -52,9 +52,10 @@ export function DatePickerWithRangePopover2({
             className={cn(
               "w-full justify-start text-left font-normal min-h-[44px]",
               "active:scale-95 transition-transform duration-200",
-              "touch-manipulation",
+              "touch-manipulation cursor-pointer",
               !date && "text-muted-foreground"
             )}
+            onClick={() => setIsOpen(true)}
           >
             <CalendarIcon className="mr-2 h-4 w-4" />
             {date?.from ? (
@@ -70,7 +71,13 @@ export function DatePickerWithRangePopover2({
             )}
           </Button>
         </PopoverTrigger>
-        <PopoverContent className="w-auto p-0 z-[100]" align="start" sideOffset={4} side="bottom">
+        <PopoverContent
+          className="w-[calc(100vw-2rem)] sm:w-auto p-0 z-[100]"
+          align="center"
+          sideOffset={4}
+          side="bottom"
+          forceMount
+        >
           <div className="flex flex-col sm:flex-row">
             <Calendar
               initialFocus

@@ -18,7 +18,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 
 import { whitelistedLocations } from "@/lib/googleMaps/whitelistedLocations";
 import { capitalizeFirstLetterOfEachWord } from "@/utils/formatting/capitalise";
-import { DatePickerWithRangePopover } from "../date/dateRangePickerPopover";
 
 import { createNewItinerary } from "@/actions/supabase/actions";
 import { createClient } from "@/utils/supabase/client";
