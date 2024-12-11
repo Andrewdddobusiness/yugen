@@ -4,7 +4,7 @@ import { useActivitiesStore } from "@/store/activityStore";
 import { Button } from "@/components/ui/button";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Check, ChevronsUpDown } from "lucide-react";
+import { Check, ChevronsUpDown, ListFilter } from "lucide-react";
 import { cn } from "@/components/lib/utils";
 
 const ActivityTypeFilters: React.FC = () => {
@@ -44,8 +44,13 @@ const ActivityTypeFilters: React.FC = () => {
       <div>
         <Popover open={open} onOpenChange={setOpen}>
           <PopoverTrigger asChild>
-            <Button variant="outline" className="h-8 justify-start rounded-full">
-              {selectedFilters.length > 0 ? selectedFilters.join(", ") : "Select type"}
+            <Button variant="outline" className="h-8 justify-start rounded-full text-gray-500">
+              <span className="hidden sm:inline">
+                {selectedFilters.length > 0 ? selectedFilters.join(", ") : "Select type"}
+              </span>
+              <span className="sm:hidden">
+                <ListFilter className="h-4 w-4" />
+              </span>
               <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
             </Button>
           </PopoverTrigger>

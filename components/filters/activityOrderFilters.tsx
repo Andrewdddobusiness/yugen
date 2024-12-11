@@ -2,7 +2,7 @@ import React from "react";
 import { Button } from "@/components/ui/button";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Check, ChevronsUpDown, X } from "lucide-react";
+import { ArrowUpDown, Check, ChevronsUpDown, X } from "lucide-react";
 import { cn } from "@/components/lib/utils";
 import { ArrowDownAZ, ArrowUpAZ } from "lucide-react";
 import { IActivityWithLocation } from "@/store/activityStore";
@@ -49,9 +49,11 @@ const ActivityOrderFilters: React.FC<ActivityOrderFiltersProps> = ({ activities,
     <div>
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
-          <Button variant="outline" className="h-8 justify-start rounded-full relative">
-            {selectedOrder || "Select sort"}
-
+          <Button variant="outline" className="h-8 justify-start rounded-full text-gray-500">
+            <span className="hidden sm:inline">{selectedOrder || "Select sort"}</span>
+            <span className="sm:hidden">
+              <ArrowUpDown className="h-4 w-4" />
+            </span>
             <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
           </Button>
         </PopoverTrigger>

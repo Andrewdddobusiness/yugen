@@ -313,186 +313,183 @@ export default function Activities() {
 
   if (isCoordinatesLoading || isDestinationLoading) return <Loading />;
 
-  console.log(isSidebarLeftOpen, isSidebarRightOpen);
   return (
-    <>
-      <div className="flex flex-row h-full overflow-hidden">
-        <div
-          className={`p-4 flex flex-col h-full transition-all duration-300 ${
-            isSidebarLeftOpen
-              ? isSidebarRightOpen
-                ? "w-full xl:w-1/2"
-                : "w-full"
-              : isSidebarRightOpen
-              ? "w-full lg:w-1/2"
-              : "w-full sm:w-1/2"
-          }`}
-        >
-          <div className="flex flex-col items-center">
-            <div className="text-2xl text-black font-bold flex justify-left pt-8">Explore Activities</div>
-            <div className="text-md text-zinc-500 flex justify-left">Search for activities that you want to do!</div>
-          </div>
-          <div className="flex flex-col flex-grow overflow-hidden">
-            <Tabs
-              defaultValue={selectedTab}
-              value={selectedTab}
-              onValueChange={(value) => handleTabChange(value as "top-places" | "search" | "history")}
-              className="flex flex-col h-full"
-            >
-              <div className="flex flex-row justify-center mt-4 mb-2">
-                <TabsList className="border">
-                  <TabsTrigger value="top-places">Top Places</TabsTrigger>
-                  <TabsTrigger value="search">Wide Search</TabsTrigger>
-                  <TabsTrigger value="history">Search History</TabsTrigger>
-                </TabsList>
-              </div>
-              <Separator className="mt-4 mb-4" />
-              <TabsContent value="top-places" className="flex-grow overflow-hidden">
-                <div className="flex flex-col h-full gap-4">
-                  <div className="flex flex-row justify-between w-full px-4">
-                    <div className="flex flex-row gap-2">
-                      <ActivityCostFilters />
-                      <ActivityTypeFilters />
-                      <ActivityOrderFilters
-                        activities={topPlacesActivities as IActivityWithLocation[]}
-                        setActivities={setTopPlacesActivities}
-                      />
-                    </div>
-                  </div>
-                  <ScrollArea className="h-full px-4">
-                    {topPlacesActivities && (
-                      <ActivityCards
-                        activities={
-                          (selectedFilters.length > 0 || selectedCostFilters.length > 0
-                            ? filterActivities(
-                                filterActivities(
-                                  topPlacesActivities as IActivityWithLocation[],
-                                  selectedFilters,
-                                  activityTypeFilters
-                                ),
-                                selectedCostFilters,
-                                activityCostFilters
-                              )
-                            : topPlacesActivities) as IActivityWithLocation[]
-                        }
-                        onSelectActivity={handleActivitySelect}
-                      />
-                    )}
-                  </ScrollArea>
-                </div>
-              </TabsContent>
-              <TabsContent value="search" className="flex-grow overflow-hidden">
-                <div className="flex flex-col h-full gap-4">
-                  <div className="flex flex-row justify-between w-full px-4">
-                    <div className="flex flex-row gap-2">
-                      <ActivityCostFilters />
-                      <ActivityTypeFilters />
-                      <ActivityOrderFilters
-                        activities={activities as IActivityWithLocation[]}
-                        setActivities={setActivities}
-                      />
-                    </div>
-                  </div>
-
-                  <ScrollArea className="h-full px-4">
-                    {activities && (
-                      <ActivityCards
-                        activities={
-                          (selectedFilters.length > 0 || selectedCostFilters.length > 0
-                            ? filterActivities(
-                                filterActivities(
-                                  activities as IActivityWithLocation[],
-                                  selectedFilters,
-                                  activityTypeFilters
-                                ),
-                                selectedCostFilters,
-                                activityCostFilters
-                              )
-                            : activities) as IActivityWithLocation[]
-                        }
-                        onSelectActivity={handleActivitySelect}
-                      />
-                    )}
-                  </ScrollArea>
-                </div>
-              </TabsContent>
-              <TabsContent value="history" className="flex-grow overflow-hidden">
-                <div className="flex flex-col h-full gap-4">
-                  <div className="flex flex-row justify-between w-full px-4 items-center">
-                    <div className="flex flex-row gap-2">
-                      <ActivityCostFilters />
-                      <ActivityTypeFilters />
-                      <ActivityOrderFilters
-                        activities={searchHistoryActivities as IActivityWithLocation[]}
-                        setActivities={setSearchHistoryActivities}
-                      />
-                    </div>
-                    <ClearHistoryButton onClearHistory={handleClearHistory} />
-                  </div>
-
-                  <ScrollArea className="h-full px-4">
-                    {searchHistoryActivities && Array.isArray(searchHistoryActivities) ? (
-                      <ActivityCards
-                        activities={
-                          (selectedFilters.length > 0 || selectedCostFilters.length > 0
-                            ? filterActivities(
-                                filterActivities(
-                                  searchHistoryActivities as IActivityWithLocation[],
-                                  selectedFilters,
-                                  activityTypeFilters
-                                ),
-                                selectedCostFilters,
-                                activityCostFilters
-                              )
-                            : searchHistoryActivities) as IActivityWithLocation[]
-                        }
-                        onSelectActivity={handleActivitySelect}
-                      />
-                    ) : (
-                      <ActivitySkeletonCards />
-                    )}
-                  </ScrollArea>
-                </div>
-              </TabsContent>
-            </Tabs>
-          </div>
+    <div className="flex flex-row h-full overflow-hidden flex-1">
+      <div
+        className={`p-4 flex flex-col h-full transition-all duration-300 ${
+          isSidebarLeftOpen
+            ? isSidebarRightOpen
+              ? "w-full xl:w-1/2"
+              : "w-full"
+            : isSidebarRightOpen
+            ? "w-full lg:w-1/2"
+            : "w-full sm:w-1/2"
+        }`}
+      >
+        <div className="hidden sm:flex flex-col items-center">
+          <div className="text-2xl text-black font-bold flex justify-left pt-8">Explore Activities</div>
+          <div className="text-md text-zinc-500 flex justify-left">Search for activities that you want to do!</div>
         </div>
-        <div
-          className={`w-full h-full relative transition-all duration-300 ${
-            isSidebarLeftOpen
-              ? isSidebarRightOpen
-                ? "w-0 xl:w-1/2 hidden xl:block"
-                : "w-0 hidden xl:block xl:w-1/2"
-              : isSidebarRightOpen
-              ? "w-0 lg:w-1/2 hidden lg:block"
-              : "w-0 sm:w-1/2 hidden sm:block"
-          }`}
-        >
-          {isCoordinatesLoading ? (
-            <div className="w-full h-full bg-zinc-50 rounded-lg flex items-center justify-center">
-              <div className="space-y-3 w-full h-full">
-                <Skeleton className="flex items-center justify-center w-full h-full rounded-lg bg-zinc-200">
-                  <EarthIcon className="w-[20%] h-[20%] text-zinc-300" />
-                </Skeleton>
-              </div>
+        <div className="flex flex-col flex-grow overflow-hidden">
+          <Tabs
+            defaultValue={selectedTab}
+            value={selectedTab}
+            onValueChange={(value) => handleTabChange(value as "top-places" | "search" | "history")}
+            className="flex flex-col h-full"
+          >
+            <div className="flex flex-row justify-center sm:mt-4 sm:mb-2">
+              <TabsList className="border">
+                <TabsTrigger value="top-places">Top Places</TabsTrigger>
+                <TabsTrigger value="search">Wide Search</TabsTrigger>
+                <TabsTrigger value="history">Search History</TabsTrigger>
+              </TabsList>
             </div>
-          ) : cityCoordinates ? (
-            <GoogleMapComponent />
-          ) : null}
-          {popupInfo && (
-            <Popup
-              longitude={popupInfo.longitude}
-              latitude={popupInfo.latitude}
-              anchor="bottom"
-              closeButton={false}
-              closeOnClick={false}
-              className="z-50"
-            >
-              <div className="px-2 py-1 text-sm font-medium">{popupInfo.name}</div>
-            </Popup>
-          )}
+            <Separator className="mt-4 mb-2 sm:mb-4" />
+            <TabsContent value="top-places" className="flex-grow overflow-hidden">
+              <div className="flex flex-col h-full gap-4">
+                <div className="flex flex-row justify-between w-full px-4">
+                  <div className="flex flex-row gap-2">
+                    <ActivityCostFilters />
+                    <ActivityTypeFilters />
+                    <ActivityOrderFilters
+                      activities={topPlacesActivities as IActivityWithLocation[]}
+                      setActivities={setTopPlacesActivities}
+                    />
+                  </div>
+                </div>
+                <ScrollArea className="h-full px-4">
+                  {topPlacesActivities && (
+                    <ActivityCards
+                      activities={
+                        (selectedFilters.length > 0 || selectedCostFilters.length > 0
+                          ? filterActivities(
+                              filterActivities(
+                                topPlacesActivities as IActivityWithLocation[],
+                                selectedFilters,
+                                activityTypeFilters
+                              ),
+                              selectedCostFilters,
+                              activityCostFilters
+                            )
+                          : topPlacesActivities) as IActivityWithLocation[]
+                      }
+                      onSelectActivity={handleActivitySelect}
+                    />
+                  )}
+                </ScrollArea>
+              </div>
+            </TabsContent>
+            <TabsContent value="search" className="flex-grow overflow-hidden">
+              <div className="flex flex-col h-full gap-4">
+                <div className="flex flex-row justify-between w-full px-4">
+                  <div className="flex flex-row gap-2">
+                    <ActivityCostFilters />
+                    <ActivityTypeFilters />
+                    <ActivityOrderFilters
+                      activities={activities as IActivityWithLocation[]}
+                      setActivities={setActivities}
+                    />
+                  </div>
+                </div>
+
+                <ScrollArea className="h-full px-4">
+                  {activities && (
+                    <ActivityCards
+                      activities={
+                        (selectedFilters.length > 0 || selectedCostFilters.length > 0
+                          ? filterActivities(
+                              filterActivities(
+                                activities as IActivityWithLocation[],
+                                selectedFilters,
+                                activityTypeFilters
+                              ),
+                              selectedCostFilters,
+                              activityCostFilters
+                            )
+                          : activities) as IActivityWithLocation[]
+                      }
+                      onSelectActivity={handleActivitySelect}
+                    />
+                  )}
+                </ScrollArea>
+              </div>
+            </TabsContent>
+            <TabsContent value="history" className="flex-grow overflow-hidden">
+              <div className="flex flex-col h-full gap-4">
+                <div className="flex flex-row justify-between w-full px-4 items-center">
+                  <div className="flex flex-row gap-2">
+                    <ActivityCostFilters />
+                    <ActivityTypeFilters />
+                    <ActivityOrderFilters
+                      activities={searchHistoryActivities as IActivityWithLocation[]}
+                      setActivities={setSearchHistoryActivities}
+                    />
+                  </div>
+                  <ClearHistoryButton onClearHistory={handleClearHistory} />
+                </div>
+
+                <ScrollArea className="h-full px-4">
+                  {searchHistoryActivities && Array.isArray(searchHistoryActivities) ? (
+                    <ActivityCards
+                      activities={
+                        (selectedFilters.length > 0 || selectedCostFilters.length > 0
+                          ? filterActivities(
+                              filterActivities(
+                                searchHistoryActivities as IActivityWithLocation[],
+                                selectedFilters,
+                                activityTypeFilters
+                              ),
+                              selectedCostFilters,
+                              activityCostFilters
+                            )
+                          : searchHistoryActivities) as IActivityWithLocation[]
+                      }
+                      onSelectActivity={handleActivitySelect}
+                    />
+                  ) : (
+                    <ActivitySkeletonCards />
+                  )}
+                </ScrollArea>
+              </div>
+            </TabsContent>
+          </Tabs>
         </div>
       </div>
-    </>
+      <div
+        className={`w-full h-full relative transition-all duration-300 ${
+          isSidebarLeftOpen
+            ? isSidebarRightOpen
+              ? "w-0 xl:w-1/2 hidden xl:block"
+              : "w-0 hidden xl:block xl:w-1/2"
+            : isSidebarRightOpen
+            ? "w-0 lg:w-1/2 hidden lg:block"
+            : "w-0 sm:w-1/2 hidden sm:block"
+        }`}
+      >
+        {isCoordinatesLoading ? (
+          <div className="w-full h-full bg-zinc-50 rounded-lg flex items-center justify-center">
+            <div className="space-y-3 w-full h-full">
+              <Skeleton className="flex items-center justify-center w-full h-full rounded-lg bg-zinc-200">
+                <EarthIcon className="w-[20%] h-[20%] text-zinc-300" />
+              </Skeleton>
+            </div>
+          </div>
+        ) : cityCoordinates ? (
+          <GoogleMapComponent />
+        ) : null}
+        {popupInfo && (
+          <Popup
+            longitude={popupInfo.longitude}
+            latitude={popupInfo.latitude}
+            anchor="bottom"
+            closeButton={false}
+            closeOnClick={false}
+            className="z-50"
+          >
+            <div className="px-2 py-1 text-sm font-medium">{popupInfo.name}</div>
+          </Popup>
+        )}
+      </div>
+    </div>
   );
 }

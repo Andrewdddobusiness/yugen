@@ -148,7 +148,7 @@ export function AppSidebarItineraryActivityRight() {
 
   if (!selectedActivity) {
     return (
-      <Sidebar side={"right"} variant="inset" className="shadow-md bg-white">
+      <Sidebar side={"right"} variant="inset" className="shadow-md bg-white flex">
         <SidebarHeader className="bg-white">
           <SidebarMenu>
             <SidebarMenuItem>
