@@ -63,8 +63,6 @@ export default function Activities() {
   const { isSidebarRightOpen, setIsSidebarRightOpen, isSidebarLeftOpen } = useSidebarStore();
   const { selectedTab, setSelectedTab } = useActivityTabStore();
 
-  const { openSidebar } = useSidebar();
-
   // **** STATES ****
   const [initialLoadComplete, setInitialLoadComplete] = useState(false);
 
@@ -314,7 +312,7 @@ export default function Activities() {
   if (isCoordinatesLoading || isDestinationLoading) return <Loading />;
 
   return (
-    <div className="flex flex-row h-full overflow-hidden flex-1">
+    <div className="flex flex-row h-full overflow-hidden flex-1 pb-10">
       <div
         className={`p-4 flex flex-col h-full transition-all duration-300 ${
           isSidebarLeftOpen ? "w-full lg:w-1/2" : "w-full md:w-1/2"

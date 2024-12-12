@@ -71,24 +71,23 @@ export function NavMain() {
                   </SidebarMenuAction>
                 </CollapsibleTrigger>
                 <CollapsibleContent>
-                  <SidebarMenuSub className="flex-col gap-2">
+                  <SidebarMenuSub className="flex-col">
                     {itineraryData?.map((itinerary) => (
                       <SidebarMenuSubItem key={itinerary.city}>
                         <SidebarMenuSubButton asChild>
                           <Link
                             href={`/itinerary/${itinerary.itinerary_id}/${itinerary.itinerary_destination_id}/activities`}
-                            className="flex flex-col items-start w-full pl-2 "
+                            className="w-full py-5"
                           >
-                            <div className="flex flex-row items-center gap-2">
-                              <Minus size="12" />
-                              <div>
-                                <div className="text-left w-full text-md">
-                                  {itinerary.city}
-                                  {", "} {itinerary.country}
-                                </div>
-                                <div className="text-left w-full text-xs text-muted-foreground">
-                                  {formatDate(itinerary.from_date)} {" - "} {formatDate(itinerary.to_date)}
-                                </div>
+                            <div className="flex items-center gap-2 w-full">
+                              <Minus size="12" className="shrink-0" />
+                              <div className="flex flex-col min-w-0">
+                                <span className="truncate text-sm">
+                                  {itinerary.city}, {itinerary.country}
+                                </span>
+                                <span className="text-xs text-muted-foreground truncate">
+                                  {formatDate(itinerary.from_date)} - {formatDate(itinerary.to_date)}
+                                </span>
                               </div>
                             </div>
                           </Link>

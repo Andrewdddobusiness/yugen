@@ -41,14 +41,14 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const { subscription } = useStripeSubscriptionStore();
 
   return (
-    <Sidebar variant="inset" {...props} className="shadow-md bg-white" sidebarWidth="18rem">
+    <Sidebar variant="inset" {...props} className="shadow-md bg-white">
       <SidebarHeader className="bg-white">
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton size="lg" asChild>
               <Link href="/">
                 <div className="flex items-center justify-center">
-                  <div className="w-[35px] h-[35px] ">
+                  <div className="w-[35px] h-[35px]">
                     <Image
                       className="w-full h-full"
                       src="/journey1.svg"

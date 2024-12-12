@@ -149,17 +149,16 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex h-screen">
       <SidebarProvider
-        defaultOpen={true}
         style={
           {
             "--sidebar-width": "350px",
-            "--sidebar-width-icon": "48px", // Width when collapsed
+            "--sidebar-width-icon": "48px",
             "--sidebar-width-mobile": "280px",
           } as React.CSSProperties
         }
       >
         <AppSidebarItineraryActivityLeft />
-        <SidebarInset>
+        <main className="flex-1 flex flex-col w-full">
           <header className="sticky top-0 flex shrink-0 items-center gap-2 border-b bg-background p-2">
             <div className="flex items-center gap-2 flex-1">
               <SidebarTrigger className="-ml-1" />
@@ -171,7 +170,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                   </BreadcrumbItem>
                   <BreadcrumbSeparator />
                   <BreadcrumbItem>
-                    <BreadcrumbPage>{getBreadcrumbText()}</BreadcrumbPage>
+                    <BreadcrumbPage>{getBreadcrumbText()}</BreadcrumbPage>xw
                   </BreadcrumbItem>
                 </BreadcrumbList>
               </Breadcrumb>
@@ -200,10 +199,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               </DropdownMenuContent>
             </DropdownMenu>
           </header>
-          <main className="flex-1 overflow-auto">{children}</main>
-        </SidebarInset>
+          <div className="flex-1 overflow-auto">{children}</div>
+        </main>
       </SidebarProvider>
-
       <ExportDialog open={exportDialogOpen} onOpenChange={setExportDialogOpen} itineraryId={itineraryId as string} />
     </div>
   );

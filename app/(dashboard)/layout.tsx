@@ -85,13 +85,11 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
   return (
     <SidebarProvider>
-      <div className="flex min-h-screen w-full">
-        <AppSidebar />
-        <main className="flex-1 flex flex-col w-full h-full bg-muted">
-          <SidebarTrigger className="mt-2 shadow-md rounded-l-none bg-white" />
-          <div className="flex-1 h-full ">{children}</div>
-        </main>
-      </div>
+      <AppSidebar />
+      <main className="flex-1 flex flex-col w-full h-full ">
+        <SidebarTrigger className="mt-2 shadow-md rounded-l-none bg-white" />
+        {children}
+      </main>
     </SidebarProvider>
   );
 }

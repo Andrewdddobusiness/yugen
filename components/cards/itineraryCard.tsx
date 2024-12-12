@@ -103,7 +103,7 @@ export default function ItineraryCard({ itinerary, onDelete }: ItineraryCardProp
       passHref
     >
       <Card
-        className="h-60 w-full sm:w-60 cursor-pointer relative backdrop-blur-lg shadow-lg hover:scale-105 transition-all duration-300 active:scale-95 rounded-xl"
+        className="h-60 w-full sm:w-60 cursor-pointer relative backdrop-blur-lg sm:shadow-lg sm:hover:scale-105 transition-all duration-300 sm:active:scale-95 rounded-xl"
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
       >
@@ -145,14 +145,23 @@ export default function ItineraryCard({ itinerary, onDelete }: ItineraryCardProp
 
         <DropdownMenu>
           <DropdownMenuTrigger
+            onClick={(e: any) => e.stopPropagation()}
             className={`absolute z-50 top-2 right-2 p-1 bg-white rounded-lg transition-opacity duration-300 text-gray-500 hover:text-white ${
-              isHovered ? "opacity-100 hover:bg-[#3A86FF]" : "opacity-0"
+              isHovered ? "opacity-100 hover:bg-[#3A86FF]" : "opacity-100 sm:opacity-0"
             }`}
           >
             <MoreHorizontal className={`h-5 w-5`} />
           </DropdownMenuTrigger>
           <DropdownMenuContent className="absolute -left-4 -bottom-10">
-            <DropdownMenuItem onClick={handleDelete} disabled={isDeleting} className="text-red-600 focus:text-red-600">
+            <DropdownMenuItem
+              onClick={(e: any) => {
+                e.preventDefault();
+                e.stopPropagation();
+                handleDelete(e);
+              }}
+              disabled={isDeleting}
+              className="text-red-600 focus:text-red-600"
+            >
               {isDeleting ? "Deleting..." : "Delete"}
             </DropdownMenuItem>
           </DropdownMenuContent>
