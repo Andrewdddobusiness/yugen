@@ -234,7 +234,6 @@ const Sidebar = React.forwardRef<
     };
 
     const sidebarWidth2 = side === "right" ? SIDEBAR_WIDTH_RIGHT : sidebarWidth;
-    console.log(sidebarWidth2);
 
     if (collapsible === "none") {
       return (

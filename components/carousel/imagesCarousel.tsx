@@ -7,9 +7,18 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 interface IImageCarouselProps {
   photoNames: string[];
   showButtons?: boolean;
+  height?: string;
+  width?: string;
+  className?: string;
 }
 
-const ImageCarousel: React.FC<IImageCarouselProps> = ({ photoNames, showButtons = false }) => {
+const ImageCarousel: React.FC<IImageCarouselProps> = ({
+  photoNames,
+  showButtons = false,
+  height = "h-80",
+  width = "w-full",
+  className = "",
+}) => {
   const [api, setApi] = useState<CarouselApi>();
   const [imageError, setImageError] = useState<{ [key: string]: boolean }>({});
 
@@ -24,8 +33,8 @@ const ImageCarousel: React.FC<IImageCarouselProps> = ({ photoNames, showButtons 
   };
 
   return (
-    <div className="relative w-full">
-      <Carousel className={`w-full ${showButtons ? "" : ""}`} setApi={setApi}>
+    <div className={`relative ${width} ${height} ${className}`}>
+      <Carousel className="w-full h-full" setApi={setApi}>
         {showButtons && (
           <Button
             variant="outline"
@@ -39,7 +48,7 @@ const ImageCarousel: React.FC<IImageCarouselProps> = ({ photoNames, showButtons 
         <CarouselContent>
           {photoNames.map((photoName: string, index: number) => (
             <CarouselItem key={index}>
-              <div className="relative h-80 w-full">
+              <div className={`relative ${height} ${width}`}>
                 <Image
                   src={getPhotoUrl(photoName)}
                   alt={`Image ${index + 1}`}
@@ -49,8 +58,7 @@ const ImageCarousel: React.FC<IImageCarouselProps> = ({ photoNames, showButtons 
                     setImageError((prev) => ({ ...prev, [photoName]: true }));
                     console.error(`Failed to load image: ${photoName}`);
                   }}
-                  unoptimized // Bypass Next.js image optimization for external URLs
-                  // Add referrer policy
+                  unoptimized
                   referrerPolicy="strict-origin-when-cross-origin"
                 />
                 {imageError[photoName] && (

@@ -2,6 +2,7 @@ import { APIProvider, Map } from "@vis.gl/react-google-maps";
 import { motion, AnimatePresence } from "framer-motion";
 
 import { useMapStore } from "@/store/mapStore";
+import { useActivitiesStore } from "@/store/activityStore";
 
 import { getRadiusForZoom } from "./zoomRadiusMap";
 import GoogleMarkers from "./googleMarkers";
@@ -11,9 +12,11 @@ import Circle from "./circle";
 import GoogleMapController from "./googleMapController";
 
 import { colors, TColor } from "@/lib/colors/colors";
+import { ActivityOverlay } from "./activityOverlay";
 
 export default function GoogleMapComponent() {
   const { centerCoordinates, initialZoom, mapRadius, setRadius, tempMarker, setCenterCoordinates } = useMapStore();
+  const { selectedActivity, setSelectedActivity } = useActivitiesStore();
 
   const center = centerCoordinates
     ? { lat: centerCoordinates[0], lng: centerCoordinates[1] }
@@ -99,6 +102,24 @@ export default function GoogleMapComponent() {
             <SearchField />
           </div>
         </motion.div>
+      </AnimatePresence>
+
+      {/* Activity Overlay with AnimatePresence for smooth transitions */}
+      <AnimatePresence>
+        {selectedActivity && (
+          <motion.div
+            initial={{ y: 100, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: 100, opacity: 0 }}
+            transition={{ type: "spring", damping: 25, stiffness: 200 }}
+          >
+            <ActivityOverlay
+              onClose={() => {
+                setSelectedActivity(null);
+              }}
+            />
+          </motion.div>
+        )}
       </AnimatePresence>
     </div>
   );

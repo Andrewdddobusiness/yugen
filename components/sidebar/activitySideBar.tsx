@@ -1,7 +1,7 @@
 "use client";
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
@@ -33,8 +33,9 @@ interface IActivitySidebarProps {
 }
 
 export default function ActivitySidebar({ activity, onClose }: IActivitySidebarProps) {
-  const searchParams = useSearchParams();
-  const itineraryId = searchParams.get("i");
+  let { itineraryId, destinationId } = useParams();
+  itineraryId = itineraryId.toString();
+  destinationId = destinationId.toString();
 
   const { insertItineraryActivity, removeItineraryActivity, itineraryActivities } = useItineraryActivityStore();
   const [isActivityAdded, setIsActivityAdded] = useState<boolean>(false);
@@ -66,7 +67,7 @@ export default function ActivitySidebar({ activity, onClose }: IActivitySidebarP
   const handleAddToItinerary = async () => {
     setLoading(true);
     if (!activity || !itineraryId) return;
-    const { success } = await insertItineraryActivity(activity, itineraryId);
+    const { success } = await insertItineraryActivity(activity, itineraryId.toString(), destinationId.toString());
     if (success) {
       setIsActivityAdded(true);
     } else {

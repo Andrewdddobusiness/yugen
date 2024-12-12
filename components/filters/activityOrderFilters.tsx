@@ -46,7 +46,7 @@ const ActivityOrderFilters: React.FC<ActivityOrderFiltersProps> = ({ activities,
   };
 
   return (
-    <div>
+    <div className="flex flex-row gap-2 items-center justify-center">
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
           <Button variant="outline" className="h-8 justify-start rounded-full text-gray-500">

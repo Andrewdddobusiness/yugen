@@ -234,6 +234,27 @@ export async function softDeleteTableData(tableName: string, matchConditions: Re
   return { success: true, message: "Soft delete successful", data };
 }
 
+export async function softDeleteTableData2(tableName: string, matchConditions: Record<string, any>) {
+  const supabase = createClient();
+
+  const { data, error } = await supabase
+    .from(tableName)
+    .update({
+      deleted_at: new Date().toISOString(),
+      date: null,
+      start_time: null,
+      end_time: null,
+    })
+    .match(matchConditions);
+
+  if (error) {
+    console.error("Soft delete failed:", error);
+    return { success: false, message: "Soft delete failed", error };
+  }
+
+  return { success: true, message: "Soft delete successful", data };
+}
+
 export const softDeleteItinerary = async (itineraryId: number) => {
   const supabase = createClient();
 

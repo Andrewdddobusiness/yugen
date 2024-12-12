@@ -317,13 +317,7 @@ export default function Activities() {
     <div className="flex flex-row h-full overflow-hidden flex-1">
       <div
         className={`p-4 flex flex-col h-full transition-all duration-300 ${
-          isSidebarLeftOpen
-            ? isSidebarRightOpen
-              ? "w-full xl:w-1/2"
-              : "w-full"
-            : isSidebarRightOpen
-            ? "w-full lg:w-1/2"
-            : "w-full sm:w-1/2"
+          isSidebarLeftOpen ? "w-full lg:w-1/2" : "w-full md:w-1/2"
         }`}
       >
         <div className="hidden sm:flex flex-col items-center">
@@ -348,7 +342,7 @@ export default function Activities() {
             <TabsContent value="top-places" className="flex-grow overflow-hidden">
               <div className="flex flex-col h-full gap-4">
                 <div className="flex flex-row justify-between w-full px-4">
-                  <div className="flex flex-row gap-2">
+                  <div className="flex flex-row gap-2 items-center justify-center w-full">
                     <ActivityCostFilters />
                     <ActivityTypeFilters />
                     <ActivityOrderFilters
@@ -456,14 +450,8 @@ export default function Activities() {
         </div>
       </div>
       <div
-        className={`w-full h-full relative transition-all duration-300 ${
-          isSidebarLeftOpen
-            ? isSidebarRightOpen
-              ? "w-0 xl:w-1/2 hidden xl:block"
-              : "w-0 hidden xl:block xl:w-1/2"
-            : isSidebarRightOpen
-            ? "w-0 lg:w-1/2 hidden lg:block"
-            : "w-0 sm:w-1/2 hidden sm:block"
+        className={`h-full relative transition-all duration-300 ${
+          isSidebarLeftOpen ? "w-0 lg:w-1/2 hidden lg:block" : "w-0 md:w-1/2 hidden md:block"
         }`}
       >
         {isCoordinatesLoading ? (

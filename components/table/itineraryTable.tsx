@@ -113,19 +113,20 @@ export function ItineraryTableView() {
                       <div className="p-4 pt-0 space-y-3 border-t">
                         <div className="grid grid-cols-2 gap-2 pt-2">
                           <div>
+                            <div className="text-xs text-gray-500 mb-1">Date</div>
+                            <DatePickerPopover
+                              itineraryActivityId={Number(activity.itinerary_activity_id)}
+                              showText={true}
+                              styled={true}
+                            />
+                          </div>
+
+                          <div>
                             <div className="text-xs text-gray-500 mb-1">Time</div>
                             <TimePopover
                               itineraryActivityId={Number(activity.itinerary_activity_id)}
                               storeStartTime={activity.start_time}
                               storeEndTime={activity.end_time}
-                              showText={true}
-                              styled={true}
-                            />
-                          </div>
-                          <div>
-                            <div className="text-xs text-gray-500 mb-1">Date</div>
-                            <DatePickerPopover
-                              itineraryActivityId={Number(activity.itinerary_activity_id)}
                               showText={true}
                               styled={true}
                             />
@@ -190,8 +191,8 @@ export function ItineraryTableView() {
             <TableHead className="flex items-center w-[20%] min-w-[200px] text-black">Activity Name</TableHead>
             <TableHead className="flex items-center w-[10%] min-w-[100px] text-black">Type</TableHead>
             <TableHead className="flex items-center w-[20%] min-w-[200px] text-blacks">Address</TableHead>
-            <TableHead className="flex items-center w-[15%] min-w-[150px] text-black">Time</TableHead>
             <TableHead className="flex items-center w-[15%] min-w-[150px] text-black">Date</TableHead>
+            <TableHead className="flex items-center w-[15%] min-w-[150px] text-black">Time</TableHead>
             <TableHead className="flex items-center w-[20%] min-w-[200px] text-black">Notes</TableHead>
           </TableRow>
         </TableHeader>
@@ -208,6 +209,13 @@ export function ItineraryTableView() {
               </TableCell>
               <TableCell className="w-[20%] min-w-[200px]">{activity.activity?.address}</TableCell>
               <TableCell className="w-[15%] min-w-[150px]">
+                <DatePickerPopover
+                  itineraryActivityId={Number(activity.itinerary_activity_id)}
+                  showText={true}
+                  styled={true}
+                />
+              </TableCell>
+              <TableCell className="w-[15%] min-w-[150px]">
                 <TimePopover
                   itineraryActivityId={Number(activity.itinerary_activity_id)}
                   storeStartTime={activity.start_time}
@@ -216,13 +224,7 @@ export function ItineraryTableView() {
                   styled={true}
                 />
               </TableCell>
-              <TableCell className="w-[15%] min-w-[150px]">
-                <DatePickerPopover
-                  itineraryActivityId={Number(activity.itinerary_activity_id)}
-                  showText={true}
-                  styled={true}
-                />
-              </TableCell>
+
               <TableCell className="w-[20%] min-w-[200px]">
                 <NotesPopover
                   id={activity.itinerary_activity_id}

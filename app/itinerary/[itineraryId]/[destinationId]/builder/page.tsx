@@ -45,7 +45,7 @@ export default function Builder() {
 
   return (
     <div className="flex flex-col h-full w-full overflow-hidden">
-      <Tabs defaultValue="calendar" className="flex flex-col h-full">
+      <Tabs defaultValue="table" className="flex flex-col h-full">
         <div className="p-2 flex-none flex justify-end">
           <TabsList className="grid w-[90px] grid-cols-2 border">
             <TabsTrigger value="calendar" className="p-2">

@@ -21,24 +21,29 @@ import { useSidebarStore } from "@/store/sidebarStore";
 export function ActivityCartSidebar() {
   // **** STORES ****
   const { setSelectedActivity } = useActivitiesStore();
-  const { setIsSidebarRightOpen, openRightSidebar } = useSidebarStore();
+  const { setIsSidebarRightOpen } = useSidebarStore();
   const { isCartOpen, setIsCartOpen } = useCartStore();
   const { itineraryActivities } = useItineraryActivityStore();
   const { state } = useSidebar();
 
   const sidebarWidth = state === "expanded" ? "16rem" : "4rem";
 
-  // filter activities that are active and not deleted with delete_at
-  const itineraryActivitiesOnlyActivities = itineraryActivities
-    .filter((itineraryActivity) => itineraryActivity.deleted_at === null)
-    .map((activity) => activity.activity)
-    .filter(Boolean) as IActivityWithLocation[];
+  const itineraryActivitiesOnlyActivities = itineraryActivities?.length
+    ? (itineraryActivities
+        .filter((itineraryActivity) => itineraryActivity.deleted_at === null)
+        .map((activity) => activity.activity)
+        .filter(Boolean) as IActivityWithLocation[])
+    : [];
 
-  // **** HANDLERS ****
   const handleActivitySelect = (activity: IActivity) => {
     setSelectedActivity(activity);
     setIsSidebarRightOpen(true);
   };
+
+  // Don't render content if no activities
+  if (!itineraryActivities?.length) {
+    return null;
+  }
 
   return (
     <div

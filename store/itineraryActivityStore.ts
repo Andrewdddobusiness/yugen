@@ -8,6 +8,7 @@ import {
   fetchActivityIdByPlaceId,
   softDeleteTableData,
   setTableDataWithCheck,
+  softDeleteTableData2,
 } from "@/actions/supabase/actions";
 import { IActivity, IActivityWithLocation } from "./activityStore";
 
@@ -325,7 +326,7 @@ export const useItineraryActivityStore = create<IItineraryStore>((set, get) => (
       const activityId = activityResult.data.activity_id;
 
       // Now use the activity_id to soft delete the itinerary activity
-      const result = await softDeleteTableData("itinerary_activity", {
+      const result = await softDeleteTableData2("itinerary_activity", {
         activity_id: activityId,
         itinerary_id: itineraryId,
       });

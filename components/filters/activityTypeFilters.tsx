@@ -24,62 +24,44 @@ const ActivityTypeFilters: React.FC = () => {
   };
 
   return (
-    <>
-      {/* Toggle buttons for larger screens */}
-      {/* <div className="hidden lg:flex space-x-2">
-        {filters.map((filter) => (
-          <Toggle
-            key={filter}
-            variant="outline"
-            className="h-8 bg-white rounded-full ml-2 w-20"
-            pressed={selectedFilters.includes(filter)}
-            onPressedChange={() => handleFilterSelect(filter)}
-          >
-            {filter}
-          </Toggle>
-        ))}
-      </div> */}
-
-      {/* Combobox for small screens */}
-      <div>
-        <Popover open={open} onOpenChange={setOpen}>
-          <PopoverTrigger asChild>
-            <Button variant="outline" className="h-8 justify-start rounded-full text-gray-500">
-              <span className="hidden sm:inline">
-                {selectedFilters.length > 0 ? selectedFilters.join(", ") : "Select type"}
-              </span>
-              <span className="sm:hidden">
-                <ListFilter className="h-4 w-4" />
-              </span>
-              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-[200px] p-0" align="start">
-            <Command>
-              <CommandInput placeholder="Search type..." />
-              <CommandList>
-                <CommandEmpty>No results found.</CommandEmpty>
-                <CommandGroup>
-                  {filters.map((filter) => (
-                    <CommandItem
-                      key={filter}
-                      onSelect={() => {
-                        handleFilterSelect(filter);
-                      }}
-                    >
-                      <Check
-                        className={cn("mr-2 h-4 w-4", selectedFilters.includes(filter) ? "opacity-100" : "opacity-0")}
-                      />
-                      {filter}
-                    </CommandItem>
-                  ))}
-                </CommandGroup>
-              </CommandList>
-            </Command>
-          </PopoverContent>
-        </Popover>
-      </div>
-    </>
+    <div className="flex flex-row gap-2 items-center justify-center">
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          <Button variant="outline" className="h-8 justify-start rounded-full text-gray-500">
+            <span className="hidden sm:inline">
+              {selectedFilters.length > 0 ? selectedFilters.join(", ") : "Select type"}
+            </span>
+            <span className="sm:hidden">
+              <ListFilter className="h-4 w-4" />
+            </span>
+            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-[200px] p-0" align="start">
+          <Command>
+            <CommandInput placeholder="Search type..." />
+            <CommandList>
+              <CommandEmpty>No results found.</CommandEmpty>
+              <CommandGroup>
+                {filters.map((filter) => (
+                  <CommandItem
+                    key={filter}
+                    onSelect={() => {
+                      handleFilterSelect(filter);
+                    }}
+                  >
+                    <Check
+                      className={cn("mr-2 h-4 w-4", selectedFilters.includes(filter) ? "opacity-100" : "opacity-0")}
+                    />
+                    {filter}
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            </CommandList>
+          </Command>
+        </PopoverContent>
+      </Popover>
+    </div>
   );
 };
 
