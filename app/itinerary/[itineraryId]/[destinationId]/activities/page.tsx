@@ -382,7 +382,7 @@ export default function Activities() {
             <TabsContent value="search" className="flex-grow overflow-hidden">
               <div className="flex flex-col h-full gap-4">
                 <div className="flex flex-row justify-between w-full px-4">
-                  <div className="flex flex-row gap-2">
+                  <div className="flex flex-row gap-2 items-center justify-center w-full">
                     <ActivityCostFilters />
                     <ActivityTypeFilters />
                     <ActivityOrderFilters
@@ -417,7 +417,7 @@ export default function Activities() {
             <TabsContent value="history" className="flex-grow overflow-hidden">
               <div className="flex flex-col h-full gap-4">
                 <div className="flex flex-row justify-between w-full px-4 items-center">
-                  <div className="flex flex-row gap-2">
+                  <div className="flex flex-row gap-2 items-center justify-center w-full">
                     <ActivityCostFilters />
                     <ActivityTypeFilters />
                     <ActivityOrderFilters
