@@ -42,21 +42,35 @@ export function ItineraryTableView() {
   };
 
   const groupActivitiesByDate = (activities: typeof itineraryActivities) => {
-    const groups: { [key: string]: typeof activities } = {};
+    const groups: { [key: string]: typeof activities } = {
+      unscheduled: [],
+    };
 
     activities.forEach((activity) => {
-      if (!activity.date) return;
-      const date = new Date(activity.date).toISOString().split("T")[0];
-      if (!groups[date]) {
-        groups[date] = [];
+      if (!activity.date) {
+        groups.unscheduled.push(activity);
+      } else {
+        const date = new Date(activity.date).toISOString().split("T")[0];
+        if (!groups[date]) {
+          groups[date] = [];
+        }
+        groups[date].push(activity);
       }
-      groups[date].push(activity);
     });
 
-    return Object.entries(groups).sort(([dateA], [dateB]) => new Date(dateA).getTime() - new Date(dateB).getTime());
+    if (groups.unscheduled.length === 0) {
+      delete groups.unscheduled;
+    }
+
+    return Object.entries(groups).sort(([dateA], [dateB]) => {
+      if (dateA === "unscheduled") return 1;
+      if (dateB === "unscheduled") return -1;
+      return new Date(dateA).getTime() - new Date(dateB).getTime();
+    });
   };
 
   const formatDate = (dateString: string) => {
+    if (dateString === "unscheduled") return "Unscheduled";
     return new Date(dateString).toLocaleDateString("en-US", {
       weekday: "long",
       month: "long",
@@ -68,7 +82,10 @@ export function ItineraryTableView() {
     (itineraryActivity) => itineraryActivity.deleted_at === null
   );
 
+  console.log("itineraryActivitiesOnlyActivities: ", itineraryActivitiesOnlyActivities);
+
   const groupedActivities = groupActivitiesByDate(itineraryActivitiesOnlyActivities);
+  console.log(groupedActivities);
 
   if (isMobile) {
     return (
