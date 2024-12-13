@@ -89,7 +89,7 @@ export function ItineraryTableView() {
 
   if (isMobile) {
     return (
-      <div className="space-y-6 p-4">
+      <div className="space-y-6 p-4 z-0">
         {groupedActivities.map(([date, activities], groupIndex) => (
           <div key={date} className="space-y-2">
             <h3 className="font-medium text-gray-900">{formatDate(date)}</h3>
