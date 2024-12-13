@@ -16,6 +16,7 @@ import { ItineraryTableView } from "@/components/table/itineraryTable";
 
 import ErrorPage from "@/app/error/page";
 import { Separator } from "@/components/ui/separator";
+import { fetchItineraryDestinationDateRange } from "@/actions/supabase/actions";
 
 export default function Builder() {
   const { itineraryId, destinationId } = useParams();
@@ -25,20 +26,30 @@ export default function Builder() {
   const { fetchItineraryActivities, setItineraryActivities } = useItineraryActivityStore();
   const { setDateRange } = useDateRangeStore();
 
+  // Add new query for date range
+  const { data: dateRangeData } = useQuery({
+    queryKey: ["itineraryDestinationDateRange", itinId, destId],
+    queryFn: () => fetchItineraryDestinationDateRange(itinId, destId),
+    enabled: !!itinId && !!destId,
+  });
+
   const { isLoading, error, data } = useQuery({
     queryKey: ["itineraryActivities", itineraryId, destinationId],
-    queryFn: () => fetchItineraryActivities(itinId || "", destId || ""),
+    queryFn: () => fetchItineraryActivities(itinId, destId),
     enabled: !!itineraryId && !!destinationId,
   });
 
   useEffect(() => {
-    if (data && data.length > 0) {
+    if (data) {
       setItineraryActivities(data);
-      const firstDate = new Date(data[0].date);
-      const lastDate = new Date(data[data.length - 1].date);
-      setDateRange(firstDate, lastDate);
     }
-  }, [data, setItineraryActivities, setDateRange]);
+  }, [data, setItineraryActivities]);
+
+  useEffect(() => {
+    if (dateRangeData?.success && dateRangeData?.data) {
+      setDateRange(dateRangeData?.data.from, dateRangeData?.data.to);
+    }
+  }, [dateRangeData, setDateRange]);
 
   if (isLoading) return <Loading />;
   if (error) return <ErrorPage />;

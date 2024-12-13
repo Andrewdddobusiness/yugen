@@ -23,16 +23,35 @@ interface CalendarProps {
 
 const DragDropCalendar: React.FC<CalendarProps> = ({ isLoading }) => {
   const [view, setView] = useState("week");
-  const { startDate, endDate } = useDateRangeStore();
-  const [date, setDate] = useState(startDate || new Date());
+  const { startDate } = useDateRangeStore();
+  const [date, setDate] = useState<Date | null>(null);
   const { itineraryActivities, setItineraryActivities } = useItineraryActivityStore();
 
-  const events = itineraryActivities.map((item) => ({
-    id: item.itinerary_activity_id,
-    title: capitalizeFirstLetterOfEachWord(item.activity?.name || ""),
-    start: new Date(`${item.date}T${item.start_time}`),
-    end: new Date(`${item.date}T${item.end_time}`),
-  }));
+  // Initialize calendar with start date
+  useEffect(() => {
+    if (startDate) {
+      setDate(new Date(startDate));
+    } else {
+      // Fallback to today if no start date
+      setDate(new Date());
+    }
+    console.log("startDate: ", startDate);
+  }, [startDate]);
+
+  // Don't render calendar until we have a valid date
+  if (!date || isLoading) {
+    return <div>Loading...</div>;
+  }
+
+  const events = itineraryActivities
+    .filter((item) => item.date && item.start_time && item.end_time) // Filter out invalid items
+    .map((item) => ({
+      id: item.itinerary_activity_id,
+      title: capitalizeFirstLetterOfEachWord(item.activity?.name || ""),
+      start: new Date(`${item.date}T${item.start_time}`),
+      end: new Date(`${item.date}T${item.end_time}`),
+    }));
+
   const handleEventDrop = async ({ event, start, end }: any) => {
     const activityToUpdate = itineraryActivities.find((activity: any) => activity.itinerary_activity_id === event.id);
     if (!activityToUpdate) return;
@@ -129,16 +148,6 @@ const DragDropCalendar: React.FC<CalendarProps> = ({ isLoading }) => {
       return <div className="text-sm font-semibold text-gray-800 p-1 text-center h-10 ">{label}</div>;
     }
   };
-
-  useEffect(() => {
-    if (startDate) {
-      setDate(startDate);
-    }
-  }, [startDate]);
-
-  if (isLoading) {
-    return <div>Loading...</div>;
-  }
 
   return (
     <div className="w-full h-full flex flex-col bg-white">

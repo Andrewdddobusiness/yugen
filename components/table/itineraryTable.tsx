@@ -82,10 +82,7 @@ export function ItineraryTableView() {
     (itineraryActivity) => itineraryActivity.deleted_at === null
   );
 
-  console.log("itineraryActivitiesOnlyActivities: ", itineraryActivitiesOnlyActivities);
-
   const groupedActivities = groupActivitiesByDate(itineraryActivitiesOnlyActivities);
-  console.log(groupedActivities);
 
   if (isMobile) {
     return (

@@ -445,6 +445,30 @@ export const fetchItineraryDestination = async (itineraryId: string) => {
   return { data };
 };
 
+export async function fetchItineraryDestinationDateRange(itineraryId: string, destinationId: string) {
+  const supabase = createClient();
+
+  const { data, error } = await supabase
+    .from("itinerary_destination")
+    .select("from_date, to_date")
+    .eq("itinerary_id", itineraryId)
+    .eq("itinerary_destination_id", destinationId)
+    .single();
+
+  if (error) {
+    console.error("Error fetching date range:", error);
+    return { success: false, message: "Fetch date range failed", error };
+  }
+
+  return {
+    success: true,
+    data: {
+      from: new Date(data.from_date),
+      to: new Date(data.to_date),
+    },
+  };
+}
+
 export async function fetchActivityIdByPlaceId(placeId: string) {
   const supabase = createClient();
 

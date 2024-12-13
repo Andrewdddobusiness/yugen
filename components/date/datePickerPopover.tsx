@@ -25,11 +25,14 @@ export function DatePickerPopover({ itineraryActivityId, showText = true, styled
       const result = await fetchFilteredTableData("itinerary_activity", "date", "itinerary_activity_id", [
         itineraryActivityId.toString(),
       ]);
+
       if (result.success && result.data?.[0]?.date) {
         return new Date(result.data[0].date);
       }
-      return undefined;
+      return null;
     },
+    refetchOnWindowFocus: false,
+    staleTime: Infinity,
   });
 
   const handleDateSelect = async (newDate: Date | undefined) => {
@@ -42,8 +45,10 @@ export function DatePickerPopover({ itineraryActivityId, showText = true, styled
         },
         ["itinerary_activity_id"]
       );
-      // Invalidate both queries to ensure all components update
-      queryClient.invalidateQueries({ queryKey: ["itineraryActivities"] });
+
+      queryClient.invalidateQueries({
+        queryKey: ["itineraryActivities"],
+      });
       queryClient.invalidateQueries({
         queryKey: ["itineraryActivity", "date", itineraryActivityId],
       });
@@ -58,7 +63,7 @@ export function DatePickerPopover({ itineraryActivityId, showText = true, styled
         <Button
           variant={styled ? "outline" : "ghost"}
           className={cn(
-            styled && "w-full text-muted-foreground min-w-40 justify-start text-left font-normal text-xs",
+            styled && "w-full rounded-xl text-muted-foreground min-w-40 justify-start text-left font-normal text-xs",
             styled && !dateData && "text-muted-foreground",
             !styled && "flex justify-center items-center p-0 h-auto "
           )}
@@ -70,7 +75,7 @@ export function DatePickerPopover({ itineraryActivityId, showText = true, styled
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-auto p-0" align="start">
-        <Calendar mode="single" selected={dateData} onSelect={handleDateSelect} initialFocus />
+        <Calendar mode="single" selected={dateData || undefined} onSelect={handleDateSelect} initialFocus />
       </PopoverContent>
     </Popover>
   );
