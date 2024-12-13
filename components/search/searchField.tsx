@@ -178,7 +178,7 @@ export default function SearchField() {
           variant="outline"
           size="sm"
           onClick={() => handleSearchTypeSelect(selectedType)}
-          className="w-full md:w-[200px] lg:w-[336px] text-sm animate-in transition-all duration-300 ease-in-out fade-in rounded-full bg-black text-white"
+          className="w-full md:w-[200px] lg:w-[336px] text-sm animate-in transition-all duration-300 ease-in-out fade-in rounded-full bg-black text-white bg-[#3A86FF] hover:bg-[#3A86FF]/90"
         >
           Search this area
         </Button>
