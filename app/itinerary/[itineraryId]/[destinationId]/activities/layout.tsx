@@ -6,7 +6,6 @@ import { useMapStore } from "@/store/mapStore";
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   const { isMapView } = useMapStore();
-  console.log(isMapView);
   return (
     <div className="flex h-[100dvh] w-full">
       {/* Desktop layout */}

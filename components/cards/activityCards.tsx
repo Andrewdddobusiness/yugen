@@ -12,7 +12,6 @@ interface IActivityCardsProps {
 
 export default function ActivityCards({ activities, onSelectActivity }: IActivityCardsProps) {
   const { open } = useSidebar();
-  console.log(open);
   return (
     <PersistedQueryProvider>
       <div

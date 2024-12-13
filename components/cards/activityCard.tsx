@@ -94,7 +94,6 @@ export default function ActivityCard({ activity, onClick, onOptionsClick }: Itin
     } catch (error) {
       console.error("Error removing activity:", error);
     } finally {
-      console.log("itineraryActivities: ", itineraryActivities);
       setLoading(false);
     }
   };
