@@ -1,9 +1,12 @@
 "use client";
 
-import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
+import { SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebarItineraryActivityRight } from "@/components/sidebar/appSidebar/appSidebarItineraryActivityRight";
+import { useMapStore } from "@/store/mapStore";
 
 export default function Layout({ children }: { children: React.ReactNode }) {
+  const { isMapView } = useMapStore();
+  console.log(isMapView);
   return (
     <div className="flex h-[100dvh] w-full">
       {/* Desktop layout */}
@@ -17,10 +20,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       <div className="lg:hidden flex flex-col w-full h-full">
         <SidebarProvider defaultOpen={false}>
           <main className="flex-1 flex flex-col w-full h-full overflow-hidden bg-muted">
-            <SidebarTrigger className="shadow-md rounded-r-none bg-white fixed top-16 right-0 z-20" />
             <div className="flex-1 h-full overflow-auto">{children}</div>
           </main>
-          <AppSidebarItineraryActivityRight />
+          <div className="sm:hidden">{!isMapView && <AppSidebarItineraryActivityRight />}</div>
         </SidebarProvider>
       </div>
     </div>

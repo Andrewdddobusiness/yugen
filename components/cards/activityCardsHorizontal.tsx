@@ -1,7 +1,7 @@
 import React from "react";
 import ActivityCardHorizontal from "./activityCardHorizontal";
 import { IActivityWithLocation } from "@/store/activityStore";
-import { useSidebarStore } from "@/store/sidebarStore";
+import { useSidebar } from "../ui/sidebar";
 
 interface IActivityCardsProps {
   activities: IActivityWithLocation[];
@@ -15,20 +15,10 @@ export default function ActivityCardsHorizontal({
   onSelectActivity,
   variant = "full",
 }: IActivityCardsProps) {
-  const { isSidebarRightOpen, isSidebarLeftOpen } = useSidebarStore();
+  const { open } = useSidebar();
 
   return (
-    <div
-      className={`grid ${
-        isSidebarLeftOpen
-          ? isSidebarRightOpen
-            ? "grid-cols-1"
-            : "grid-cols-1"
-          : isSidebarRightOpen
-          ? "grid-cols-1"
-          : "grid-cols-1"
-      } gap-4 pb-8`}
-    >
+    <div className={`grid ${open ? "grid-cols-1" : "grid-cols-1"} gap-4 pb-8`}>
       {activities.map((activity) => (
         <ActivityCardHorizontal
           key={activity.place_id}

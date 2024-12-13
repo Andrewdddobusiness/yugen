@@ -1,8 +1,8 @@
 import React from "react";
 import ActivityCard from "./activityCard";
 import { IActivityWithLocation } from "@/store/activityStore";
-import { useSidebarStore } from "@/store/sidebarStore";
 import PersistedQueryProvider from "@/components/providers/persistedQueryProvider";
+import { useSidebar } from "../ui/sidebar";
 
 interface IActivityCardsProps {
   activities: IActivityWithLocation[];
@@ -11,14 +11,14 @@ interface IActivityCardsProps {
 }
 
 export default function ActivityCards({ activities, onSelectActivity }: IActivityCardsProps) {
-  const { isSidebarRightOpen, isSidebarLeftOpen } = useSidebarStore();
-
+  const { open } = useSidebar();
+  console.log(open);
   return (
     <PersistedQueryProvider>
       <div
         className={`grid ${
-          isSidebarLeftOpen
-            ? "grid-cols-1 2xl:grid-cols-2 4xl:grid-cols-3 6xl:grid-cols-4"
+          open
+            ? "grid-cols-1 xl:grid-cols-2 4xl:grid-cols-3 6xl:grid-cols-4"
             : "grid-cols-1 lg:grid-cols-2 3xl:grid-cols-3 5xl:grid-cols-4"
         } gap-4 pb-8`}
       >

@@ -1,6 +1,4 @@
-import React, { useEffect } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { useParams } from "next/navigation";
+import React from "react";
 
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -16,17 +14,12 @@ import { X } from "lucide-react";
 import { useCartStore } from "@/store/cartStore";
 import { useItineraryActivityStore } from "@/store/itineraryActivityStore";
 import { IActivity, IActivityWithLocation, useActivitiesStore } from "@/store/activityStore";
-import { useSidebarStore } from "@/store/sidebarStore";
 
 export function ActivityCartSidebar() {
   // **** STORES ****
   const { setSelectedActivity } = useActivitiesStore();
-  const { setIsSidebarRightOpen } = useSidebarStore();
   const { isCartOpen, setIsCartOpen } = useCartStore();
   const { itineraryActivities } = useItineraryActivityStore();
-  const { state } = useSidebar();
-
-  const sidebarWidth = state === "expanded" ? "16rem" : "4rem";
 
   const itineraryActivitiesOnlyActivities = itineraryActivities?.length
     ? (itineraryActivities
@@ -37,7 +30,6 @@ export function ActivityCartSidebar() {
 
   const handleActivitySelect = (activity: IActivity) => {
     setSelectedActivity(activity);
-    setIsSidebarRightOpen(true);
   };
 
   // Don't render content if no activities
@@ -52,9 +44,6 @@ export function ActivityCartSidebar() {
         "shadow-[2px_2px_5px_rgba(0,0,0,0.1)]",
         isCartOpen ? "w-[400px] opacity-100 visible" : "w-0 opacity-0 invisible"
       )}
-      style={{
-        left: sidebarWidth,
-      }}
     >
       <div className="flex flex-col h-full">
         <div className="bg-white p-4 flex justify-between items-center">

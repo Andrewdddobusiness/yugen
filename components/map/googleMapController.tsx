@@ -3,7 +3,6 @@ import { useMap } from "@vis.gl/react-google-maps";
 
 import { useMapStore } from "@/store/mapStore";
 import { useActivitiesStore } from "@/store/activityStore";
-import { useSidebarStore } from "@/store/sidebarStore";
 import { useSidebar } from "@/components/ui/sidebar";
 
 import { fetchPlaceDetails } from "@/actions/google/actions";
@@ -12,8 +11,7 @@ export default function GoogleMapController() {
   const map = useMap("map-instance");
   const { setTempMarker } = useMapStore();
   const { setSelectedActivity } = useActivitiesStore();
-  const { setIsSidebarRightOpen } = useSidebarStore();
-  const { openSidebar } = useSidebar();
+  const { open } = useSidebar();
 
   useEffect(() => {
     if (!map) return;
@@ -37,8 +35,6 @@ export default function GoogleMapController() {
           });
 
           setSelectedActivity(activity);
-          setIsSidebarRightOpen(true);
-          openSidebar();
         } catch (error) {
           console.error("Error fetching place details:", error);
         }
@@ -48,7 +44,7 @@ export default function GoogleMapController() {
     return () => {
       google.maps.event.removeListener(listener);
     };
-  }, [map, setTempMarker, setSelectedActivity, setIsSidebarRightOpen, openSidebar]);
+  }, [map, setTempMarker, setSelectedActivity]);
 
   return null;
 }

@@ -127,8 +127,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     }
   }, [itineraryActivities, setItineraryActivities]);
 
-  console.log("itineraryActivities: ", itineraryActivities);
-
   const getBreadcrumbText = () => {
     if (pathname.includes("/builder")) {
       return "Builder";
@@ -170,7 +168,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                   </BreadcrumbItem>
                   <BreadcrumbSeparator />
                   <BreadcrumbItem>
-                    <BreadcrumbPage>{getBreadcrumbText()}</BreadcrumbPage>xw
+                    <BreadcrumbPage>{getBreadcrumbText()}</BreadcrumbPage>
                   </BreadcrumbItem>
                 </BreadcrumbList>
               </Breadcrumb>

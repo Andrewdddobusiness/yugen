@@ -26,8 +26,9 @@ import { fetchCityCoordinates, fetchPlaceDetails } from "@/actions/google/action
 import { fetchNearbyActivities } from "@/actions/google/actions";
 
 import { IActivity, IActivityWithLocation, IOpenHours, useActivitiesStore } from "@/store/activityStore";
-import { useItineraryActivityStore } from "@/store/itineraryActivityStore";
+
 import { useSidebarStore } from "@/store/sidebarStore";
+
 import { useMapStore } from "@/store/mapStore";
 import { useActivityTabStore } from "@/store/activityTabStore";
 
@@ -35,12 +36,15 @@ import { filterActivities } from "@/utils/filters/filterActivities";
 import { activityTypeFilters, activityCostFilters } from "@/utils/filters/filters";
 
 import { Popup } from "react-map-gl";
-import { useSidebar } from "@/components/ui/sidebar";
 import GoogleMapComponent from "@/components/map/googleMap";
 import ClearHistoryButton from "@/components/buttons/clearHistoryButton";
 import ActivityOrderFilters from "@/components/filters/activityOrderFilters";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EarthIcon } from "lucide-react";
+import { ViewToggleButton } from "@/components/buttons/mapViewToggleButton";
+import { cn } from "@/components/lib/utils";
+
+import { useSidebar } from "@/components/ui/sidebar";
 
 export default function Activities() {
   const queryClient = useQueryClient();
@@ -58,10 +62,11 @@ export default function Activities() {
     searchHistoryActivities,
     setSearchHistoryActivities,
   } = useActivitiesStore();
-  const { fetchItineraryActivities, setItineraryActivities } = useItineraryActivityStore();
-  const { mapRadius, setCenterCoordinates, itineraryCoordinates, setItineraryCoordinates } = useMapStore();
-  const { isSidebarRightOpen, setIsSidebarRightOpen, isSidebarLeftOpen } = useSidebarStore();
+  const { mapRadius, setCenterCoordinates, itineraryCoordinates, setItineraryCoordinates, isMapView, setIsMapView } =
+    useMapStore();
+  const { setIsSidebarRightOpen } = useSidebarStore();
   const { selectedTab, setSelectedTab } = useActivityTabStore();
+  const { open } = useSidebar();
 
   // **** STATES ****
   const [initialLoadComplete, setInitialLoadComplete] = useState(false);
@@ -309,14 +314,17 @@ export default function Activities() {
     await deleteItinerarySearchHistory(itineraryId as string, destinationId as string);
   };
 
+  const toggleView = () => setIsMapView(!isMapView);
+
   if (isCoordinatesLoading || isDestinationLoading) return <Loading />;
 
   return (
-    <div className="flex flex-row h-full overflow-hidden flex-1 pb-10">
+    <div className="flex flex-row h-full overflow-hidden flex-1">
       <div
-        className={`p-4 flex flex-col h-full transition-all duration-300 ${
-          isSidebarLeftOpen ? "w-full lg:w-1/2" : "w-full md:w-1/2"
-        }`}
+        className={cn(
+          "p-4 flex flex-col h-full transition-all duration-300",
+          isMapView ? "hidden lg:flex lg:w-1/2" : open ? "w-full lg:w-1/2" : "w-full lg:w-1/2"
+        )}
       >
         <div className="hidden sm:flex flex-col items-center">
           <div className="text-2xl text-black font-bold flex justify-left pt-8">Explore Activities</div>
@@ -448,9 +456,10 @@ export default function Activities() {
         </div>
       </div>
       <div
-        className={`h-full relative transition-all duration-300 ${
-          isSidebarLeftOpen ? "w-0 lg:w-1/2 hidden lg:block" : "w-0 md:w-1/2 hidden md:block"
-        }`}
+        className={cn(
+          "h-full relative transition-all duration-300",
+          isMapView ? (open ? "w-full lg:w-1/2" : "w-full lg:w-1/2") : "hidden lg:w-1/2 lg:block"
+        )}
       >
         {isCoordinatesLoading ? (
           <div className="w-full h-full bg-zinc-50 rounded-lg flex items-center justify-center">
@@ -476,6 +485,7 @@ export default function Activities() {
           </Popup>
         )}
       </div>
+      <ViewToggleButton isMapView={isMapView} onToggle={toggleView} />
     </div>
   );
 }

@@ -31,16 +31,13 @@ const getDayName = (dayNumber: number) => {
 };
 
 export function ActivityOverlay({ onClose }: ActivityOverlayProps) {
-  // Reuse the existing logic from AppSidebarItineraryActivityRight
   let { itineraryId, destinationId } = useParams();
   const { selectedActivity } = useActivitiesStore();
   const { insertItineraryActivity, removeItineraryActivity, isActivityAdded } = useItineraryActivityStore();
   const [loading, setLoading] = useState<boolean>(false);
-  const { setTempMarker } = useMapStore();
 
   const isAdded = isActivityAdded(selectedActivity?.place_id || "");
 
-  // Handlers remain the same as in AppSidebarItineraryActivityRight
   const handleAddToItinerary = async () => {
     setLoading(true);
     if (!selectedActivity || !itineraryId || !destinationId) return;
@@ -59,7 +56,6 @@ export function ActivityOverlay({ onClose }: ActivityOverlayProps) {
     setLoading(false);
   };
 
-  // Add the renderOpeningHours function from appSidebarItineraryActivityRight
   const renderOpeningHours = () => {
     if (!selectedActivity || !selectedActivity.open_hours) {
       return <p>Opening hours not available</p>;
@@ -111,7 +107,7 @@ export function ActivityOverlay({ onClose }: ActivityOverlayProps) {
   };
 
   return (
-    <div className="absolute bottom-0 left-0 right-0 mx-4 mb-4 h-[40vh] bg-white rounded-3xl shadow-lg">
+    <div className="absolute bottom-16 left-0 right-0 mx-4 h-[40vh] bg-white rounded-3xl shadow-lg">
       <div className="relative flex flex-col h-full">
         <Button
           variant="ghost"
@@ -250,16 +246,20 @@ export function ActivityOverlay({ onClose }: ActivityOverlayProps) {
         {/* Footer with action button */}
         <div className="absolute bottom-0 left-0 right-0 p-4 border-t bg-white rounded-b-3xl">
           {loading ? (
-            <Button disabled className="w-full rounded-full">
+            <Button disabled className="w-full rounded-xl bg-[#3A86FF] text-white shadow-lg hover:bg-[#3A86FF]/80">
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               Please wait
             </Button>
           ) : isAdded ? (
-            <Button variant="secondary" className="w-full rounded-full" onClick={handleRemoveToItinerary}>
+            <Button variant="secondary" className="w-full rounded-xl" onClick={handleRemoveToItinerary}>
               Remove from Itinerary
             </Button>
           ) : (
-            <Button variant="default" className="w-full rounded-full" onClick={handleAddToItinerary}>
+            <Button
+              variant="default"
+              className="w-full rounded-xl bg-[#3A86FF] text-white shadow-lg hover:bg-[#3A86FF]/80"
+              onClick={handleAddToItinerary}
+            >
               Add to Itinerary
             </Button>
           )}

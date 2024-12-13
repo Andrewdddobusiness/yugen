@@ -21,12 +21,9 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import CommentsCarousel from "@/components/carousel/reviewsCarousel";
 import ImagesCarousel from "@/components/carousel/imagesCarousel";
-import LoadingSpinner from "@/components/loading/loadingSpinner";
 
 import Rating from "@/components/rating/rating";
 import { Skeleton } from "@/components/ui/skeleton";
-
-import { toast } from "sonner";
 
 import { Globe, Clock, Loader2, X, Phone, ImageOff } from "lucide-react";
 
@@ -56,7 +53,6 @@ export function AppSidebarItineraryActivityRight() {
   const isAdded = isActivityAdded(selectedActivity?.place_id || "");
 
   // **** STATES ****
-
   const [loading, setLoading] = useState<boolean>(false);
 
   const { open, toggleSidebar } = useSidebar();

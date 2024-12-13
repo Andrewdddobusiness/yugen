@@ -1,7 +1,5 @@
 import { AdvancedMarker, useMap } from "@vis.gl/react-google-maps";
 import { IActivity, useActivitiesStore } from "@/store/activityStore";
-import { useSidebarStore } from "@/store/sidebarStore";
-import { useSidebar } from "../ui/sidebar";
 import CustomMarker from "./customMarker";
 import { TColor } from "@/lib/colors/colors";
 
@@ -16,8 +14,6 @@ interface IWaypointProps {
 
 export default function GoogleMarker({ latitude, longitude, activity, number, color, size = "md" }: IWaypointProps) {
   const { setSelectedActivity, selectedActivity } = useActivitiesStore();
-  const { setIsSidebarRightOpen } = useSidebarStore();
-  const { openSidebar } = useSidebar();
   const map = useMap("map-instance");
 
   // Check if this marker's activity is the selected one
@@ -29,7 +25,6 @@ export default function GoogleMarker({ latitude, longitude, activity, number, co
     }
 
     setSelectedActivity(activity);
-    setIsSidebarRightOpen(true);
   };
 
   return (

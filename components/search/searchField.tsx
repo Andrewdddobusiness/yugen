@@ -125,7 +125,7 @@ export default function SearchField() {
 
     try {
       const activities = await fetchNearbyActivities(centerCoordinates[0], centerCoordinates[1], mapRadius, type);
-      console.log("activities2: ", activities);
+
       setActivities(activities);
       setSelectedTab("search");
     } catch (error) {
@@ -164,7 +164,7 @@ export default function SearchField() {
           onChange={handleSearchChange}
           onFocus={handleInputFocus}
           onBlur={handleInputBlur}
-          className={`w-full rounded-lg md:w-[200px] lg:w-[336px] ${isActivitiesLoading ? "pr-10" : ""}`}
+          className={`w-64 rounded-lg md:w-64 lg:w-[336px] ${isActivitiesLoading ? "pr-10" : ""}`}
         />
         {isActivitiesLoading && (
           <div className="absolute right-3 top-1/2 -translate-y-1/2">

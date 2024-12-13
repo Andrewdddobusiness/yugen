@@ -15,7 +15,7 @@ import { colors, TColor } from "@/lib/colors/colors";
 import { ActivityOverlay } from "./activityOverlay";
 
 export default function GoogleMapComponent() {
-  const { centerCoordinates, initialZoom, mapRadius, setRadius, tempMarker, setCenterCoordinates } = useMapStore();
+  const { centerCoordinates, initialZoom, setRadius, tempMarker, setCenterCoordinates } = useMapStore();
   const { selectedActivity, setSelectedActivity } = useActivitiesStore();
 
   const center = centerCoordinates

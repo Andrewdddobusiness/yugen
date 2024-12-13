@@ -18,6 +18,8 @@ interface IMapStore {
 
   setRadius: (radius: number) => void;
   setTempMarker: (marker: ITempMarker | null) => void;
+  isMapView: boolean;
+  setIsMapView: (isMapView: boolean) => void;
 }
 
 export const useMapStore = create<IMapStore>((set, get) => ({
@@ -30,4 +32,6 @@ export const useMapStore = create<IMapStore>((set, get) => ({
   setItineraryCoordinates: (coordinates: [number, number]) => set({ itineraryCoordinates: coordinates }),
   setRadius: (mapRadius: number) => set({ mapRadius }),
   setTempMarker: (marker) => set({ tempMarker: marker }),
+  isMapView: false,
+  setIsMapView: (isMapView) => set({ isMapView }),
 }));

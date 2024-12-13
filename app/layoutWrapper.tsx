@@ -1,6 +1,4 @@
 "use client";
-import { useEffect } from "react";
-import { useUserStore } from "@/store/userStore";
 import { GeistSans } from "geist/font/sans";
 import { Outfit } from "next/font/google";
 import Providers from "./providers";
