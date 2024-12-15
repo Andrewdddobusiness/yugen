@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { useParams, usePathname } from "next/navigation";
 import { Binoculars, Command, NotebookPen, SquareChevronLeft, TextSearch } from "lucide-react";
 import { cn } from "@/components/lib/utils";
@@ -109,13 +110,15 @@ export function AppSidebarItineraryActivityLeft() {
             <SidebarMenuItem>
               <SidebarMenuButton size="lg" asChild className="md:h-8 md:p-0 mt-1">
                 <Link href="/">
-                  <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
-                    <Command className="size-4" />
-                  </div>
-                  <div className="grid flex-1 text-left text-sm leading-tight">
-                    <span className="truncate font-semibold">Journey</span>
-                    <span className="truncate text-xs">Free</span>
-                  </div>
+                  <Image
+                    className="w-full h-full"
+                    src="/journey1.svg"
+                    alt="Journey Logo"
+                    width={100}
+                    height={100}
+                    priority
+                    draggable={false}
+                  />
                 </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
