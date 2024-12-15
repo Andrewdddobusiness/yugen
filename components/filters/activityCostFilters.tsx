@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { MdMoneyOff, MdAttachMoney } from "react-icons/md";
-import { Check, ChevronsUpDown, Wallet } from "lucide-react";
+import { Check, ChevronsUpDown, CircleDollarSign } from "lucide-react";
 import { cn } from "@/components/lib/utils";
 
 const ActivityCostFilters: React.FC = () => {
@@ -32,11 +32,8 @@ const ActivityCostFilters: React.FC = () => {
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
           <Button variant="outline" className="h-8 justify-start rounded-full text-gray-500">
-            <span className="hidden sm:inline">
-              {selectedCostFilters.length > 0 ? selectedCostFilters.join(", ") : "Select cost"}
-            </span>
-            <span className="sm:hidden">
-              <Wallet className="h-4 w-4" />
+            <span>
+              <CircleDollarSign className="h-4 w-4" />
             </span>
             <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
           </Button>

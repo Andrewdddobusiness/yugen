@@ -4,7 +4,7 @@ import { useParams } from "next/navigation";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 
 import { Separator } from "@/components/ui/separator";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 import ActivityCards from "@/components/cards/activityCards";
@@ -326,10 +326,6 @@ export default function Activities() {
           isMapView ? "hidden lg:flex lg:w-1/2" : open ? "w-full lg:w-1/2" : "w-full lg:w-1/2"
         )}
       >
-        <div className="hidden sm:flex flex-col items-center">
-          <div className="text-2xl text-black font-bold flex justify-left pt-8">Explore Activities</div>
-          <div className="text-md text-zinc-500 flex justify-left">Search for activities that you want to do!</div>
-        </div>
         <div className="flex flex-col flex-grow overflow-hidden">
           <Tabs
             defaultValue={selectedTab}
@@ -337,18 +333,18 @@ export default function Activities() {
             onValueChange={(value) => handleTabChange(value as "top-places" | "search" | "history")}
             className="flex flex-col h-full"
           >
-            <div className="flex flex-row justify-center sm:mt-4 sm:mb-2">
+            <div className="flex flex-row justify-center ">
               <TabsList className="border">
                 <TabsTrigger value="top-places">Top Places</TabsTrigger>
                 <TabsTrigger value="search">Wide Search</TabsTrigger>
                 <TabsTrigger value="history">Search History</TabsTrigger>
               </TabsList>
             </div>
-            <Separator className="mt-4 mb-2 sm:mb-4" />
+            <Separator className="mt-4 mb-2" />
             <TabsContent value="top-places" className="flex-grow overflow-hidden">
               <div className="flex flex-col h-full gap-4">
-                <div className="flex flex-row justify-between w-full px-4">
-                  <div className="flex flex-row gap-2 items-center justify-center w-full">
+                <div className="flex flex-row justify-between w-full px-4 pb-4">
+                  <div className="flex flex-row gap-2 w-full">
                     <ActivityCostFilters />
                     <ActivityTypeFilters />
                     <ActivityOrderFilters
@@ -358,7 +354,7 @@ export default function Activities() {
                   </div>
                 </div>
                 <ScrollArea className="h-full px-4">
-                  {topPlacesActivities && (
+                  {topPlacesActivities && Array.isArray(topPlacesActivities) && topPlacesActivities.length > 0 ? (
                     <ActivityCards
                       activities={
                         (selectedFilters.length > 0 || selectedCostFilters.length > 0
@@ -375,14 +371,16 @@ export default function Activities() {
                       }
                       onSelectActivity={handleActivitySelect}
                     />
+                  ) : (
+                    <ActivitySkeletonCards />
                   )}
                 </ScrollArea>
               </div>
             </TabsContent>
             <TabsContent value="search" className="flex-grow overflow-hidden">
               <div className="flex flex-col h-full gap-4">
-                <div className="flex flex-row justify-between w-full px-4">
-                  <div className="flex flex-row gap-2 items-center justify-center w-full">
+                <div className="flex flex-row justify-between w-full px-4 pb-4">
+                  <div className="flex flex-row gap-2 w-full">
                     <ActivityCostFilters />
                     <ActivityTypeFilters />
                     <ActivityOrderFilters
@@ -393,7 +391,7 @@ export default function Activities() {
                 </div>
 
                 <ScrollArea className="h-full px-4">
-                  {activities && (
+                  {activities && Array.isArray(activities) && activities.length > 0 ? (
                     <ActivityCards
                       activities={
                         (selectedFilters.length > 0 || selectedCostFilters.length > 0
@@ -410,26 +408,35 @@ export default function Activities() {
                       }
                       onSelectActivity={handleActivitySelect}
                     />
+                  ) : (
+                    <ActivitySkeletonCards />
                   )}
                 </ScrollArea>
               </div>
             </TabsContent>
             <TabsContent value="history" className="flex-grow overflow-hidden">
               <div className="flex flex-col h-full gap-4">
-                <div className="flex flex-row justify-between w-full px-4 items-center">
-                  <div className="flex flex-row gap-2 items-center justify-center w-full">
-                    <ActivityCostFilters />
-                    <ActivityTypeFilters />
-                    <ActivityOrderFilters
-                      activities={searchHistoryActivities as IActivityWithLocation[]}
-                      setActivities={setSearchHistoryActivities}
-                    />
-                  </div>
-                  <ClearHistoryButton onClearHistory={handleClearHistory} />
+                <div className="relative w-full px-4">
+                  <ScrollArea className="w-full pb-4">
+                    <div className="flex flex-row items-center justify-between gap-2 min-w-max">
+                      <div className="flex flex-row gap-2">
+                        <ActivityCostFilters />
+                        <ActivityTypeFilters />
+                        <ActivityOrderFilters
+                          activities={searchHistoryActivities as IActivityWithLocation[]}
+                          setActivities={setSearchHistoryActivities}
+                        />
+                      </div>
+                      <ClearHistoryButton onClearHistory={handleClearHistory} />
+                    </div>
+                    <ScrollBar orientation="horizontal" />
+                  </ScrollArea>
                 </div>
 
                 <ScrollArea className="h-full px-4">
-                  {searchHistoryActivities && Array.isArray(searchHistoryActivities) ? (
+                  {searchHistoryActivities &&
+                  Array.isArray(searchHistoryActivities) &&
+                  searchHistoryActivities.length > 0 ? (
                     <ActivityCards
                       activities={
                         (selectedFilters.length > 0 || selectedCostFilters.length > 0

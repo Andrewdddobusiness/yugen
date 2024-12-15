@@ -50,8 +50,7 @@ const ActivityOrderFilters: React.FC<ActivityOrderFiltersProps> = ({ activities,
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
           <Button variant="outline" className="h-8 justify-start rounded-full text-gray-500">
-            <span className="hidden sm:inline">{selectedOrder || "Select sort"}</span>
-            <span className="sm:hidden">
+            <span>
               <ArrowUpDown className="h-4 w-4" />
             </span>
             <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />

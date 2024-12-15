@@ -169,6 +169,10 @@ export function ActivityOverlay({ onClose }: ActivityOverlayProps) {
 
                 {/* Quick Info Section */}
                 <div className="flex flex-col gap-4">
+                  <div className="flex items-center gap-2 text-md">
+                    <span>{selectedActivity?.description}</span>
+                  </div>
+
                   {/* Address */}
                   {selectedActivity?.address && (
                     <div className="flex items-center gap-2 text-sm">
