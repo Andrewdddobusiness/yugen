@@ -145,10 +145,12 @@ export default function ActivityCard({ activity, onClick, onOptionsClick }: Itin
         </div>
         <div className="flex flex-wrap gap-2">
           {formatCategoryTypeArray(activity.types.slice(0, 1)).map((type) => (
-            <Badge key={type}>{type}</Badge>
+            <Badge key={type} className="bg-[#3A86FF] text-white">
+              {type}
+            </Badge>
           ))}
         </div>
-        <div className="text-sm line-clamp-2 h-10 overflow-hidden">{activity.description}</div>
+        <div className="text-sm line-clamp-2 h-10 overflow-hidden text-gray-500">{activity.description}</div>
       </CardContent>
 
       <CardFooter className="p-0 absolute bottom-0 left-0 right-0 z-20">
@@ -156,7 +158,7 @@ export default function ActivityCard({ activity, onClick, onOptionsClick }: Itin
           {loading ? (
             <Button
               variant="outline"
-              className="flex w-3/4 px-4 py-1 text-sm font-medium rounded-tl-none rounded-r-none hover:bg-gray-100 hover:text-black"
+              className="flex w-3/4 px-4 py-1 text-sm font-medium rounded-tl-none rounded-r-none hover:bg-gray-100 hover:text-black "
               disabled
             >
               <Loader2 className="mr-2 h-4 w-4 animate-spin " />
@@ -165,7 +167,7 @@ export default function ActivityCard({ activity, onClick, onOptionsClick }: Itin
           ) : isAdded ? (
             <Button
               variant="secondary"
-              className="flex w-3/4 px-4 py-1 text-sm font-medium rounded-tl-none rounded-r-none hover:bg-gray-100 hover:text-black"
+              className="flex w-3/4 px-4 py-1 text-sm font-medium text-gray-500 rounded-tl-none rounded-r-none hover:bg-gray-100 hover:text-black"
               onClick={handleRemoveToItinerary}
             >
               Remove
@@ -173,7 +175,7 @@ export default function ActivityCard({ activity, onClick, onOptionsClick }: Itin
           ) : (
             <Button
               variant="outline"
-              className="flex w-3/4 px-4 py-1 text-sm font-medium rounded-tl-none rounded-r-none hover:bg-gray-100 hover:text-black"
+              className="flex w-3/4 px-4 py-1 text-sm font-medium rounded-tl-none rounded-r-none border-b-0 border-l-0 hover:bg-gray-100 hover:text-black"
               onClick={handleAddToItinerary}
             >
               Add to Itinerary
@@ -181,7 +183,7 @@ export default function ActivityCard({ activity, onClick, onOptionsClick }: Itin
           )}
           <Button
             variant="default"
-            className="flex w-1/4 justify-center items-center px-3 py-1 text-sm font-medium rounded-l-none rounded-tr-none hover:bg-zinc-700"
+            className="flex w-1/4 justify-center items-center px-3 py-1 text-sm font-medium rounded-l-none rounded-tr-none hover:bg-[#3A86FF]/90 bg-[#3A86FF] text-white"
             onClick={handleOptionsClick}
           >
             <ChevronDown size={12} />

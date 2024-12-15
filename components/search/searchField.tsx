@@ -153,24 +153,57 @@ export default function SearchField() {
     };
   }, [centerCoordinates, mapRadius]);
 
+  const handleClearSearch = () => {
+    setSelectedSearchQuery("");
+    setAutocompleteResults([]);
+    setSearchTypeArea(false);
+    setMapHasChanged(false);
+    if (inputRef.current) {
+      inputRef.current.focus();
+    }
+  };
+
   return (
     <div className="flex flex-col gap-2 mt-2 relative">
       <div className="relative w-full">
         <Input
           ref={inputRef}
-          type="search"
+          type="text"
           placeholder="Search for places..."
           value={selectedSearchQuery}
           onChange={handleSearchChange}
           onFocus={handleInputFocus}
           onBlur={handleInputBlur}
-          className={`w-64 rounded-lg md:w-64 lg:w-[336px] ${isActivitiesLoading ? "pr-10" : ""}`}
+          className={`w-64 rounded-lg md:w-64 lg:w-[336px] ${
+            isActivitiesLoading || selectedSearchQuery ? "pr-10" : ""
+          }`}
         />
-        {isActivitiesLoading && (
-          <div className="absolute right-3 top-1/2 -translate-y-1/2">
-            <Loader2 className="h-4 w-4 animate-spin text-gray-500" />
-          </div>
-        )}
+        <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-2">
+          {selectedSearchQuery && (
+            <button
+              onClick={handleClearSearch}
+              className="p-1 hover:bg-gray-100 rounded-full"
+              aria-label="Clear search"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="text-gray-500"
+              >
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+            </button>
+          )}
+          {isActivitiesLoading && <Loader2 className="h-4 w-4 animate-spin text-gray-500" />}
+        </div>
       </div>
 
       {mapHasChanged && searchTypeArea && (
@@ -178,9 +211,9 @@ export default function SearchField() {
           variant="outline"
           size="sm"
           onClick={() => handleSearchTypeSelect(selectedType)}
-          className="w-full md:w-[200px] lg:w-[336px] text-sm animate-in transition-all duration-300 ease-in-out fade-in rounded-full bg-black text-white bg-[#3A86FF] hover:bg-[#3A86FF]/90"
+          className="w-full md:w-[200px] lg:w-[336px] text-sm animate-in transition-all duration-300 ease-in-out fade-in rounded-xl text-white bg-[#3A86FF] hover:bg-[#3A86FF]/90 shadow-lg"
         >
-          Search this area
+          Search This Area
         </Button>
       )}
 

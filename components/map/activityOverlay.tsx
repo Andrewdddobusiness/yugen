@@ -251,7 +251,7 @@ export function ActivityOverlay({ onClose }: ActivityOverlayProps) {
               Please wait
             </Button>
           ) : isAdded ? (
-            <Button variant="secondary" className="w-full rounded-xl" onClick={handleRemoveToItinerary}>
+            <Button variant="secondary" className="w-full rounded-xl text-gray-500" onClick={handleRemoveToItinerary}>
               Remove from Itinerary
             </Button>
           ) : (
