@@ -90,10 +90,10 @@ export function ExportDownloadState({ type, onBack, onClose, onExport }: ExportD
       </DialogHeader>
 
       <div className={cn("space-y-4", status === "success" && "animate-in fade-in-0")}>
-        {status === "downloading" && <Progress value={progress} className="w-full animate-in fade-in-0" />}
+        {status === "downloading" && <Progress value={progress} className="w-full animate-in fade-in-0 " />}
         {status === "success" && (
           <div className="flex items-center justify-center text-primary">
-            <CheckCircle2 className="h-12 w-12 animate-in zoom-in-0" />
+            <CheckCircle2 className="h-12 w-12 animate-in zoom-in-0 text-[#3A86FF]" />
           </div>
         )}
         {status === "error" && (
