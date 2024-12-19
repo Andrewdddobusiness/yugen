@@ -157,7 +157,7 @@ const DragDropCalendar: React.FC<CalendarProps> = ({ isLoading }) => {
         <div className="flex flex-row items-center">
           <div className="overflow-hidden flex flex-row">
             <Button
-              className="h-8 px-4 py-2 rounded-l-lg rounded-r-none flex items-center"
+              className="h-8 px-4 py-2 rounded-l-lg rounded-r-none flex items-center bg-[#3A86FF] text-white hover:bg-[#3A86FF]/80 "
               onClick={() =>
                 handleNavigate(
                   moment(date)
@@ -168,11 +168,14 @@ const DragDropCalendar: React.FC<CalendarProps> = ({ isLoading }) => {
             >
               <ChevronLeft size={12} />
             </Button>
-            <Button className="h-8 px-4 py-2 rounded-none text-xs" onClick={() => setDate(new Date())}>
+            <Button
+              className="h-8 px-4 py-2 rounded-none text-xs bg-[#3A86FF] text-white hover:bg-[#3A86FF]/80 "
+              onClick={() => setDate(new Date())}
+            >
               Today
             </Button>
             <Button
-              className="h-8 px-4 py-2 rounded-r-lg rounded-l-none flex items-center"
+              className="h-8 px-4 py-2 rounded-r-lg rounded-l-none flex items-center bg-[#3A86FF] text-white hover:bg-[#3A86FF]/80"
               onClick={() =>
                 handleNavigate(
                   moment(date)
@@ -184,10 +187,10 @@ const DragDropCalendar: React.FC<CalendarProps> = ({ isLoading }) => {
               <ChevronRight size={12} />
             </Button>
           </div>
-          <Separator orientation="vertical" className="h-6 " />
+          <Separator orientation="vertical" className="h-6 mx-2" />
 
           <Button
-            className="text-xs px-4 h-8 rounded-lg"
+            className="text-xs px-4 h-8 rounded-lg bg-[#3A86FF] text-white hover:bg-[#3A86FF]/80"
             onClick={() => handleViewChange(view === "week" ? "day" : "week")}
           >
             {view === "week" ? "Day View" : "Week View"}
