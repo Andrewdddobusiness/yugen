@@ -147,7 +147,11 @@ export default function TimePopover({
         </div>
         {error && <p className="text-xs text-red-500 mt-2">{error}</p>}
         <div className="mt-4 flex justify-end">
-          <Button onClick={handleSave} disabled={!startTime || !endTime || !!error || isLoading}>
+          <Button
+            onClick={handleSave}
+            disabled={!startTime || !endTime || !!error || isLoading}
+            className="bg-[#3A86FF] hover:bg-[#3A86FF]/80 rounded-xl shadow-lg text-white active:scale-95 transition-all duration-300 ease-in-out"
+          >
             {isLoading ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />

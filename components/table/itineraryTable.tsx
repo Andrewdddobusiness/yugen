@@ -8,19 +8,37 @@ import { DatePickerPopover } from "@/components/date/datePickerPopover";
 import { formatCategoryType } from "@/utils/formatting/types";
 import { useItineraryActivityStore } from "@/store/itineraryActivityStore";
 import { NotesPopover } from "@/components/popover/notesPopover";
-import { ChevronDown, ChevronUp, MapPin, Phone, Globe } from "lucide-react";
+import { ChevronDown, ChevronUp, MapPin, Phone, Globe, MoreHorizontal, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { useDateRangeStore } from "@/store/dateRangeStore";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+
+import { useParams } from "next/navigation";
+import ItineraryTableRow from "@/components/table/itineraryTableRow";
+import { ItineraryTableDateHeader } from "@/components/table/itineraryTableDateHeader";
+import { useQueryClient } from "@tanstack/react-query";
 
 export function ItineraryTableView() {
   const isMobile = useIsMobile();
-  const { itineraryActivities } = useItineraryActivityStore();
-  const { startDate, endDate } = useDateRangeStore();
+  const { itineraryId } = useParams();
+  const queryClient = useQueryClient();
+
+  /* STATE */
+  const [loading, setLoading] = useState(false);
   const [notes, setNotes] = useState<{ [key: string]: string }>({});
   const [expandedCards, setExpandedCards] = useState<{ [key: string]: boolean }>({});
+
+  /* STORE */
+  const { itineraryActivities, removeItineraryActivity } = useItineraryActivityStore();
+  const { startDate, endDate } = useDateRangeStore();
 
   const toggleCard = (id: string) => {
     setExpandedCards((prev) => ({
@@ -87,6 +105,20 @@ export function ItineraryTableView() {
 
   const groupedActivities = groupActivitiesByDate(itineraryActivitiesOnlyActivities);
 
+  const handleRemoveActivity = async (placeId: string) => {
+    try {
+      if (!itineraryId) return;
+      await removeItineraryActivity(placeId, Array.isArray(itineraryId) ? itineraryId[0] : itineraryId);
+
+      // Refresh the activities list
+      queryClient.invalidateQueries({
+        queryKey: ["itineraryActivities"],
+      });
+    } catch (error) {
+      console.error("Error removing activity:", error);
+    }
+  };
+
   if (isMobile) {
     return (
       <div className="space-y-6 p-4 z-0">
@@ -135,8 +167,8 @@ export function ItineraryTableView() {
                               itineraryActivityId={Number(activity.itinerary_activity_id)}
                               showText={true}
                               styled={true}
-                              startDate={startDate}
-                              endDate={endDate}
+                              startDate={startDate || undefined}
+                              endDate={endDate || undefined}
                             />
                           </div>
 
@@ -213,66 +245,23 @@ export function ItineraryTableView() {
             <TableHead className="flex items-center w-[15%] min-w-[150px] text-black">Date</TableHead>
             <TableHead className="flex items-center w-[15%] min-w-[150px] text-black">Time</TableHead>
             <TableHead className="flex items-center w-[20%] min-w-[200px] text-black">Notes</TableHead>
+            <TableHead className="flex items-center w-[5%] min-w-[50px] text-black"></TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {groupedActivities
             .map(([date, activities]) => [
-              <TableRow key={`header-${date}`} className="flex w-full bg-gray-50">
-                <TableCell colSpan={6} className="py-2 font-semibold text-gray-700 text-md">
-                  {formatDate(date)}
-                </TableCell>
-              </TableRow>,
-
+              <ItineraryTableDateHeader key={`header-${date}`} date={date} formatDate={formatDate} />,
               ...activities.map((activity) => (
-                <TableRow key={activity.itinerary_activity_id} className="flex w-full">
-                  <TableCell className="w-[20%] min-w-[200px]">{activity.activity?.name}</TableCell>
-                  <TableCell className="w-[10%] min-w-[100px]">
-                    {activity.activity?.types && (
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger>
-                            <Badge
-                              variant={getTypeBadgeVariant(activity.activity.types[0])}
-                              className="bg-[#3A86FF] hover:bg-[#3A86FF]/80 px-2 flex items-center justify-start w-fit"
-                            >
-                              <span className="line-clamp-1 text-left">
-                                {formatCategoryType(activity.activity.types[0])}
-                              </span>
-                            </Badge>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <p>{formatCategoryType(activity.activity.types[0])}</p>
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
-                    )}
-                  </TableCell>
-                  <TableCell className="w-[20%] min-w-[200px]">{activity.activity?.address}</TableCell>
-                  <TableCell className="w-[15%] min-w-[150px]">
-                    <DatePickerPopover
-                      itineraryActivityId={Number(activity.itinerary_activity_id)}
-                      showText={true}
-                      styled={true}
-                    />
-                  </TableCell>
-                  <TableCell className="w-[15%] min-w-[150px]">
-                    <TimePopover
-                      itineraryActivityId={Number(activity.itinerary_activity_id)}
-                      storeStartTime={activity.start_time}
-                      storeEndTime={activity.end_time}
-                      showText={true}
-                      styled={true}
-                    />
-                  </TableCell>
-                  <TableCell className="w-[20%] min-w-[200px]">
-                    <NotesPopover
-                      id={activity.itinerary_activity_id}
-                      value={notes[activity.itinerary_activity_id] || ""}
-                      onChange={handleNotesChange}
-                    />
-                  </TableCell>
-                </TableRow>
+                <ItineraryTableRow
+                  key={activity.itinerary_activity_id}
+                  activity={activity}
+                  notes={notes}
+                  onNotesChange={handleNotesChange}
+                  onRemoveActivity={handleRemoveActivity}
+                  startDate={startDate || undefined}
+                  endDate={endDate || undefined}
+                />
               )),
             ])
             .flat()}
