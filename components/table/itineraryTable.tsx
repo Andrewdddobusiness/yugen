@@ -12,12 +12,13 @@ import { ChevronDown, ChevronUp, MapPin, Phone, Globe } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
-
+import { useDateRangeStore } from "@/store/dateRangeStore";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 export function ItineraryTableView() {
   const isMobile = useIsMobile();
   const { itineraryActivities } = useItineraryActivityStore();
+  const { startDate, endDate } = useDateRangeStore();
   const [notes, setNotes] = useState<{ [key: string]: string }>({});
   const [expandedCards, setExpandedCards] = useState<{ [key: string]: boolean }>({});
 
@@ -134,6 +135,8 @@ export function ItineraryTableView() {
                               itineraryActivityId={Number(activity.itinerary_activity_id)}
                               showText={true}
                               styled={true}
+                              startDate={startDate}
+                              endDate={endDate}
                             />
                           </div>
 

@@ -59,7 +59,11 @@ export default function ClearHistoryButton({ onClearHistory }: ClearHistoryButto
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel>Cancel</AlertDialogCancel>
-          <AlertDialogAction onClick={handleClearHistory} disabled={isLoading}>
+          <AlertDialogAction
+            onClick={handleClearHistory}
+            disabled={isLoading}
+            className="bg-[#FF3A3A] hover:bg-[#FF3A3A]/80"
+          >
             {isLoading ? "Clearing..." : "Clear History"}
           </AlertDialogAction>
         </AlertDialogFooter>

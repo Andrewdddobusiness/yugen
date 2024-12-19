@@ -11,6 +11,7 @@ import { DatePickerPopover } from "../date/datePickerPopover";
 import { useItineraryActivityStore, IItineraryActivity } from "@/store/itineraryActivityStore";
 import { Button } from "../ui/button";
 import { useParams } from "next/dist/client/components/navigation";
+import { useDateRangeStore } from "@/store/dateRangeStore";
 
 interface ItineraryListCardProps {
   activity: IItineraryActivity;
@@ -29,6 +30,7 @@ export const ItineraryListCard: React.FC<ItineraryListCardProps> = ({ activity, 
   const { itineraryActivities, removeItineraryActivity } = useItineraryActivityStore();
   const latestActivity =
     itineraryActivities.find((a) => a.itinerary_activity_id === activity.itinerary_activity_id) || activity;
+  const { startDate, endDate } = useDateRangeStore();
   const [isHovered, setIsHovered] = useState(false);
 
   /* HANDLERS */
@@ -75,16 +77,18 @@ export const ItineraryListCard: React.FC<ItineraryListCardProps> = ({ activity, 
 
           {/* Interactive elements - No drag behavior */}
           <div className="flex flex-row gap-4 items-center" onClick={(e) => e.stopPropagation()}>
+            <DatePickerPopover
+              itineraryActivityId={Number(activity.itinerary_activity_id)}
+              showText={false}
+              styled={false}
+              startDate={startDate || undefined}
+              endDate={endDate || undefined}
+            />
+
             <TimePopover
               itineraryActivityId={Number(latestActivity.itinerary_activity_id)}
               storeStartTime={latestActivity.start_time}
               storeEndTime={latestActivity.end_time}
-              showText={false}
-              styled={false}
-            />
-
-            <DatePickerPopover
-              itineraryActivityId={Number(activity.itinerary_activity_id)}
               showText={false}
               styled={false}
             />

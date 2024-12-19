@@ -2,7 +2,7 @@
 
 import React from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { format } from "date-fns";
+import { format, isWithinInterval } from "date-fns";
 import { Calendar } from "@/components/ui/calendar";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -14,9 +14,17 @@ interface DatePickerPopoverProps {
   itineraryActivityId: number;
   showText?: boolean;
   styled?: boolean;
+  startDate?: Date;
+  endDate?: Date;
 }
 
-export function DatePickerPopover({ itineraryActivityId, showText = true, styled = true }: DatePickerPopoverProps) {
+export function DatePickerPopover({
+  itineraryActivityId,
+  showText = true,
+  styled = true,
+  startDate,
+  endDate,
+}: DatePickerPopoverProps) {
   const queryClient = useQueryClient();
 
   const { data: dateData, isLoading } = useQuery({
@@ -34,6 +42,19 @@ export function DatePickerPopover({ itineraryActivityId, showText = true, styled
     refetchOnWindowFocus: false,
     staleTime: Infinity,
   });
+
+  const disabledDays = (date: Date) => {
+    if (!startDate || !endDate) return false;
+    // Set time to noon to avoid timezone issues
+    const normalizedDate = new Date(date.setHours(12, 0, 0, 0));
+    const normalizedStart = new Date(startDate.setHours(12, 0, 0, 0));
+    const normalizedEnd = new Date(endDate.setHours(12, 0, 0, 0));
+
+    return !isWithinInterval(normalizedDate, {
+      start: normalizedStart,
+      end: normalizedEnd,
+    });
+  };
 
   const handleDateSelect = async (newDate: Date | undefined) => {
     try {
@@ -75,7 +96,14 @@ export function DatePickerPopover({ itineraryActivityId, showText = true, styled
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-auto p-0" align="start">
-        <Calendar mode="single" selected={dateData || undefined} onSelect={handleDateSelect} initialFocus />
+        <Calendar
+          mode="single"
+          selected={dateData || undefined}
+          onSelect={handleDateSelect}
+          disabled={disabledDays}
+          defaultMonth={startDate}
+          initialFocus
+        />
       </PopoverContent>
     </Popover>
   );

@@ -78,7 +78,7 @@ export default function ActivityCard({ activity, onClick, onOptionsClick }: Itin
       setLoading(false);
     }
   };
-  const { itineraryActivities } = useItineraryActivityStore();
+
   const handleRemoveToItinerary = async (e: React.MouseEvent) => {
     e.stopPropagation();
     setLoading(true);
@@ -131,7 +131,9 @@ export default function ActivityCard({ activity, onClick, onOptionsClick }: Itin
           </div>
         )}
 
-        <div className="absolute top-2 left-2">{priceLevelText === "" ? null : <Badge>{priceLevelText}</Badge>}</div>
+        <div className="absolute top-2 left-2">
+          {priceLevelText === "" ? null : <Badge className="bg-[#3A86FF]/40 backdrop-blur-sm">{priceLevelText}</Badge>}
+        </div>
       </div>
 
       <CardContent className="flex flex-col gap-2 mt-5 flex-grow">
@@ -145,7 +147,7 @@ export default function ActivityCard({ activity, onClick, onOptionsClick }: Itin
         </div>
         <div className="flex flex-wrap gap-2">
           {formatCategoryTypeArray(activity.types.slice(0, 1)).map((type) => (
-            <Badge key={type} className="bg-[#3A86FF] text-white">
+            <Badge key={type} className="bg-[#3A86FF] hover:bg-[#3A86FF]/80 text-white">
               {type}
             </Badge>
           ))}
