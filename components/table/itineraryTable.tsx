@@ -13,6 +13,8 @@ import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+
 export function ItineraryTableView() {
   const isMobile = useIsMobile();
   const { itineraryActivities } = useItineraryActivityStore();
@@ -201,53 +203,76 @@ export function ItineraryTableView() {
     <div className="rounded-md w-full h-full overflow-x-auto bg-white">
       <Table className="relative">
         <TableHeader>
-          <TableRow className="flex w-full text-md ">
+          <TableRow className="flex w-full text-md">
             <TableHead className="flex items-center w-[20%] min-w-[200px] text-black">Activity Name</TableHead>
             <TableHead className="flex items-center w-[10%] min-w-[100px] text-black">Type</TableHead>
-            <TableHead className="flex items-center w-[20%] min-w-[200px] text-blacks">Address</TableHead>
+            <TableHead className="flex items-center w-[20%] min-w-[200px] text-black">Address</TableHead>
             <TableHead className="flex items-center w-[15%] min-w-[150px] text-black">Date</TableHead>
             <TableHead className="flex items-center w-[15%] min-w-[150px] text-black">Time</TableHead>
             <TableHead className="flex items-center w-[20%] min-w-[200px] text-black">Notes</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
-          {itineraryActivitiesOnlyActivities.map((activity) => (
-            <TableRow key={activity.itinerary_activity_id} className="flex w-full">
-              <TableCell className=" w-[20%] min-w-[200px]">{activity.activity?.name}</TableCell>
-              <TableCell className="w-[10%] min-w-[100px]">
-                {activity.activity?.types && (
-                  <Badge variant={getTypeBadgeVariant(activity.activity.types[0])}>
-                    <span className="line-clamp-1">{formatCategoryType(activity.activity.types[0])}</span>
-                  </Badge>
-                )}
-              </TableCell>
-              <TableCell className="w-[20%] min-w-[200px]">{activity.activity?.address}</TableCell>
-              <TableCell className="w-[15%] min-w-[150px]">
-                <DatePickerPopover
-                  itineraryActivityId={Number(activity.itinerary_activity_id)}
-                  showText={true}
-                  styled={true}
-                />
-              </TableCell>
-              <TableCell className="w-[15%] min-w-[150px]">
-                <TimePopover
-                  itineraryActivityId={Number(activity.itinerary_activity_id)}
-                  storeStartTime={activity.start_time}
-                  storeEndTime={activity.end_time}
-                  showText={true}
-                  styled={true}
-                />
-              </TableCell>
+          {groupedActivities
+            .map(([date, activities]) => [
+              <TableRow key={`header-${date}`} className="flex w-full bg-gray-50">
+                <TableCell colSpan={6} className="py-2 font-semibold text-gray-700 text-md">
+                  {formatDate(date)}
+                </TableCell>
+              </TableRow>,
 
-              <TableCell className="w-[20%] min-w-[200px]">
-                <NotesPopover
-                  id={activity.itinerary_activity_id}
-                  value={notes[activity.itinerary_activity_id] || ""}
-                  onChange={handleNotesChange}
-                />
-              </TableCell>
-            </TableRow>
-          ))}
+              ...activities.map((activity) => (
+                <TableRow key={activity.itinerary_activity_id} className="flex w-full">
+                  <TableCell className="w-[20%] min-w-[200px]">{activity.activity?.name}</TableCell>
+                  <TableCell className="w-[10%] min-w-[100px]">
+                    {activity.activity?.types && (
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger>
+                            <Badge
+                              variant={getTypeBadgeVariant(activity.activity.types[0])}
+                              className="bg-[#3A86FF] hover:bg-[#3A86FF]/80 px-2 flex items-center justify-start w-fit"
+                            >
+                              <span className="line-clamp-1 text-left">
+                                {formatCategoryType(activity.activity.types[0])}
+                              </span>
+                            </Badge>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>{formatCategoryType(activity.activity.types[0])}</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    )}
+                  </TableCell>
+                  <TableCell className="w-[20%] min-w-[200px]">{activity.activity?.address}</TableCell>
+                  <TableCell className="w-[15%] min-w-[150px]">
+                    <DatePickerPopover
+                      itineraryActivityId={Number(activity.itinerary_activity_id)}
+                      showText={true}
+                      styled={true}
+                    />
+                  </TableCell>
+                  <TableCell className="w-[15%] min-w-[150px]">
+                    <TimePopover
+                      itineraryActivityId={Number(activity.itinerary_activity_id)}
+                      storeStartTime={activity.start_time}
+                      storeEndTime={activity.end_time}
+                      showText={true}
+                      styled={true}
+                    />
+                  </TableCell>
+                  <TableCell className="w-[20%] min-w-[200px]">
+                    <NotesPopover
+                      id={activity.itinerary_activity_id}
+                      value={notes[activity.itinerary_activity_id] || ""}
+                      onChange={handleNotesChange}
+                    />
+                  </TableCell>
+                </TableRow>
+              )),
+            ])
+            .flat()}
         </TableBody>
       </Table>
     </div>
