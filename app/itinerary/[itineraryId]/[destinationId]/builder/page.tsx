@@ -62,7 +62,7 @@ export default function Builder() {
   if (error) return <ErrorPage />;
 
   return (
-    <ResizablePanelGroup direction="horizontal" className="flex h-full w-full overflow-hidden">
+    <ResizablePanelGroup direction="horizontal" className="flex h-full w-full overflow-hidden ">
       <ResizablePanel defaultSize={showMap ? 60 : 100} className="min-w-0">
         <Tabs defaultValue="table" className="flex flex-col h-full">
           <div className="p-2 flex justify-between items-center shrink-0">
