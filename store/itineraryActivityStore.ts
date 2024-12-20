@@ -20,7 +20,7 @@ export interface IItineraryActivity {
   start_time: string;
   end_time: string;
   deleted_at: string | null;
-  activity?: IActivity & { place_id: string };
+  activity?: IActivity;
 }
 
 interface IItineraryStore {
