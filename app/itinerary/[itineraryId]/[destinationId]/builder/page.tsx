@@ -93,7 +93,7 @@ export default function Builder() {
             <TabsContent value="table" className="h-full m-0 data-[state=active]:flex flex-col">
               <ScrollArea className="flex-1">
                 <div className="h-full p-2">
-                  <ItineraryTableView />
+                  <ItineraryTableView showMap={showMap} onToggleMap={toggleMap} />
                 </div>
               </ScrollArea>
             </TabsContent>

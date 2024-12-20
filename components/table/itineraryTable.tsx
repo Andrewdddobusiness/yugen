@@ -19,7 +19,12 @@ import ItineraryTableRow from "@/components/table/itineraryTableRow";
 import { ItineraryTableDateHeader } from "@/components/table/itineraryTableDateHeader";
 import { useQueryClient } from "@tanstack/react-query";
 
-export function ItineraryTableView() {
+interface ItineraryTableViewProps {
+  showMap?: boolean;
+  onToggleMap?: () => void;
+}
+
+export function ItineraryTableView({ showMap, onToggleMap }: ItineraryTableViewProps) {
   const isMobile = useIsMobile();
   const { itineraryId } = useParams();
   const queryClient = useQueryClient();
@@ -254,6 +259,8 @@ export function ItineraryTableView() {
                   onRemoveActivity={handleRemoveActivity}
                   startDate={startDate || undefined}
                   endDate={endDate || undefined}
+                  showMap={showMap}
+                  onToggleMap={onToggleMap}
                 />
               )),
             ])

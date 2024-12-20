@@ -1,3 +1,4 @@
+import { useRef, useEffect } from "react";
 import { TableCell, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { DatePickerPopover } from "@/components/date/datePickerPopover";
@@ -13,6 +14,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { formatCategoryType } from "@/utils/formatting/types";
+import { useActivitiesStore } from "@/store/activityStore";
+import { useMap } from "@vis.gl/react-google-maps";
 
 interface ItineraryTableRowProps {
   activity: any; // Replace with proper type
@@ -21,6 +24,8 @@ interface ItineraryTableRowProps {
   onRemoveActivity: (placeId: string) => void;
   startDate?: Date;
   endDate?: Date;
+  showMap?: boolean;
+  onToggleMap?: () => void;
 }
 
 export default function ItineraryTableRow({
@@ -30,7 +35,19 @@ export default function ItineraryTableRow({
   onRemoveActivity,
   startDate,
   endDate,
+  showMap,
+  onToggleMap,
 }: ItineraryTableRowProps) {
+  const { setSelectedActivity } = useActivitiesStore();
+  const mapRef = useRef<google.maps.Map | null>(null);
+  const map = useMap();
+
+  useEffect(() => {
+    if (map) {
+      mapRef.current = map;
+    }
+  }, [map]);
+
   const getTypeBadgeVariant = (type: string) => {
     switch (type?.toLowerCase()) {
       case "restaurant":
@@ -42,8 +59,23 @@ export default function ItineraryTableRow({
     }
   };
 
+  const handleRowClick = () => {
+    if (activity.activity) {
+      // If map is not visible, show it first
+      if (!showMap && onToggleMap) {
+        onToggleMap();
+      }
+
+      setSelectedActivity(activity.activity || null);
+    }
+  };
+
   return (
-    <TableRow key={activity.itinerary_activity_id} className="flex w-full">
+    <TableRow
+      key={activity.itinerary_activity_id}
+      className="flex w-full hover:bg-gray-50 cursor-pointer"
+      onClick={handleRowClick}
+    >
       <TableCell className="w-[20%] min-w-[200px]">{activity.activity?.name}</TableCell>
       <TableCell className="w-[10%] min-w-[100px]">
         {activity.activity?.types && (
