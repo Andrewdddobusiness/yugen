@@ -1,25 +1,18 @@
 "use client";
 import { useState } from "react";
 import { useIsMobile } from "@/components/hooks/use-mobile";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Table, TableBody, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import TimePopover from "@/components/time/timePopover";
-import { Badge } from "@/components/ui/badge";
+
 import { DatePickerPopover } from "@/components/date/datePickerPopover";
-import { formatCategoryType } from "@/utils/formatting/types";
+
 import { useItineraryActivityStore } from "@/store/itineraryActivityStore";
 import { NotesPopover } from "@/components/popover/notesPopover";
-import { ChevronDown, ChevronUp, MapPin, Phone, Globe, MoreHorizontal, Trash2 } from "lucide-react";
+import { ChevronDown, MapPin, Phone, Globe } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { useDateRangeStore } from "@/store/dateRangeStore";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 
 import { useParams } from "next/navigation";
 import ItineraryTableRow from "@/components/table/itineraryTableRow";

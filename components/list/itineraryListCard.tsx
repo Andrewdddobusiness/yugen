@@ -44,10 +44,10 @@ export const ItineraryListCard: React.FC<ItineraryListCardProps> = ({ activity, 
   };
 
   return (
-    <div className="relative w-full " onMouseEnter={() => setIsHovered(true)} onMouseLeave={() => setIsHovered(false)}>
+    <div className="relative w-full" onMouseEnter={() => setIsHovered(true)} onMouseLeave={() => setIsHovered(false)}>
       <div
         className={cn(
-          "flex flex-row w-full gap-3 transition-all duration-300 items-center",
+          "flex flex-row w-full gap-2 transition-all duration-300 items-center",
           isDragging ? "opacity-50" : ""
         )}
       >
@@ -68,7 +68,7 @@ export const ItineraryListCard: React.FC<ItineraryListCardProps> = ({ activity, 
         <div className="flex flex-row flex-grow justify-between gap-4 bg-white py-2 px-4 rounded-lg border">
           <h3
             className={cn(
-              "flex-1 text-md font-medium line-clamp-1 transition-all duration-200",
+              "flex-1 text-sm font-medium line-clamp-1 transition-all duration-200",
               isHovered ? "text-zinc-500" : ""
             )}
           >

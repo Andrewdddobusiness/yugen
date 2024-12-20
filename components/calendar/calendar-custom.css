@@ -79,3 +79,25 @@
 .rbc-header {
   border-bottom: none !important;
 }
+
+/* Style for the event background */
+.rbc-event {
+  background-color: #3a86ff !important;
+  border: none !important;
+}
+
+/* Style for when hovering over the event */
+.rbc-event:hover {
+  background-color: #3A86FF/80 !important;
+}
+
+/* Style for the event when being dragged */
+.rbc-addons-dnd .rbc-event.rbc-dragging {
+  background-color: #3a86ff !important;
+  opacity: 0.8;
+}
+
+/* Style for the event resize handle */
+.rbc-event .rbc-addons-dnd-resize-ns-anchor .rbc-addons-dnd-resize-ns-icon {
+  background-color: #3a86ff !important;
+}

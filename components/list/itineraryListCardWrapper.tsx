@@ -15,7 +15,7 @@ const ItineraryListCardWrapper = ({ activity }: { activity: any }) => {
   };
 
   return (
-    <div ref={setNodeRef} style={style} className="w-full px-4">
+    <div ref={setNodeRef} style={style} className="w-full px-2">
       <ItineraryListCard
         activity={activity}
         dragHandleProps={{ ...attributes, ...listeners }}

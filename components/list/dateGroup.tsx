@@ -38,7 +38,7 @@ export function DateGroup({ date, activities, isUnscheduled }: DateGroupProps) {
     <div
       ref={setNodeRef}
       data-date={dateString}
-      className={`pb-4  rounded-lg ${isOver ? "bg-blue-100" : ""} transition-colors duration-200`}
+      className={`pb-4 rounded-lg ${isOver ? "bg-blue-100" : ""} transition-colors duration-200`}
     >
       <div className="flex items-center mb-2">
         <Button variant="ghost" size="icon" className="rounded-full " onClick={toggleOpen}>
@@ -48,7 +48,7 @@ export function DateGroup({ date, activities, isUnscheduled }: DateGroupProps) {
       </div>
 
       {isOpen && (
-        <div className="flex flex-col justify-center items-center space-y-4">
+        <div className="flex flex-col justify-center items-center space-y-2">
           {sortedActivities.length > 0 ? (
             sortedActivities.map((activity) => (
               <ItineraryListCardWrapper key={activity.itinerary_activity_id} activity={activity} />

@@ -25,17 +25,18 @@ const DragDropCalendar: React.FC<CalendarProps> = ({ isLoading }) => {
   const [view, setView] = useState("week");
   const { startDate } = useDateRangeStore();
   const [date, setDate] = useState<Date | null>(null);
+  const isInitialMount = React.useRef(true);
   const { itineraryActivities, setItineraryActivities } = useItineraryActivityStore();
 
-  // Initialize calendar with start date
   useEffect(() => {
-    if (startDate) {
-      setDate(new Date(startDate));
-    } else {
-      // Fallback to today if no start date
-      setDate(new Date());
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      if (startDate) {
+        setDate(new Date(startDate));
+      } else {
+        setDate(new Date());
+      }
     }
-    console.log("startDate: ", startDate);
   }, [startDate]);
 
   // Don't render calendar until we have a valid date
