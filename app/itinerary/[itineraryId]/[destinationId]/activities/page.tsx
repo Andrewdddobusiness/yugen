@@ -319,7 +319,7 @@ export default function Activities() {
   if (isCoordinatesLoading || isDestinationLoading) return <Loading />;
 
   return (
-    <div className="flex flex-row h-full overflow-hidden flex-1">
+    <div className="flex flex-row h-full w-full">
       <div
         className={cn(
           "p-4 flex flex-col h-full transition-all duration-300",
@@ -333,7 +333,7 @@ export default function Activities() {
             onValueChange={(value) => handleTabChange(value as "top-places" | "search" | "history")}
             className="flex flex-col h-full"
           >
-            <div className="flex flex-row justify-center ">
+            <div className="flex flex-row justify-center">
               <TabsList className="border">
                 <TabsTrigger value="top-places">Top Places</TabsTrigger>
                 <TabsTrigger value="search">Wide Search</TabsTrigger>
@@ -343,7 +343,7 @@ export default function Activities() {
             <Separator className="mt-4 mb-2" />
             <TabsContent value="top-places" className="flex-grow overflow-hidden">
               <div className="flex flex-col h-full gap-4">
-                <div className="flex flex-row justify-between w-full px-4 pb-4">
+                <div className="flex flex-row justify-between w-full px-4">
                   <div className="flex flex-row gap-2 w-full">
                     <ActivityCostFilters />
                     <ActivityTypeFilters />
@@ -353,7 +353,7 @@ export default function Activities() {
                     />
                   </div>
                 </div>
-                <ScrollArea className="h-full px-4">
+                <ScrollArea className="flex h-full px-4 pb-14 sm:pb-0">
                   {topPlacesActivities && Array.isArray(topPlacesActivities) && topPlacesActivities.length > 0 ? (
                     <ActivityCards
                       activities={

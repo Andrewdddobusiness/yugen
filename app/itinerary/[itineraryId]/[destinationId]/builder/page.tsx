@@ -63,7 +63,7 @@ export default function Builder() {
 
   return (
     <ResizablePanelGroup direction="horizontal" className="flex h-full w-full overflow-hidden">
-      <ResizablePanel defaultSize={showMap ? 60 : 100}>
+      <ResizablePanel defaultSize={showMap ? 60 : 100} className="min-w-0">
         <Tabs defaultValue="table" className="flex flex-col h-full">
           <div className="p-2 flex justify-between items-center shrink-0">
             <TabsList className="grid w-[90px] grid-cols-2 border">
@@ -91,10 +91,8 @@ export default function Builder() {
               </ScrollArea>
             </TabsContent>
             <TabsContent value="table" className="h-full m-0 data-[state=active]:flex flex-col">
-              <ScrollArea className="flex-1">
-                <div className="h-full p-2">
-                  <ItineraryTableView showMap={showMap} onToggleMap={toggleMap} />
-                </div>
+              <ScrollArea className="flex-1 px-4 overflow-x-auto">
+                <ItineraryTableView showMap={showMap} onToggleMap={toggleMap} />
               </ScrollArea>
             </TabsContent>
           </div>
@@ -105,7 +103,7 @@ export default function Builder() {
 
       <ResizablePanel
         defaultSize={40}
-        className={cn("transition-all duration-300 ease-in-out", !showMap && "hidden")}
+        className={cn("transition-all duration-300 ease-in-out min-w-0", !showMap && "hidden")}
         maxSize={50}
       >
         <div className="h-full w-full">

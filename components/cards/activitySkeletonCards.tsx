@@ -19,7 +19,7 @@ export default function ActivitySkeletonCards() {
         open
           ? "grid-cols-1 xl:grid-cols-2 4xl:grid-cols-3 6xl:grid-cols-4"
           : "grid-cols-1 lg:grid-cols-2 3xl:grid-cols-3 5xl:grid-cols-4"
-      } gap-4 pb-8`}
+      } gap-4`}
     >
       <ActivitySkeletonCard />
       <ActivitySkeletonCard />
