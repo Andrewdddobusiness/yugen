@@ -6,9 +6,9 @@ import { useMapStore } from "@/store/mapStore";
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   const { isMapView } = useMapStore();
-  console.log(isMapView);
+
   return (
-    <div className="flex h-[100dvh] w-full">
+    <div className="flex h-full w-full">
       {/* Desktop layout */}
       <div className="hidden lg:flex lg:flex-col w-full h-full">
         <main className="flex-1 flex flex-col w-full h-full bg-muted">
@@ -18,7 +18,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
       {/* Mobile layout */}
       <div className="lg:hidden flex flex-col w-full h-full">
-        <SidebarProvider defaultOpen={false}>
+        <SidebarProvider defaultOpen={false} className="w-full h-full">
           <main className="flex-1 flex flex-col w-full h-full overflow-hidden bg-muted">
             <div className="flex-1 h-full overflow-auto">{children}</div>
           </main>
