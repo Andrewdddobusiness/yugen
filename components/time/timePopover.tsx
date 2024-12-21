@@ -92,8 +92,19 @@ export default function TimePopover({
   };
 
   return (
-    <Popover open={isOpen} onOpenChange={setIsOpen}>
-      <PopoverTrigger>
+    <Popover
+      open={isOpen}
+      onOpenChange={(open) => {
+        if (open) {
+          // When opening
+          setIsOpen(true);
+        } else {
+          // When closing
+          setIsOpen(false);
+        }
+      }}
+    >
+      <PopoverTrigger asChild onClick={(e) => e.stopPropagation()}>
         <Button
           variant={styled ? "outline" : "ghost"}
           className={cn(
@@ -114,7 +125,7 @@ export default function TimePopover({
           </div>
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-72 p-4">
+      <PopoverContent className="w-72 p-4" onClick={(e) => e.stopPropagation()}>
         <div>
           <h3 className="font-semibold mb-2">Start Time</h3>
           <Select onValueChange={(value) => handleTimeChange("start", value)} value={startTime}>

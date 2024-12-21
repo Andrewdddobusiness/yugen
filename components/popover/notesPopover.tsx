@@ -14,9 +14,15 @@ interface NotesPopoverProps {
 export function NotesPopover({ id, value, onChange }: NotesPopoverProps) {
   const [isOpen, setIsOpen] = useState(false);
 
-  const handleClose = () => {
+  const handleClose = (e: React.MouseEvent) => {
+    e.stopPropagation();
     setIsOpen(false);
     onChange(id, "");
+  };
+
+  const handleOpen = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setIsOpen(true);
   };
 
   return (
@@ -25,7 +31,7 @@ export function NotesPopover({ id, value, onChange }: NotesPopoverProps) {
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button variant="outline" size="lg" className="h-8 w-8 p-0 rounded-full" onClick={() => setIsOpen(true)}>
+              <Button variant="outline" size="lg" className="h-8 w-8 p-0 rounded-full" onClick={handleOpen}>
                 <StickyNote className="h-4 w-4" />
               </Button>
             </TooltipTrigger>

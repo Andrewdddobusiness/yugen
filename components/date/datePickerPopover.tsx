@@ -80,7 +80,7 @@ export function DatePickerPopover({
 
   return (
     <Popover>
-      <PopoverTrigger asChild>
+      <PopoverTrigger asChild onClick={(e) => e.stopPropagation()}>
         <Button
           variant={styled ? "outline" : "ghost"}
           className={cn(
@@ -95,7 +95,7 @@ export function DatePickerPopover({
           </div>
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-auto p-0" align="start">
+      <PopoverContent className="w-auto p-0" align="start" onClick={(e) => e.stopPropagation()}>
         <Calendar
           mode="single"
           selected={dateData || undefined}

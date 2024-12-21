@@ -129,7 +129,7 @@ export default function Builder() {
         )}
         maxSize={50}
       >
-        <div className="h-full w-full">
+        <div className="h-full w-full z-10">
           <GoogleMapView
             activities={itineraryActivities.filter(
               (a) =>
@@ -143,7 +143,7 @@ export default function Builder() {
       <ResizablePanel
         defaultSize={40}
         className={cn(
-          "sm:hidden transition-all duration-300 ease-in-out min-w-0",
+          "sm:hidden transition-all duration-300 ease-in-out min-w-0 z-10",
           !isMapView && "hidden" // Only affects mobile visibility
         )}
         maxSize={50}
