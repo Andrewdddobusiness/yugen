@@ -20,6 +20,8 @@ import { fetchItineraryDestinationDateRange } from "@/actions/supabase/actions";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import GoogleMapView from "@/components/map/googleMapView";
+import { useMapStore } from "@/store/mapStore";
+import { ViewToggleButton } from "@/components/buttons/mapViewToggleButton";
 
 export default function Builder() {
   const { itineraryId, destinationId } = useParams();
@@ -28,6 +30,7 @@ export default function Builder() {
 
   const { itineraryActivities, fetchItineraryActivities, setItineraryActivities } = useItineraryActivityStore();
   const { setDateRange } = useDateRangeStore();
+  const { isMapView, setIsMapView } = useMapStore();
 
   // Add new query for date range
   const { data: dateRangeData } = useQuery({
@@ -56,6 +59,10 @@ export default function Builder() {
 
   const [showMap, setShowMap] = useState(false);
 
+  const toggleView = () => {
+    setIsMapView(!isMapView);
+  };
+
   const toggleMap = () => setShowMap(!showMap);
 
   if (isLoading) return <Loading />;
@@ -63,7 +70,13 @@ export default function Builder() {
 
   return (
     <ResizablePanelGroup direction="horizontal" className="flex h-full w-full overflow-hidden ">
-      <ResizablePanel defaultSize={showMap ? 60 : 100} className="min-w-0">
+      <ResizablePanel
+        defaultSize={showMap ? 60 : 100}
+        className={cn("min-w-0", {
+          "hidden sm:block": isMapView,
+          block: !isMapView,
+        })}
+      >
         <Tabs defaultValue="table" className="flex flex-col h-full">
           <div className="p-2 flex justify-between items-center shrink-0">
             <TabsList className="grid w-[90px] grid-cols-2 border">
@@ -75,7 +88,12 @@ export default function Builder() {
               </TabsTrigger>
             </TabsList>
 
-            <Button variant="outline" size="icon" onClick={toggleMap} className={cn("h-8 w-8", showMap && "bg-muted")}>
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={toggleMap}
+              className={cn("h-8 w-8 hidden sm:flex", showMap && "bg-muted")}
+            >
               <Map className="h-4 w-4" />
             </Button>
           </div>
@@ -99,11 +117,15 @@ export default function Builder() {
         </Tabs>
       </ResizablePanel>
 
-      <ResizableHandle />
+      <ResizableHandle className="hidden sm:block" />
 
       <ResizablePanel
         defaultSize={40}
-        className={cn("transition-all duration-300 ease-in-out min-w-0", !showMap && "hidden")}
+        className={cn("transition-all duration-300 ease-in-out min-w-0", {
+          "hidden sm:block": !showMap,
+          hidden: !showMap && !isMapView,
+          block: isMapView,
+        })}
         maxSize={50}
       >
         <div className="h-full w-full">
@@ -115,6 +137,10 @@ export default function Builder() {
           />
         </div>
       </ResizablePanel>
+
+      <div className="sm:hidden">
+        <ViewToggleButton isMapView={isMapView} onToggle={toggleView} />
+      </div>
     </ResizablePanelGroup>
   );
 }
