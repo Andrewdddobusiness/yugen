@@ -233,7 +233,7 @@ export function ItineraryTableView({ showMap, onToggleMap }: ItineraryTableViewP
   }
 
   return (
-    <div className="rounded-md w-full h-full overflow-x-auto bg-white max-w-[1000px]">
+    <div className="rounded-md w-full h-full overflow-x-auto bg-white">
       <Table className="relative">
         <TableHeader>
           <TableRow className="flex w-full text-md">
