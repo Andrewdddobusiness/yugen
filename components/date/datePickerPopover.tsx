@@ -84,12 +84,12 @@ export function DatePickerPopover({
         <Button
           variant={styled ? "outline" : "ghost"}
           className={cn(
-            styled && "w-full rounded-xl text-muted-foreground min-w-40 justify-start text-left font-normal text-xs",
+            styled && "w-full rounded-xl text-muted-foreground min-w-32 justify-start text-left font-normal text-xs",
             styled && !dateData && "text-muted-foreground",
             !styled && "flex justify-center items-center p-0 h-auto "
           )}
         >
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 line-clamp-1">
             <CalendarIcon size={16} />
             {showText && (dateData ? format(dateData, "PPP") : <span>Pick a date</span>)}
           </div>

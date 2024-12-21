@@ -97,12 +97,12 @@ export default function TimePopover({
         <Button
           variant={styled ? "outline" : "ghost"}
           className={cn(
-            styled && "w-full rounded-xl min-w-40 justify-start text-left font-normal text-xs",
+            styled && "w-full rounded-xl min-w-32 justify-start text-left font-normal text-xs",
             styled && "text-muted-foreground",
             !styled && "flex justify-center items-center p-0 h-auto "
           )}
         >
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 line-clamp-1">
             <Clock size={16} />
             {showText && (
               <p>

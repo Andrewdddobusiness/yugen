@@ -64,6 +64,7 @@ export default function Builder() {
   };
 
   const toggleMap = () => setShowMap(!showMap);
+  console.log(showMap);
 
   if (isLoading) return <Loading />;
   if (error) return <ErrorPage />;
@@ -119,13 +120,32 @@ export default function Builder() {
 
       <ResizableHandle className="hidden sm:block" />
 
+      {/* Desktop Map Panel */}
       <ResizablePanel
         defaultSize={40}
-        className={cn("transition-all duration-300 ease-in-out min-w-0", {
-          "hidden sm:block": !showMap,
-          hidden: !showMap && !isMapView,
-          block: isMapView,
-        })}
+        className={cn(
+          "hidden sm:block transition-all duration-300 ease-in-out min-w-0",
+          !showMap && "sm:hidden" // Only affects desktop visibility
+        )}
+        maxSize={50}
+      >
+        <div className="h-full w-full">
+          <GoogleMapView
+            activities={itineraryActivities.filter(
+              (a) =>
+                a.activity?.coordinates && Array.isArray(a.activity.coordinates) && a.activity.coordinates.length === 2
+            )}
+          />
+        </div>
+      </ResizablePanel>
+
+      {/* Mobile Map Panel */}
+      <ResizablePanel
+        defaultSize={40}
+        className={cn(
+          "sm:hidden transition-all duration-300 ease-in-out min-w-0",
+          !isMapView && "hidden" // Only affects mobile visibility
+        )}
         maxSize={50}
       >
         <div className="h-full w-full">
