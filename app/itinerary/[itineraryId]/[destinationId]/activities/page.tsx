@@ -59,6 +59,7 @@ export default function Activities() {
     setTopPlacesActivities,
     selectedFilters,
     selectedCostFilters,
+    areaSearchActivities,
     searchHistoryActivities,
     setSearchHistoryActivities,
   } = useActivitiesStore();
@@ -306,7 +307,7 @@ export default function Activities() {
     setIsSidebarRightOpen(true);
   };
 
-  const handleTabChange = (tab: "top-places" | "search" | "history") => {
+  const handleTabChange = (tab: "top-places" | "search" | "area-search" | "history") => {
     setSelectedTab(tab);
   };
 
@@ -330,13 +331,14 @@ export default function Activities() {
           <Tabs
             defaultValue={selectedTab}
             value={selectedTab}
-            onValueChange={(value) => handleTabChange(value as "top-places" | "search" | "history")}
+            onValueChange={(value) => handleTabChange(value as "top-places" | "search" | "area-search" | "history")}
             className="flex flex-col h-full"
           >
             <div className="flex flex-row justify-center">
               <TabsList className="border">
                 <TabsTrigger value="top-places">Top Places</TabsTrigger>
                 <TabsTrigger value="search">Wide Search</TabsTrigger>
+                <TabsTrigger value="area-search">Area Search</TabsTrigger>
                 <TabsTrigger value="history">Search History</TabsTrigger>
               </TabsList>
             </div>
@@ -405,6 +407,43 @@ export default function Activities() {
                               activityCostFilters
                             )
                           : activities) as IActivityWithLocation[]
+                      }
+                      onSelectActivity={handleActivitySelect}
+                    />
+                  ) : (
+                    <ActivitySkeletonCards />
+                  )}
+                </ScrollArea>
+              </div>
+            </TabsContent>
+            <TabsContent value="area-search" className="flex-grow overflow-hidden">
+              <div className="flex flex-col h-full gap-4">
+                <div className="flex flex-row justify-between w-full px-4 pb-4">
+                  <div className="flex flex-row gap-2 w-full">
+                    <ActivityCostFilters />
+                    <ActivityTypeFilters />
+                    <ActivityOrderFilters
+                      activities={areaSearchActivities as IActivityWithLocation[]}
+                      setActivities={setActivities}
+                    />
+                  </div>
+                </div>
+
+                <ScrollArea className="h-full px-4">
+                  {areaSearchActivities && Array.isArray(areaSearchActivities) && areaSearchActivities.length > 0 ? (
+                    <ActivityCards
+                      activities={
+                        (selectedFilters.length > 0 || selectedCostFilters.length > 0
+                          ? filterActivities(
+                              filterActivities(
+                                areaSearchActivities as IActivityWithLocation[],
+                                selectedFilters,
+                                activityTypeFilters
+                              ),
+                              selectedCostFilters,
+                              activityCostFilters
+                            )
+                          : areaSearchActivities) as IActivityWithLocation[]
                       }
                       onSelectActivity={handleActivitySelect}
                     />

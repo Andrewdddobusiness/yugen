@@ -7,7 +7,7 @@ import GoogleMarker from "./googleMarker";
 
 export default function GoogleMarkers({ color }: { color?: TColor }) {
   const { selectedTab } = useActivityTabStore();
-  const { activities, topPlacesActivities, searchHistoryActivities } = useActivitiesStore();
+  const { activities, topPlacesActivities, searchHistoryActivities, areaSearchActivities } = useActivitiesStore();
   const [markerCoordinates, setMarkerCoordinates] = useState<[number, number][] | null>(null);
 
   useEffect(() => {
@@ -24,6 +24,9 @@ export default function GoogleMarkers({ color }: { color?: TColor }) {
       case "history":
         currentActivities = searchHistoryActivities;
         break;
+      case "area-search":
+        currentActivities = areaSearchActivities;
+        break;
     }
 
     if (currentActivities && Array.isArray(currentActivities)) {
@@ -33,7 +36,7 @@ export default function GoogleMarkers({ color }: { color?: TColor }) {
     }
 
     setMarkerCoordinates(coordinates);
-  }, [selectedTab, activities, topPlacesActivities, searchHistoryActivities]);
+  }, [selectedTab, activities, topPlacesActivities, searchHistoryActivities, areaSearchActivities]);
 
   const getActivityFromCoordinate = (coordinate: [number, number]) => {
     const currentActivities =
@@ -41,6 +44,8 @@ export default function GoogleMarkers({ color }: { color?: TColor }) {
         ? topPlacesActivities
         : selectedTab === "search"
         ? activities
+        : selectedTab === "area-search"
+        ? areaSearchActivities
         : searchHistoryActivities;
 
     if (!coordinate || !currentActivities || currentActivities.length === 0) return null;

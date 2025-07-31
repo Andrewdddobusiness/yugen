@@ -308,3 +308,112 @@ export const fetchPlaceDetails = async (placeId: string): Promise<IActivity> => 
     throw error;
   }
 };
+
+export async function fetchAreaActivities(areaName: string, cityName: string, polygonCoordinates: number[][]) {
+  try {
+    const bounds = polygonCoordinates.reduce(
+      (acc, coord) => ({
+        north: Math.max(acc.north, coord[1]),
+        south: Math.min(acc.south, coord[1]),
+        east: Math.max(acc.east, coord[0]),
+        west: Math.min(acc.west, coord[0]),
+      }),
+      { north: -90, south: 90, east: -180, west: 180 }
+    );
+
+    // Calculate center point of the polygon
+    const center = {
+      latitude: (bounds.north + bounds.south) / 2,
+      longitude: (bounds.east + bounds.west) / 2,
+    };
+
+    // Calculate radius in meters (approximate distance from center to corner)
+    const radius = Math.max(
+      getDistanceFromLatLonInMeters(center.latitude, center.longitude, bounds.north, bounds.east),
+      getDistanceFromLatLonInMeters(center.latitude, center.longitude, bounds.south, bounds.west)
+    );
+
+    const url = "https://places.googleapis.com/v1/places:searchNearby";
+    const response = await axios.post(
+      url,
+      {
+        locationRestriction: {
+          circle: {
+            center: center,
+            radius: radius,
+          },
+        },
+        includedTypes: includedTypes,
+        maxResultCount: 20,
+      },
+      {
+        headers: {
+          "Content-Type": "application/json",
+          "X-Goog-Api-Key": GOOGLE_MAPS_API_KEY,
+          "X-Goog-FieldMask": [
+            "places.id",
+            "places.displayName",
+            "places.formattedAddress",
+            "places.location",
+            "places.types",
+            "places.priceLevel",
+            "places.rating",
+            "places.editorialSummary",
+            "places.websiteUri",
+            "places.photos",
+            "places.currentOpeningHours",
+          ].join(","),
+          Referer: process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000",
+        },
+      }
+    );
+
+    const activities = response.data.places.map(mapGooglePlaceToActivity);
+
+    // Filter results to only include places within the polygon
+    return activities.filter((activity: any) =>
+      isPointInPolygon([activity.coordinates[1], activity.coordinates[0]], polygonCoordinates)
+    );
+  } catch (error) {
+    if (axios.isAxiosError(error)) {
+      console.error("Error fetching area activities:", {
+        status: error.response?.status,
+        message: error.response?.data?.error?.message || error.message,
+      });
+    } else {
+      console.error("Error fetching area activities:", error);
+    }
+    throw error;
+  }
+}
+
+// Helper function to calculate distance between two points in meters
+function getDistanceFromLatLonInMeters(lat1: number, lon1: number, lat2: number, lon2: number) {
+  const R = 6371e3; // Earth's radius in meters
+  const φ1 = (lat1 * Math.PI) / 180;
+  const φ2 = (lat2 * Math.PI) / 180;
+  const Δφ = ((lat2 - lat1) * Math.PI) / 180;
+  const Δλ = ((lon2 - lon1) * Math.PI) / 180;
+
+  const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) + Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+  return R * c;
+}
+
+// Helper function to check if a point is inside a polygon
+function isPointInPolygon(point: number[], polygon: number[][]) {
+  const [x, y] = point;
+  let inside = false;
+
+  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+    const [xi, yi] = polygon[i];
+    const [xj, yj] = polygon[j];
+
+    const intersect = yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi;
+
+    if (intersect) inside = !inside;
+  }
+
+  return inside;
+}

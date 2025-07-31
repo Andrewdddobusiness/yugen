@@ -1,8 +1,11 @@
-import { APIProvider, Map } from "@vis.gl/react-google-maps";
+import { APIProvider, Map, MapCameraChangedEvent } from "@vis.gl/react-google-maps";
 import { motion, AnimatePresence } from "framer-motion";
+import { useState, useEffect } from "react";
+import { GeoJSON } from "geojson";
 
 import { useMapStore } from "@/store/mapStore";
 import { useActivitiesStore } from "@/store/activityStore";
+import { useActivityTabStore } from "@/store/activityTabStore";
 
 import { getRadiusForZoom } from "./zoomRadiusMap";
 import GoogleMarkers from "./googleMarkers";
@@ -13,16 +16,71 @@ import GoogleMapController from "./googleMapController";
 
 import { colors, TColor } from "@/lib/colors/colors";
 import { ActivityOverlay } from "./activityOverlay";
+import { DeckGLOverlay } from "./areaOverlay";
+import { fetchAreaActivities } from "@/actions/google/actions";
 
 export default function GoogleMapComponent() {
   const { centerCoordinates, initialZoom, setRadius, tempMarker, setCenterCoordinates } = useMapStore();
-  const { selectedActivity, setSelectedActivity } = useActivitiesStore();
+  const { selectedActivity, setSelectedActivity, setAreaSearchActivities } = useActivitiesStore();
+  const { selectedTab } = useActivityTabStore();
+
+  // Add Bondi Beach area GeoJSON data
+  const sydneySuburbGeoJson: GeoJSON.FeatureCollection = {
+    type: "FeatureCollection",
+    features: [
+      {
+        type: "Feature",
+        properties: {
+          name: "Bondi Beach",
+          city: "Sydney",
+        },
+        geometry: {
+          type: "Polygon",
+          coordinates: [
+            [
+              [151.2744, -33.8915], // Bondi Beach coordinates
+              [151.2845, -33.8915],
+              [151.2845, -33.8965],
+              [151.2744, -33.8965],
+              [151.2744, -33.8915],
+            ],
+          ],
+        },
+      },
+      {
+        type: "Feature",
+        properties: {
+          name: "Surry Hills",
+          city: "Sydney",
+        },
+        geometry: {
+          type: "Polygon",
+          coordinates: [
+            [
+              [151.207, -33.8845],
+              [151.217, -33.8845],
+              [151.217, -33.89],
+              [151.207, -33.89],
+              [151.207, -33.8845],
+            ],
+          ],
+        },
+      },
+    ],
+  };
+
+  const [geoJsonData, setGeoJsonData] = useState<GeoJSON.FeatureCollection | null>(null);
+
+  // Set the GeoJSON data when component mounts
+  useEffect(() => {
+    setGeoJsonData(sydneySuburbGeoJson);
+  }, []);
 
   const center = centerCoordinates
     ? { lat: centerCoordinates[0], lng: centerCoordinates[1] }
-    : { lat: 51.5074, lng: -0.1278 }; // Default to London
+    : { lat: 51.5074, lng: -0.1278 };
 
-  const handleZoomChanged = (e: google.maps.MapMouseEvent) => {
+  const handleZoomChanged = (e: MapCameraChangedEvent) => {
     if (e.detail) {
       const zoom = e.detail.zoom;
       const radius = getRadiusForZoom(zoom);
@@ -33,12 +91,27 @@ export default function GoogleMapComponent() {
     }
   };
 
-  const handleCenterChanged = (e: google.maps.MapMouseEvent) => {
+  const handleCenterChanged = (e: MapCameraChangedEvent) => {
     if (e.detail) {
       const newCenter = e.detail.center;
       if (newCenter) {
         setCenterCoordinates([newCenter.lat, newCenter.lng]);
       }
+    }
+  };
+
+  const handleAreaClick = async (properties: any) => {
+    try {
+      const feature = geoJsonData?.features.find(
+        (f: any) => f.properties?.name === properties.name && f.properties?.city === properties.city
+      );
+
+      if (feature && feature.geometry.type === "Polygon") {
+        const activities = await fetchAreaActivities(properties.name, properties.city, feature.geometry.coordinates[0]);
+        setAreaSearchActivities(activities); // Store the activities in the global store
+      }
+    } catch (error) {
+      console.error(`Error fetching activities for ${properties.name}:`, error);
     }
   };
 
@@ -54,21 +127,19 @@ export default function GoogleMapComponent() {
           disableDefaultUI={true}
           onZoomChanged={handleZoomChanged}
           onCenterChanged={handleCenterChanged}
-          options={{
-            mapTypeControl: false,
-            fullscreenControl: false,
-            minZoom: 10,
-            maxZoom: 17,
-            restriction: {
-              latLngBounds: {
-                north: 85,
-                south: -85,
-                west: -180,
-                east: 180,
-              },
+          mapTypeControl={false}
+          fullscreenControl={false}
+          minZoom={10}
+          maxZoom={17}
+          restriction={{
+            latLngBounds: {
+              north: 85,
+              south: -85,
+              west: -180,
+              east: 180,
             },
-            clickableIcons: true,
           }}
+          clickableIcons={true}
         >
           <GoogleMapController />
           <GoogleMarkers />
@@ -81,9 +152,9 @@ export default function GoogleMapComponent() {
               size="lg"
             />
           )}
-          {/* {centerCoordinates && (
-            <Circle center={{ lat: centerCoordinates[0], lng: centerCoordinates[1] }} radius={mapRadius} />
-          )} */}
+          {selectedTab === "area-search" && geoJsonData && (
+            <DeckGLOverlay data={geoJsonData} onAreaClick={handleAreaClick} />
+          )}
         </Map>
       </APIProvider>
 

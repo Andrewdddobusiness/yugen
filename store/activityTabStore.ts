@@ -1,8 +1,8 @@
 import { create } from "zustand";
 
 interface IActivityTabStore {
-  selectedTab: "top-places" | "search" | "history";
-  setSelectedTab: (tab: "top-places" | "search" | "history") => void;
+  selectedTab: "top-places" | "search" | "area-search" | "history";
+  setSelectedTab: (tab: "top-places" | "search" | "area-search" | "history") => void;
 }
 
 export const useActivityTabStore = create<IActivityTabStore>((set) => ({

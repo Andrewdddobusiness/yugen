@@ -27,7 +27,6 @@ export default function SearchField() {
   const { setActivities, isActivitiesLoading, setIsActivitiesLoading } = useActivitiesStore();
 
   // **** STATES ****
-
   const [autocompleteResults, setAutocompleteResults] = useState<Array<ISearchHistoryItem>>([]);
   const [isVisible, setIsVisible] = useState<boolean>(false);
   const [mapHasChanged, setMapHasChanged] = useState(false);
