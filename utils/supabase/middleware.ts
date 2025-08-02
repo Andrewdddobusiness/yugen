@@ -56,12 +56,23 @@ export async function updateSession(request: NextRequest) {
     }
   );
 
-  const user = await supabase.auth.getUser();
+  const { data: { user }, error } = await supabase.auth.getUser();
 
-  const isProtectedRoute = protectedRoutes.some((route: string) => request.nextUrl.pathname.startsWith(route));
+  const pathname = request.nextUrl.pathname;
+  const isProtectedRoute = protectedRoutes.some((route: string) => pathname.startsWith(route));
+  const isAuthRoute = pathname.startsWith('/login') || pathname.startsWith('/signUp') || pathname.startsWith('/auth');
 
-  if (isProtectedRoute && user.error) {
-    return NextResponse.redirect(new URL("/", request.url));
+  // Redirect authenticated users away from auth pages
+  if (user && isAuthRoute && !pathname.startsWith('/auth/verify-email')) {
+    return NextResponse.redirect(new URL("/itineraries", request.url));
+  }
+
+  // Redirect unauthenticated users from protected routes to login
+  if (isProtectedRoute && (error || !user)) {
+    const loginUrl = new URL("/login", request.url);
+    // Store the original URL to redirect back after login
+    loginUrl.searchParams.set('redirectTo', pathname);
+    return NextResponse.redirect(loginUrl);
   }
 
   return response;

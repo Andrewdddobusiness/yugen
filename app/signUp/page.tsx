@@ -13,6 +13,7 @@ import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from "
 import { useToast } from "@/components/ui/use-toast";
 
 import LoadingSpinner from "@/components/loading/loadingSpinner";
+import { GoogleSignInButton } from "@/components/auth/GoogleSignInButton";
 
 import { signup, logout } from "@/actions/auth/actions";
 import { signUpSchema } from "@/schemas/loginSchema";
@@ -164,6 +165,22 @@ export default function SignUpPage() {
                 )}
               </form>
             </Form>
+
+            <div className="mt-6 space-y-4">
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center">
+                  <span className="w-full border-t" />
+                </div>
+                <div className="relative flex justify-center text-xs uppercase">
+                  <span className="bg-background px-2 text-muted-foreground">Or continue with</span>
+                </div>
+              </div>
+              
+              <GoogleSignInButton 
+                text="Sign up with Google"
+                className="rounded-xl shadow-lg hover:scale-105 transition-all duration-300"
+              />
+            </div>
 
             <div className="mt-4 text-center text-sm text-gray-500">
               Already have an account?{" "}

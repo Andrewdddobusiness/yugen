@@ -2,27 +2,54 @@
 import Stripe from "stripe";
 import { createClient } from "@/utils/supabase/server";
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: "2024-10-28.acacia",
-});
+// Initialize Stripe only if the secret key is properly configured
+const getStripe = () => {
+  const secretKey = process.env.STRIPE_SECRET_KEY;
+  if (!secretKey || secretKey === 'sk_test_placeholder_key_for_development') {
+    return null;
+  }
+  return new Stripe(secretKey, {
+    apiVersion: "2024-10-28.acacia",
+  });
+};
 
 export async function handleUserSignup(userId: string, email: string, firstName: string, lastName: string) {
   const supabase = createClient();
 
   try {
-    // Create Stripe customer with name
-    const customer = await stripe.customers.create({
-      email,
-      name: `${firstName} ${lastName}`,
-      metadata: {
-        supabase_user_id: userId,
-      },
-    });
+    const stripe = getStripe();
+    
+    let stripeCustomerId = null;
+    
+    // Only create Stripe customer if Stripe is properly configured
+    if (stripe) {
+      try {
+        const customer = await stripe.customers.create({
+          email,
+          name: `${firstName} ${lastName}`,
+          metadata: {
+            supabase_user_id: userId,
+          },
+        });
+        stripeCustomerId = customer.id;
+      } catch (stripeError) {
+        console.warn("Stripe customer creation failed:", stripeError);
+        // Continue without Stripe - this is optional for development
+      }
+    }
 
-    // Create profile with Stripe customer ID
-    const { error: profileError } = await supabase.from("profile").insert({
+    // Create profile (with or without Stripe customer ID)
+    const profileData: any = {
       user_id: userId,
-      stripe_customer_id: customer.id,
+      display_name: `${firstName} ${lastName}`.trim() || null,
+    };
+    
+    if (stripeCustomerId) {
+      profileData.stripe_customer_id = stripeCustomerId;
+    }
+
+    const { error: profileError } = await supabase.from("profiles").upsert(profileData, {
+      onConflict: 'user_id'
     });
 
     if (profileError) throw profileError;
@@ -33,6 +60,11 @@ export async function handleUserSignup(userId: string, email: string, firstName:
 }
 
 export async function createCheckoutSession(priceId: string) {
+  const stripe = getStripe();
+  if (!stripe) {
+    throw new Error("Stripe is not configured");
+  }
+  
   try {
     const supabase = createClient();
     const {
@@ -45,7 +77,7 @@ export async function createCheckoutSession(priceId: string) {
 
     // Get the user's Stripe customer ID from profile
     const { data: profile } = await supabase
-      .from("profile")
+      .from("profiles")
       .select("stripe_customer_id")
       .eq("user_id", user.id)
       .single();
@@ -131,6 +163,11 @@ export async function getSubscriptionDetails() {
 }
 
 export async function createCustomerPortalSession() {
+  const stripe = getStripe();
+  if (!stripe) {
+    throw new Error("Stripe is not configured");
+  }
+  
   try {
     const supabase = createClient();
     const {
@@ -140,7 +177,7 @@ export async function createCustomerPortalSession() {
     if (!user) throw new Error("User not authenticated");
 
     const { data: profile } = await supabase
-      .from("profile")
+      .from("profiles")
       .select("stripe_customer_id")
       .eq("user_id", user.id)
       .single();
