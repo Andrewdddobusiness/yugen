@@ -13,7 +13,8 @@ export const createItinerarySchema = z.object({
 
 export const updateItinerarySchema = createItinerarySchema.partial();
 
-export const createDestinationSchema = z.object({
+// Base destination schema without refinement
+const baseDestinationSchema = z.object({
   city: z.string().min(1, "City is required").max(100, "City name too long"),
   country: z.string().min(1, "Country is required").max(100, "Country name too long"),
   from_date: z.date({ required_error: "Start date is required" }),
@@ -21,12 +22,19 @@ export const createDestinationSchema = z.object({
   order_number: z.number().min(1, "Order must be positive").default(1),
   accommodation_notes: z.string().max(500, "Notes too long").optional(),
   transportation_notes: z.string().max(500, "Notes too long").optional(),
-}).refine((data) => data.to_date >= data.from_date, {
-  message: "End date must be after start date",
-  path: ["to_date"],
 });
 
-export const updateDestinationSchema = createDestinationSchema.partial();
+// Create destination schema with refinement
+export const createDestinationSchema = baseDestinationSchema.refine(
+  (data) => data.to_date >= data.from_date, 
+  {
+    message: "End date must be after start date",
+    path: ["to_date"],
+  }
+);
+
+// Update destination schema (partial of base schema without refinement)
+export const updateDestinationSchema = baseDestinationSchema.partial();
 
 // Types derived from schemas
 export type CreateItineraryData = z.infer<typeof createItinerarySchema>;

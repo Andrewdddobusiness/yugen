@@ -19,7 +19,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { whitelistedLocations } from "@/lib/googleMaps/whitelistedLocations";
 import { capitalizeFirstLetterOfEachWord } from "@/utils/formatting/capitalise";
 
-import { createNewItinerary } from "@/actions/supabase/actions";
+import { createItinerary } from "@/actions/supabase/itinerary";
 import { createClient } from "@/utils/supabase/client";
 import { useCreateItineraryStore } from "@/store/createItineraryStore";
 import { DatePickerWithRangePopover2 } from "../date/dateRangePickerPopover2";
@@ -192,24 +192,32 @@ export default function PopUpCreateItinerary({ children, className, ...props }: 
     setError(null);
 
     try {
-      const { success, error: createError } = await createNewItinerary(
-        user.id,
-        destination,
-        {
-          from: dateRange.from,
-          to: dateRange.to,
-        },
-        adultsCount,
-        kidsCount
-      );
+      const selectedLocation = destination.split(", ");
+      const city = selectedLocation[0];
+      const country = selectedLocation[1] || selectedLocation[0];
 
-      if (success) {
+      const result = await createItinerary({
+        title: `Trip to ${city}`,
+        adults: adultsCount,
+        kids: kidsCount,
+        currency: "USD",
+        is_public: false,
+        destination: {
+          city: city,
+          country: country,
+          from_date: dateRange.from,
+          to_date: dateRange.to,
+          order_number: 1,
+        }
+      });
+
+      if (result.success) {
         await queryClient.invalidateQueries({ queryKey: ["itineraries"] });
         setOpen(false);
         resetStore();
         router.push("/itineraries");
       } else {
-        setError(error || "Failed to create itinerary");
+        setError(result.error?.message || "Failed to create itinerary");
       }
     } catch (err) {
       console.error("Error creating itinerary:", err);

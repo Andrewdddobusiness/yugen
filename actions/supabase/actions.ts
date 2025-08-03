@@ -1,6 +1,6 @@
 "use server";
 import { IItineraryCard } from "@/components/cards/itineraryCard";
-import { createClient } from "@/utils/supabase/client";
+import { createClient } from "@/utils/supabase/server";
 
 /*
   INSERT
@@ -60,8 +60,8 @@ export async function createNewItinerary(
         city: city,
         country: country,
         order_number: 1,
-        from_date: dateRange.from,
-        to_date: dateRange.to,
+        from_date: dateRange.from.toISOString().split('T')[0], // Convert to YYYY-MM-DD
+        to_date: dateRange.to.toISOString().split('T')[0], // Convert to YYYY-MM-DD
       },
     ]);
 
