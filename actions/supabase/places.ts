@@ -11,6 +11,7 @@ import type {
   DatabaseResponse,
   Coordinates
 } from "@/types/database";
+import { searchCache, cachedSearch } from "@/lib/cache/searchCache";
 
 // Type definitions for place operations
 type CreatePlaceData = CreateActivityData;
@@ -171,42 +172,123 @@ export async function updatePlace(id: string, data: UpdatePlaceData): Promise<Da
 }
 
 /**
- * Searches for places using query and optional location
- * Note: This is a placeholder for Google Places API integration
+ * Searches for places using Google Places API with autocomplete (with caching)
  */
 export async function searchPlaces(
   query: string,
   location?: Coordinates
 ): Promise<DatabaseResponse<any[]>> {
   try {
-    // This is a placeholder - in a real implementation, you would:
-    // 1. Call Google Places API with the search parameters
-    // 2. Transform the results to match your activity schema
-    // 3. Return the formatted results
+    if (!query || query.trim().length < 2) {
+      return {
+        success: true,
+        data: []
+      };
+    }
+
+    const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+    if (!apiKey || apiKey === 'your-google-maps-api-key-here') {
+      // Fallback to database search if no API key
+      return await searchPlacesInDatabase(query);
+    }
+
+    // Generate cache key
+    const cacheKey = searchCache.generateSearchKey(query, location, 50000);
     
-    // For now, search existing places in database
-    const supabase = createClient();
+    // Try to get from cache first
+    const cached = searchCache.get<DatabaseResponse<any[]>>(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
+    const baseUrl = "https://places.googleapis.com/v1/places:autocomplete";
     
-    let searchQuery = supabase
+    const requestBody: any = {
+      input: query.trim(),
+    };
+
+    // Add location bias if coordinates provided
+    if (location) {
+      requestBody.locationBias = {
+        circle: {
+          center: {
+            latitude: location.lat,
+            longitude: location.lng,
+          },
+          radius: 50000, // 50km radius
+        },
+      };
+    }
+
+    const response = await fetch(baseUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Goog-Api-Key": apiKey,
+        "X-Goog-FieldMask": [
+          "suggestions.placePrediction.place",
+          "suggestions.placePrediction.structuredFormat",
+          "suggestions.placePrediction.types",
+        ].join(","),
+      },
+      body: JSON.stringify(requestBody),
+    });
+
+    if (!response.ok) {
+      console.error("Google Places API error:", response.status, response.statusText);
+      // Fallback to database search
+      return await searchPlacesInDatabase(query);
+    }
+
+    const data = await response.json();
+    
+    const results = data.suggestions?.map((suggestion: any) => ({
+      place_id: suggestion.placePrediction.place,
+      name: suggestion.placePrediction.structuredFormat.mainText.text,
+      address: suggestion.placePrediction.structuredFormat.secondaryText?.text || "",
+      types: suggestion.placePrediction.types || [],
+      source: "google_autocomplete"
+    })) || [];
+
+    const result = {
+      success: true,
+      data: results
+    };
+
+    // Cache the result for 10 minutes
+    searchCache.set(cacheKey, result, 10 * 60 * 1000);
+
+    return result;
+
+  } catch (error: any) {
+    console.error("Error in searchPlaces:", error);
+    // Fallback to database search on error
+    return await searchPlacesInDatabase(query);
+  }
+}
+
+/**
+ * Fallback search in database when Google API is unavailable
+ */
+async function searchPlacesInDatabase(query: string): Promise<DatabaseResponse<any[]>> {
+  const supabase = createClient();
+  
+  try {
+    const { data, error } = await supabase
       .from("activity")
       .select(`
         *,
         reviews:review(*),
         open_hours:open_hours(*)
       `)
-      .ilike("name", `%${query}%`);
-
-    // TODO: Add location-based filtering when coordinates are available
-    // This would require PostGIS extensions for geographic queries
-
-    const { data, error } = await searchQuery
+      .ilike("name", `%${query}%`)
       .limit(20);
 
     if (error) {
       return {
         success: false,
         error: { 
-          message: "Failed to search places",
+          message: "Failed to search places in database",
           code: error.code,
           details: error
         }
@@ -215,15 +297,17 @@ export async function searchPlaces(
 
     return {
       success: true,
-      data: data || []
+      data: (data || []).map(place => ({
+        ...place,
+        source: "database"
+      }))
     };
 
   } catch (error: any) {
-    console.error("Error in searchPlaces:", error);
     return {
       success: false,
       error: { 
-        message: error.message || "An unexpected error occurred",
+        message: error.message || "Database search failed",
         details: error
       }
     };
@@ -326,25 +410,67 @@ export async function getPlacesByDestination(destinationId: string): Promise<Dat
 }
 
 /**
- * Gets place details from Google Places API by place ID
- * Note: This is a placeholder for Google Places API integration
+ * Gets detailed place information from Google Places API
  */
 export async function getPlaceDetails(placeId: string): Promise<DatabaseResponse<any>> {
   try {
-    // This is a placeholder - in a real implementation, you would:
-    // 1. Call Google Places API Details endpoint
-    // 2. Transform the result to match your activity schema
-    // 3. Return the formatted result
+    const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+    if (!apiKey || apiKey === 'your-google-maps-api-key-here') {
+      // Fallback to database if no API key
+      return await getPlace(placeId);
+    }
+
+    // Use the existing fetchPlaceDetails function from google/actions.ts
+    const { fetchPlaceDetails } = await import("@/actions/google/actions");
     
-    // For now, return database place if it exists
-    return await getPlace(placeId);
+    const placeDetails = await fetchPlaceDetails(placeId);
+    
+    // Transform to match our database schema
+    const transformedPlace = {
+      place_id: placeDetails.place_id,
+      name: placeDetails.name,
+      coordinates: placeDetails.coordinates ? {
+        lat: placeDetails.coordinates[0],
+        lng: placeDetails.coordinates[1]
+      } : null,
+      types: placeDetails.types || [],
+      price_level: placeDetails.price_level || null,
+      address: placeDetails.address || "",
+      rating: placeDetails.rating || null,
+      description: placeDetails.description || "",
+      google_maps_url: placeDetails.google_maps_url || "",
+      website_url: placeDetails.website_url || "",
+      photo_names: placeDetails.photo_names || [],
+      phone_number: placeDetails.phone_number || "",
+      reviews: placeDetails.reviews || [],
+      open_hours: placeDetails.open_hours || [],
+      source: "google_api"
+    };
+
+    return {
+      success: true,
+      data: transformedPlace
+    };
 
   } catch (error: any) {
     console.error("Error in getPlaceDetails:", error);
+    
+    // Fallback to database search
+    const dbResult = await getPlace(placeId);
+    if (dbResult.success) {
+      return {
+        success: true,
+        data: {
+          ...dbResult.data,
+          source: "database_fallback"
+        }
+      };
+    }
+    
     return {
       success: false,
       error: { 
-        message: error.message || "An unexpected error occurred",
+        message: error.message || "Failed to fetch place details",
         details: error
       }
     };
