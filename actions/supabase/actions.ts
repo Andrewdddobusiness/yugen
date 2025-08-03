@@ -19,7 +19,6 @@ export async function insertTableData(tableName: string, tableData: any) {
 }
 
 export async function createNewItinerary(
-  userId: string,
   destination: string,
   dateRange: { from: Date; to: Date },
   adultsCount: number,
@@ -28,12 +27,19 @@ export async function createNewItinerary(
   const supabase = createClient();
 
   try {
+    // Get the current user
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    
+    if (userError || !user) {
+      throw new Error("User not authenticated");
+    }
+
     // Insert itinerary data
     const { data: itineraryData, error: itineraryError } = await supabase
       .from("itinerary")
       .insert([
         {
-          user_id: userId,
+          user_id: user.id,
           adults: adultsCount,
           kids: kidsCount,
         },
