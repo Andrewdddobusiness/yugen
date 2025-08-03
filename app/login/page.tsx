@@ -46,6 +46,17 @@ export default function LoginPage() {
           description: "Welcome back traveller!",
         });
         router.push("/itineraries");
+      } else if (response.error?.message === "Email not confirmed") {
+        toast({
+          title: "Email not verified",
+          description: "Please check your email and verify your account before logging in.",
+        });
+        router.push(`/auth/verify-email?email=${encodeURIComponent(values.email)}`);
+      } else {
+        toast({
+          title: "Login failed",
+          description: response.message || "Invalid email or password.",
+        });
       }
       setLoading(false);
     } catch (error) {

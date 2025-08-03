@@ -38,24 +38,26 @@ export async function handleUserSignup(userId: string, email: string, firstName:
       }
     }
 
-    // Create profile (with or without Stripe customer ID)
-    const profileData: any = {
-      user_id: userId,
-      display_name: `${firstName} ${lastName}`.trim() || null,
-    };
-    
+    // Update profile with Stripe customer ID if created
+    // Note: Profile is automatically created by database trigger when user is inserted
     if (stripeCustomerId) {
-      profileData.stripe_customer_id = stripeCustomerId;
+      // Wait a moment for the trigger to create the profile
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      const { error: updateError } = await supabase
+        .from("profiles")
+        .update({ stripe_customer_id: stripeCustomerId })
+        .eq('user_id', userId);
+
+      if (updateError) {
+        console.warn("Failed to update profile with Stripe customer ID:", updateError);
+        // Don't throw here as the user signup should still succeed
+      }
     }
-
-    const { error: profileError } = await supabase.from("profiles").upsert(profileData, {
-      onConflict: 'user_id'
-    });
-
-    if (profileError) throw profileError;
   } catch (error) {
     console.error("Error in user signup hook:", error);
-    throw error;
+    // Don't throw the error - we don't want to fail the entire signup for Stripe issues
+    console.warn("Continuing with signup despite error in post-signup process");
   }
 }
 

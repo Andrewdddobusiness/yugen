@@ -1,19 +1,25 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { resendConfirmation } from "@/actions/auth/actions";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { toast } from "sonner";
 import { Mail, RefreshCw } from "lucide-react";
+import Link from "next/link";
 
 export default function VerifyEmailPage() {
   const { user } = useAuth();
+  const searchParams = useSearchParams();
   const [isResending, setIsResending] = useState(false);
+  
+  // Get email from query params or user object
+  const email = searchParams.get('email') || user?.email;
 
   const handleResendConfirmation = async () => {
-    if (!user?.email) {
+    if (!email) {
       toast.error("No email address found");
       return;
     }
@@ -21,7 +27,7 @@ export default function VerifyEmailPage() {
     setIsResending(true);
 
     try {
-      const result = await resendConfirmation(user.email);
+      const result = await resendConfirmation(email);
 
       if (result.success) {
         toast.success("Confirmation email sent! Please check your inbox.");
@@ -45,7 +51,7 @@ export default function VerifyEmailPage() {
           </div>
           <CardTitle>Verify Your Email</CardTitle>
           <CardDescription>
-            We've sent a confirmation email to <strong>{user?.email}</strong>
+            We've sent a confirmation email to <strong>{email}</strong>
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -85,6 +91,14 @@ export default function VerifyEmailPage() {
                 support@journey.com
               </a>
             </p>
+          </div>
+
+          <div className="pt-4 border-t">
+            <Link href="/login">
+              <Button variant="ghost" className="w-full">
+                Back to Login
+              </Button>
+            </Link>
           </div>
         </CardContent>
       </Card>

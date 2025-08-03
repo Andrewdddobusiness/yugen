@@ -15,7 +15,7 @@ import { useToast } from "@/components/ui/use-toast";
 import LoadingSpinner from "@/components/loading/loadingSpinner";
 import { GoogleSignInButton } from "@/components/auth/GoogleSignInButton";
 
-import { signup, logout } from "@/actions/auth/actions";
+import { signup, logout, resendConfirmation } from "@/actions/auth/actions";
 import { signUpSchema } from "@/schemas/loginSchema";
 
 export default function SignUpPage() {
@@ -190,10 +190,55 @@ export default function SignUpPage() {
             </div>
           </div>
         ) : (
-          <div className="mx-auto grid w-[350px] gap-6">
-            <div className="grid gap-2 text-center">
-              <h1 className="text-3xl font-bold">Awesome!</h1>
-              <p className="text-muted-foreground">Check your email to verify your account.</p>
+          <div className="mx-auto grid w-[450px] gap-6">
+            <div className="grid gap-4 text-center">
+              <div className="mx-auto mb-4 h-16 w-16 rounded-full bg-green-100 flex items-center justify-center">
+                <svg className="h-8 w-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+              </div>
+              <h1 className="text-3xl font-bold text-[#3A86FF]">Welcome aboard!</h1>
+              <div className="space-y-2">
+                <p className="text-lg text-muted-foreground">
+                  We've sent a verification email to:
+                </p>
+                <p className="font-semibold text-lg">{user.user?.email}</p>
+              </div>
+              <div className="bg-blue-50 rounded-lg p-4 text-sm text-blue-800">
+                <p className="font-semibold mb-1">Please verify your email before logging in</p>
+                <p>Check your inbox and click the verification link to activate your account.</p>
+              </div>
+              <div className="pt-4 space-y-3">
+                <Link href="/login">
+                  <Button className="w-full rounded-xl shadow-lg hover:scale-105 transition-all duration-300 bg-[#032bc0] text-white hover:bg-[#3A86FF]">
+                    Go to Login
+                  </Button>
+                </Link>
+                <p className="text-sm text-muted-foreground">
+                  Didn't receive the email? Check your spam folder or{" "}
+                  <button
+                    onClick={async () => {
+                      if (user.user?.email) {
+                        const result = await resendConfirmation(user.user.email);
+                        if (result.success) {
+                          toast({
+                            title: "Email sent!",
+                            description: "Please check your inbox.",
+                          });
+                        } else {
+                          toast({
+                            title: "Error",
+                            description: result.message,
+                          });
+                        }
+                      }
+                    }}
+                    className="text-[#3A86FF] underline hover:no-underline"
+                  >
+                    resend verification email
+                  </button>
+                </p>
+              </div>
             </div>
           </div>
         )}

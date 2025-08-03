@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Confirm Your Email - Journey</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            line-height: 1.6;
+            color: #1f2937;
+            background-color: #f8fafc;
+        }
+        
+        .email-container {
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: #ffffff;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #3A86FF 0%, #032bc0 100%);
+            padding: 40px 30px;
+            text-align: center;
+        }
+        
+        .logo {
+            color: #ffffff;
+            font-size: 32px;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        
+        .header-text {
+            color: #e0e7ff;
+            font-size: 16px;
+        }
+        
+        .content {
+            padding: 40px 30px;
+        }
+        
+        .welcome-title {
+            color: #1f2937;
+            font-size: 28px;
+            font-weight: bold;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        
+        .welcome-text {
+            color: #6b7280;
+            font-size: 16px;
+            margin-bottom: 30px;
+            text-align: center;
+            line-height: 1.8;
+        }
+        
+        .confirm-button {
+            display: block;
+            width: fit-content;
+            margin: 30px auto;
+            padding: 16px 32px;
+            background: linear-gradient(135deg, #3A86FF 0%, #032bc0 100%);
+            color: #ffffff;
+            text-decoration: none;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 16px;
+            text-align: center;
+            transition: transform 0.2s;
+        }
+        
+        .confirm-button:hover {
+            transform: translateY(-2px);
+        }
+        
+        .alternative-link {
+            margin-top: 30px;
+            padding: 20px;
+            background-color: #f1f5f9;
+            border-radius: 8px;
+            border-left: 4px solid #3A86FF;
+        }
+        
+        .alternative-text {
+            color: #64748b;
+            font-size: 14px;
+            margin-bottom: 10px;
+        }
+        
+        .link-text {
+            color: #3A86FF;
+            word-break: break-all;
+            font-size: 14px;
+        }
+        
+        .footer {
+            background-color: #f8fafc;
+            padding: 30px;
+            text-align: center;
+            border-top: 1px solid #e2e8f0;
+        }
+        
+        .footer-text {
+            color: #94a3b8;
+            font-size: 14px;
+            margin-bottom: 10px;
+        }
+        
+        .footer-link {
+            color: #3A86FF;
+            text-decoration: none;
+        }
+        
+        .feature-box {
+            background: linear-gradient(135deg, #fef3c7 0%, #fed7aa 100%);
+            border-radius: 8px;
+            padding: 20px;
+            margin: 30px 0;
+            text-align: center;
+        }
+        
+        .feature-title {
+            color: #92400e;
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+        
+        .feature-text {
+            color: #a16207;
+            font-size: 14px;
+        }
+        
+        @media (max-width: 600px) {
+            .email-container {
+                margin: 0;
+                border-radius: 0;
+            }
+            
+            .header, .content, .footer {
+                padding: 30px 20px;
+            }
+            
+            .welcome-title {
+                font-size: 24px;
+            }
+            
+            .confirm-button {
+                width: 100%;
+                padding: 18px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="email-container">
+        <!-- Header -->
+        <div class="header">
+            <div class="logo">Journey</div>
+            <div class="header-text">Your travel planning companion</div>
+        </div>
+        
+        <!-- Main Content -->
+        <div class="content">
+            <h1 class="welcome-title">Welcome aboard! 🎉</h1>
+            
+            <p class="welcome-text">
+                Thanks for joining Journey! We're excited to help you plan your next adventure. 
+                To get started, please confirm your email address by clicking the button below.
+            </p>
+            
+            <a href="{{ .ConfirmationURL }}" class="confirm-button">
+                Confirm Your Email
+            </a>
+            
+            <div class="feature-box">
+                <div class="feature-title">🗺️ What's Next?</div>
+                <div class="feature-text">
+                    Once verified, you'll be able to create itineraries, discover amazing places, 
+                    and organize your trips like a pro!
+                </div>
+            </div>
+            
+            <div class="alternative-link">
+                <p class="alternative-text">
+                    <strong>Can't click the button?</strong> Copy and paste this link into your browser:
+                </p>
+                <div class="link-text">{{ .ConfirmationURL }}</div>
+            </div>
+        </div>
+        
+        <!-- Footer -->
+        <div class="footer">
+            <p class="footer-text">
+                This email was sent from Journey. If you didn't create an account, 
+                you can safely ignore this email.
+            </p>
+            <p class="footer-text">
+                Need help? Contact us at <a href="mailto:support@journey.com" class="footer-link">support@journey.com</a>
+            </p>
+        </div>
+    </div>
+</body>
+</html>

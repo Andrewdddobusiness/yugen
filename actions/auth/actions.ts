@@ -13,11 +13,30 @@ export async function login(formData: FormData, redirectTo?: string) {
     password: formData.get("password") as string,
   };
 
-  const { error } = await supabase.auth.signInWithPassword(loginFormData);
+  const { data, error } = await supabase.auth.signInWithPassword(loginFormData);
 
   if (error) {
     console.log(error);
-    return { success: false, message: "Error with login", error };
+    // Check if the error is about email confirmation
+    if (error.message?.includes("Email not confirmed") || error.message?.includes("email not verified")) {
+      return { 
+        success: false, 
+        message: "Please verify your email before logging in", 
+        error: { message: "Email not confirmed" } 
+      };
+    }
+    return { success: false, message: error.message || "Invalid email or password", error };
+  }
+
+  // Check if user email is confirmed
+  if (data.user && !data.user.email_confirmed_at) {
+    // Sign out the user since they shouldn't be logged in without verification
+    await supabase.auth.signOut();
+    return { 
+      success: false, 
+      message: "Please verify your email before logging in", 
+      error: { message: "Email not confirmed" } 
+    };
   }
   
   revalidatePath("/", "layout");
