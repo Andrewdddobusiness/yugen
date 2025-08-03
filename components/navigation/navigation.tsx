@@ -186,12 +186,11 @@ export default function Navigation() {
                   href="/pricing"
                   className={cn(
                     navigationMenuTriggerStyle(),
-                    "text-[#FFBE0B]",
-                    "hover:text-[#FFBE0B]/80",
-                    "focus:text-[#FFBE0B]",
-                    "active:text-[#FFBE0B]",
-                    "focus:border-[#FFBE0B]",
-                    scrolled && "text-[#fff] hover:text-[#fff]/80"
+                    "text-gray-700 font-medium",
+                    "hover:text-blue-600",
+                    "focus:text-blue-600",
+                    "transition-colors duration-200",
+                    scrolled && "text-white hover:text-blue-200"
                   )}
                 >
                   Pricing
