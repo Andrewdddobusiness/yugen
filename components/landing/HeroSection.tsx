@@ -165,7 +165,7 @@ export default function HeroSection({ user, isUserLoading }: HeroSectionProps) {
             {/* Demo Image */}
             <div className="relative aspect-video bg-gradient-to-br from-blue-50 to-indigo-100">
               <Image
-                src="/demo-screenshot.png"
+                src="/popup-itinerary-builder.jpg"
                 alt="Journey App Demo - Travel Itinerary Planner"
                 fill
                 className="object-cover"

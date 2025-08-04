@@ -9,12 +9,13 @@ import { useQueryClient } from "@tanstack/react-query";
 import * as VisuallyHidden from "@radix-ui/react-visually-hidden";
 
 import { Button } from "../ui/button";
-import { Plus, Minus, Loader2 } from "lucide-react";
+import { Plus, Minus, Loader2, MapPin } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger } from "../ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 
 import { ComboBox } from "@/components/comboBox/comboBox";
 import { Skeleton } from "@/components/ui/skeleton";
+import DestinationSelector from "@/components/destination/DestinationSelector";
 
 import { whitelistedLocations } from "@/lib/googleMaps/whitelistedLocations";
 import { capitalizeFirstLetterOfEachWord } from "@/utils/formatting/capitalise";
@@ -23,6 +24,22 @@ import { createItinerary } from "@/actions/supabase/itinerary";
 import { createClient } from "@/utils/supabase/client";
 import { useCreateItineraryStore } from "@/store/createItineraryStore";
 import { DatePickerWithRangePopover2 } from "../date/dateRangePickerPopover2";
+
+interface Destination {
+  id: string;
+  name: string;
+  country: string;
+  city: string;
+  formatted_address: string;
+  place_id: string;
+  coordinates: {
+    lat: number;
+    lng: number;
+  };
+  timezone: string;
+  photos?: string[];
+  description?: string;
+}
 
 const formSchema = z.object({
   destination: z.string().min(2, {
@@ -47,12 +64,13 @@ export default function PopUpCreateItinerary({ children, className, ...props }: 
   const supabase = createClient();
 
   // **** STORES ****
-  const { destination, setDestination, dateRange, setDateRange, resetStore } = useCreateItineraryStore();
+  const { destination, destinationData, setDestination, setDestinationData, dateRange, setDateRange, resetStore } = useCreateItineraryStore();
 
   // **** STATES ****
   const [user, setUser] = useState<any>(null);
   const [open, setOpen] = useState(false);
   const [step, setStep] = useState(0);
+  const [showDestinationSelector, setShowDestinationSelector] = useState(false);
   const [destinationError, setDestinationError] = useState(false);
   const [dateRangeError, setDateRangeError] = useState(false);
   const [adultsCount, setAdultsCount] = useState(1);
@@ -86,14 +104,37 @@ export default function PopUpCreateItinerary({ children, className, ...props }: 
               <FormItem className="flex flex-col">
                 <FormLabel>Destination</FormLabel>
                 <FormControl>
-                  {locationList ? (
-                    <ComboBox
-                      selectedValue={destination}
-                      selections={locationList}
-                      onSelectionChange={handleDestinationChange}
-                    />
+                  {destinationData ? (
+                    <div className="flex items-center justify-between p-3 border border-gray-300 rounded-md bg-blue-50">
+                      <div className="flex items-center space-x-3">
+                        <div className="p-2 bg-blue-600 rounded-lg">
+                          <MapPin className="h-4 w-4 text-white" />
+                        </div>
+                        <div>
+                          <div className="font-medium text-gray-900">{destinationData.name}</div>
+                          <div className="text-sm text-gray-600">{destinationData.country}</div>
+                        </div>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={handleOpenDestinationSelector}
+                        className="text-blue-600 border-blue-600 hover:bg-blue-600 hover:text-white"
+                      >
+                        Change
+                      </Button>
+                    </div>
                   ) : (
-                    <Skeleton className="w-full h-[40px] rounded-md" />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={handleOpenDestinationSelector}
+                      className="w-full h-12 justify-start text-gray-500 border-gray-300 hover:border-blue-400 hover:text-blue-600"
+                    >
+                      <MapPin className="h-5 w-5 mr-3" />
+                      Choose your destination...
+                    </Button>
                   )}
                 </FormControl>
                 <FormMessage />
@@ -183,7 +224,9 @@ export default function PopUpCreateItinerary({ children, className, ...props }: 
   }, [supabase]);
 
   const handleCreateItinerary = async () => {
-    if (!user?.id || !destination || !dateRange?.from || !dateRange?.to) {
+    const currentDestination = destinationData || (destination ? { city: destination.split(", ")[0], country: destination.split(", ")[1] || destination } : null);
+    
+    if (!user?.id || !currentDestination || !dateRange?.from || !dateRange?.to) {
       setError("Missing required information");
       return;
     }
@@ -192,9 +235,8 @@ export default function PopUpCreateItinerary({ children, className, ...props }: 
     setError(null);
 
     try {
-      const selectedLocation = destination.split(", ");
-      const city = selectedLocation[0];
-      const country = selectedLocation[1] || selectedLocation[0];
+      const city = destinationData?.city || currentDestination.city;
+      const country = destinationData?.country || currentDestination.country;
 
       const result = await createItinerary({
         title: `Trip to ${city}`,
@@ -230,7 +272,7 @@ export default function PopUpCreateItinerary({ children, className, ...props }: 
   const isStepValid = () => {
     switch (step) {
       case 0:
-        return destination && destination.length >= 2 && dateRange?.from && dateRange?.to;
+        return (destination && destination.length >= 2 || destinationData) && dateRange?.from && dateRange?.to;
       case 1:
         return adultsCount >= 1;
       default:
@@ -240,7 +282,7 @@ export default function PopUpCreateItinerary({ children, className, ...props }: 
 
   const getStepError = () => {
     if (step === 0) {
-      if (!destination) {
+      if (!destination && !destinationData) {
         return "Please select a destination";
       }
       if (!dateRange?.from || !dateRange?.to) {
@@ -277,6 +319,20 @@ export default function PopUpCreateItinerary({ children, className, ...props }: 
     }
   };
 
+  const handleDestinationSelect = (destination: Destination) => {
+    setDestinationData(destination);
+    setShowDestinationSelector(false);
+    setDestinationError(false);
+  };
+
+  const handleOpenDestinationSelector = () => {
+    setShowDestinationSelector(true);
+  };
+
+  const handleCloseDestinationSelector = () => {
+    setShowDestinationSelector(false);
+  };
+
   function onSubmit(values: z.infer<typeof formSchema>) {
     handleCreateItinerary();
   }
@@ -302,62 +358,72 @@ export default function PopUpCreateItinerary({ children, className, ...props }: 
       <DialogTrigger asChild>
         <div className={`inline-flex ${className}`}>{children}</div>
       </DialogTrigger>
-      <DialogContent className="w-[90%] sm:w-full max-w-[1000px] h-[400px] grid grid-cols-1 sm:grid-cols-2 p-4 sm:p-0 gap-0 rounded-xl">
-        <div className="relative w-full h-full hidden sm:block">
-          <Image src={steps[step].image} alt={steps[step].title} fill className="object-cover rounded-l-md" priority />
-        </div>
+      <DialogContent className={`w-[90%] sm:w-full ${showDestinationSelector ? 'max-w-[900px] h-[650px]' : 'max-w-[1000px] h-[400px] grid grid-cols-1 sm:grid-cols-2'} p-0 gap-0 rounded-xl`}>
+        {showDestinationSelector ? (
+          <DestinationSelector
+            onDestinationSelect={handleDestinationSelect}
+            onClose={handleCloseDestinationSelector}
+            initialDestination={destinationData}
+          />
+        ) : (
+          <>
+            <div className="relative w-full h-full hidden sm:block">
+              <Image src={steps[step].image} alt={steps[step].title} fill className="object-cover rounded-l-md" priority />
+            </div>
 
-        <DialogDescription className="flex flex-col px-4 sm:px-6 pt-8 sm:pt-10 pb-6 h-full justify-between">
-          <VisuallyHidden.Root>
-            <DialogTitle>Create New Itinerary</DialogTitle>
-          </VisuallyHidden.Root>
+            <DialogDescription className="flex flex-col px-4 sm:px-6 pt-8 sm:pt-10 pb-6 h-full justify-between">
+              <VisuallyHidden.Root>
+                <DialogTitle>Create New Itinerary</DialogTitle>
+              </VisuallyHidden.Root>
 
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col h-full justify-between">
-              <div className="flex flex-col gap-1">
-                <DialogTitle className="text-2xl sm:text-3xl text-black">
-                  Let&apos;s build your next vacation!
-                </DialogTitle>
-                <div className="text-lg sm:text-xl font-medium text-zinc-800">{steps[step].title}</div>
-                <div className="mt-4">{steps[step].content}</div>
-              </div>
+              <Form {...form}>
+                <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col h-full justify-between">
+                  <div className="flex flex-col gap-1">
+                    <DialogTitle className="text-2xl sm:text-3xl text-black">
+                      Let&apos;s build your next vacation!
+                    </DialogTitle>
+                    <div className="text-lg sm:text-xl font-medium text-zinc-800">{steps[step].title}</div>
+                    <div className="mt-4">{steps[step].content}</div>
+                  </div>
 
-              <div className="flex flex-row mt-4 justify-between">
-                <Button
-                  type="button"
-                  className="flex w-28 rounded-xl shadow-lg"
-                  variant={"outline"}
-                  onClick={handleBack}
-                  disabled={step === 0}
-                >
-                  Back
-                </Button>
-                <div className="flex flex-row justify-center items-center">
-                  {steps.map((_, index) => (
-                    <div
-                      key={index}
-                      className={`h-2 w-2 rounded-full mx-1 ${index === step ? "bg-black" : "bg-gray-400"}`}
-                    />
-                  ))}
-                </div>
-                <Button
-                  type="button"
-                  className="flex w-28 bg-[#3A86FF] rounded-xl shadow-md shadow-[#3A86FF] text-white hover:bg-[#3A86FF]/90 active:scale-95 transition-all duration-300"
-                  onClick={handleNext}
-                  disabled={!isStepValid() || loading}
-                >
-                  {loading ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : step < steps.length - 1 ? (
-                    "Next"
-                  ) : (
-                    "Create itinerary"
-                  )}
-                </Button>
-              </div>
-            </form>
-          </Form>
-        </DialogDescription>
+                  <div className="flex flex-row mt-4 justify-between">
+                    <Button
+                      type="button"
+                      className="flex w-28 rounded-xl shadow-lg"
+                      variant={"outline"}
+                      onClick={handleBack}
+                      disabled={step === 0}
+                    >
+                      Back
+                    </Button>
+                    <div className="flex flex-row justify-center items-center">
+                      {steps.map((_, index) => (
+                        <div
+                          key={index}
+                          className={`h-2 w-2 rounded-full mx-1 ${index === step ? "bg-black" : "bg-gray-400"}`}
+                        />
+                      ))}
+                    </div>
+                    <Button
+                      type="button"
+                      className="flex w-28 bg-[#3A86FF] rounded-xl shadow-md shadow-[#3A86FF] text-white hover:bg-[#3A86FF]/90 active:scale-95 transition-all duration-300"
+                      onClick={handleNext}
+                      disabled={!isStepValid() || loading}
+                    >
+                      {loading ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : step < steps.length - 1 ? (
+                        "Next"
+                      ) : (
+                        "Create itinerary"
+                      )}
+                    </Button>
+                  </div>
+                </form>
+              </Form>
+            </DialogDescription>
+          </>
+        )}
       </DialogContent>
     </Dialog>
   );

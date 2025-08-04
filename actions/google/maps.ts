@@ -193,6 +193,71 @@ export async function getNearbyPlaces(
 /**
  * Gets place photos using Google Places API
  */
+/**
+ * Search for places using Google Places API Text Search
+ */
+export async function searchPlaces(
+  query: string,
+  type?: string
+): Promise<DatabaseResponse<any[]>> {
+  try {
+    const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+    
+    if (!apiKey || apiKey === 'your-google-maps-api-key-here') {
+      return {
+        success: false,
+        error: { message: "Google Maps API key not configured" }
+      };
+    }
+
+    const encodedQuery = encodeURIComponent(query);
+    let url = `https://maps.googleapis.com/maps/api/place/textsearch/json?query=${encodedQuery}&key=${apiKey}`;
+    
+    if (type) {
+      url += `&type=${type}`;
+    }
+
+    const response = await fetch(url);
+    const data = await response.json();
+
+    if (!response.ok) {
+      return {
+        success: false,
+        error: { 
+          message: "Places search API request failed",
+          code: response.status.toString(),
+          details: data
+        }
+      };
+    }
+
+    if (data.status !== 'OK') {
+      return {
+        success: false,
+        error: { 
+          message: `Places search failed: ${data.status}`,
+          details: data
+        }
+      };
+    }
+
+    return {
+      success: true,
+      data: data.results || []
+    };
+
+  } catch (error: any) {
+    console.error("Error in searchPlaces:", error);
+    return {
+      success: false,
+      error: { 
+        message: error.message || "Failed to search places",
+        details: error
+      }
+    };
+  }
+}
+
 export async function getPlacePhotos(
   photoReferences: string[],
   maxWidth: number = 1000,
