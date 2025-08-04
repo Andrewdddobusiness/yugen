@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { MapPin, Search, Clock, Users, Calendar } from "lucide-react";
+import { MapPin, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import DestinationSearch from "./DestinationSearch";
 import PopularDestinations from "./PopularDestinations";

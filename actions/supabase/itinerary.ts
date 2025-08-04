@@ -284,7 +284,11 @@ export async function updateItinerary(
 }
 
 /**
- * Soft deletes an itinerary
+ * Soft deletes an itinerary and all related data
+ * 
+ * NOTE: We keep deleted_at field for audit purposes and use soft deletes.
+ * This function manually soft deletes all related records since CASCADE 
+ * constraints don't work with soft deletes (UPDATE operations).
  */
 export async function deleteItinerary(id: number): Promise<DatabaseResponse<null>> {
   const supabase = createClient();
@@ -299,9 +303,49 @@ export async function deleteItinerary(id: number): Promise<DatabaseResponse<null
       };
     }
 
+    // First verify the user owns this itinerary and it's not already deleted
+    const { data: itinerary, error: checkError } = await supabase
+      .from("itinerary")
+      .select("itinerary_id")
+      .eq("itinerary_id", id)
+      .eq("user_id", user.id)
+      .is("deleted_at", null)
+      .single();
+
+    if (checkError || !itinerary) {
+      return {
+        success: false,
+        error: { message: "Itinerary not found or access denied" }
+      };
+    }
+
+    const deletedAt = new Date().toISOString();
+
+    // Soft delete all related records manually since CASCADE doesn't work with UPDATEs
+    
+    // 1. Soft delete itinerary activities
+    await supabase
+      .from("itinerary_activity")
+      .update({ deleted_at: deletedAt })
+      .eq("itinerary_id", id)
+      .is("deleted_at", null);
+
+    // 2. Delete search history (hard delete since it's just logs)
+    await supabase
+      .from("itinerary_search_history")
+      .delete()
+      .eq("itinerary_id", id);
+
+    // 3. Delete destinations (hard delete to keep referential integrity clean)
+    await supabase
+      .from("itinerary_destination")
+      .delete()
+      .eq("itinerary_id", id);
+
+    // 4. Finally, soft delete the itinerary itself
     const { error } = await supabase
       .from("itinerary")
-      .update({ deleted_at: new Date().toISOString() })
+      .update({ deleted_at: deletedAt })
       .eq("itinerary_id", id)
       .eq("user_id", user.id);
 
