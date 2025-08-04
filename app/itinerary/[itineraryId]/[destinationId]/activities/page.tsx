@@ -118,9 +118,12 @@ export default function Activities() {
       return fetchNearbyActivities(itineraryCoordinates[0], itineraryCoordinates[1], mapRadius);
     },
     enabled: Array.isArray(itineraryCoordinates) && itineraryCoordinates.length === 2 && !initialLoadComplete,
-    staleTime: 5 * 60 * 1000,
+    staleTime: 10 * 60 * 1000, // Increase stale time to 10 minutes
+    gcTime: 15 * 60 * 1000, // Keep in cache for 15 minutes
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
+    refetchOnMount: false, // Prevent refetch on component mount
+    retry: 1, // Reduce retry attempts
   });
 
   useEffect(() => {
@@ -227,6 +230,11 @@ export default function Activities() {
       return result;
     },
     enabled: !!itineraryId && !!destinationId,
+    staleTime: 5 * 60 * 1000, // 5 minutes stale time
+    gcTime: 10 * 60 * 1000, // Keep in cache for 10 minutes
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    retry: 1,
   });
 
   const placeDetailsQuery = async (placeId: string) => {
@@ -244,7 +252,9 @@ export default function Activities() {
           throw error;
         }
       },
-      staleTime: Infinity,
+      staleTime: Infinity, // Cache indefinitely since place details don't change
+      gcTime: 30 * 60 * 1000, // Keep in cache for 30 minutes
+      retry: 1, // Reduce retry attempts
     });
     return data;
   };
@@ -253,53 +263,108 @@ export default function Activities() {
     mutationFn: async (placeDetails: any) => {
       return await insertActivity(placeDetails);
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["searchHistoryActivities"] });
-    },
+    // Remove automatic invalidation to prevent excessive re-fetching
+    // We'll handle state updates manually in the useEffect
   });
+
+  // Track which place IDs we've already processed to prevent duplicate requests
+  const [processedPlaceIds, setProcessedPlaceIds] = useState<Set<string>>(new Set());
+  const [isProcessingMissingActivities, setIsProcessingMissingActivities] = useState(false);
 
   useEffect(() => {
     const fetchActivities = async () => {
       if (
-        searchHistoryActivitiesData &&
-        Array.isArray(searchHistoryActivitiesData.activities) &&
-        (searchHistoryActivitiesData.activities.length > 0 || searchHistoryActivitiesData.missingPlaceIds.length > 0)
+        !searchHistoryActivitiesData ||
+        isProcessingMissingActivities ||
+        !Array.isArray(searchHistoryActivitiesData.activities)
       ) {
-        let newActivities: IActivity[] = [];
+        return;
+      }
 
-        if (searchHistoryActivitiesData.activities.length > 0) {
-          newActivities = searchHistoryActivitiesData.activities;
+      // Set existing activities immediately
+      if (searchHistoryActivitiesData.activities.length > 0) {
+        setSearchHistoryActivities(searchHistoryActivitiesData.activities);
+      }
+
+      const missingPlaceIds = searchHistoryActivitiesData.missingPlaceIds || [];
+      
+      // Filter out already processed place IDs
+      const newMissingPlaceIds = missingPlaceIds.filter(
+        (placeId: string) => !processedPlaceIds.has(placeId)
+      );
+
+      if (newMissingPlaceIds.length === 0) {
+        return;
+      }
+
+      setIsProcessingMissingActivities(true);
+
+      try {
+        // Process missing activities in batches to avoid overwhelming the API
+        const batchSize = 3;
+        const batches = [];
+        for (let i = 0; i < newMissingPlaceIds.length; i += batchSize) {
+          batches.push(newMissingPlaceIds.slice(i, i + batchSize));
         }
 
-        setSearchHistoryActivities(newActivities);
-
-        const missingPlaceIds = searchHistoryActivitiesData.missingPlaceIds || [];
-
-        // Fetch missing activities
-        for (const placeId of missingPlaceIds) {
-          try {
-            const placeDetails = await placeDetailsQuery(placeId);
-
-            if (placeDetails) {
-              const newActivity = await insertActivityMutation.mutateAsync(placeDetails);
-
-              let currentActivities = Array.isArray(searchHistoryActivities) ? searchHistoryActivities : [];
-              if (currentActivities.some((a: IActivity) => a.place_id === newActivity.place_id)) {
-                currentActivities = currentActivities;
-              } else {
-                currentActivities = [...currentActivities, newActivity];
+        for (const batch of batches) {
+          // Process batch in parallel but limit concurrency
+          const batchPromises = batch.map(async (placeId: string) => {
+            try {
+              // Mark as processed immediately to prevent duplicate requests
+              setProcessedPlaceIds(prev => new Set([...prev, placeId]));
+              
+              const placeDetails = await placeDetailsQuery(placeId);
+              if (placeDetails) {
+                return await insertActivityMutation.mutateAsync(placeDetails);
               }
-              setSearchHistoryActivities(currentActivities);
+              return null;
+            } catch (error) {
+              console.error(`Error processing place ID ${placeId}:`, error);
+              return null;
             }
-          } catch (error) {
-            console.error("Error fetching and inserting missing activity:", error);
+          });
+
+          const batchResults = await Promise.allSettled(batchPromises);
+          const newActivities = batchResults
+            .filter((result): result is PromiseFulfilledResult<any> => 
+              result.status === 'fulfilled' && result.value !== null
+            )
+            .map(result => result.value);
+
+          // Update activities with new batch results
+          if (newActivities.length > 0) {
+            setSearchHistoryActivities(current => {
+              const currentArray = Array.isArray(current) ? current : [];
+              const existingPlaceIds = new Set(currentArray.map((a: IActivity) => a.place_id));
+              const uniqueNewActivities = newActivities.filter((a: IActivity) => 
+                !existingPlaceIds.has(a.place_id)
+              );
+              return [...currentArray, ...uniqueNewActivities];
+            });
+          }
+
+          // Add small delay between batches to prevent API rate limiting
+          if (batches.indexOf(batch) < batches.length - 1) {
+            await new Promise(resolve => setTimeout(resolve, 100));
           }
         }
+      } catch (error) {
+        console.error("Error processing missing activities:", error);
+      } finally {
+        setIsProcessingMissingActivities(false);
       }
     };
 
     fetchActivities();
-  }, [searchHistoryActivitiesData, setSearchHistoryActivities]);
+  }, [
+    searchHistoryActivitiesData?.activities,
+    searchHistoryActivitiesData?.missingPlaceIds,
+    isProcessingMissingActivities,
+    insertActivityMutation,
+    processedPlaceIds,
+    setSearchHistoryActivities
+  ]);
 
   // **** HANDLERS ****
   const handleActivitySelect = (activity: IActivity) => {
@@ -473,6 +538,16 @@ export default function Activities() {
                 </div>
 
                 <ScrollArea className="h-full px-4">
+                  {/* Processing indicator */}
+                  {isProcessingMissingActivities && (
+                    <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                      <div className="flex items-center space-x-2">
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500"></div>
+                        <span className="text-sm text-blue-700">Loading additional activities...</span>
+                      </div>
+                    </div>
+                  )}
+                  
                   {searchHistoryActivities &&
                   Array.isArray(searchHistoryActivities) &&
                   searchHistoryActivities.length > 0 ? (
@@ -492,8 +567,12 @@ export default function Activities() {
                       }
                       onSelectActivity={handleActivitySelect}
                     />
-                  ) : (
+                  ) : isSearchHistoryLoading || isProcessingMissingActivities ? (
                     <ActivitySkeletonCards />
+                  ) : (
+                    <div className="text-center py-8 text-gray-500">
+                      <p>No search history available</p>
+                    </div>
                   )}
                 </ScrollArea>
               </div>
