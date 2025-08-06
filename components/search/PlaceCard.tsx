@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { getPlacePhotos } from '@/actions/google/maps';
 import type { ActivityWithDetails } from '@/types/database';
+import SavePlaceButton from '@/components/wishlist/SavePlaceButton';
 
 interface PlaceCardProps {
   place: any; // Can be from Google API or database
@@ -145,13 +146,12 @@ export default function PlaceCard({
           </h3>
           {showActions && (
             <div className="flex space-x-1 ml-2">
-              <button
-                onClick={onAddToWishlist}
-                className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                title="Add to wishlist"
-              >
-                <Heart className="h-4 w-4" />
-              </button>
+              <SavePlaceButton 
+                placeId={place.place_id}
+                variant="icon"
+                size="sm"
+                onSaved={onAddToWishlist}
+              />
               <button
                 onClick={onAddToItinerary}
                 className="p-1.5 text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-colors"

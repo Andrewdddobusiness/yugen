@@ -20,7 +20,8 @@ export const createActivitySchema = z.object({
   phone_number: z.string().max(50).optional(),
 });
 
-export const scheduleActivitySchema = z.object({
+// Base schema without refinement for reuse
+const scheduleActivitySchemaBase = z.object({
   itinerary_id: z.number().positive("Invalid itinerary ID"),
   itinerary_destination_id: z.number().positive("Invalid destination ID"),
   activity_id: z.number().positive("Invalid activity ID"),
@@ -30,12 +31,16 @@ export const scheduleActivitySchema = z.object({
   notes: z.string().max(500, "Notes too long").optional(),
   cost: z.number().positive("Cost must be positive").optional(),
   order_in_day: z.number().positive("Order must be positive").optional(),
-}).refine((data) => data.end_time > data.start_time, {
+});
+
+// Main schema with refinement for validation
+export const scheduleActivitySchema = scheduleActivitySchemaBase.refine((data) => data.end_time > data.start_time, {
   message: "End time must be after start time",
   path: ["end_time"],
 });
 
-export const updateActivityScheduleSchema = scheduleActivitySchema.partial().omit({
+// Update schema using base schema (without refinement) for partial
+export const updateActivityScheduleSchema = scheduleActivitySchemaBase.partial().omit({
   itinerary_id: true,
   itinerary_destination_id: true,
   activity_id: true,

@@ -19,6 +19,7 @@ import { IActivityWithLocation } from "@/store/activityStore";
 import { useItineraryActivityStore } from "@/store/itineraryActivityStore";
 
 import { ActivityImage } from "@/components/images/activityImage";
+import SavePlaceButton from "@/components/wishlist/SavePlaceButton";
 
 interface ItineraryCardProps {
   activity: IActivityWithLocation;
@@ -133,6 +134,15 @@ export default function ActivityCard({ activity, onClick, onOptionsClick }: Itin
 
         <div className="absolute top-2 left-2">
           {priceLevelText === "" ? null : <Badge className="bg-[#3A86FF]/40 backdrop-blur-sm">{priceLevelText}</Badge>}
+        </div>
+        
+        <div className="absolute top-2 right-2">
+          <SavePlaceButton 
+            placeId={activity.place_id}
+            variant="icon"
+            size="sm"
+            className="bg-white/80 hover:bg-white shadow-sm"
+          />
         </div>
       </div>
 

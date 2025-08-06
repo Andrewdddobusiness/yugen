@@ -16,8 +16,6 @@ import ActivitySkeletonCards from "@/components/cards/activitySkeletonCards";
 
 import {
   fetchItineraryDestination,
-  fetchFilteredTableData,
-  fetchFilteredTableData2,
   fetchSearchHistoryActivities,
   insertActivity,
   deleteItinerarySearchHistory,
@@ -25,7 +23,7 @@ import {
 import { fetchCityCoordinates, fetchPlaceDetails } from "@/actions/google/actions";
 import { fetchNearbyActivities } from "@/actions/google/actions";
 
-import { IActivity, IActivityWithLocation, IOpenHours, useActivitiesStore } from "@/store/activityStore";
+import { IActivity, IActivityWithLocation, useActivitiesStore } from "@/store/activityStore";
 
 import { useSidebarStore } from "@/store/sidebarStore";
 
@@ -45,6 +43,8 @@ import { ViewToggleButton } from "@/components/buttons/mapViewToggleButton";
 import { cn } from "@/components/lib/utils";
 
 import { useSidebar } from "@/components/ui/sidebar";
+import WishlistPanel from "@/components/wishlist/WishlistPanel";
+import { useWishlist } from "@/hooks/useWishlist";
 
 export default function Activities() {
   const queryClient = useQueryClient();
@@ -71,6 +71,10 @@ export default function Activities() {
 
   // **** STATES ****
   const [initialLoadComplete, setInitialLoadComplete] = useState(false);
+  const [showWishlist, setShowWishlist] = useState(false);
+  
+  // **** WISHLIST HOOK ****
+  const { isLoading: isWishlistLoading } = useWishlist();
 
   const [popupInfo, setPopupInfo] = useState<{
     longitude: number;
@@ -133,90 +137,13 @@ export default function Activities() {
     }
   }, [fetchedActivities, setActivities, initialLoadComplete, setInitialLoadComplete]);
 
-  // **** GET TOP PLACES ACTIVITIES ****
-  const { data: countryData, isLoading: isCountryDataLoading } = useQuery({
-    queryKey: ["countryData", destinationData?.data?.country],
-    queryFn: async () => {
-      const result = await fetchFilteredTableData("country", "country_id", "country_name", [
-        destinationData?.data?.country as string,
-      ]);
-      if (!result.success || !result.data) {
-        throw new Error(result.message || "Failed to fetch country data");
-      }
-      return result.data;
-    },
-    enabled: !!destinationData?.data?.country,
-  });
-
-  const { data: cityData, isLoading: isCityDataLoading } = useQuery({
-    queryKey: ["cityData", destinationData?.data?.city, countryData?.[0]?.country_id],
-    queryFn: async () => {
-      if (!countryData || !countryData[0] || typeof countryData[0].country_id === "undefined") {
-        throw new Error("Country data is not available or invalid");
-      }
-      const result = await fetchFilteredTableData2("city", "city_id", {
-        city_name: destinationData?.data?.city,
-        country_id: countryData[0].country_id,
-      });
-      if ("error" in result || !result.data) {
-        throw new Error(result.error?.message || "Failed to fetch city data");
-      }
-      return result.data;
-    },
-    enabled: !!destinationData?.data?.city && !!countryData && countryData.length > 0,
-  });
-
-  const { data: fetchedtopPlacesActivities, isLoading: isTopPlacesActivitiesLoading } = useQuery({
-    queryKey: ["topPlacesActivities", cityData?.[0]?.city_id],
-    queryFn: async (): Promise<IActivity[]> => {
-      if (!cityData || !cityData[0] || typeof cityData[0].city_id === "undefined") {
-        throw new Error("City data is not available or invalid");
-      }
-      const result = await fetchFilteredTableData2(
-        "activity",
-        `*,
-        review(*),
-        open_hours(*)`,
-        {
-          city_id: cityData[0].city_id,
-          is_top_place: true,
-        }
-      );
-
-      if (!result.success || !result.data) {
-        throw new Error(result.message || "Failed to fetch top places activities");
-      }
-      return result.data.map((activity: IActivity) => ({
-        place_id: activity.place_id,
-        name: activity.name,
-        coordinates: activity.coordinates,
-        types: activity.types,
-        price_level: activity.price_level,
-        address: activity.address,
-        rating: activity.rating,
-        description: activity.description,
-        google_maps_url: activity.google_maps_url,
-        website_url: activity.website_url,
-        photo_names: activity.photo_names,
-        duration: activity.duration,
-        phone_number: activity.phone_number,
-        reviews: activity.reviews,
-        open_hours: activity.open_hours.map((oh: IOpenHours) => ({
-          day: oh.day,
-          open_hour: oh.open_hour,
-          open_minute: oh.open_minute,
-          close_hour: oh.close_hour,
-          close_minute: oh.close_minute,
-        })),
-        is_top_place: activity.is_top_place,
-      })) as IActivity[];
-    },
-    enabled: !!cityData && cityData.length > 0,
-  });
-
+  // **** TOP PLACES ACTIVITIES (DISABLED FOR NOW) ****
+  // Note: Top places functionality is disabled because the activity table 
+  // doesn't have city_id or is_top_place columns in the current schema
   useEffect(() => {
-    setTopPlacesActivities(fetchedtopPlacesActivities as IActivity[]);
-  }, [fetchedtopPlacesActivities, isTopPlacesActivitiesLoading, setTopPlacesActivities]);
+    // Set empty top places for now - this can be implemented later when schema is updated
+    setTopPlacesActivities([]);
+  }, [setTopPlacesActivities]);
 
   // **** GET SEARCH HISTORY ACTIVITIES ****
   const { data: searchHistoryActivitiesData, isLoading: isSearchHistoryLoading } = useQuery<{
@@ -334,7 +261,7 @@ export default function Activities() {
 
           // Update activities with new batch results
           if (newActivities.length > 0) {
-            setSearchHistoryActivities(current => {
+            setSearchHistoryActivities((current: IActivity[] | undefined) => {
               const currentArray = Array.isArray(current) ? current : [];
               const existingPlaceIds = new Set(currentArray.map((a: IActivity) => a.place_id));
               const uniqueNewActivities = newActivities.filter((a: IActivity) => 
@@ -372,7 +299,7 @@ export default function Activities() {
     setIsSidebarRightOpen(true);
   };
 
-  const handleTabChange = (tab: "top-places" | "search" | "area-search" | "history") => {
+  const handleTabChange = (tab: "top-places" | "search" | "area-search" | "history" | "wishlist") => {
     setSelectedTab(tab);
   };
 
@@ -396,7 +323,7 @@ export default function Activities() {
           <Tabs
             defaultValue={selectedTab}
             value={selectedTab}
-            onValueChange={(value) => handleTabChange(value as "top-places" | "search" | "area-search" | "history")}
+            onValueChange={(value) => handleTabChange(value as "top-places" | "search" | "area-search" | "history" | "wishlist")}
             className="flex flex-col h-full"
           >
             <div className="flex flex-row justify-center">
@@ -405,6 +332,7 @@ export default function Activities() {
                 <TabsTrigger value="search">Wide Search</TabsTrigger>
                 <TabsTrigger value="area-search">Area Search</TabsTrigger>
                 <TabsTrigger value="history">Search History</TabsTrigger>
+                <TabsTrigger value="wishlist">Wishlist</TabsTrigger>
               </TabsList>
             </div>
             <Separator className="mt-4 mb-2" />
@@ -575,6 +503,49 @@ export default function Activities() {
                     </div>
                   )}
                 </ScrollArea>
+              </div>
+            </TabsContent>
+            <TabsContent value="wishlist" className="flex-grow overflow-hidden">
+              <div className="flex flex-col h-full gap-4">
+                <WishlistPanel 
+                  className="h-full border-0 shadow-none"
+                  onPlaceSelect={(item) => {
+                    if (item.activity) {
+                      // Convert ActivityWithDetails to IActivity format
+                      const activityForSelection: IActivity = {
+                        ...item.activity,
+                        coordinates: item.activity.coordinates ? 
+                          [item.activity.coordinates.x, item.activity.coordinates.y] as [number, number] : 
+                          [0, 0] as [number, number],
+                        price_level: item.activity.price_level || '',
+                        address: item.activity.address || '',
+                        description: item.activity.description || '',
+                        google_maps_url: item.activity.google_maps_url || '',
+                        website_url: item.activity.website_url || '',
+                        photo_names: item.activity.photo_names || [],
+                        duration: typeof item.activity.duration === 'string' ? parseInt(item.activity.duration) || 0 : item.activity.duration || 0,
+                        phone_number: item.activity.phone_number || '',
+                        rating: item.activity.rating || 0,
+                        reviews: (item.activity.reviews || []).map(review => ({
+                          ...review,
+                          description: review.description || '',
+                          rating: review.rating || 0,
+                          author: review.author || '',
+                          uri: review.uri || '',
+                          publish_date_time: review.publish_date_time || ''
+                        })),
+                        open_hours: (item.activity.open_hours || []).map(oh => ({
+                          ...oh,
+                          open_hour: oh.open_hour || 0,
+                          open_minute: oh.open_minute || 0,
+                          close_hour: oh.close_hour || 0,
+                          close_minute: oh.close_minute || 0
+                        }))
+                      };
+                      handleActivitySelect(activityForSelection);
+                    }
+                  }}
+                />
               </div>
             </TabsContent>
           </Tabs>

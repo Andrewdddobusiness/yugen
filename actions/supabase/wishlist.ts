@@ -65,17 +65,49 @@ export async function addToWishlist(data: AddToWishlistData): Promise<DatabaseRe
       // Check if already in wishlist
       const { data: existing, error: existingError } = await supabase
         .from("itinerary_search_history")
-        .select("search_history_id")
+        .select("search_history_id, is_saved_to_wishlist")
         .eq("itinerary_id", validatedData.itinerary_id)
         .eq("itinerary_destination_id", destination.itinerary_destination_id)
         .eq("place_id", validatedData.place_id)
         .single();
 
       if (!existingError && existing) {
-        return {
-          success: false,
-          error: { message: "Place already in wishlist" }
-        };
+        if (existing.is_saved_to_wishlist) {
+          return {
+            success: false,
+            error: { message: "Place already in wishlist" }
+          };
+        } else {
+          // Update existing record to mark as saved to wishlist
+          const { data: updatedItem, error: updateError } = await supabase
+            .from("itinerary_search_history")
+            .update({ 
+              is_saved_to_wishlist: true,
+              priority: validatedData.priority || 3,
+              notes: validatedData.notes || null
+            })
+            .eq("search_history_id", existing.search_history_id)
+            .select()
+            .single();
+
+          if (updateError) {
+            return {
+              success: false,
+              error: { 
+                message: "Failed to add to wishlist",
+                code: updateError.code,
+                details: updateError
+              }
+            };
+          }
+
+          revalidatePath(`/itinerary/${validatedData.itinerary_id}`);
+
+          return {
+            success: true,
+            data: updatedItem
+          };
+        }
       }
 
       // Add to wishlist
@@ -85,6 +117,9 @@ export async function addToWishlist(data: AddToWishlistData): Promise<DatabaseRe
           itinerary_id: validatedData.itinerary_id,
           itinerary_destination_id: destination.itinerary_destination_id,
           place_id: validatedData.place_id,
+          is_saved_to_wishlist: true,
+          priority: validatedData.priority || 3,
+          notes: validatedData.notes || null,
         })
         .select()
         .single();
@@ -160,9 +195,14 @@ export async function removeFromWishlist(searchHistoryId: number): Promise<Datab
       };
     }
 
+    // Instead of deleting, mark as not saved to wishlist (soft delete for wishlist)
     const { error } = await supabase
       .from("itinerary_search_history")
-      .delete()
+      .update({ 
+        is_saved_to_wishlist: false,
+        notes: null,
+        priority: 3
+      })
       .eq("search_history_id", searchHistoryId);
 
     if (error) {
@@ -195,10 +235,22 @@ export async function removeFromWishlist(searchHistoryId: number): Promise<Datab
   }
 }
 
+export interface WishlistItemWithActivity {
+  search_history_id: number;
+  place_id: string;
+  notes?: string;
+  priority: number;
+  categories: string[];
+  tags: string[];
+  visit_status: string;
+  searched_at: string;
+  activity?: ActivityWithDetails;
+}
+
 /**
  * Gets the wishlist for a user's itinerary
  */
-export async function getWishlist(itineraryId: number, destinationId?: number): Promise<DatabaseResponse<ActivityWithDetails[]>> {
+export async function getWishlist(itineraryId: number, destinationId?: number): Promise<DatabaseResponse<WishlistItemWithActivity[]>> {
   const supabase = createClient();
 
   try {
@@ -225,11 +277,12 @@ export async function getWishlist(itineraryId: number, destinationId?: number): 
       };
     }
 
-    // Get search history (wishlist) items
+    // Get search history (wishlist) items - only those marked as saved to wishlist
     let searchQuery = supabase
       .from("itinerary_search_history")
-      .select("place_id")
-      .eq("itinerary_id", itineraryId);
+      .select("place_id, search_history_id, notes, priority, categories, tags, visit_status, searched_at")
+      .eq("itinerary_id", itineraryId)
+      .eq("is_saved_to_wishlist", true);
 
     if (destinationId) {
       searchQuery = searchQuery.eq("itinerary_destination_id", destinationId);
@@ -277,9 +330,25 @@ export async function getWishlist(itineraryId: number, destinationId?: number): 
       };
     }
 
+    // Combine search history data with activity details
+    const wishlistItems: WishlistItemWithActivity[] = searchHistory.map(historyItem => {
+      const activity = activities?.find(act => act.place_id === historyItem.place_id);
+      return {
+        search_history_id: historyItem.search_history_id,
+        place_id: historyItem.place_id,
+        notes: historyItem.notes,
+        priority: historyItem.priority,
+        categories: historyItem.categories || [],
+        tags: historyItem.tags || [],
+        visit_status: historyItem.visit_status,
+        searched_at: historyItem.searched_at,
+        activity: activity
+      };
+    });
+
     return {
       success: true,
-      data: (activities || []) as ActivityWithDetails[]
+      data: wishlistItems
     };
 
   } catch (error: any) {
@@ -324,10 +393,16 @@ export async function clearWishlist(itineraryId: number, destinationId?: number)
       };
     }
 
+    // Clear wishlist by marking items as not saved to wishlist
     let deleteQuery = supabase
       .from("itinerary_search_history")
-      .delete()
-      .eq("itinerary_id", itineraryId);
+      .update({ 
+        is_saved_to_wishlist: false,
+        notes: null,
+        priority: 3
+      })
+      .eq("itinerary_id", itineraryId)
+      .eq("is_saved_to_wishlist", true);
 
     if (destinationId) {
       deleteQuery = deleteQuery.eq("itinerary_destination_id", destinationId);
@@ -401,8 +476,7 @@ export async function updateWishlistItem(
       };
     }
 
-    // Note: The current schema doesn't include notes/priority fields in search history
-    // This is a placeholder for when those fields are added to the schema
+    // Update wishlist item with new notes/priority
     const updateData: any = {};
     if (data.notes !== undefined) updateData.notes = data.notes;
     if (data.priority !== undefined) updateData.priority = data.priority;

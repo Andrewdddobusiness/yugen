@@ -144,6 +144,12 @@ export const fetchNearbyActivities = async (
     throw new Error("Invalid coordinates provided");
   }
 
+  // Clamp radius to Google Places API limits (0 to 50,000 meters)
+  const validRadius = Math.max(0, Math.min(50000, radiusInMeters));
+  if (validRadius !== radiusInMeters) {
+    console.warn(`Radius ${radiusInMeters}m is outside API limits, clamping to ${validRadius}m`);
+  }
+
   let includedTypesForSearch;
   switch (searchType) {
     case "food":
@@ -171,12 +177,20 @@ export const fetchNearbyActivities = async (
           latitude: latitude,
           longitude: longitude,
         },
-        radius: radiusInMeters,
+        radius: validRadius,
       },
     },
   };
 
   try {
+    console.log("Making Google Places API request:", {
+      url: baseUrl,
+      requestBody,
+      originalRadius: radiusInMeters,
+      validatedRadius: validRadius,
+      apiKeyExists: !!process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
+    });
+
     const response = await fetch(baseUrl, {
       method: "POST",
       headers: {
@@ -203,7 +217,14 @@ export const fetchNearbyActivities = async (
     });
 
     if (!response.ok) {
-      throw new Error(`Failed to fetch nearby activities: ${response.statusText}`);
+      const errorText = await response.text();
+      console.error("Google Places API error:", {
+        status: response.status,
+        statusText: response.statusText,
+        body: errorText,
+        requestBody
+      });
+      throw new Error(`Failed to fetch nearby activities: ${response.status} ${response.statusText}`);
     }
 
     const data = await response.json();
