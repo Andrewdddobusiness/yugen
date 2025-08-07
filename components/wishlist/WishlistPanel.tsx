@@ -243,6 +243,15 @@ export default function WishlistPanel({
       {/* Wishlist Items */}
       <ScrollArea className="h-[400px]">
         <div className="p-2">
+          {/* Show message if some items are missing place details */}
+          {!isLoading && filteredItems.some(item => !item.activity) && (
+            <div className="mb-3 p-2 bg-amber-50 border border-amber-200 rounded-lg">
+              <p className="text-xs text-amber-800">
+                Some places are missing details. This may happen if they were saved before full information was available.
+              </p>
+            </div>
+          )}
+          
           {isLoading ? (
             <div className="space-y-3">
               {[...Array(3)].map((_, i) => (
@@ -269,14 +278,24 @@ export default function WishlistPanel({
                   <div className="flex items-start justify-between">
                     <div className="flex-1 min-w-0">
                       <h4 className="font-medium text-sm text-gray-900 truncate">
-                        {item.activity?.name}
+                        {item.activity?.name || (
+                          <span className="text-gray-500 italic">
+                            Place information not available
+                          </span>
+                        )}
                       </h4>
                       
-                      {item.activity?.address && (
+                      {item.activity?.address ? (
                         <div className="flex items-center space-x-1 mt-1">
                           <MapPin className="h-3 w-3 text-gray-400 flex-shrink-0" />
                           <p className="text-xs text-gray-600 truncate">
                             {item.activity.address}
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="flex items-center space-x-1 mt-1">
+                          <p className="text-xs text-gray-400">
+                            Place ID: {item.placeId}
                           </p>
                         </div>
                       )}
