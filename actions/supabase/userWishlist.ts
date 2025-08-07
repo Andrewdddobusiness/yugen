@@ -11,6 +11,41 @@ import {
   type UserWishlistItem,
   type UserWishlistItemWithActivity
 } from "@/types/userWishlist";
+import { createOrUpdateActivity } from "@/actions/supabase/activities";
+import type { CreateActivityData } from "@/schemas/activitySchema";
+
+/**
+ * Enhanced wishlist add function that saves activity details first
+ */
+export async function addToUserWishlistWithActivity(
+  wishlistData: AddToUserWishlistData,
+  activityData?: CreateActivityData
+): Promise<DatabaseResponse<UserWishlistItem>> {
+  const supabase = createClient();
+
+  try {
+    // First, save activity details if provided
+    if (activityData) {
+      const activityResult = await createOrUpdateActivity(activityData);
+      if (!activityResult.success) {
+        console.warn("Failed to save activity details:", activityResult.error);
+        // Continue anyway - we can still save to wishlist without activity details
+      }
+    }
+
+    // Then add to wishlist using the existing function
+    return await addToUserWishlist(wishlistData);
+  } catch (error: any) {
+    console.error("Error in addToUserWishlistWithActivity:", error);
+    return {
+      success: false,
+      error: { 
+        message: error.message || "An unexpected error occurred",
+        details: error
+      }
+    };
+  }
+}
 
 /**
  * Adds a place to the user's global wishlist

@@ -45,6 +45,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const { setUser, setUserLoading, setProfileUrl, setIsProfileUrlLoading } = useUserStore();
   const { setSubscription, setIsSubscriptionLoading } = useStripeSubscriptionStore();
   const { setIsCartOpen, isCartOpen } = useCartStore();
+  
+  // Remove useWishlist from here to prevent multiple instances
 
   //***** GET USER *****//
   const { data: user, isLoading: isUserLoading } = useQuery({

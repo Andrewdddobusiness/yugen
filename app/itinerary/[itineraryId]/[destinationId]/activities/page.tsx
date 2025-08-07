@@ -44,7 +44,7 @@ import { cn } from "@/components/lib/utils";
 
 import { useSidebar } from "@/components/ui/sidebar";
 import WishlistPanel from "@/components/wishlist/WishlistPanel";
-import { useWishlist } from "@/hooks/useWishlist";
+// Remove useWishlist import to prevent multiple instances
 
 export default function Activities() {
   const queryClient = useQueryClient();
@@ -73,8 +73,7 @@ export default function Activities() {
   const [initialLoadComplete, setInitialLoadComplete] = useState(false);
   const [showWishlist, setShowWishlist] = useState(false);
   
-  // **** WISHLIST HOOK ****
-  const { isLoading: isWishlistLoading } = useWishlist();
+  // Remove useWishlist to prevent multiple instances
 
   const [popupInfo, setPopupInfo] = useState<{
     longitude: number;
@@ -287,10 +286,11 @@ export default function Activities() {
   }, [
     searchHistoryActivitiesData?.activities,
     searchHistoryActivitiesData?.missingPlaceIds,
-    isProcessingMissingActivities,
-    insertActivityMutation,
-    processedPlaceIds,
-    setSearchHistoryActivities
+    // Remove the problematic dependencies that cause infinite loops:
+    // - isProcessingMissingActivities (causes loop with setIsProcessingMissingActivities)
+    // - insertActivityMutation (not stable)
+    // - processedPlaceIds (updated inside effect)  
+    // - setSearchHistoryActivities (Zustand setter not stable)
   ]);
 
   // **** HANDLERS ****

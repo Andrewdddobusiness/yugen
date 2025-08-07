@@ -95,8 +95,7 @@ export default function WishlistPanel({
     removeWishlistItem
   } = useWishlistStore();
 
-  // Use wishlist hook for data management
-  useWishlist();
+  // Remove useWishlist from here to prevent multiple instances
 
   const filteredItems = getFilteredItems();
   const categoryCounts = getCategoryCounts();

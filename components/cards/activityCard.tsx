@@ -139,6 +139,24 @@ export default function ActivityCard({ activity, onClick, onOptionsClick }: Itin
         <div className="absolute top-2 right-2">
           <SavePlaceButton 
             placeId={activity.place_id}
+            activityData={{
+              place_id: activity.place_id,
+              name: activity.name,
+              address: activity.address,
+              coordinates: activity.coordinates ? {
+                lat: activity.coordinates[0],
+                lng: activity.coordinates[1]
+              } : undefined,
+              types: activity.types || [],
+              price_level: activity.price_level,
+              rating: activity.rating,
+              description: activity.description,
+              google_maps_url: activity.google_maps_url,
+              website_url: activity.website_url,
+              photo_names: activity.photo_names || [],
+              phone_number: activity.phone_number,
+              duration: activity.duration || undefined
+            }}
             variant="icon"
             size="sm"
             className="bg-white/80 hover:bg-white shadow-sm"

@@ -148,6 +148,23 @@ export default function PlaceCard({
             <div className="flex space-x-1 ml-2">
               <SavePlaceButton 
                 placeId={place.place_id}
+                activityData={{
+                  place_id: place.place_id,
+                  name: place.name,
+                  address: place.address || place.formatted_address,
+                  coordinates: place.coordinates || (place.geometry?.location ? {
+                    lat: place.geometry.location.lat,
+                    lng: place.geometry.location.lng
+                  } : undefined),
+                  types: place.types || [],
+                  price_level: place.price_level,
+                  rating: place.rating,
+                  description: place.description || place.editorial_summary?.overview,
+                  google_maps_url: place.google_maps_url || place.url,
+                  website_url: place.website_url || place.website,
+                  photo_names: place.photo_names || place.photos?.map((p: any) => p.name || p.photo_reference) || [],
+                  phone_number: place.phone_number || place.formatted_phone_number
+                }}
                 variant="icon"
                 size="sm"
                 onSaved={onAddToWishlist}

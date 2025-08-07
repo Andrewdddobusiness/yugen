@@ -1,24 +1,20 @@
 "use client";
 
-import React, { useState } from 'react';
+import React from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { Heart, Loader2, Plus, Check } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
 
 import { useWishlistStore } from '@/store/wishlistStore';
-import { addToUserWishlist, removeFromUserWishlist } from '@/actions/supabase/userWishlist';
-import { useWishlist } from '@/hooks/useWishlist';
+import { addToUserWishlist, removeFromUserWishlist, addToUserWishlistWithActivity } from '@/actions/supabase/userWishlist';
+import { useQueryClient } from '@tanstack/react-query';
 import { cn } from '@/components/lib/utils';
+import type { CreateActivityData } from '@/schemas/activitySchema';
 
 interface SavePlaceButtonProps {
   placeId: string;
+  activityData?: CreateActivityData; // Optional activity details to save
   variant?: 'icon' | 'button';
   size?: 'sm' | 'md' | 'lg';
   className?: string;
@@ -29,6 +25,7 @@ interface SavePlaceButtonProps {
 
 export default function SavePlaceButton({
   placeId,
+  activityData,
   variant = 'icon',
   size = 'md',
   className = "",
@@ -36,10 +33,12 @@ export default function SavePlaceButton({
   onSaved,
   onRemoved
 }: SavePlaceButtonProps) {
-  const [isHovered, setIsHovered] = useState(false);
   
-  // Use wishlist hook for state synchronization
-  const { invalidate: invalidateWishlist } = useWishlist();
+  // Use query client directly to avoid multiple useWishlist instances
+  const queryClient = useQueryClient();
+  const invalidateWishlist = () => {
+    queryClient.invalidateQueries({ queryKey: ['userWishlist'] });
+  };
 
   const {
     isInWishlist,
@@ -54,13 +53,20 @@ export default function SavePlaceButton({
   // Add to wishlist mutation
   const addMutation = useMutation({
     mutationFn: async () => {
-      return await addToUserWishlist({
+      const wishlistData = {
         place_id: placeId,
         priority: 3, // Default priority (medium)
-        visit_status: 'want_to_go',
+        visit_status: 'want_to_go' as const,
         categories: [],
         tags: []
-      });
+      };
+
+      // Use enhanced function if activity data is provided
+      if (activityData) {
+        return await addToUserWishlistWithActivity(wishlistData, activityData);
+      } else {
+        return await addToUserWishlist(wishlistData);
+      }
     },
     onSuccess: (data) => {
       if (data.success && data.data) {
@@ -151,15 +157,13 @@ export default function SavePlaceButton({
           isSaved && "bg-red-600 hover:bg-red-700 text-white",
           className
         )}
-        onMouseEnter={() => setIsHovered(true)}
-        onMouseLeave={() => setIsHovered(false)}
       >
         {isLoading ? (
           <Loader2 className={cn("animate-spin", getIconSize())} />
         ) : isSaved ? (
           <>
             <Check className={getIconSize()} />
-            {showText && <span>{isHovered ? 'Remove' : 'Saved'}</span>}
+            {showText && <span>Saved</span>}
           </>
         ) : (
           <>
@@ -172,49 +176,36 @@ export default function SavePlaceButton({
   }
 
   return (
-    <TooltipProvider>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleClick}
-            disabled={isLoading}
-            className={cn(
-              "rounded-full transition-all duration-200",
-              size === 'sm' && "h-7 w-7 p-0",
-              size === 'lg' && "h-10 w-10 p-0",
-              size === 'md' && "h-8 w-8 p-0",
-              className
-            )}
-            onMouseEnter={() => setIsHovered(true)}
-            onMouseLeave={() => setIsHovered(false)}
-          >
-            {isLoading ? (
-              <Loader2 className={cn("animate-spin", getIconSize())} />
-            ) : (
-              <Heart
-                className={cn(
-                  getIconSize(),
-                  "transition-all duration-200",
-                  isSaved 
-                    ? "text-red-500 fill-red-500" 
-                    : "text-gray-400 hover:text-red-500",
-                  isHovered && !isSaved && "scale-110"
-                )}
-              />
-            )}
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent>
-          <p className="text-xs">
-            {isLoading 
-              ? (isSaved ? 'Removing...' : 'Saving...') 
-              : (isSaved ? 'Remove from wishlist' : 'Save to wishlist')
-            }
-          </p>
-        </TooltipContent>
-      </Tooltip>
-    </TooltipProvider>
+    <Button
+      variant="ghost"
+      size="sm"
+      onClick={handleClick}
+      disabled={isLoading}
+      className={cn(
+        "rounded-full transition-all duration-200",
+        size === 'sm' && "h-7 w-7 p-0",
+        size === 'lg' && "h-10 w-10 p-0",
+        size === 'md' && "h-8 w-8 p-0",
+        className
+      )}
+      title={isLoading 
+        ? (isSaved ? 'Removing...' : 'Saving...') 
+        : (isSaved ? 'Remove from wishlist' : 'Save to wishlist')
+      }
+    >
+      {isLoading ? (
+        <Loader2 className={cn("animate-spin", getIconSize())} />
+      ) : (
+        <Heart
+          className={cn(
+            getIconSize(),
+            "transition-all duration-200",
+            isSaved 
+              ? "text-red-500 fill-red-500" 
+              : "text-gray-400 hover:text-red-500 hover:scale-110"
+          )}
+        />
+      )}
+    </Button>
   );
 }
