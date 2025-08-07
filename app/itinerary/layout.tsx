@@ -151,9 +151,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       <SidebarProvider
         style={
           {
-            "--sidebar-width": "350px",
+            "--sidebar-width": "420px",
             "--sidebar-width-icon": "48px",
-            "--sidebar-width-mobile": "280px",
+            "--sidebar-width-mobile": "320px",
           } as React.CSSProperties
         }
       >

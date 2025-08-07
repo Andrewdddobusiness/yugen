@@ -4,7 +4,7 @@ import * as React from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useParams, usePathname } from "next/navigation";
-import { Binoculars, Command, NotebookPen, SquareChevronLeft, TextSearch } from "lucide-react";
+import { Binoculars, Command, NotebookPen, SquareChevronLeft, TextSearch, Heart, Search, Lightbulb } from "lucide-react";
 import { cn } from "@/components/lib/utils";
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -31,12 +31,208 @@ import { DatePickerWithRangePopover3 } from "@/components/date/dateRangePickerPo
 import { useEffect, useState } from "react";
 import { fetchItineraryDestination, setItineraryDestinationDateRange } from "@/actions/supabase/actions";
 import { Separator } from "@/components/ui/separator";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import WishlistPanel from "@/components/wishlist/WishlistPanel";
+import PlaceSearch from "@/components/search/PlaceSearch";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { useWishlistStore } from '@/store/wishlistStore';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { MoreVertical, Trash2, Edit, ExternalLink, MapPin, Star } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+
+// Sidebar-specific wishlist component
+function SidebarWishlist() {
+  const [searchQuery, setSearchQuery] = useState("");
+  
+  const {
+    wishlistItems,
+    selectedCategory,
+    selectedPriority,
+    isLoading,
+    setSelectedCategory,
+    setSelectedPriority,
+    setSearchQuery: setStoreSearchQuery,
+    getFilteredItems,
+    getWishlistCount,
+    removeWishlistItem
+  } = useWishlistStore();
+
+  const filteredItems = getFilteredItems();
+  const wishlistCount = getWishlistCount();
+
+  const handleSearchChange = (value: string) => {
+    setSearchQuery(value);
+    setStoreSearchQuery(value);
+  };
+
+  const handleRemoveItem = async (item: any) => {
+    try {
+      removeWishlistItem(item.searchHistoryId);
+    } catch (error) {
+      console.error('Failed to remove from wishlist:', error);
+    }
+  };
+
+  const formatRating = (rating: number) => (
+    <div className="flex items-center space-x-1">
+      <Star className="h-3 w-3 text-yellow-400 fill-current" />
+      <span className="text-xs font-medium">{rating.toFixed(1)}</span>
+    </div>
+  );
+
+  return (
+    <div className="p-3 space-y-3 w-full">
+      {/* Search */}
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+        <Input
+          placeholder="Search saved places..."
+          value={searchQuery}
+          onChange={(e) => handleSearchChange(e.target.value)}
+          className="pl-10 h-8 bg-background text-sm w-full"
+        />
+      </div>
+
+      {/* Count */}
+      {wishlistCount > 0 && (
+        <div className="flex items-center justify-between">
+          <span className="text-xs text-muted-foreground">{wishlistCount} saved</span>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              setSelectedCategory('');
+              setSelectedPriority('');
+              handleSearchChange('');
+            }}
+            className="h-5 text-xs px-2"
+          >
+            Clear
+          </Button>
+        </div>
+      )}
+
+      {/* Wishlist Items */}
+      {isLoading ? (
+        <div className="space-y-3">
+          {[...Array(3)].map((_, i) => (
+            <div key={i} className="animate-pulse">
+              <div className="h-16 bg-muted rounded-md"></div>
+            </div>
+          ))}
+        </div>
+      ) : filteredItems.length === 0 ? (
+        <div className="text-center py-8">
+          <Heart className="h-8 w-8 mx-auto mb-2 text-muted-foreground/50" />
+          <p className="text-sm text-muted-foreground">
+            {wishlistCount === 0 ? 'No places saved yet' : 'No places match your filters'}
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-2 w-full">
+          {filteredItems.map((item) => (
+            <div
+              key={item.placeId}
+              className="group bg-muted/50 hover:bg-muted rounded-md p-2.5 transition-colors cursor-pointer w-full"
+            >
+              <div className="flex items-start gap-2 w-full">
+                <div className="flex-1 min-w-0">
+                  <h4 className="font-medium text-sm text-foreground line-clamp-2">
+                    {item.activity?.name || (
+                      <span className="text-muted-foreground italic">
+                        Place information not available
+                      </span>
+                    )}
+                  </h4>
+                  
+                  {item.activity?.address ? (
+                    <div className="flex items-start gap-1 mt-1">
+                      <MapPin className="h-3 w-3 text-muted-foreground flex-shrink-0 mt-0.5" />
+                      <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">
+                        {item.activity.address}
+                      </p>
+                    </div>
+                  ) : (
+                    <p className="text-xs text-muted-foreground mt-1 truncate">
+                      ID: {item.placeId.slice(-8)}
+                    </p>
+                  )}
+
+                  <div className="flex items-center flex-wrap gap-2 mt-2">
+                    {item.activity?.rating && formatRating(item.activity.rating)}
+                    
+                    {item.priority && (
+                      <Badge
+                        variant={
+                          item.priority === 'high' ? 'destructive' :
+                          item.priority === 'medium' ? 'default' : 'secondary'
+                        }
+                        className="text-xs px-1.5 py-0.5"
+                      >
+                        {item.priority}
+                      </Badge>
+                    )}
+                  </div>
+                </div>
+
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
+                    >
+                      <MoreVertical className="h-3 w-3" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-40">
+                    {item.activity?.google_maps_url && (
+                      <DropdownMenuItem asChild>
+                        <a
+                          href={item.activity.google_maps_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs"
+                        >
+                          <ExternalLink className="h-3 w-3 mr-2" />
+                          View on Maps
+                        </a>
+                      </DropdownMenuItem>
+                    )}
+                    <DropdownMenuItem
+                      onClick={(e: React.MouseEvent) => {
+                        e.stopPropagation();
+                        handleRemoveItem(item);
+                      }}
+                      className="text-destructive text-xs"
+                    >
+                      <Trash2 className="h-3 w-3 mr-2" />
+                      Remove
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export function AppSidebarItineraryActivityLeft() {
   const { itineraryId, destinationId } = useParams();
   const pathname = usePathname();
 
   const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
+  const [activeTab, setActiveTab] = useState("days");
 
   const queryClient = useQueryClient();
 
@@ -185,7 +381,69 @@ export function AppSidebarItineraryActivityLeft() {
           <Separator />
         </div>
         <SidebarContent className="h-full w-full">
-          <ItineraryList />
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="h-full flex flex-col">
+            <div className="px-4 py-2">
+              <TabsList className="grid w-full grid-cols-4">
+                <TabsTrigger value="days" className="text-xs">
+                  <NotebookPen className="h-3 w-3 mr-1" />
+                  Days
+                </TabsTrigger>
+                <TabsTrigger value="saved" className="text-xs">
+                  <Heart className="h-3 w-3 mr-1" />
+                  Saved
+                </TabsTrigger>
+                <TabsTrigger value="search" className="text-xs">
+                  <Search className="h-3 w-3 mr-1" />
+                  Search
+                </TabsTrigger>
+                <TabsTrigger value="ideas" className="text-xs">
+                  <Lightbulb className="h-3 w-3 mr-1" />
+                  Ideas
+                </TabsTrigger>
+              </TabsList>
+            </div>
+            
+            <div className="flex-1 overflow-hidden">
+              <TabsContent value="days" className="h-full m-0">
+                <ScrollArea className="h-full">
+                  <ItineraryList />
+                </ScrollArea>
+              </TabsContent>
+              
+              <TabsContent value="saved" className="h-full m-0">
+                <ScrollArea className="h-full">
+                  <SidebarWishlist />
+                </ScrollArea>
+              </TabsContent>
+              
+              <TabsContent value="search" className="h-full m-0">
+                <ScrollArea className="h-full">
+                  <div className="p-3 w-full">
+                    <PlaceSearch 
+                      onPlaceSelect={(place) => console.log('Place selected:', place)}
+                      showFilters={false}
+                      className="border-0 shadow-none bg-transparent p-0 w-full"
+                    />
+                  </div>
+                </ScrollArea>
+              </TabsContent>
+              
+              <TabsContent value="ideas" className="h-full m-0">
+                <ScrollArea className="h-full">
+                  <div className="p-4">
+                    <div className="text-sm text-muted-foreground mb-4">
+                      Suggested places and activities for your trip
+                    </div>
+                    <div className="text-center text-muted-foreground py-8">
+                      <Lightbulb className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                      <p className="text-sm">Coming soon...</p>
+                      <p className="text-xs">AI-powered suggestions based on your preferences</p>
+                    </div>
+                  </div>
+                </ScrollArea>
+              </TabsContent>
+            </div>
+          </Tabs>
         </SidebarContent>
       </Sidebar>
 
