@@ -1,10 +1,24 @@
 "use client";
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { useDraggable } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
-import { Clock, MapPin, GripVertical } from 'lucide-react';
+import { GripVertical } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { ActivityBlockContent } from './ActivityBlockContent';
+import { ActivityBlockPopover } from './ActivityBlockPopover';
+
+interface ActivityData {
+  name: string;
+  address?: string;
+  coordinates?: [number, number];
+  types?: string[];
+  rating?: number;
+  price_level?: string;
+  phone_number?: string;
+  website_url?: string;
+  photo_names?: string[];
+}
 
 interface ScheduledActivity {
   id: string;
@@ -15,11 +29,11 @@ interface ScheduledActivity {
   endTime: string;
   duration: number;
   position: { day: number; startSlot: number; span: number };
-  activity?: {
-    name: string;
-    address?: string;
-    coordinates?: [number, number];
-  };
+  activity?: ActivityData;
+  notes?: string;
+  is_booked?: boolean;
+  cost?: number;
+  priority?: number;
 }
 
 interface ActivityBlockProps {
@@ -37,6 +51,10 @@ export function ActivityBlock({
 }: ActivityBlockProps) {
   const [isResizing, setIsResizing] = useState(false);
   const [resizeDirection, setResizeDirection] = useState<'top' | 'bottom' | null>(null);
+  const [showPopover, setShowPopover] = useState(false);
+  const [popoverPosition, setPopoverPosition] = useState({ x: 0, y: 0 });
+  const blockRef = useRef<HTMLDivElement>(null);
+  const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
   const {
     attributes,
@@ -83,47 +101,90 @@ export function ActivityBlock({
     handleResizeStart('bottom');
   }, [handleResizeStart]);
 
+  const handleMouseEnter = useCallback((e: React.MouseEvent) => {
+    // Don't show popover if we're dragging or resizing, or if it's an overlay
+    if (isDragging || isResizing || isOverlay) return;
+    
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current);
+    }
+    
+    hoverTimeoutRef.current = setTimeout(() => {
+      if (blockRef.current) {
+        const rect = blockRef.current.getBoundingClientRect();
+        setPopoverPosition({
+          x: rect.left + rect.width / 2,
+          y: rect.top
+        });
+        setShowPopover(true);
+      }
+    }, 500); // Show after 500ms delay
+  }, [isDragging, isResizing, isOverlay]);
+
+  const handleMouseLeave = useCallback(() => {
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current);
+      hoverTimeoutRef.current = null;
+    }
+    setShowPopover(false);
+  }, []);
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (hoverTimeoutRef.current) {
+        clearTimeout(hoverTimeoutRef.current);
+      }
+    };
+  }, []);
+
   const style = transform ? {
     transform: CSS.Translate.toString(transform),
   } : undefined;
 
-  const formatTime = (timeString: string) => {
-    const [hours, minutes] = timeString.split(':');
-    const hour = parseInt(hours);
-    const minute = minutes;
-    const ampm = hour >= 12 ? 'PM' : 'AM';
-    const displayHour = hour > 12 ? hour - 12 : hour === 0 ? 12 : hour;
-    return `${displayHour}:${minute} ${ampm}`;
+  // Determine block size based on duration
+  const getBlockSize = (duration: number): 'compact' | 'standard' | 'extended' => {
+    if (duration < 60) return 'compact';        // < 1 hour
+    if (duration < 180) return 'standard';      // 1-3 hours  
+    return 'extended';                          // 3+ hours
   };
 
-  const getDurationText = (duration: number) => {
-    const hours = Math.floor(duration / 60);
-    const minutes = duration % 60;
-    
-    if (hours === 0) {
-      return `${minutes}m`;
-    } else if (minutes === 0) {
-      return `${hours}h`;
-    } else {
-      return `${hours}h ${minutes}m`;
+  // Generate color based on activity category following the color coding system
+  const getActivityColor = (types?: string[], activityId?: string) => {
+    if (types && types.length > 0) {
+      const primaryType = types[0].toLowerCase();
+      
+      // Category-based colors as per CALENDAR-002 specification
+      if (primaryType.includes('restaurant') || primaryType.includes('food') || primaryType.includes('meal')) {
+        return 'bg-red-500';  // 🍴 Food & Dining: Red/Orange tones
+      }
+      if (primaryType.includes('tourist_attraction') || primaryType.includes('museum') || primaryType.includes('landmark')) {
+        return 'bg-blue-500';  // 🏛️ Attractions: Blue tones
+      }
+      if (primaryType.includes('shopping') || primaryType.includes('store') || primaryType.includes('mall')) {
+        return 'bg-purple-500';  // 🛍️ Shopping: Purple tones
+      }
+      if (primaryType.includes('park') || primaryType.includes('natural') || primaryType.includes('outdoor')) {
+        return 'bg-green-500';  // 🌳 Outdoors: Green tones
+      }
+      if (primaryType.includes('entertainment') || primaryType.includes('amusement') || primaryType.includes('night_club')) {
+        return 'bg-pink-500';  // 🎭 Entertainment: Pink/Magenta tones
+      }
+      if (primaryType.includes('lodging') || primaryType.includes('hotel') || primaryType.includes('accommodation')) {
+        return 'bg-gray-500';  // 🏨 Accommodation: Gray tones
+      }
+      if (primaryType.includes('transit') || primaryType.includes('transport') || primaryType.includes('airport')) {
+        return 'bg-yellow-500';  // 🚗 Transportation: Yellow/Amber tones
+      }
     }
-  };
 
-  // Generate color based on activity type or use a default palette
-  const getActivityColor = (activityId: string) => {
+    // Fallback to hash-based color for consistency
     const colors = [
-      'bg-blue-500',
-      'bg-green-500', 
-      'bg-purple-500',
-      'bg-orange-500',
-      'bg-red-500',
-      'bg-teal-500',
-      'bg-pink-500',
-      'bg-indigo-500'
+      'bg-blue-500', 'bg-green-500', 'bg-purple-500', 'bg-orange-500',
+      'bg-red-500', 'bg-teal-500', 'bg-pink-500', 'bg-indigo-500'
     ];
     
-    // Simple hash to get consistent color for same activity
-    const hash = activityId.split('').reduce((a, b) => {
+    const hash = (activityId || '').split('').reduce((a, b) => {
       a = ((a << 5) - a) + b.charCodeAt(0);
       return a & a;
     }, 0);
@@ -131,15 +192,22 @@ export function ActivityBlock({
     return colors[Math.abs(hash) % colors.length];
   };
 
-  const activityColor = getActivityColor(activity.activityId || activity.id);
+  const blockSize = getBlockSize(activity.duration);
+  const activityColor = getActivityColor(activity.activity?.types, activity.activityId || activity.id);
 
   return (
-    <div
-      ref={setNodeRef}
-      style={style}
-      {...listeners}
-      {...attributes}
-      className={cn(
+    <>
+      <div
+        ref={(node) => {
+          setNodeRef(node);
+          blockRef.current = node;
+        }}
+        style={style}
+        {...listeners}
+        {...attributes}
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
+        className={cn(
         "relative rounded-lg shadow-sm border-l-4 overflow-hidden transition-all group",
         !isResizing && "cursor-move",
         isResizing && "cursor-ns-resize",
@@ -149,58 +217,34 @@ export function ActivityBlock({
         isOverlay && "shadow-2xl border-2 border-white",
         activityColor.replace('bg-', 'border-l-'),
         "bg-white",
+        // Dynamic height based on block size
+        blockSize === 'compact' && "min-h-[2rem]",
+        blockSize === 'standard' && "min-h-[3rem]", 
+        blockSize === 'extended' && "min-h-[5rem]",
         className
       )}
       role="button"
       tabIndex={0}
-      aria-label={`Move ${activity.activity?.name || 'activity'} scheduled for ${formatTime(activity.startTime)}`}
+      aria-label={`Move ${activity.activity?.name || 'activity'}`}
     >
-      {/* Drag Handle */}
-      <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity">
-        <GripVertical className="h-3 w-3 text-gray-400" />
-      </div>
+      {/* Drag Handle - only show on hover and for standard+ blocks */}
+      {blockSize !== 'compact' && (
+        <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity z-20">
+          <GripVertical className="h-3 w-3 text-gray-400" />
+        </div>
+      )}
 
       {/* Activity Content */}
-      <div className="p-2 pr-6">
-        {/* Activity Name */}
-        <div className="font-medium text-sm text-gray-900 leading-tight mb-1 truncate">
-          {activity.activity?.name || 'Untitled Activity'}
-        </div>
+      <ActivityBlockContent
+        activity={activity}
+        blockSize={blockSize}
+        activityColor={activityColor}
+        isResizing={isResizing}
+        isDragging={isDragging}
+      />
 
-        {/* Time and Duration */}
-        <div className="flex items-center text-xs text-gray-600 mb-1">
-          <Clock className="h-3 w-3 mr-1 flex-shrink-0" />
-          <span className="truncate">
-            {formatTime(activity.startTime)} - {formatTime(activity.endTime)}
-          </span>
-        </div>
-
-        {/* Duration Badge */}
-        <div className="flex items-center justify-between">
-          <span className={cn(
-            "inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium",
-            activityColor.replace('bg-', 'bg-').replace('500', '100'),
-            activityColor.replace('bg-', 'text-').replace('500', '700')
-          )}>
-            {getDurationText(activity.duration)}
-          </span>
-
-          {/* Location indicator */}
-          {activity.activity?.address && (
-            <MapPin className="h-3 w-3 text-gray-400 flex-shrink-0" />
-          )}
-        </div>
-
-        {/* Address (if space allows) */}
-        {activity.activity?.address && activity.position.span >= 2 && (
-          <div className="mt-1 text-xs text-gray-500 truncate">
-            {activity.activity.address}
-          </div>
-        )}
-      </div>
-
-      {/* Resize Handles */}
-      {!isOverlay && onResize && (
+      {/* Resize Handles - only show for standard+ blocks */}
+      {!isOverlay && onResize && blockSize !== 'compact' && (
         <>
           <div 
             className="absolute top-0 left-0 right-0 h-2 cursor-n-resize hover:bg-blue-300 opacity-0 group-hover:opacity-100 transition-opacity z-10"
@@ -229,6 +273,14 @@ export function ActivityBlock({
           </div>
         </div>
       )}
-    </div>
+      </div>
+
+      {/* Hover Popover */}
+      <ActivityBlockPopover
+        activity={activity}
+        isVisible={showPopover}
+        position={popoverPosition}
+      />
+    </>
   );
 }
