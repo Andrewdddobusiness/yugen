@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { DndContext, DragOverlay, closestCorners, DragStartEvent, DragOverEvent, DragEndEvent } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { format, startOfWeek, endOfWeek, eachDayOfInterval, isSameDay } from 'date-fns';
@@ -10,6 +10,9 @@ import { ActivityBlock } from './ActivityBlock';
 import { TimeSlots } from './TimeSlots';
 import { CalendarControls } from './CalendarControls';
 import { cn } from '@/lib/utils';
+import { setItineraryActivityDateTimes } from '@/actions/supabase/actions';
+import { useToast } from '@/components/ui/use-toast';
+import { checkActivityOverlap, findNearestValidSlot, timeToMinutes } from '@/utils/calendar/collisionDetection';
 
 interface CalendarGridProps {
   selectedDate?: Date;
@@ -48,7 +51,14 @@ export function CalendarGrid({
   className
 }: CalendarGridProps) {
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [dragOverInfo, setDragOverInfo] = useState<{
+    dayIndex: number;
+    slotIndex: number;
+    hasConflict: boolean;
+  } | null>(null);
   const { itineraryActivities, setItineraryActivities } = useItineraryActivityStore();
+  const { toast } = useToast();
 
   // Generate time slots (30-minute intervals from 6:00 AM to 11:00 PM)
   const timeSlots: TimeSlot[] = useMemo(() => {
@@ -137,11 +147,144 @@ export function CalendarGrid({
   };
 
   const handleDragOver = (event: DragOverEvent) => {
-    // Handle drag over logic for visual feedback
+    const { active, over } = event;
+    
+    if (!over) {
+      setDragOverInfo(null);
+      return;
+    }
+
+    // Parse drop zone ID
+    const dropZoneData = over.id.toString().split('-');
+    if (dropZoneData.length !== 3 || dropZoneData[0] !== 'slot') {
+      setDragOverInfo(null);
+      return;
+    }
+
+    const dayIndex = parseInt(dropZoneData[1]);
+    const slotIndex = parseInt(dropZoneData[2]);
+    
+    if (isNaN(dayIndex) || isNaN(slotIndex)) {
+      setDragOverInfo(null);
+      return;
+    }
+
+    const targetDate = days[dayIndex];
+    const targetSlot = timeSlots[slotIndex];
+    
+    if (!targetDate || !targetSlot) {
+      setDragOverInfo(null);
+      return;
+    }
+
+    // Find the activity being dragged
+    const draggedActivity = scheduledActivities.find(act => act.id === active.id);
+    if (!draggedActivity) {
+      setDragOverInfo(null);
+      return;
+    }
+
+    // Check for conflicts
+    const proposedDate = format(targetDate, 'yyyy-MM-dd');
+    const proposedStartTime = `${targetSlot.hour.toString().padStart(2, '0')}:${targetSlot.minute.toString().padStart(2, '0')}:00`;
+    
+    const existingActivities = itineraryActivities.map(act => ({
+      id: act.itinerary_activity_id,
+      date: act.date,
+      startTime: act.start_time,
+      endTime: act.end_time
+    }));
+    
+    const conflicts = checkActivityOverlap(
+      {
+        date: proposedDate,
+        startTime: proposedStartTime,
+        endTime: `${Math.floor((targetSlot.hour * 60 + targetSlot.minute + draggedActivity.duration) / 60).toString().padStart(2, '0')}:${((targetSlot.hour * 60 + targetSlot.minute + draggedActivity.duration) % 60).toString().padStart(2, '0')}:00`
+      },
+      existingActivities,
+      active.id as string
+    );
+    
+    setDragOverInfo({
+      dayIndex,
+      slotIndex,
+      hasConflict: conflicts.length > 0
+    });
   };
 
-  const handleDragEnd = (event: DragEndEvent) => {
+  const handleResize = useCallback(async (activityId: string, newDuration: number, resizeDirection: 'top' | 'bottom') => {
+    // Find the activity being resized
+    const activityToResize = itineraryActivities.find(act => act.itinerary_activity_id === activityId);
+    if (!activityToResize || !activityToResize.start_time || !activityToResize.end_time) return;
+
+    const startMinutes = timeToMinutes(activityToResize.start_time);
+    const endMinutes = timeToMinutes(activityToResize.end_time);
+    
+    let newStartTime: string;
+    let newEndTime: string;
+    
+    if (resizeDirection === 'bottom') {
+      // Resizing the end time
+      const newEndMinutes = startMinutes + newDuration;
+      newStartTime = activityToResize.start_time;
+      newEndTime = `${Math.floor(newEndMinutes / 60).toString().padStart(2, '0')}:${(newEndMinutes % 60).toString().padStart(2, '0')}:00`;
+    } else {
+      // Resizing the start time
+      const newStartMinutes = endMinutes - newDuration;
+      newStartTime = `${Math.floor(newStartMinutes / 60).toString().padStart(2, '0')}:${(newStartMinutes % 60).toString().padStart(2, '0')}:00`;
+      newEndTime = activityToResize.end_time;
+    }
+
+    // Update activity optimistically
+    const updatedActivity = {
+      ...activityToResize,
+      start_time: newStartTime,
+      end_time: newEndTime
+    };
+
+    const updatedActivities = itineraryActivities.map(act =>
+      act.itinerary_activity_id === activityId ? updatedActivity : act
+    );
+    
+    setItineraryActivities(updatedActivities);
+
+    // Save to database
+    setIsSaving(true);
+    try {
+      const result = await setItineraryActivityDateTimes(
+        activityId,
+        activityToResize.date,
+        newStartTime,
+        newEndTime
+      );
+
+      if (result.success) {
+        toast({
+          title: "Activity resized",
+          description: `Duration updated to ${Math.floor(newDuration / 60)}h ${newDuration % 60}m`,
+        });
+      } else {
+        throw new Error(result.message || 'Failed to resize activity');
+      }
+    } catch (error) {
+      console.error('Error resizing activity:', error);
+      
+      // Revert on error
+      setItineraryActivities(itineraryActivities);
+      
+      toast({
+        title: "Failed to resize",
+        description: "Could not resize the activity. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  }, [itineraryActivities, setItineraryActivities, toast]);
+
+  const handleDragEnd = async (event: DragEndEvent) => {
     setActiveId(null);
+    setDragOverInfo(null);
     
     const { active, over } = event;
     
@@ -172,13 +315,42 @@ export function CalendarGrid({
 
     if (updatedItineraryActivity) {
       const newDate = format(targetDate, 'yyyy-MM-dd');
-      const newStartTime = `${targetSlot.hour.toString().padStart(2, '0')}:${targetSlot.minute.toString().padStart(2, '0')}:00`;
+      const proposedStartTime = `${targetSlot.hour.toString().padStart(2, '0')}:${targetSlot.minute.toString().padStart(2, '0')}:00`;
       
-      // Calculate end time based on original duration
-      const endMinutes = targetSlot.hour * 60 + targetSlot.minute + draggedActivity.duration;
-      const endHour = Math.floor(endMinutes / 60);
-      const endMinute = endMinutes % 60;
-      const newEndTime = `${endHour.toString().padStart(2, '0')}:${endMinute.toString().padStart(2, '0')}:00`;
+      // Check for collisions
+      const existingActivities = itineraryActivities.map(act => ({
+        id: act.itinerary_activity_id,
+        date: act.date,
+        startTime: act.start_time,
+        endTime: act.end_time
+      }));
+      
+      const validSlot = findNearestValidSlot(
+        proposedStartTime,
+        draggedActivity.duration,
+        newDate,
+        existingActivities,
+        active.id as string
+      );
+      
+      if (!validSlot) {
+        toast({
+          title: "No available time slot",
+          description: "Could not find an available time slot for this activity.",
+          variant: "destructive"
+        });
+        return;
+      }
+      
+      const { startTime: newStartTime, endTime: newEndTime } = validSlot;
+      
+      // Check if we had to adjust the time due to conflicts
+      if (newStartTime !== proposedStartTime) {
+        toast({
+          title: "Time adjusted",
+          description: "Activity time was adjusted to avoid conflicts.",
+        });
+      }
 
       const updatedActivity = {
         ...updatedItineraryActivity,
@@ -187,15 +359,45 @@ export function CalendarGrid({
         end_time: newEndTime
       };
 
-      // Update the store
+      // Optimistically update the store
       const updatedActivities = itineraryActivities.map(act =>
         act.itinerary_activity_id === active.id ? updatedActivity : act
       );
       
       setItineraryActivities(updatedActivities);
 
-      // TODO: Update database
-      console.log('Activity moved:', updatedActivity);
+      // Auto-save to database
+      setIsSaving(true);
+      try {
+        const result = await setItineraryActivityDateTimes(
+          updatedActivity.itinerary_activity_id,
+          newDate,
+          newStartTime,
+          newEndTime
+        );
+
+        if (result.success) {
+          toast({
+            title: "Activity updated",
+            description: `${updatedActivity.activity?.name || 'Activity'} moved successfully`,
+          });
+        } else {
+          throw new Error(result.message || 'Failed to update activity');
+        }
+      } catch (error) {
+        console.error('Error saving activity:', error);
+        
+        // Revert on error
+        setItineraryActivities(itineraryActivities);
+        
+        toast({
+          title: "Failed to save",
+          description: "Could not save the activity position. Please try again.",
+          variant: "destructive"
+        });
+      } finally {
+        setIsSaving(false);
+      }
     }
   };
 
@@ -210,6 +412,14 @@ export function CalendarGrid({
         onViewModeChange={onViewModeChange}
         className="border-b border-gray-200"
       />
+
+      {/* Saving Indicator */}
+      {isSaving && (
+        <div className="absolute top-16 right-4 bg-white rounded-lg shadow-lg p-2 flex items-center space-x-2 z-50">
+          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+          <span className="text-sm text-gray-600">Saving...</span>
+        </div>
+      )}
 
       <DndContext
         collisionDetection={closestCorners}
@@ -230,6 +440,8 @@ export function CalendarGrid({
                 dayIndex={dayIndex}
                 timeSlots={timeSlots}
                 activities={scheduledActivities.filter(act => act.position.day === dayIndex)}
+                dragOverInfo={dragOverInfo}
+                onResize={handleResize}
                 className={dayIndex < days.length - 1 ? "border-r border-gray-200" : ""}
               />
             ))}

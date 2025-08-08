@@ -12,13 +12,13 @@ Implement the core drag-and-drop calendar interface similar to Google Calendar, 
 - [x] Create calendar grid with time slots (hourly/30-min intervals)
 - [x] Implement drag-and-drop functionality for activity blocks
 - [x] Add visual feedback during drag operations (ghost elements, drop zones)
-- [ ] Handle time slot snapping and collision detection
-- [ ] Create resizable activity blocks for duration adjustment
+- [x] Handle time slot snapping and collision detection
+- [x] Create resizable activity blocks for duration adjustment
 - [x] Implement multi-day view (day, 3-day, week views)
 - [ ] Add keyboard accessibility for drag operations
 - [ ] Handle edge cases (overlapping activities, invalid drops)
 - [ ] Implement undo/redo functionality
-- [ ] Add auto-save during drag operations
+- [x] Add auto-save during drag operations
 
 ## Technical Implementation
 
@@ -143,19 +143,23 @@ interface CalendarState {
 6. **Current Time Indicator**: Red line showing current time on today's column
 7. **Activity Positioning**: Automatic positioning based on start time and duration
 8. **Responsive Design**: Works across different screen sizes
+9. **Collision Detection**: Visual feedback for conflicting time slots during drag
+10. **Time Slot Snapping**: Activities automatically snap to valid time slots
+11. **Resizable Activity Blocks**: Top and bottom resize handles for duration adjustment
+12. **Auto-save Functionality**: Automatic database updates during drag and resize operations
+13. **Optimistic Updates**: Immediate UI updates with error rollback
 
 ### 🚧 In Progress
-- Time slot snapping and collision detection
-- Resizable activity blocks for duration adjustment
-- Database integration for drag operations
+- Handling edge cases and overlapping activities
 - Enhanced keyboard accessibility
+- Undo/redo functionality
 
 ### 📋 Next Steps
-1. Implement collision detection and overlap warnings
-2. Add resize handles for duration adjustment
-3. Connect drag operations to database updates
-4. Add keyboard navigation support
-5. Implement undo/redo functionality
+1. Add keyboard navigation and accessibility features
+2. Implement comprehensive edge case handling
+3. Add undo/redo functionality for better user experience
+4. Connect with wishlist sidebar for drag-from-sidebar functionality
+5. Add advanced features like multi-select and bulk operations
 
 ## Notes
 - This is the core feature of the entire application

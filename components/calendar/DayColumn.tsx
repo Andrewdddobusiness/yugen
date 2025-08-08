@@ -34,7 +34,13 @@ interface DayColumnProps {
   dayIndex: number;
   timeSlots: TimeSlot[];
   activities: ScheduledActivity[];
+  dragOverInfo?: {
+    dayIndex: number;
+    slotIndex: number;
+    hasConflict: boolean;
+  } | null;
   className?: string;
+  onResize?: (activityId: string, newDuration: number, resizeDirection: 'top' | 'bottom') => void;
 }
 
 interface TimeSlotDropZoneProps {
@@ -44,8 +50,8 @@ interface TimeSlotDropZoneProps {
   className?: string;
 }
 
-function TimeSlotDropZone({ dayIndex, slotIndex, className }: TimeSlotDropZoneProps) {
-  const { setNodeRef, isOver } = useDroppable({
+function TimeSlotDropZone({ dayIndex, slotIndex, isOver, hasConflict, className }: TimeSlotDropZoneProps & { hasConflict?: boolean }) {
+  const { setNodeRef } = useDroppable({
     id: `slot-${dayIndex}-${slotIndex}`
   });
 
@@ -54,7 +60,8 @@ function TimeSlotDropZone({ dayIndex, slotIndex, className }: TimeSlotDropZonePr
       ref={setNodeRef}
       className={cn(
         "absolute inset-0 transition-colors",
-        isOver && "bg-blue-100 border-2 border-blue-300 border-dashed",
+        isOver && !hasConflict && "bg-blue-100 border-2 border-blue-300 border-dashed",
+        isOver && hasConflict && "bg-red-100 border-2 border-red-300 border-dashed",
         className
       )}
     />
@@ -66,7 +73,9 @@ export function DayColumn({
   dayIndex,
   timeSlots,
   activities,
-  className
+  dragOverInfo,
+  className,
+  onResize
 }: DayColumnProps) {
   const isCurrentDay = isToday(date);
   const isWeekendDay = isWeekend(date);
@@ -107,6 +116,8 @@ export function DayColumn({
             <TimeSlotDropZone
               dayIndex={dayIndex}
               slotIndex={slotIndex}
+              isOver={dragOverInfo?.dayIndex === dayIndex && dragOverInfo?.slotIndex === slotIndex}
+              hasConflict={dragOverInfo?.dayIndex === dayIndex && dragOverInfo?.slotIndex === slotIndex ? dragOverInfo.hasConflict : false}
             />
 
             {/* Current time indicator */}
@@ -153,6 +164,7 @@ export function DayColumn({
               <ActivityBlock
                 activity={activity}
                 className="h-full"
+                onResize={onResize}
               />
             </div>
           ))}

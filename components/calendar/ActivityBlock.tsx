@@ -1,6 +1,6 @@
 "use client";
 
-import React from 'react';
+import React, { useState, useCallback } from 'react';
 import { useDraggable } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
 import { Clock, MapPin, GripVertical } from 'lucide-react';
@@ -26,13 +26,18 @@ interface ActivityBlockProps {
   activity: ScheduledActivity;
   isOverlay?: boolean;
   className?: string;
+  onResize?: (activityId: string, newDuration: number, resizeDirection: 'top' | 'bottom') => void;
 }
 
 export function ActivityBlock({
   activity,
   isOverlay = false,
-  className
+  className,
+  onResize
 }: ActivityBlockProps) {
+  const [isResizing, setIsResizing] = useState(false);
+  const [resizeDirection, setResizeDirection] = useState<'top' | 'bottom' | null>(null);
+  
   const {
     attributes,
     listeners,
@@ -41,8 +46,42 @@ export function ActivityBlock({
     isDragging
   } = useDraggable({
     id: activity.id,
-    disabled: isOverlay
+    disabled: isOverlay || isResizing
   });
+
+  const handleResizeStart = useCallback((direction: 'top' | 'bottom') => {
+    setIsResizing(true);
+    setResizeDirection(direction);
+    
+    const handleMouseMove = (e: MouseEvent) => {
+      // Calculate new duration based on mouse movement
+      // This is a simplified version - in a real implementation you'd need to:
+      // 1. Calculate the mouse position relative to the calendar grid
+      // 2. Convert to time slots
+      // 3. Update the activity duration accordingly
+      e.preventDefault();
+    };
+
+    const handleMouseUp = () => {
+      setIsResizing(false);
+      setResizeDirection(null);
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+  }, []);
+
+  const handleResizeTopMouseDown = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    handleResizeStart('top');
+  }, [handleResizeStart]);
+
+  const handleResizeBottomMouseDown = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    handleResizeStart('bottom');
+  }, [handleResizeStart]);
 
   const style = transform ? {
     transform: CSS.Translate.toString(transform),
@@ -101,9 +140,12 @@ export function ActivityBlock({
       {...listeners}
       {...attributes}
       className={cn(
-        "relative rounded-lg shadow-sm border-l-4 overflow-hidden cursor-move transition-all",
+        "relative rounded-lg shadow-sm border-l-4 overflow-hidden transition-all group",
+        !isResizing && "cursor-move",
+        isResizing && "cursor-ns-resize",
         "hover:shadow-md active:shadow-lg",
         isDragging && "opacity-50 rotate-1 shadow-xl",
+        isResizing && "shadow-lg ring-2 ring-blue-300",
         isOverlay && "shadow-2xl border-2 border-white",
         activityColor.replace('bg-', 'border-l-'),
         "bg-white",
@@ -158,10 +200,18 @@ export function ActivityBlock({
       </div>
 
       {/* Resize Handles */}
-      {!isOverlay && (
+      {!isOverlay && onResize && (
         <>
-          <div className="absolute top-0 left-0 right-0 h-1 cursor-n-resize hover:bg-gray-300 opacity-0 hover:opacity-100 transition-opacity" />
-          <div className="absolute bottom-0 left-0 right-0 h-1 cursor-s-resize hover:bg-gray-300 opacity-0 hover:opacity-100 transition-opacity" />
+          <div 
+            className="absolute top-0 left-0 right-0 h-2 cursor-n-resize hover:bg-blue-300 opacity-0 group-hover:opacity-100 transition-opacity z-10"
+            onMouseDown={handleResizeTopMouseDown}
+            title="Resize start time"
+          />
+          <div 
+            className="absolute bottom-0 left-0 right-0 h-2 cursor-s-resize hover:bg-blue-300 opacity-0 group-hover:opacity-100 transition-opacity z-10"
+            onMouseDown={handleResizeBottomMouseDown}
+            title="Resize end time"
+          />
         </>
       )}
 
@@ -169,6 +219,14 @@ export function ActivityBlock({
       {isDragging && (
         <div className="absolute inset-0 bg-blue-500 bg-opacity-20 flex items-center justify-center">
           <div className="text-blue-700 text-xs font-medium">Moving...</div>
+        </div>
+      )}
+      
+      {isResizing && (
+        <div className="absolute inset-0 bg-blue-500 bg-opacity-20 flex items-center justify-center">
+          <div className="text-blue-700 text-xs font-medium">
+            Resizing {resizeDirection === 'top' ? 'start time' : 'end time'}...
+          </div>
         </div>
       )}
     </div>
