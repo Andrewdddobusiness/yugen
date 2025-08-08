@@ -2,6 +2,7 @@
 import React, { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import DragDropCalendar from "@/components/calendar/calendar";
+import { GoogleCalendarView } from "@/components/calendar/GoogleCalendarView";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useItineraryActivityStore } from "@/store/itineraryActivityStore";
 import { useItineraryLayoutStore } from "@/store/itineraryLayoutStore";
@@ -82,11 +83,9 @@ export default function Builder() {
             <ResizablePanel defaultSize={60} className="min-w-0">
               <div className="h-full bg-gray-50">
                 {currentView === 'calendar' ? (
-                  <ScrollArea className="flex-1 h-full">
-                    <div className="h-full p-4">
-                      <DragDropCalendar isLoading={false} />
-                    </div>
-                  </ScrollArea>
+                  <div className="h-full">
+                    <GoogleCalendarView isLoading={false} className="h-full" />
+                  </div>
                 ) : (
                   <ScrollArea className="flex-1 h-full">
                     <div className="p-4">
@@ -119,11 +118,9 @@ export default function Builder() {
         ) : (
           <div className="h-full w-full bg-gray-50">
             {currentView === 'calendar' ? (
-              <ScrollArea className="flex-1 h-full">
-                <div className="h-full p-4">
-                  <DragDropCalendar isLoading={false} />
-                </div>
-              </ScrollArea>
+              <div className="h-full">
+                <GoogleCalendarView isLoading={false} className="h-full" />
+              </div>
             ) : (
               <ScrollArea className="flex-1 h-full">
                 <div className="p-4">
