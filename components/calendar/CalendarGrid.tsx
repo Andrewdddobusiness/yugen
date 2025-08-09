@@ -28,6 +28,7 @@ interface CalendarGridProps {
   selectedDate?: Date;
   viewMode?: 'day' | '3-day' | 'week';
   onViewModeChange?: (mode: 'day' | '3-day' | 'week') => void;
+  onDateChange?: (date: Date) => void;
   className?: string;
 }
 
@@ -52,6 +53,7 @@ export function CalendarGrid({
   selectedDate = new Date(),
   viewMode = 'week',
   onViewModeChange,
+  onDateChange,
   className
 }: CalendarGridProps) {
   const { destinationId } = useParams();
@@ -561,6 +563,7 @@ export function CalendarGrid({
         selectedDate={selectedDate}
         viewMode={viewMode}
         onViewModeChange={onViewModeChange}
+        onDateChange={onDateChange}
         className="border-b border-gray-200"
       />
 

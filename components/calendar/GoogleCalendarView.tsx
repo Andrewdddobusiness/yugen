@@ -39,6 +39,7 @@ export function GoogleCalendarView({
       selectedDate={selectedDate}
       viewMode={viewMode}
       onViewModeChange={setViewMode}
+      onDateChange={setSelectedDate}
       className={className}
     />
   );

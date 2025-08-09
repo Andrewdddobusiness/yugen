@@ -236,6 +236,35 @@ export function MobileGridNavigation({
   onTodayClick,
   className
 }: Omit<GridNavigationProps, 'timeInterval' | 'onTimeIntervalChange' | 'customDateRange' | 'onCustomDateRangeChange'>) {
+  
+  const handlePrevious = () => {
+    switch (viewMode) {
+      case 'day':
+        onDateChange(subDays(currentDate, 1));
+        break;
+      case '3-day':
+        onDateChange(subDays(currentDate, 3));
+        break;
+      case 'week':
+        onDateChange(subWeeks(currentDate, 1));
+        break;
+    }
+  };
+
+  const handleNext = () => {
+    switch (viewMode) {
+      case 'day':
+        onDateChange(addDays(currentDate, 1));
+        break;
+      case '3-day':
+        onDateChange(addDays(currentDate, 3));
+        break;
+      case 'week':
+        onDateChange(addWeeks(currentDate, 1));
+        break;
+    }
+  };
+
   return (
     <div className={cn(
       "flex flex-col space-y-2 p-2 border-b border-gray-200 bg-white",
@@ -295,12 +324,4 @@ export function MobileGridNavigation({
       </div>
     </div>
   );
-
-  function handlePrevious() {
-    onDateChange(viewMode === 'week' ? subWeeks(currentDate, 1) : subDays(currentDate, 1));
-  }
-
-  function handleNext() {
-    onDateChange(viewMode === 'week' ? addWeeks(currentDate, 1) : addDays(currentDate, 1));
-  }
 }

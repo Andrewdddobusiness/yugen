@@ -410,9 +410,10 @@ export function CalendarGridEnhanced({
       // Escape to cancel operations
     };
 
-    if (gridRef.current) {
-      gridRef.current.addEventListener('keydown', handleKeyDown);
-      return () => gridRef.current?.removeEventListener('keydown', handleKeyDown);
+    const currentGrid = gridRef.current;
+    if (currentGrid) {
+      currentGrid.addEventListener('keydown', handleKeyDown);
+      return () => currentGrid.removeEventListener('keydown', handleKeyDown);
     }
   }, []);
 
@@ -521,23 +522,27 @@ export function CalendarGridEnhanced({
                       };
 
                       return (
-                        <DropZone
+                        <div
                           key={`${dayIndex}-${slotIndex}`}
-                          data={dropZoneData}
-                          isDraggingGlobal={isDragging}
-                          className="border-b border-gray-100"
+                          className="border-b border-gray-100 relative"
                           style={{ height: timeInterval === 15 ? 30 : timeInterval === 30 ? 48 : 60 }}
                         >
-                          <GridCell
-                            cell={cellData}
-                            isOver={false}
-                            isDragging={isDragging}
-                            onCellClick={handleCellClick}
-                            onCellDoubleClick={handleCellDoubleClick}
-                            onCellSelect={handleCellSelect}
-                            className="h-full"
-                          />
-                        </DropZone>
+                          <DropZone
+                            data={dropZoneData}
+                            isDraggingGlobal={isDragging}
+                            className="absolute inset-0"
+                          >
+                            <GridCell
+                              cell={cellData}
+                              isOver={false}
+                              isDragging={isDragging}
+                              onCellClick={handleCellClick}
+                              onCellDoubleClick={handleCellDoubleClick}
+                              onCellSelect={handleCellSelect}
+                              className="h-full"
+                            />
+                          </DropZone>
+                        </div>
                       );
                     })}
 
