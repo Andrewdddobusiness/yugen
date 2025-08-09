@@ -46,6 +46,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { WishlistItem } from '@/components/sidebar/WishlistItem';
 
 // Sidebar-specific wishlist component
 function SidebarWishlist() {
@@ -138,88 +139,14 @@ function SidebarWishlist() {
       ) : (
         <div className="space-y-2 w-full">
           {filteredItems.map((item) => (
-            <div
+            <WishlistItem
               key={item.placeId}
-              className="group bg-muted/50 hover:bg-muted rounded-md p-2.5 transition-colors cursor-pointer w-full"
-            >
-              <div className="flex items-start gap-2 w-full">
-                <div className="flex-1 min-w-0">
-                  <h4 className="font-medium text-sm text-foreground line-clamp-2">
-                    {item.activity?.name || (
-                      <span className="text-muted-foreground italic">
-                        Place information not available
-                      </span>
-                    )}
-                  </h4>
-                  
-                  {item.activity?.address ? (
-                    <div className="flex items-start gap-1 mt-1">
-                      <MapPin className="h-3 w-3 text-muted-foreground flex-shrink-0 mt-0.5" />
-                      <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">
-                        {item.activity.address}
-                      </p>
-                    </div>
-                  ) : (
-                    <p className="text-xs text-muted-foreground mt-1 truncate">
-                      ID: {item.placeId.slice(-8)}
-                    </p>
-                  )}
-
-                  <div className="flex items-center flex-wrap gap-2 mt-2">
-                    {item.activity?.rating && formatRating(item.activity.rating)}
-                    
-                    {item.priority && (
-                      <Badge
-                        variant={
-                          item.priority === 'high' ? 'destructive' :
-                          item.priority === 'medium' ? 'default' : 'secondary'
-                        }
-                        className="text-xs px-1.5 py-0.5"
-                      >
-                        {item.priority}
-                      </Badge>
-                    )}
-                  </div>
-                </div>
-
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
-                    >
-                      <MoreVertical className="h-3 w-3" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-40">
-                    {item.activity?.google_maps_url && (
-                      <DropdownMenuItem asChild>
-                        <a
-                          href={item.activity.google_maps_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-xs"
-                        >
-                          <ExternalLink className="h-3 w-3 mr-2" />
-                          View on Maps
-                        </a>
-                      </DropdownMenuItem>
-                    )}
-                    <DropdownMenuItem
-                      onClick={(e: React.MouseEvent) => {
-                        e.stopPropagation();
-                        handleRemoveItem(item);
-                      }}
-                      className="text-destructive text-xs"
-                    >
-                      <Trash2 className="h-3 w-3 mr-2" />
-                      Remove
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
-            </div>
+              item={item}
+              isDragEnabled={true}
+              onRemove={() => handleRemoveItem(item)}
+              showActions={true}
+              className="w-full bg-muted/50 hover:bg-muted border-0 shadow-none"
+            />
           ))}
         </div>
       )}

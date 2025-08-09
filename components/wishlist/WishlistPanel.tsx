@@ -40,11 +40,13 @@ import { useWishlist } from '@/hooks/useWishlist';
 import { cn } from '@/components/lib/utils';
 import WishlistCategories from './WishlistCategories';
 import PlaceNotes from './PlaceNotes';
+import { WishlistItem as DraggableWishlistItem } from '@/components/sidebar/WishlistItem';
 
 interface WishlistPanelProps {
   className?: string;
   onPlaceSelect?: (item: WishlistItem) => void;
   isCollapsed?: boolean;
+  enableDragToCalendar?: boolean;
 }
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -73,7 +75,8 @@ const CATEGORY_LABELS: Record<string, string> = {
 export default function WishlistPanel({ 
   className = "",
   onPlaceSelect,
-  isCollapsed = false
+  isCollapsed = false,
+  enableDragToCalendar = false
 }: WishlistPanelProps) {
   const { itineraryId, destinationId } = useParams();
   const router = useRouter();
@@ -270,115 +273,14 @@ export default function WishlistPanel({
           ) : (
             <div className="space-y-2">
               {filteredItems.map((item) => (
-                <div
+                <DraggableWishlistItem
                   key={item.placeId}
-                  className="group bg-gray-50 hover:bg-gray-100 rounded-lg p-3 transition-colors cursor-pointer"
-                  onClick={() => onPlaceSelect?.(item)}
-                >
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1 min-w-0">
-                      <h4 className="font-medium text-sm text-gray-900 truncate">
-                        {item.activity?.name || (
-                          <span className="text-gray-500 italic">
-                            Place information not available
-                          </span>
-                        )}
-                      </h4>
-                      
-                      {item.activity?.address ? (
-                        <div className="flex items-center space-x-1 mt-1">
-                          <MapPin className="h-3 w-3 text-gray-400 flex-shrink-0" />
-                          <p className="text-xs text-gray-600 truncate">
-                            {item.activity.address}
-                          </p>
-                        </div>
-                      ) : (
-                        <div className="flex items-center space-x-1 mt-1">
-                          <p className="text-xs text-gray-400">
-                            Place ID: {item.placeId}
-                          </p>
-                        </div>
-                      )}
-
-                      <div className="flex items-center space-x-2 mt-2">
-                        {item.activity?.rating && formatRating(item.activity.rating)}
-                        
-                        {item.activity?.types && item.activity.types.length > 0 && (
-                          <span className="text-xs text-gray-500">
-                            {formatTypes(item.activity.types)}
-                          </span>
-                        )}
-                      </div>
-
-                      <div className="flex items-center space-x-2 mt-2">
-                        {item.priority && (
-                          <Badge
-                            variant={
-                              item.priority === 'high' ? 'destructive' :
-                              item.priority === 'medium' ? 'default' : 'secondary'
-                            }
-                            className="text-xs"
-                          >
-                            {item.priority} priority
-                          </Badge>
-                        )}
-                        
-                        {item.notes && (
-                          <Badge variant="outline" className="text-xs">
-                            📝 Has notes
-                          </Badge>
-                        )}
-                      </div>
-                    </div>
-
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
-                        >
-                          <MoreVertical className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem asChild>
-                          <PlaceNotes 
-                            item={item}
-                            trigger={
-                              <div className="flex items-center w-full px-2 py-1.5 text-sm cursor-pointer">
-                                <Edit className="h-4 w-4 mr-2" />
-                                Edit Notes
-                              </div>
-                            }
-                          />
-                        </DropdownMenuItem>
-                        {item.activity?.google_maps_url && (
-                          <DropdownMenuItem asChild>
-                            <a
-                              href={item.activity.google_maps_url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                            >
-                              <ExternalLink className="h-4 w-4 mr-2" />
-                              View on Maps
-                            </a>
-                          </DropdownMenuItem>
-                        )}
-                        <DropdownMenuItem
-                          onClick={(e: React.MouseEvent) => {
-                            e.stopPropagation();
-                            handleRemoveItem(item);
-                          }}
-                          className="text-red-600"
-                        >
-                          <Trash2 className="h-4 w-4 mr-2" />
-                          Remove
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
-                </div>
+                  item={item}
+                  isDragEnabled={enableDragToCalendar}
+                  onSchedule={onPlaceSelect ? () => onPlaceSelect(item) : undefined}
+                  onRemove={() => handleRemoveItem(item)}
+                  className="mx-0"
+                />
               ))}
             </div>
           )}
@@ -403,3 +305,6 @@ export default function WishlistPanel({
     </div>
   );
 }
+
+// Also export as named export for sidebar usage
+export { WishlistPanel };

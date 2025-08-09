@@ -35,10 +35,14 @@ import { Button } from "@/components/ui/button";
 import { Download, Share, Users } from "lucide-react";
 import { ExportDialog } from "@/components/share/exportDialog";
 import Loading from "@/components/loading/loading";
+import { DndContext, DragOverlay, closestCorners } from '@dnd-kit/core';
+import { WishlistItem } from '@/components/sidebar/WishlistItem';
+import { useWishlistStore } from '@/store/wishlistStore';
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   const { itineraryId, destinationId } = useParams();
   const pathname = usePathname();
+  const [activeId, setActiveId] = useState<string | null>(null);
 
   //**** STORES ****//
   const { fetchItineraryActivities, setItineraryActivities } = useItineraryActivityStore();
@@ -141,14 +145,31 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   };
 
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
+  
+  // Get wishlist items for DragOverlay
+  const { wishlistItems } = useWishlistStore();
+  const activeWishlistItem = activeId ? wishlistItems.find(item => `wishlist-${item.placeId}` === activeId) : null;
 
   if (!itineraryId || !destinationId) {
     return <Loading />;
   }
 
+  const handleDragStart = (event: any) => {
+    setActiveId(event.active.id);
+  };
+
+  const handleDragEnd = () => {
+    setActiveId(null);
+  };
+
   return (
-    <div className="flex h-screen">
-      <SidebarProvider
+    <DndContext 
+      collisionDetection={closestCorners}
+      onDragStart={handleDragStart}
+      onDragEnd={handleDragEnd}
+    >
+      <div className="flex h-screen">
+        <SidebarProvider
         style={
           {
             "--sidebar-width": "420px",
@@ -203,6 +224,21 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         </main>
       </SidebarProvider>
       <ExportDialog open={exportDialogOpen} onOpenChange={setExportDialogOpen} itineraryId={itineraryId as string} />
-    </div>
+      </div>
+      
+      {/* DragOverlay renders the dragged item above everything */}
+      <DragOverlay style={{ zIndex: 9999, pointerEvents: 'none' }}>
+        {activeId && activeWishlistItem ? (
+          <div className="bg-white border border-gray-200 rounded-lg shadow-xl p-2 opacity-90 cursor-grabbing max-w-sm">
+            <div className="font-medium text-sm truncate">
+              {activeWishlistItem.activity?.name || 'Place'}
+            </div>
+            <div className="text-xs text-gray-500 truncate">
+              Drag to calendar to schedule
+            </div>
+          </div>
+        ) : null}
+      </DragOverlay>
+    </DndContext>
   );
 }

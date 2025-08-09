@@ -740,3 +740,72 @@ export const insertActivity = async (placeDetails: any): Promise<any> => {
     throw error;
   }
 };
+
+export const addItineraryActivity = async (
+  placeId: string,
+  activityId: string | null | undefined,
+  date: string,
+  startTime: string,
+  endTime: string,
+  itineraryDestinationId?: string
+) => {
+  const supabase = createClient();
+
+  try {
+    // Get the current user
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    
+    if (userError || !user) {
+      throw new Error("User not authenticated");
+    }
+
+    // If itineraryDestinationId is not provided, we need to get it from the current context
+    // For now, we'll require it to be passed in
+    if (!itineraryDestinationId) {
+      throw new Error("itinerary_destination_id is required");
+    }
+
+    // Get the itinerary_id from the destination
+    const { data: destination, error: destError } = await supabase
+      .from("itinerary_destination")
+      .select("itinerary_id")
+      .eq("itinerary_destination_id", itineraryDestinationId)
+      .single();
+
+    if (destError || !destination) {
+      throw new Error("Could not find itinerary destination");
+    }
+
+    // Insert the itinerary activity
+    const { data: itineraryActivity, error: activityError } = await supabase
+      .from("itinerary_activity")
+      .insert({
+        itinerary_id: destination.itinerary_id,
+        itinerary_destination_id: itineraryDestinationId,
+        place_id: placeId,
+        activity_id: activityId,
+        date: date,
+        start_time: startTime,
+        end_time: endTime,
+        is_booked: false,
+        order_in_day: 0
+      })
+      .select()
+      .single();
+
+    if (activityError) throw activityError;
+
+    return { 
+      success: true, 
+      data: itineraryActivity,
+      message: "Activity added to itinerary successfully"
+    };
+  } catch (error) {
+    console.error("Error adding itinerary activity:", error);
+    return { 
+      success: false, 
+      error: error instanceof Error ? error.message : 'Unknown error occurred',
+      message: "Failed to add activity to itinerary"
+    };
+  }
+};

@@ -77,11 +77,46 @@ export default function Builder() {
 
       {/* Main Content */}
       <div className="flex-1 flex overflow-hidden">
-        {showMap ? (
-          <ResizablePanelGroup direction="horizontal" className="h-full">
-            {/* Main Content */}
-            <ResizablePanel defaultSize={60} className="min-w-0">
-              <div className="h-full bg-gray-50">
+            {showMap ? (
+              <ResizablePanelGroup direction="horizontal" className="h-full">
+                {/* Main Content */}
+                <ResizablePanel defaultSize={60} className="min-w-0">
+                  <div className="h-full bg-gray-50">
+                    {currentView === 'calendar' ? (
+                      <div className="h-full">
+                        <GoogleCalendarView isLoading={false} className="h-full" />
+                      </div>
+                    ) : (
+                      <ScrollArea className="flex-1 h-full">
+                        <div className="p-4">
+                          <ItineraryTableView showMap={false} onToggleMap={() => {}} />
+                        </div>
+                      </ScrollArea>
+                    )}
+                  </div>
+                </ResizablePanel>
+
+                <ResizableHandle />
+
+                {/* Map Panel */}
+                <ResizablePanel
+                  defaultSize={40}
+                  minSize={25}
+                  maxSize={60}
+                  className="hidden sm:block"
+                >
+                  <div className="h-full">
+                    <GoogleMapView
+                      activities={itineraryActivities.filter(
+                        (a) =>
+                          a.activity?.coordinates && Array.isArray(a.activity.coordinates) && a.activity.coordinates.length === 2
+                      )}
+                    />
+                  </div>
+                </ResizablePanel>
+              </ResizablePanelGroup>
+            ) : (
+              <div className="h-full w-full bg-gray-50">
                 {currentView === 'calendar' ? (
                   <div className="h-full">
                     <GoogleCalendarView isLoading={false} className="h-full" />
@@ -94,42 +129,7 @@ export default function Builder() {
                   </ScrollArea>
                 )}
               </div>
-            </ResizablePanel>
-
-            <ResizableHandle />
-
-            {/* Map Panel */}
-            <ResizablePanel
-              defaultSize={40}
-              minSize={25}
-              maxSize={60}
-              className="hidden sm:block"
-            >
-              <div className="h-full">
-                <GoogleMapView
-                  activities={itineraryActivities.filter(
-                    (a) =>
-                      a.activity?.coordinates && Array.isArray(a.activity.coordinates) && a.activity.coordinates.length === 2
-                  )}
-                />
-              </div>
-            </ResizablePanel>
-          </ResizablePanelGroup>
-        ) : (
-          <div className="h-full w-full bg-gray-50">
-            {currentView === 'calendar' ? (
-              <div className="h-full">
-                <GoogleCalendarView isLoading={false} className="h-full" />
-              </div>
-            ) : (
-              <ScrollArea className="flex-1 h-full">
-                <div className="p-4">
-                  <ItineraryTableView showMap={false} onToggleMap={() => {}} />
-                </div>
-              </ScrollArea>
             )}
-          </div>
-        )}
       </div>
     </div>
   );

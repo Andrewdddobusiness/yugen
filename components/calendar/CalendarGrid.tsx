@@ -4,13 +4,14 @@ import React, { useState, useMemo, useCallback } from 'react';
 import { DndContext, DragOverlay, closestCorners, DragStartEvent, DragOverEvent, DragEndEvent } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { format, startOfWeek, endOfWeek, eachDayOfInterval, isSameDay } from 'date-fns';
+import { useParams } from 'next/navigation';
 import { useItineraryActivityStore } from '@/store/itineraryActivityStore';
 import { DayColumn } from './DayColumn';
 import { ActivityBlock } from './ActivityBlock';
 import { TimeSlots } from './TimeSlots';
 import { CalendarControls } from './CalendarControls';
 import { cn } from '@/lib/utils';
-import { setItineraryActivityDateTimes } from '@/actions/supabase/actions';
+import { setItineraryActivityDateTimes, addItineraryActivity } from '@/actions/supabase/actions';
 import { useToast } from '@/components/ui/use-toast';
 import { checkActivityOverlap, findNearestValidSlot, timeToMinutes } from '@/utils/calendar/collisionDetection';
 
@@ -50,6 +51,7 @@ export function CalendarGrid({
   onViewModeChange,
   className
 }: CalendarGridProps) {
+  const { destinationId } = useParams();
   const [activeId, setActiveId] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [dragOverInfo, setDragOverInfo] = useState<{
@@ -126,7 +128,7 @@ export function CalendarGrid({
         return {
           id: activity.itinerary_activity_id,
           activityId: activity.activity_id || '',
-          placeId: activity.place_id || '',
+          placeId: activity.activity?.place_id || '',
           date: activityDate,
           startTime: activity.start_time,
           endTime: activity.end_time,
@@ -177,11 +179,23 @@ export function CalendarGrid({
       return;
     }
 
-    // Find the activity being dragged
-    const draggedActivity = scheduledActivities.find(act => act.id === active.id);
-    if (!draggedActivity) {
-      setDragOverInfo(null);
-      return;
+    // Check if this is a wishlist item being dragged
+    const dragData = active.data?.current;
+    let duration = 60; // Default 1 hour
+    let excludeId = null;
+    
+    if (dragData?.type === 'wishlist-item') {
+      // For wishlist items, use suggested duration or default
+      duration = dragData.item.activity?.duration || 60;
+    } else {
+      // Find the activity being dragged (existing logic)
+      const draggedActivity = scheduledActivities.find(act => act.id === active.id);
+      if (!draggedActivity) {
+        setDragOverInfo(null);
+        return;
+      }
+      duration = draggedActivity.duration;
+      excludeId = active.id as string;
     }
 
     // Check for conflicts
@@ -199,10 +213,10 @@ export function CalendarGrid({
       {
         date: proposedDate,
         startTime: proposedStartTime,
-        endTime: `${Math.floor((targetSlot.hour * 60 + targetSlot.minute + draggedActivity.duration) / 60).toString().padStart(2, '0')}:${((targetSlot.hour * 60 + targetSlot.minute + draggedActivity.duration) % 60).toString().padStart(2, '0')}:00`
+        endTime: `${Math.floor((targetSlot.hour * 60 + targetSlot.minute + duration) / 60).toString().padStart(2, '0')}:${((targetSlot.hour * 60 + targetSlot.minute + duration) % 60).toString().padStart(2, '0')}:00`
       },
       existingActivities,
-      active.id as string
+      excludeId
     );
     
     setDragOverInfo({
@@ -282,6 +296,78 @@ export function CalendarGrid({
     }
   }, [itineraryActivities, setItineraryActivities, toast]);
 
+  const handleWishlistItemDrop = async (wishlistItem: any, targetDate: Date, targetSlot: any) => {
+    if (!wishlistItem.activity) {
+      toast({
+        title: "Cannot schedule item",
+        description: "This wishlist item is missing activity details.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const newDate = format(targetDate, 'yyyy-MM-dd');
+    const startTime = `${targetSlot.hour.toString().padStart(2, '0')}:${targetSlot.minute.toString().padStart(2, '0')}:00`;
+    
+    // Determine duration - use activity suggestion or default to 1 hour
+    const durationMinutes = wishlistItem.activity.duration || 60;
+    const endTimeMinutes = (targetSlot.hour * 60 + targetSlot.minute) + durationMinutes;
+    const endTime = `${Math.floor(endTimeMinutes / 60).toString().padStart(2, '0')}:${(endTimeMinutes % 60).toString().padStart(2, '0')}:00`;
+
+    setIsSaving(true);
+    try {
+      const result = await addItineraryActivity(
+        wishlistItem.placeId,
+        wishlistItem.activity.activity_id || null,
+        newDate,
+        startTime,
+        endTime,
+        destinationId as string
+      );
+
+      if (result.success && result.data) {
+        // Add the new activity to the store
+        const newActivity = {
+          itinerary_activity_id: result.data.itinerary_activity_id,
+          itinerary_id: result.data.itinerary_id,
+          itinerary_destination_id: result.data.itinerary_destination_id,
+          place_id: wishlistItem.placeId,
+          activity_id: wishlistItem.activity.activity_id,
+          date: newDate,
+          start_time: startTime,
+          end_time: endTime,
+          notes: wishlistItem.notes || null,
+          is_booked: false,
+          booking_reference: null,
+          cost: wishlistItem.cost || null,
+          order_in_day: 0,
+          deleted_at: null,
+          activity: wishlistItem.activity,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        };
+
+        setItineraryActivities([...itineraryActivities, newActivity]);
+
+        toast({
+          title: "Activity scheduled",
+          description: `${wishlistItem.activity.name} has been added to your itinerary.`,
+        });
+      } else {
+        throw new Error(result.error || result.message || 'Failed to schedule activity');
+      }
+    } catch (error) {
+      console.error('Error scheduling wishlist item:', error);
+      toast({
+        title: "Failed to schedule",
+        description: "Could not add this item to your itinerary. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   const handleDragEnd = async (event: DragEndEvent) => {
     setActiveId(null);
     setDragOverInfo(null);
@@ -304,7 +390,14 @@ export function CalendarGrid({
     
     if (!targetDate || !targetSlot) return;
 
-    // Find the activity being dragged
+    // Check if this is a wishlist item being dragged
+    const dragData = active.data?.current;
+    if (dragData?.type === 'wishlist-item') {
+      await handleWishlistItemDrop(dragData.item, targetDate, targetSlot);
+      return;
+    }
+
+    // Find the activity being dragged (existing logic for scheduled activities)
     const draggedActivity = scheduledActivities.find(act => act.id === active.id);
     if (!draggedActivity) return;
 
