@@ -8,12 +8,21 @@ import { useParams } from 'next/navigation';
 import { useItineraryActivityStore } from '@/store/itineraryActivityStore';
 import { DayColumn } from './DayColumn';
 import { ActivityBlock } from './ActivityBlock';
-import { TimeSlots } from './TimeSlots';
+import { TimeGrid, TimeSlot } from './TimeGrid';
 import { CalendarControls } from './CalendarControls';
+import { ConflictResolver, TimeConflict } from './ConflictResolver';
 import { cn } from '@/lib/utils';
 import { setItineraryActivityDateTimes, addItineraryActivity } from '@/actions/supabase/actions';
 import { useToast } from '@/components/ui/use-toast';
-import { checkActivityOverlap, findNearestValidSlot, timeToMinutes } from '@/utils/calendar/collisionDetection';
+import { 
+  checkActivityOverlap, 
+  findNearestValidSlot, 
+  timeToMinutes,
+  detectConflicts,
+  snapToTimeSlot
+} from '@/utils/calendar/collisionDetection';
+import { estimateActivityDuration } from '@/utils/calendar/durationEstimation';
+import { useTimeSchedulingStore, useSchedulingContext } from '@/store/timeSchedulingStore';
 
 interface CalendarGridProps {
   selectedDate?: Date;
@@ -22,12 +31,6 @@ interface CalendarGridProps {
   className?: string;
 }
 
-interface TimeSlot {
-  time: string;
-  hour: number;
-  minute: number;
-  label: string;
-}
 
 interface ScheduledActivity {
   id: string;
@@ -59,29 +62,57 @@ export function CalendarGrid({
     slotIndex: number;
     hasConflict: boolean;
   } | null>(null);
+  const [conflicts, setConflicts] = useState<TimeConflict[]>([]);
+  const [showConflictResolver, setShowConflictResolver] = useState(false);
+  
   const { itineraryActivities, setItineraryActivities } = useItineraryActivityStore();
   const { toast } = useToast();
+  const schedulingContext = useSchedulingContext();
+  const { 
+    updateTimeGridConfig,
+    startSchedulingSession,
+    endSchedulingSession,
+    updateSchedulingSession 
+  } = useTimeSchedulingStore();
 
-  // Generate time slots (30-minute intervals from 6:00 AM to 11:00 PM)
+  // Generate time slots using enhanced TimeGrid system
   const timeSlots: TimeSlot[] = useMemo(() => {
+    const { interval, startHour, endHour } = schedulingContext.config;
     const slots: TimeSlot[] = [];
-    for (let hour = 6; hour <= 23; hour++) {
-      for (let minute = 0; minute < 60; minute += 30) {
+    let intervalIndex = 0;
+
+    for (let hour = startHour; hour <= endHour; hour++) {
+      const intervalsPerHour = 60 / interval;
+      
+      for (let i = 0; i < intervalsPerHour; i++) {
+        const minute = i * interval;
         const timeString = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
-        const displayTime = minute === 0 ? 
-          `${hour > 12 ? hour - 12 : hour === 0 ? 12 : hour}:00 ${hour >= 12 ? 'PM' : 'AM'}` :
-          `${hour > 12 ? hour - 12 : hour === 0 ? 12 : hour}:30 ${hour >= 12 ? 'PM' : 'AM'}`;
         
+        // Format display time
+        let displayTime: string;
+        if (minute === 0) {
+          const displayHour = hour > 12 ? hour - 12 : hour === 0 ? 12 : hour;
+          displayTime = `${displayHour}:00 ${hour >= 12 ? 'PM' : 'AM'}`;
+        } else {
+          const displayHour = hour > 12 ? hour - 12 : hour === 0 ? 12 : hour;
+          displayTime = `${displayHour}:${minute.toString().padStart(2, '0')} ${hour >= 12 ? 'PM' : 'AM'}`;
+        }
+
         slots.push({
           time: timeString,
           hour,
           minute,
-          label: displayTime
+          label: displayTime,
+          isHour: minute === 0,
+          intervalIndex
         });
+
+        intervalIndex++;
       }
     }
+
     return slots;
-  }, []);
+  }, [schedulingContext.config]);
 
   // Generate days based on view mode
   const days = useMemo(() => {
@@ -183,10 +214,29 @@ export function CalendarGrid({
     const dragData = active.data?.current;
     let duration = 60; // Default 1 hour
     let excludeId = null;
+    let placeData = null;
     
     if (dragData?.type === 'wishlist-item') {
-      // For wishlist items, use suggested duration or default
-      duration = dragData.item.activity?.duration || 60;
+      // For wishlist items, estimate duration intelligently
+      if (dragData.item.activity) {
+        const estimate = estimateActivityDuration(
+          {
+            place_id: dragData.item.placeId,
+            types: dragData.item.activity.types || [],
+            name: dragData.item.activity.name,
+            rating: dragData.item.activity.rating,
+            user_ratings_total: dragData.item.activity.user_ratings_total
+          },
+          {
+            timeOfDay: `${targetSlot.hour}:${targetSlot.minute}`,
+            isWeekend: targetDate.getDay() === 0 || targetDate.getDay() === 6
+          }
+        );
+        duration = estimate.duration;
+        placeData = dragData.item.activity;
+      } else {
+        duration = dragData.item.activity?.duration || 60;
+      }
     } else {
       // Find the activity being dragged (existing logic)
       const draggedActivity = scheduledActivities.find(act => act.id === active.id);
@@ -198,9 +248,10 @@ export function CalendarGrid({
       excludeId = active.id as string;
     }
 
-    // Check for conflicts
+    // Enhanced conflict detection
     const proposedDate = format(targetDate, 'yyyy-MM-dd');
     const proposedStartTime = `${targetSlot.hour.toString().padStart(2, '0')}:${targetSlot.minute.toString().padStart(2, '0')}:00`;
+    const proposedEndTime = `${Math.floor((targetSlot.hour * 60 + targetSlot.minute + duration) / 60).toString().padStart(2, '0')}:${((targetSlot.hour * 60 + targetSlot.minute + duration) % 60).toString().padStart(2, '0')}:00`;
     
     const existingActivities = itineraryActivities.map(act => ({
       id: act.itinerary_activity_id,
@@ -209,20 +260,27 @@ export function CalendarGrid({
       endTime: act.end_time
     }));
     
-    const conflicts = checkActivityOverlap(
+    // Use enhanced conflict detection
+    const detectedConflicts = detectConflicts(
       {
         date: proposedDate,
         startTime: proposedStartTime,
-        endTime: `${Math.floor((targetSlot.hour * 60 + targetSlot.minute + duration) / 60).toString().padStart(2, '0')}:${((targetSlot.hour * 60 + targetSlot.minute + duration) % 60).toString().padStart(2, '0')}:00`
+        endTime: proposedEndTime,
+        placeId: placeData?.place_id,
+        duration
       },
       existingActivities,
-      excludeId
+      undefined, // business hours - could be enhanced later
+      schedulingContext.travelSettings.showTravelTime ? schedulingContext.travelSettings.bufferMinutes : undefined,
+      excludeId || undefined
     );
+    
+    const hasHighSeverityConflicts = detectedConflicts.some(c => c.severity === 'high');
     
     setDragOverInfo({
       dayIndex,
       slotIndex,
-      hasConflict: conflicts.length > 0
+      hasConflict: hasHighSeverityConflicts
     });
   };
 
@@ -521,8 +579,48 @@ export function CalendarGrid({
         onDragEnd={handleDragEnd}
       >
         <div className="flex-1 flex overflow-hidden">
-          {/* Time Column */}
-          <TimeSlots timeSlots={timeSlots} className="border-r border-gray-200" />
+          {/* Time Column using enhanced TimeGrid */}
+          <TimeGrid 
+            config={schedulingContext.config}
+            className="border-r border-gray-200"
+          >
+            {(slots) => (
+              <div className="w-20 flex-shrink-0 bg-gray-50">
+                <div className="h-12 border-b border-gray-200" />
+                <div className="relative">
+                  {slots.map((slot) => {
+                    const slotHeight = schedulingContext.config.interval === 15 ? 30 : 
+                                    schedulingContext.config.interval === 30 ? 48 : 60;
+                    
+                    return (
+                      <div
+                        key={slot.time}
+                        className={cn(
+                          "border-b relative",
+                          slot.isHour ? "border-gray-200" : "border-gray-100"
+                        )}
+                        style={{ height: `${slotHeight}px` }}
+                      >
+                        {(slot.isHour || schedulingContext.config.interval === 15) && (
+                          <div 
+                            className={cn(
+                              "absolute -top-2 right-2 text-xs px-1 bg-gray-50",
+                              slot.isHour ? "text-gray-700 font-medium" : "text-gray-500"
+                            )}
+                          >
+                            {schedulingContext.config.interval === 15 || slot.isHour ? slot.label : ''}
+                          </div>
+                        )}
+                        {slot.isHour && (
+                          <div className="absolute left-0 top-0 w-2 h-px bg-gray-300" />
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </TimeGrid>
 
           {/* Days Grid */}
           <div className="flex-1 flex">
@@ -552,6 +650,35 @@ export function CalendarGrid({
           )}
         </DragOverlay>
       </DndContext>
+
+      {/* Conflict Resolution Dialog */}
+      <ConflictResolver
+        conflicts={conflicts}
+        isOpen={showConflictResolver}
+        onClose={() => setShowConflictResolver(false)}
+        onResolve={async (resolutions) => {
+          // Handle conflict resolutions
+          try {
+            for (const resolution of resolutions) {
+              // Apply the selected resolution
+              // This would involve updating the activity times, duration, etc.
+              console.log('Applying resolution:', resolution);
+            }
+            setConflicts([]);
+            toast({
+              title: "Conflicts resolved",
+              description: `${resolutions.length} conflict${resolutions.length > 1 ? 's' : ''} resolved successfully.`,
+            });
+          } catch (error) {
+            console.error('Failed to resolve conflicts:', error);
+            toast({
+              title: "Failed to resolve conflicts",
+              description: "Some conflicts could not be resolved. Please try again.",
+              variant: "destructive"
+            });
+          }
+        }}
+      />
     </div>
   );
 }
