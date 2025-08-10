@@ -36,6 +36,7 @@ import WishlistPanel from "@/components/wishlist/WishlistPanel";
 import PlaceSearch from "@/components/search/PlaceSearch";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useWishlistStore } from '@/store/wishlistStore';
+import { useDateRangeStore } from '@/store/dateRangeStore';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -162,6 +163,9 @@ export function AppSidebarItineraryActivityLeft() {
   const [activeTab, setActiveTab] = useState("days");
 
   const queryClient = useQueryClient();
+  
+  // Get the date range store to sync with table components
+  const { setDateRange: setStoreDateRange } = useDateRangeStore();
 
   const { data: destinationData, isLoading: isDestinationLoading } = useQuery({
     queryKey: ["itineraryDestination", itineraryId],
@@ -176,9 +180,13 @@ export function AppSidebarItineraryActivityLeft() {
 
   useEffect(() => {
     if (itinerary) {
-      setDateRange({ from: itinerary.from_date as Date, to: itinerary.to_date as Date });
+      const dateRangeValue = { from: itinerary.from_date as Date, to: itinerary.to_date as Date };
+      setDateRange(dateRangeValue);
+      
+      // Also update the date range store so table components can access it
+      setStoreDateRange(dateRangeValue.from, dateRangeValue.to);
     }
-  }, [itinerary]);
+  }, [itinerary, setStoreDateRange]);
 
   const navItems = [
     {
@@ -206,7 +214,11 @@ export function AppSidebarItineraryActivityLeft() {
   const handleDateRangeConfirm = async (dateRange: DateRange | undefined) => {
     try {
       setDateRange(dateRange);
+      
+      // Also update the date range store so table components can access it
       if (dateRange && dateRange.from && dateRange.to) {
+        setStoreDateRange(dateRange.from, dateRange.to);
+        
         const result = await setItineraryDestinationDateRange(itineraryId as string, destinationId as string, {
           from: dateRange.from,
           to: dateRange.to,
@@ -218,6 +230,9 @@ export function AppSidebarItineraryActivityLeft() {
         } else {
           console.error("Error updating date range:", result.message);
         }
+      } else {
+        // Clear the store if no date range is selected
+        setStoreDateRange(null, null);
       }
     } catch (error) {
       console.error("Error setting date range:", error);

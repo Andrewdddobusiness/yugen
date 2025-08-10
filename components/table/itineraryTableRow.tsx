@@ -106,7 +106,12 @@ export default function ItineraryTableRow({
           endDate={endDate}
         />
       </TableCell>
-      <TableCell className="w-[15%] min-w-[150px]">
+      <TableCell 
+        className="w-[15%] min-w-[150px]"
+        onClick={(e) => {
+          e.stopPropagation();
+        }}
+      >
         <TimePopover
           itineraryActivityId={Number(activity.itinerary_activity_id)}
           storeStartTime={activity.start_time}
@@ -115,7 +120,12 @@ export default function ItineraryTableRow({
           styled={true}
         />
       </TableCell>
-      <TableCell className="w-[20%] min-w-[200px]">
+      <TableCell 
+        className="w-[20%] min-w-[200px]"
+        onClick={(e) => {
+          e.stopPropagation();
+        }}
+      >
         <NotesPopover
           id={activity.itinerary_activity_id}
           value={notes[activity.itinerary_activity_id] || ""}
