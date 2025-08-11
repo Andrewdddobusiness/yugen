@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { format, isToday } from 'date-fns';
 import { Clock, MapPin, Star, DollarSign, Phone, Globe, Edit3, Trash2, ChevronDown, ChevronRight, Check, X, Save, Loader2, GripVertical } from 'lucide-react';
 import {
@@ -49,6 +49,8 @@ import { TravelTimeSettings } from '@/components/travel/TravelTimeSettings';
 import { useTravelTimes } from '@/components/hooks/use-travel-times';
 import { shouldShowTravelTime, getTravelTimeColor, formatTravelTime, getTotalTravelTimeForDay } from '@/utils/travel/travelTimeUtils';
 import type { TravelMode } from '@/actions/google/travelTime';
+import { SearchAndFilter, FilterableActivity } from '@/components/list/SearchAndFilter';
+import { HighlightedText } from '@/components/ui/highlighted-text';
 
 interface ItineraryListViewProps {
   showMap?: boolean;
@@ -280,7 +282,10 @@ function SortableActivity(props: SortableActivityProps) {
                       )}
                       title="Click to edit activity name"
                     >
-                      {activity.activity?.name || 'Unnamed Activity'}
+                      <HighlightedText 
+                        text={activity.activity?.name || 'Unnamed Activity'}
+                        searchTerm={currentSearchTerm}
+                      />
                     </h3>
                   )}
                   
@@ -323,7 +328,10 @@ function SortableActivity(props: SortableActivityProps) {
               {activity.activity?.address && (
                 <div className="flex items-start gap-2 text-sm text-gray-600">
                   <MapPin className="h-4 w-4 mt-0.5 flex-shrink-0" />
-                  <span>{activity.activity.address}</span>
+                  <HighlightedText 
+                    text={activity.activity.address}
+                    searchTerm={currentSearchTerm}
+                  />
                 </div>
               )}
 
@@ -422,7 +430,10 @@ function SortableActivity(props: SortableActivityProps) {
                             <Edit3 className="h-4 w-4" />
                           </div>
                           <div className="flex-1 group-hover:text-blue-600">
-                            {activity.notes}
+                            <HighlightedText 
+                              text={activity.notes || ''}
+                              searchTerm={currentSearchTerm}
+                            />
                           </div>
                         </div>
                       </div>
@@ -467,6 +478,8 @@ export function ItineraryListView({
   const [activeId, setActiveId] = useState<UniqueIdentifier | null>(null);
   const [isReordering, setIsReordering] = useState(false);
   const [travelModes, setTravelModes] = useState<TravelMode[]>(['walking', 'driving']);
+  const [filteredActivities, setFilteredActivities] = useState<FilterableActivity[]>([]);
+  const [currentSearchTerm, setCurrentSearchTerm] = useState<string>('');
   const [expandedDays, setExpandedDays] = useState<Set<string>>(() => {
     // Try to restore from localStorage first, then fall back to defaults
     if (typeof window !== 'undefined') {
@@ -858,7 +871,52 @@ export function ItineraryListView({
     }
   };
 
-  const groupedActivities = groupActivitiesByDate(activeActivities);
+  // Convert activities to filterable format
+  const filterableActivities: FilterableActivity[] = useMemo(() => {
+    return activeActivities.map(activity => ({
+      itinerary_activity_id: activity.itinerary_activity_id,
+      date: activity.date,
+      start_time: activity.start_time,
+      end_time: activity.end_time,
+      notes: activity.notes,
+      activity: activity.activity ? {
+        name: activity.activity.name,
+        address: activity.activity.address,
+        types: activity.activity.types,
+        rating: activity.activity.rating,
+        price_level: activity.activity.price_level,
+        coordinates: activity.activity.coordinates,
+      } : undefined,
+    }));
+  }, [activeActivities]);
+
+  // Handle filtered activities from search component
+  const handleFilteredActivitiesChange = useCallback((filtered: FilterableActivity[]) => {
+    setFilteredActivities(filtered);
+  }, []);
+
+  // Handle search term change for highlighting
+  const handleSearchTermChange = useCallback((searchTerm: string) => {
+    setCurrentSearchTerm(searchTerm);
+  }, []);
+
+  // Initialize filtered activities when filterable activities change
+  useEffect(() => {
+    if (filteredActivities.length === 0 && filterableActivities.length > 0) {
+      setFilteredActivities(filterableActivities);
+    }
+  }, [filterableActivities, filteredActivities.length]);
+
+  // Convert filtered activities back to the original format for grouping
+  const activitiesForGrouping = useMemo(() => {
+    return activeActivities.filter(activity =>
+      filteredActivities.some(filtered => 
+        filtered.itinerary_activity_id === activity.itinerary_activity_id
+      )
+    );
+  }, [activeActivities, filteredActivities]);
+
+  const groupedActivities = groupActivitiesByDate(activitiesForGrouping);
 
   // Travel time integration
   const { 
@@ -977,12 +1035,28 @@ export function ItineraryListView({
 
   return (
     <div className={cn("space-y-6", isMobile ? "p-4" : "p-6", className)}>
-      {groupedActivities.length === 0 ? (
+      {/* Search and Filter Component */}
+      <SearchAndFilter
+        activities={filterableActivities}
+        onFilteredActivitiesChange={handleFilteredActivitiesChange}
+        onSearchTermChange={handleSearchTermChange}
+        className="-mx-2 -mt-2"
+      />
+
+      {activeActivities.length === 0 ? (
         <div className="text-center py-12">
           <div className="text-muted-foreground">
             <Clock className="h-12 w-12 mx-auto mb-4 opacity-50" />
-            <h3 className="text-lg font-medium mb-2">No activities scheduled</h3>
+            <h3 className="text-lg font-medium mb-2">No activities in itinerary</h3>
             <p className="text-sm">Add activities to your itinerary to see them here.</p>
+          </div>
+        </div>
+      ) : groupedActivities.length === 0 ? (
+        <div className="text-center py-12">
+          <div className="text-muted-foreground">
+            <Clock className="h-12 w-12 mx-auto mb-4 opacity-50" />
+            <h3 className="text-lg font-medium mb-2">No activities match current filters</h3>
+            <p className="text-sm">Try adjusting your search or filters to see more results.</p>
           </div>
         </div>
       ) : (
@@ -990,7 +1064,10 @@ export function ItineraryListView({
           {/* Expand/Collapse All Controls */}
           <div className="flex items-center justify-between">
             <div className="text-sm text-muted-foreground">
-              {groupedActivities.length} {groupedActivities.length === 1 ? 'day' : 'days'} with activities
+              {filteredActivities.length === activeActivities.length 
+                ? `${groupedActivities.length} ${groupedActivities.length === 1 ? 'day' : 'days'} with activities`
+                : `Showing ${filteredActivities.length} of ${activeActivities.length} activities in ${groupedActivities.length} ${groupedActivities.length === 1 ? 'day' : 'days'}`
+              }
             </div>
             <div className="flex items-center gap-2">
               <Button
