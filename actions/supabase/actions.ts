@@ -206,6 +206,42 @@ export async function setItineraryActivityTimes(itineraryActivityId: string, sta
   return { success: true, message: "Set date range successful", data };
 }
 
+export async function setItineraryActivityNotes(itineraryActivityId: string, notes: string) {
+  const supabase = createClient();
+
+  const { data, error } = await supabase
+    .from("itinerary_activity")
+    .update({
+      notes: notes,
+    })
+    .eq("itinerary_activity_id", itineraryActivityId);
+
+  if (error) {
+    console.error("Error setting notes:", error);
+    return { success: false, message: "Set notes failed", error };
+  }
+
+  return { success: true, message: "Set notes successful", data };
+}
+
+export async function setActivityName(activityId: string, name: string) {
+  const supabase = createClient();
+
+  const { data, error } = await supabase
+    .from("activity")
+    .update({
+      name: name,
+    })
+    .eq("activity_id", activityId);
+
+  if (error) {
+    console.error("Error setting activity name:", error);
+    return { success: false, message: "Set activity name failed", error };
+  }
+
+  return { success: true, message: "Set activity name successful", data };
+}
+
 /*
   DELETE
 */
