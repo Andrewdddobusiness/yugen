@@ -2,7 +2,29 @@
 
 import React, { useState, useEffect } from 'react';
 import { format, isToday } from 'date-fns';
-import { Clock, MapPin, Star, DollarSign, Phone, Globe, Edit3, Trash2, ChevronDown, ChevronRight, Check, X, Save, Loader2 } from 'lucide-react';
+import { Clock, MapPin, Star, DollarSign, Phone, Globe, Edit3, Trash2, ChevronDown, ChevronRight, Check, X, Save, Loader2, GripVertical } from 'lucide-react';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+  DragStartEvent,
+  DragOverlay,
+  UniqueIdentifier,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import {
+  useSortable,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import { cn } from '@/lib/utils';
 import { useItineraryActivityStore } from '@/store/itineraryActivityStore';
 import { useDateRangeStore } from '@/store/dateRangeStore';
@@ -17,7 +39,7 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
 import { NotesPopover } from '@/components/popover/notesPopover';
-import { setItineraryActivityTimes, setItineraryActivityNotes, setActivityName } from '@/actions/supabase/actions';
+import { setItineraryActivityTimes, setItineraryActivityNotes, setActivityName, batchUpdateItineraryActivities } from '@/actions/supabase/actions';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
@@ -50,6 +72,380 @@ interface ItineraryActivity {
   deleted_at?: string | null;
 }
 
+interface SortableActivityProps {
+  activity: ItineraryActivity;
+  index: number;
+  editingField: { activityId: string; field: 'name' | 'time' | 'notes' } | null;
+  editingValues: { [key: string]: string };
+  savingStates: { [key: string]: boolean };
+  onStartEditing: (activityId: string, field: 'name' | 'time' | 'notes', currentValue: string) => void;
+  onCancelEditing: () => void;
+  onSaveField: (activity: ItineraryActivity) => void;
+  onRemoveActivity: (placeId: string) => void;
+  onEditKeyDown: (e: React.KeyboardEvent, activity: ItineraryActivity) => void;
+  onEditingValueChange: (key: string, value: string) => void;
+  formatTime: (timeString: string | null) => string | null;
+  formatTimeForEditing: (startTime: string | null, endTime: string | null) => string;
+  validateTimeInput: (value: string) => boolean;
+  getPriceDisplay: (priceLevel?: string) => string | null;
+  isMobile: boolean;
+  isDragging?: boolean;
+}
+
+// Sortable Activity Component
+function SortableActivity(props: SortableActivityProps) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging: isCurrentlyDragging,
+  } = useSortable({ id: props.activity.itinerary_activity_id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isCurrentlyDragging ? 0.5 : 1,
+  };
+
+  const {
+    activity,
+    editingField,
+    editingValues,
+    savingStates,
+    onStartEditing,
+    onCancelEditing,
+    onSaveField,
+    onRemoveActivity,
+    onEditKeyDown,
+    onEditingValueChange,
+    formatTime,
+    formatTimeForEditing,
+    validateTimeInput,
+    getPriceDisplay,
+    isMobile,
+  } = props;
+
+  return (
+    <div ref={setNodeRef} style={style} data-sortable-id={activity.itinerary_activity_id}>
+      <Card className={cn(
+        "hover:shadow-md transition-shadow",
+        isCurrentlyDragging && "shadow-lg ring-2 ring-blue-500"
+      )}>
+        <CardContent className={cn(isMobile ? "p-3" : "p-4")}>
+          <div className={cn("flex items-start", isMobile ? "gap-3" : "gap-4")}>
+            {/* Drag Handle */}
+            <button
+              {...attributes}
+              {...listeners}
+              className="flex items-center justify-center cursor-move touch-none p-1 rounded hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1"
+              title="Drag to reorder (or use Alt+Arrow keys)"
+              tabIndex={0}
+              aria-label="Drag to reorder activity"
+            >
+              <GripVertical className="h-5 w-5 text-gray-400 hover:text-gray-600" />
+            </button>
+
+            {/* Time indicator */}
+            <div className={cn("flex flex-col items-center", isMobile ? "min-w-[70px]" : "min-w-[110px]")}>
+              {editingField?.activityId === activity.itinerary_activity_id && editingField.field === 'time' ? (
+                <div className="space-y-2 w-full">
+                  <Input
+                    value={editingValues[`${activity.itinerary_activity_id}-time`] || ''}
+                    onChange={(e) => onEditingValueChange(
+                      `${activity.itinerary_activity_id}-time`,
+                      e.target.value
+                    )}
+                    onKeyDown={(e) => onEditKeyDown(e, activity)}
+                    className={cn(
+                      "text-xs h-7 text-center",
+                      !validateTimeInput(editingValues[`${activity.itinerary_activity_id}-time`] || '') && "border-red-500"
+                    )}
+                    placeholder="09:00|17:00"
+                    autoFocus
+                  />
+                  <div className="flex justify-center gap-1">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => onSaveField(activity)}
+                      disabled={savingStates[`${activity.itinerary_activity_id}-time`] || 
+                               !validateTimeInput(editingValues[`${activity.itinerary_activity_id}-time`] || '')}
+                      className="h-6 w-6 p-0 text-green-600 hover:text-green-700 hover:bg-green-50"
+                    >
+                      {savingStates[`${activity.itinerary_activity_id}-time`] ? (
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                      ) : (
+                        <Check className="h-3 w-3" />
+                      )}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={onCancelEditing}
+                      className="h-6 w-6 p-0 text-gray-500 hover:text-gray-700 hover:bg-gray-50"
+                    >
+                      <X className="h-3 w-3" />
+                    </Button>
+                  </div>
+                  <div className="text-xs text-gray-400 text-center">HH:MM format</div>
+                </div>
+              ) : (
+                <div 
+                  className="cursor-pointer hover:bg-gray-50 rounded px-2 py-1 transition-colors group"
+                  onClick={() => onStartEditing(
+                    activity.itinerary_activity_id,
+                    'time',
+                    formatTimeForEditing(activity.start_time, activity.end_time)
+                  )}
+                  title="Click to edit times"
+                >
+                  {activity.start_time ? (
+                    <>
+                      <span className="text-sm font-medium text-gray-900 group-hover:text-blue-600">
+                        {formatTime(activity.start_time)}
+                      </span>
+                      {activity.end_time && (
+                        <>
+                          <div className="w-px h-4 bg-gray-300 my-1" />
+                          <span className="text-xs text-gray-500 group-hover:text-blue-600">
+                            {formatTime(activity.end_time)}
+                          </span>
+                        </>
+                      )}
+                    </>
+                  ) : (
+                    <span className="text-xs text-gray-400 group-hover:text-blue-600">Add time</span>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Activity details */}
+            <div className="flex-1 space-y-2">
+              {/* Title and type */}
+              <div className="flex items-start justify-between">
+                <div className="flex-1">
+                  {editingField?.activityId === activity.itinerary_activity_id && editingField.field === 'name' ? (
+                    <div className="flex items-center gap-2 mb-1">
+                      <Input
+                        value={editingValues[`${activity.itinerary_activity_id}-name`] || ''}
+                        onChange={(e) => onEditingValueChange(
+                          `${activity.itinerary_activity_id}-name`,
+                          e.target.value
+                        )}
+                        onKeyDown={(e) => onEditKeyDown(e, activity)}
+                        className="font-medium text-gray-900 h-8 text-base"
+                        autoFocus
+                        placeholder="Activity name"
+                      />
+                      <div className="flex items-center gap-1">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => onSaveField(activity)}
+                          disabled={savingStates[`${activity.itinerary_activity_id}-name`]}
+                          className="h-8 w-8 p-0 text-green-600 hover:text-green-700 hover:bg-green-50"
+                        >
+                          {savingStates[`${activity.itinerary_activity_id}-name`] ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Check className="h-4 w-4" />
+                          )}
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={onCancelEditing}
+                          className="h-8 w-8 p-0 text-gray-500 hover:text-gray-700 hover:bg-gray-50"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <h3 
+                      className="font-medium text-gray-900 mb-1 cursor-pointer hover:text-blue-600 hover:underline transition-colors"
+                      onClick={() => onStartEditing(
+                        activity.itinerary_activity_id, 
+                        'name', 
+                        activity.activity?.name || ''
+                      )}
+                      title="Click to edit activity name"
+                    >
+                      {activity.activity?.name || 'Unnamed Activity'}
+                    </h3>
+                  )}
+                  
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {activity.activity?.types && activity.activity.types.length > 0 && (
+                      <Badge variant="secondary" className="text-xs">
+                        {formatCategoryType(activity.activity.types[0])}
+                      </Badge>
+                    )}
+                    
+                    {activity.activity?.rating && (
+                      <div className="flex items-center gap-1 text-xs text-gray-600">
+                        <Star className="h-3 w-3 text-yellow-400 fill-current" />
+                        <span>{activity.activity.rating.toFixed(1)}</span>
+                      </div>
+                    )}
+                    
+                    {activity.activity?.price_level && (
+                      <div className="text-xs text-gray-600">
+                        {getPriceDisplay(activity.activity.price_level)}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Actions */}
+                <div className="flex items-center gap-1 ml-4">
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    onClick={() => onRemoveActivity(activity.activity?.place_id || '')}
+                    className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+
+              {/* Address */}
+              {activity.activity?.address && (
+                <div className="flex items-start gap-2 text-sm text-gray-600">
+                  <MapPin className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                  <span>{activity.activity.address}</span>
+                </div>
+              )}
+
+              {/* Contact information */}
+              {(activity.activity?.phone_number || activity.activity?.website_url) && (
+                <div className={cn("flex items-center text-sm", isMobile ? "gap-3 flex-wrap" : "gap-4")}>
+                  {activity.activity.phone_number && (
+                    <Link 
+                      href={`tel:${activity.activity.phone_number}`}
+                      className="flex items-center gap-1 text-blue-600 hover:text-blue-700 hover:underline"
+                    >
+                      <Phone className="h-3 w-3" />
+                      <span>{activity.activity.phone_number}</span>
+                    </Link>
+                  )}
+                  
+                  {activity.activity.website_url && (
+                    <Link 
+                      href={activity.activity.website_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={cn("flex items-center gap-1 text-blue-600 hover:text-blue-700 hover:underline truncate", isMobile ? "max-w-36" : "max-w-48")}
+                    >
+                      <Globe className="h-3 w-3 flex-shrink-0" />
+                      <span className="truncate">Visit website</span>
+                    </Link>
+                  )}
+                </div>
+              )}
+
+              {/* Notes */}
+              <div className="pt-2">
+                {editingField?.activityId === activity.itinerary_activity_id && editingField.field === 'notes' ? (
+                  <div className="space-y-2">
+                    <Textarea
+                      value={editingValues[`${activity.itinerary_activity_id}-notes`] || ''}
+                      onChange={(e) => onEditingValueChange(
+                        `${activity.itinerary_activity_id}-notes`,
+                        e.target.value
+                      )}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+                          e.preventDefault();
+                          onSaveField(activity);
+                        } else if (e.key === 'Escape') {
+                          e.preventDefault();
+                          onCancelEditing();
+                        }
+                      }}
+                      className="min-h-[80px] text-sm resize-y"
+                      placeholder="Add notes about this activity..."
+                      autoFocus
+                    />
+                    <div className="flex items-center justify-between">
+                      <div className="text-xs text-gray-400">Ctrl+Enter to save, Esc to cancel</div>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => onSaveField(activity)}
+                          disabled={savingStates[`${activity.itinerary_activity_id}-notes`]}
+                          className="text-green-600 hover:text-green-700 hover:bg-green-50"
+                        >
+                          {savingStates[`${activity.itinerary_activity_id}-notes`] ? (
+                            <Loader2 className="h-4 w-4 animate-spin mr-1" />
+                          ) : (
+                            <Save className="h-4 w-4 mr-1" />
+                          )}
+                          Save
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={onCancelEditing}
+                          className="text-gray-500 hover:text-gray-700 hover:bg-gray-50"
+                        >
+                          Cancel
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {activity.notes ? (
+                      <div 
+                        className="text-sm text-gray-600 bg-gray-50 rounded-lg p-3 cursor-pointer hover:bg-gray-100 transition-colors group border border-dashed border-gray-200 hover:border-gray-300"
+                        onClick={() => onStartEditing(
+                          activity.itinerary_activity_id,
+                          'notes',
+                          activity.notes || ''
+                        )}
+                        title="Click to edit notes"
+                      >
+                        <div className="flex items-start gap-2">
+                          <div className="text-gray-400 group-hover:text-blue-500">
+                            <Edit3 className="h-4 w-4" />
+                          </div>
+                          <div className="flex-1 group-hover:text-blue-600">
+                            {activity.notes}
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => onStartEditing(
+                          activity.itinerary_activity_id,
+                          'notes',
+                          ''
+                        )}
+                        className="text-gray-500 hover:text-blue-600 hover:border-blue-300 border-dashed"
+                      >
+                        <Edit3 className="h-4 w-4 mr-2" />
+                        Add notes
+                      </Button>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
 export function ItineraryListView({ 
   showMap, 
   onToggleMap, 
@@ -61,6 +457,9 @@ export function ItineraryListView({
   const [editingField, setEditingField] = useState<{ activityId: string; field: 'name' | 'time' | 'notes' } | null>(null);
   const [editingValues, setEditingValues] = useState<{ [key: string]: string }>({});
   const [savingStates, setSavingStates] = useState<{ [key: string]: boolean }>({});
+  const [draggedActivity, setDraggedActivity] = useState<ItineraryActivity | null>(null);
+  const [activeId, setActiveId] = useState<UniqueIdentifier | null>(null);
+  const [isReordering, setIsReordering] = useState(false);
   const [expandedDays, setExpandedDays] = useState<Set<string>>(() => {
     // Try to restore from localStorage first, then fall back to defaults
     if (typeof window !== 'undefined') {
@@ -82,6 +481,20 @@ export function ItineraryListView({
   const isMobile = useIsMobile();
   
   const { itineraryActivities, removeItineraryActivity, setItineraryActivities } = useItineraryActivityStore();
+  
+  // DnD sensors setup with touch and mouse support
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8, // Prevents accidental drags
+        tolerance: 5,
+        delay: 100, // Small delay for touch devices
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
   const { startDate, endDate } = useDateRangeStore();
 
   // Filter out deleted activities
@@ -168,6 +581,119 @@ export function ItineraryListView({
 
   const handleNotesChange = (id: string, value: string) => {
     setNotes((prev) => ({ ...prev, [id]: value }));
+  };
+
+  const handleEditingValueChange = (key: string, value: string) => {
+    setEditingValues({ ...editingValues, [key]: value });
+  };
+
+  const handleDragStart = (event: DragStartEvent) => {
+    const { active } = event;
+    const activity = activeActivities.find(a => a.itinerary_activity_id === active.id);
+    if (activity) {
+      setDraggedActivity(activity);
+      setActiveId(active.id);
+    }
+  };
+
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event;
+    
+    setDraggedActivity(null);
+    setActiveId(null);
+
+    if (!over || active.id === over.id) {
+      return;
+    }
+
+    setIsReordering(true);
+    
+    try {
+      // Find the activities involved in the drag
+      const activeActivity = activeActivities.find(a => a.itinerary_activity_id === active.id);
+      const overActivity = activeActivities.find(a => a.itinerary_activity_id === over.id);
+
+      if (!activeActivity || !overActivity) return;
+
+      // Check if both activities are in the same day
+      const activeDate = activeActivity.date || 'unscheduled';
+      const overDate = overActivity.date || 'unscheduled';
+
+      if (activeDate !== overDate) {
+        toast.error('Activities can only be reordered within the same day');
+        return;
+      }
+
+      // Get activities for this date
+      const dateKey = activeDate === 'unscheduled' ? 'unscheduled' : new Date(activeDate).toISOString().split("T")[0];
+      const dayActivities = activeActivities.filter(a => {
+        const actDate = a.date || 'unscheduled';
+        const actKey = actDate === 'unscheduled' ? 'unscheduled' : new Date(actDate).toISOString().split("T")[0];
+        return actKey === dateKey;
+      });
+
+      // Find indices
+      const oldIndex = dayActivities.findIndex(a => a.itinerary_activity_id === active.id);
+      const newIndex = dayActivities.findIndex(a => a.itinerary_activity_id === over.id);
+
+      if (oldIndex === -1 || newIndex === -1) return;
+
+      // Reorder activities
+      const reorderedDayActivities = arrayMove(dayActivities, oldIndex, newIndex);
+
+      // Update times if activities have times set
+      const updatedActivities = await updateActivityTimes(reorderedDayActivities, dateKey);
+
+      // Update the full activities list
+      const newActivities = activeActivities.map(activity => {
+        const updated = updatedActivities.find(a => a.itinerary_activity_id === activity.itinerary_activity_id);
+        return updated || activity;
+      });
+
+      // Update local state
+      setItineraryActivities(newActivities);
+
+      // Invalidate queries to refresh data
+      queryClient.invalidateQueries({ queryKey: ["itineraryActivities"] });
+
+      toast.success('Activities reordered successfully');
+    } catch (error) {
+      console.error('Error reordering activities:', error);
+      toast.error('Failed to reorder activities. Please try again.');
+      
+      // Revert to original order by refetching
+      queryClient.invalidateQueries({ queryKey: ["itineraryActivities"] });
+    } finally {
+      setIsReordering(false);
+    }
+  };
+
+  // Helper function to update activity times after reordering
+  const updateActivityTimes = async (activities: ItineraryActivity[], dateKey: string) => {
+    // If it's unscheduled, no need to update times
+    if (dateKey === 'unscheduled') return activities;
+
+    // Calculate new times based on position
+    const activitiesWithTimes = activities.filter(a => a.start_time);
+    const activitiesWithoutTimes = activities.filter(a => !a.start_time);
+
+    // If no activities have times, return as is
+    if (activitiesWithTimes.length === 0) return activities;
+
+    // Sort activities with times by their start time
+    activitiesWithTimes.sort((a, b) => {
+      if (!a.start_time || !b.start_time) return 0;
+      return a.start_time.localeCompare(b.start_time);
+    });
+
+    // Update server with new order
+    const updatePromises = activities.map(async (activity, index) => {
+      // For now, we'll keep the times as they are
+      // In a future enhancement, we could adjust times based on the new order
+      return activity;
+    });
+
+    return Promise.all(updatePromises);
   };
 
   const handleRemoveActivity = async (placeId: string) => {
@@ -353,11 +879,72 @@ export function ItineraryListView({
             break;
         }
       }
+
+      // Alt + Arrow keys for reordering within focused activity
+      if (event.altKey && (event.key === 'ArrowUp' || event.key === 'ArrowDown')) {
+        event.preventDefault();
+        
+        // Find the focused element
+        const focusedElement = document.activeElement;
+        if (!focusedElement) return;
+
+        // Find the parent sortable item
+        const sortableItem = focusedElement.closest('[data-sortable-id]');
+        if (!sortableItem) return;
+
+        const activityId = sortableItem.getAttribute('data-sortable-id');
+        if (!activityId) return;
+
+        // Find the activity and its current position
+        const activity = activeActivities.find(a => a.itinerary_activity_id === activityId);
+        if (!activity) return;
+
+        const dateKey = activity.date ? new Date(activity.date).toISOString().split("T")[0] : 'unscheduled';
+        const dayActivities = activeActivities.filter(a => {
+          const actDate = a.date || 'unscheduled';
+          const actKey = actDate === 'unscheduled' ? 'unscheduled' : new Date(actDate).toISOString().split("T")[0];
+          return actKey === dateKey;
+        });
+
+        const currentIndex = dayActivities.findIndex(a => a.itinerary_activity_id === activityId);
+        if (currentIndex === -1) return;
+
+        // Determine new index
+        const newIndex = event.key === 'ArrowUp' 
+          ? Math.max(0, currentIndex - 1)
+          : Math.min(dayActivities.length - 1, currentIndex + 1);
+
+        if (newIndex === currentIndex) return;
+
+        // Reorder activities
+        const reorderedDayActivities = arrayMove(dayActivities, currentIndex, newIndex);
+
+        // Update the full activities list
+        const newActivities = activeActivities.map(act => {
+          const updated = reorderedDayActivities.find(a => a.itinerary_activity_id === act.itinerary_activity_id);
+          return updated || act;
+        });
+
+        // Update local state
+        setItineraryActivities(newActivities);
+
+        // Show feedback
+        toast.success(`Moved ${activity.activity?.name || 'activity'} ${event.key === 'ArrowUp' ? 'up' : 'down'}`);
+
+        // Maintain focus on the moved item
+        setTimeout(() => {
+          const movedItem = document.querySelector(`[data-sortable-id="${activityId}"]`);
+          if (movedItem) {
+            const focusableElement = movedItem.querySelector('button, [tabindex="0"]') as HTMLElement;
+            focusableElement?.focus();
+          }
+        }, 100);
+      }
     };
 
     document.addEventListener('keydown', handleGlobalKeyDown);
     return () => document.removeEventListener('keydown', handleGlobalKeyDown);
-  }, []);
+  }, [activeActivities, setItineraryActivities]);
 
   return (
     <div className={cn("space-y-6", isMobile ? "p-4" : "p-6", className)}>
@@ -395,6 +982,18 @@ export function ItineraryListView({
               >
                 Collapse All
               </Button>
+              <div className="text-xs text-muted-foreground pl-2 border-l">
+                <span className="hidden sm:inline">Drag </span>
+                <GripVertical className="inline h-3 w-3" />
+                <span className="hidden sm:inline"> or Alt+↑↓ to reorder</span>
+                <span className="sm:hidden">Alt+↑↓ reorder</span>
+              </div>
+              {isReordering && (
+                <div className="flex items-center gap-2 text-xs text-blue-600">
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                  Reordering...
+                </div>
+              )}
             </div>
           </div>
         </>
@@ -475,308 +1074,64 @@ export function ItineraryListView({
 
                 {/* Collapsible Activities Content */}
                 <CollapsibleContent className="collapsible-content space-y-3">
-                  <div className={cn("space-y-3", isMobile ? "ml-8" : "ml-10")}>
-                    {activities.map((activity, index) => (
-                  <Card key={activity.itinerary_activity_id} className="hover:shadow-md transition-shadow">
-                    <CardContent className={cn(isMobile ? "p-3" : "p-4")}>
-                      <div className={cn("flex items-start", isMobile ? "gap-3" : "gap-4")}>
-                        {/* Time indicator */}
-                        <div className={cn("flex flex-col items-center", isMobile ? "min-w-[70px]" : "min-w-[110px]")}>
-                          {editingField?.activityId === activity.itinerary_activity_id && editingField.field === 'time' ? (
-                            <div className="space-y-2 w-full">
-                              <Input
-                                value={editingValues[`${activity.itinerary_activity_id}-time`] || ''}
-                                onChange={(e) => setEditingValues({
-                                  ...editingValues,
-                                  [`${activity.itinerary_activity_id}-time`]: e.target.value
-                                })}
-                                onKeyDown={(e) => handleEditKeyDown(e, activity)}
-                                className={cn(
-                                  "text-xs h-7 text-center",
-                                  !validateTimeInput(editingValues[`${activity.itinerary_activity_id}-time`] || '') && "border-red-500"
-                                )}
-                                placeholder="09:00|17:00"
-                                autoFocus
-                              />
-                              <div className="flex justify-center gap-1">
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  onClick={() => saveField(activity)}
-                                  disabled={savingStates[`${activity.itinerary_activity_id}-time`] || 
-                                           !validateTimeInput(editingValues[`${activity.itinerary_activity_id}-time`] || '')}
-                                  className="h-6 w-6 p-0 text-green-600 hover:text-green-700 hover:bg-green-50"
-                                >
-                                  {savingStates[`${activity.itinerary_activity_id}-time`] ? (
-                                    <Loader2 className="h-3 w-3 animate-spin" />
-                                  ) : (
-                                    <Check className="h-3 w-3" />
-                                  )}
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  onClick={cancelEditing}
-                                  className="h-6 w-6 p-0 text-gray-500 hover:text-gray-700 hover:bg-gray-50"
-                                >
-                                  <X className="h-3 w-3" />
-                                </Button>
-                              </div>
-                              <div className="text-xs text-gray-400 text-center">HH:MM format</div>
-                            </div>
-                          ) : (
-                            <div 
-                              className="cursor-pointer hover:bg-gray-50 rounded px-2 py-1 transition-colors group"
-                              onClick={() => startEditing(
-                                activity.itinerary_activity_id,
-                                'time',
-                                formatTimeForEditing(activity.start_time, activity.end_time)
-                              )}
-                              title="Click to edit times"
-                            >
-                              {activity.start_time ? (
-                                <>
-                                  <span className="text-sm font-medium text-gray-900 group-hover:text-blue-600">
-                                    {formatTime(activity.start_time)}
-                                  </span>
-                                  {activity.end_time && (
-                                    <>
-                                      <div className="w-px h-4 bg-gray-300 my-1" />
-                                      <span className="text-xs text-gray-500 group-hover:text-blue-600">
-                                        {formatTime(activity.end_time)}
-                                      </span>
-                                    </>
-                                  )}
-                                </>
-                              ) : (
-                                <span className="text-xs text-gray-400 group-hover:text-blue-600">Add time</span>
-                              )}
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Activity details */}
-                        <div className="flex-1 space-y-2">
-                          {/* Title and type */}
-                          <div className="flex items-start justify-between">
-                            <div className="flex-1">
-                              {editingField?.activityId === activity.itinerary_activity_id && editingField.field === 'name' ? (
-                                <div className="flex items-center gap-2 mb-1">
-                                  <Input
-                                    value={editingValues[`${activity.itinerary_activity_id}-name`] || ''}
-                                    onChange={(e) => setEditingValues({
-                                      ...editingValues,
-                                      [`${activity.itinerary_activity_id}-name`]: e.target.value
-                                    })}
-                                    onKeyDown={(e) => handleEditKeyDown(e, activity)}
-                                    className="font-medium text-gray-900 h-8 text-base"
-                                    autoFocus
-                                    placeholder="Activity name"
-                                  />
-                                  <div className="flex items-center gap-1">
-                                    <Button
-                                      size="sm"
-                                      variant="ghost"
-                                      onClick={() => saveField(activity)}
-                                      disabled={savingStates[`${activity.itinerary_activity_id}-name`]}
-                                      className="h-8 w-8 p-0 text-green-600 hover:text-green-700 hover:bg-green-50"
-                                    >
-                                      {savingStates[`${activity.itinerary_activity_id}-name`] ? (
-                                        <Loader2 className="h-4 w-4 animate-spin" />
-                                      ) : (
-                                        <Check className="h-4 w-4" />
-                                      )}
-                                    </Button>
-                                    <Button
-                                      size="sm"
-                                      variant="ghost"
-                                      onClick={cancelEditing}
-                                      className="h-8 w-8 p-0 text-gray-500 hover:text-gray-700 hover:bg-gray-50"
-                                    >
-                                      <X className="h-4 w-4" />
-                                    </Button>
-                                  </div>
-                                </div>
-                              ) : (
-                                <h3 
-                                  className="font-medium text-gray-900 mb-1 cursor-pointer hover:text-blue-600 hover:underline transition-colors"
-                                  onClick={() => startEditing(
-                                    activity.itinerary_activity_id, 
-                                    'name', 
-                                    activity.activity?.name || ''
-                                  )}
-                                  title="Click to edit activity name"
-                                >
-                                  {activity.activity?.name || 'Unnamed Activity'}
-                                </h3>
-                              )}
-                              
-                              <div className="flex items-center gap-2 flex-wrap">
-                                {activity.activity?.types && activity.activity.types.length > 0 && (
-                                  <Badge variant="secondary" className="text-xs">
-                                    {formatCategoryType(activity.activity.types[0])}
-                                  </Badge>
-                                )}
-                                
-                                {activity.activity?.rating && (
-                                  <div className="flex items-center gap-1 text-xs text-gray-600">
-                                    <Star className="h-3 w-3 text-yellow-400 fill-current" />
-                                    <span>{activity.activity.rating.toFixed(1)}</span>
-                                  </div>
-                                )}
-                                
-                                {activity.activity?.price_level && (
-                                  <div className="text-xs text-gray-600">
-                                    {getPriceDisplay(activity.activity.price_level)}
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-
-                            {/* Actions */}
-                            <div className="flex items-center gap-1 ml-4">
-                              <Button 
-                                variant="ghost" 
-                                size="sm" 
-                                onClick={() => handleRemoveActivity(activity.activity?.place_id || '')}
-                                className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          </div>
-
-                          {/* Address */}
-                          {activity.activity?.address && (
-                            <div className="flex items-start gap-2 text-sm text-gray-600">
-                              <MapPin className="h-4 w-4 mt-0.5 flex-shrink-0" />
-                              <span>{activity.activity.address}</span>
-                            </div>
-                          )}
-
-                          {/* Contact information */}
-                          {(activity.activity?.phone_number || activity.activity?.website_url) && (
-                            <div className={cn("flex items-center text-sm", isMobile ? "gap-3 flex-wrap" : "gap-4")}>
-                              {activity.activity.phone_number && (
-                                <Link 
-                                  href={`tel:${activity.activity.phone_number}`}
-                                  className="flex items-center gap-1 text-blue-600 hover:text-blue-700 hover:underline"
-                                >
-                                  <Phone className="h-3 w-3" />
-                                  <span>{activity.activity.phone_number}</span>
-                                </Link>
-                              )}
-                              
-                              {activity.activity.website_url && (
-                                <Link 
-                                  href={activity.activity.website_url}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className={cn("flex items-center gap-1 text-blue-600 hover:text-blue-700 hover:underline truncate", isMobile ? "max-w-36" : "max-w-48")}
-                                >
-                                  <Globe className="h-3 w-3 flex-shrink-0" />
-                                  <span className="truncate">Visit website</span>
-                                </Link>
-                              )}
-                            </div>
-                          )}
-
-                          {/* Notes */}
-                          <div className="pt-2">
-                            {editingField?.activityId === activity.itinerary_activity_id && editingField.field === 'notes' ? (
-                              <div className="space-y-2">
-                                <Textarea
-                                  value={editingValues[`${activity.itinerary_activity_id}-notes`] || ''}
-                                  onChange={(e) => setEditingValues({
-                                    ...editingValues,
-                                    [`${activity.itinerary_activity_id}-notes`]: e.target.value
-                                  })}
-                                  onKeyDown={(e) => {
-                                    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
-                                      e.preventDefault();
-                                      saveField(activity);
-                                    } else if (e.key === 'Escape') {
-                                      e.preventDefault();
-                                      cancelEditing();
-                                    }
-                                  }}
-                                  className="min-h-[80px] text-sm resize-y"
-                                  placeholder="Add notes about this activity..."
-                                  autoFocus
-                                />
-                                <div className="flex items-center justify-between">
-                                  <div className="text-xs text-gray-400">Ctrl+Enter to save, Esc to cancel</div>
-                                  <div className="flex items-center gap-2">
-                                    <Button
-                                      size="sm"
-                                      variant="ghost"
-                                      onClick={() => saveField(activity)}
-                                      disabled={savingStates[`${activity.itinerary_activity_id}-notes`]}
-                                      className="text-green-600 hover:text-green-700 hover:bg-green-50"
-                                    >
-                                      {savingStates[`${activity.itinerary_activity_id}-notes`] ? (
-                                        <Loader2 className="h-4 w-4 animate-spin mr-1" />
-                                      ) : (
-                                        <Save className="h-4 w-4 mr-1" />
-                                      )}
-                                      Save
-                                    </Button>
-                                    <Button
-                                      size="sm"
-                                      variant="ghost"
-                                      onClick={cancelEditing}
-                                      className="text-gray-500 hover:text-gray-700 hover:bg-gray-50"
-                                    >
-                                      Cancel
-                                    </Button>
-                                  </div>
-                                </div>
-                              </div>
-                            ) : (
-                              <div className="space-y-2">
-                                {activity.notes ? (
-                                  <div 
-                                    className="text-sm text-gray-600 bg-gray-50 rounded-lg p-3 cursor-pointer hover:bg-gray-100 transition-colors group border border-dashed border-gray-200 hover:border-gray-300"
-                                    onClick={() => startEditing(
-                                      activity.itinerary_activity_id,
-                                      'notes',
-                                      activity.notes || ''
-                                    )}
-                                    title="Click to edit notes"
-                                  >
-                                    <div className="flex items-start gap-2">
-                                      <div className="text-gray-400 group-hover:text-blue-500">
-                                        <Edit3 className="h-4 w-4" />
-                                      </div>
-                                      <div className="flex-1 group-hover:text-blue-600">
-                                        {activity.notes}
-                                      </div>
-                                    </div>
-                                  </div>
-                                ) : (
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => startEditing(
-                                      activity.itinerary_activity_id,
-                                      'notes',
-                                      ''
-                                    )}
-                                    className="text-gray-500 hover:text-blue-600 hover:border-blue-300 border-dashed"
-                                  >
-                                    <Edit3 className="h-4 w-4 mr-2" />
-                                    Add notes
-                                  </Button>
-                                )}
-                              </div>
-                            )}
-                          </div>
-                        </div>
+                  <DndContext
+                    sensors={sensors}
+                    collisionDetection={closestCenter}
+                    onDragStart={handleDragStart}
+                    onDragEnd={handleDragEnd}
+                  >
+                    <SortableContext
+                      items={activities.map(a => a.itinerary_activity_id)}
+                      strategy={verticalListSortingStrategy}
+                    >
+                      <div className={cn("space-y-3", isMobile ? "ml-8" : "ml-10")}>
+                        {activities.map((activity, index) => (
+                          <SortableActivity
+                            key={activity.itinerary_activity_id}
+                            activity={activity}
+                            index={index}
+                            editingField={editingField}
+                            editingValues={editingValues}
+                            savingStates={savingStates}
+                            onStartEditing={startEditing}
+                            onCancelEditing={cancelEditing}
+                            onSaveField={saveField}
+                            onRemoveActivity={handleRemoveActivity}
+                            onEditKeyDown={handleEditKeyDown}
+                            onEditingValueChange={handleEditingValueChange}
+                            formatTime={formatTime}
+                            formatTimeForEditing={formatTimeForEditing}
+                            validateTimeInput={validateTimeInput}
+                            getPriceDisplay={getPriceDisplay}
+                            isMobile={isMobile}
+                          />
+                        ))}
                       </div>
-                    </CardContent>
-                  </Card>
-                    ))}
-                  </div>
+                    </SortableContext>
+
+                    {/* Drag Overlay */}
+                    <DragOverlay>
+                      {activeId && draggedActivity ? (
+                        <Card className="shadow-xl opacity-90">
+                          <CardContent className={cn(isMobile ? "p-3" : "p-4")}>
+                            <div className="flex items-center gap-2">
+                              <GripVertical className="h-5 w-5 text-gray-400" />
+                              <div>
+                                <h3 className="font-medium text-gray-900">
+                                  {draggedActivity.activity?.name || 'Unnamed Activity'}
+                                </h3>
+                                {draggedActivity.start_time && (
+                                  <span className="text-sm text-gray-500">
+                                    {formatTime(draggedActivity.start_time)}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ) : null}
+                    </DragOverlay>
+                  </DndContext>
                 </CollapsibleContent>
               </div>
             </Collapsible>

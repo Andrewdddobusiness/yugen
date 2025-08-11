@@ -224,6 +224,38 @@ export async function setItineraryActivityNotes(itineraryActivityId: string, not
   return { success: true, message: "Set notes successful", data };
 }
 
+export async function batchUpdateItineraryActivities(updates: { id: string; order?: number; start_time?: string; end_time?: string }[]) {
+  const supabase = createClient();
+
+  try {
+    // Update each activity
+    const updatePromises = updates.map(({ id, ...updateData }) => 
+      supabase
+        .from("itinerary_activity")
+        .update(updateData)
+        .eq("itinerary_activity_id", id)
+    );
+
+    const results = await Promise.all(updatePromises);
+    
+    // Check if any updates failed
+    const failedUpdates = results.filter(result => result.error);
+    if (failedUpdates.length > 0) {
+      console.error("Some updates failed:", failedUpdates);
+      return { 
+        success: false, 
+        message: "Some updates failed", 
+        errors: failedUpdates.map(r => r.error) 
+      };
+    }
+
+    return { success: true, message: "Batch update successful" };
+  } catch (error) {
+    console.error("Error in batch update:", error);
+    return { success: false, message: "Batch update failed", error };
+  }
+}
+
 export async function setActivityName(activityId: string, name: string) {
   const supabase = createClient();
 
