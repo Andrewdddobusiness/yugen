@@ -1,8 +1,8 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, forwardRef, useImperativeHandle, useRef } from 'react';
 import { format, isToday } from 'date-fns';
-import { Clock, MapPin, Star, DollarSign, Phone, Globe, Edit3, Trash2, ChevronDown, ChevronRight, Check, X, Save, Loader2, GripVertical } from 'lucide-react';
+import { Clock, MapPin, Star, DollarSign, Phone, Globe, Edit3, Trash2, ChevronDown, ChevronRight, Check, X, Save, Loader2, GripVertical, Square, CheckSquare2, Move, FileDown, Calendar, StickyNote } from 'lucide-react';
 import {
   DndContext,
   closestCenter,
@@ -28,6 +28,7 @@ import { CSS } from '@dnd-kit/utilities';
 import { cn } from '@/lib/utils';
 import { useItineraryActivityStore } from '@/store/itineraryActivityStore';
 import { useDateRangeStore } from '@/store/dateRangeStore';
+import { useItineraryLayoutStore } from '@/store/itineraryLayoutStore';
 import { useIsMobile } from '@/components/hooks/use-mobile';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -51,11 +52,18 @@ import { shouldShowTravelTime, getTravelTimeColor, formatTravelTime, getTotalTra
 import type { TravelMode } from '@/actions/google/travelTime';
 import { SearchAndFilter, FilterableActivity } from '@/components/list/SearchAndFilter';
 import { HighlightedText } from '@/components/ui/highlighted-text';
+import { BulkActionToolbar } from '@/components/list/BulkActionToolbar';
 
 interface ItineraryListViewProps {
   showMap?: boolean;
   onToggleMap?: () => void;
   className?: string;
+  targetDate?: Date | null;
+}
+
+export interface ItineraryListViewRef {
+  scrollToDate: (date: Date) => void;
+  containerRef: React.RefObject<HTMLDivElement>;
 }
 
 interface ItineraryActivity {
@@ -98,6 +106,10 @@ interface SortableActivityProps {
   getPriceDisplay: (priceLevel?: string) => string | null;
   isMobile: boolean;
   isDragging?: boolean;
+  // Bulk selection props
+  isSelected: boolean;
+  onToggleSelection: (activityId: string, selected: boolean, event?: React.MouseEvent) => void;
+  selectionMode: boolean;
 }
 
 // Sortable Activity Component
@@ -139,10 +151,30 @@ function SortableActivity(props: SortableActivityProps) {
     <div ref={setNodeRef} style={style} data-sortable-id={activity.itinerary_activity_id}>
       <Card className={cn(
         "hover:shadow-md transition-shadow",
-        isCurrentlyDragging && "shadow-lg ring-2 ring-blue-500"
+        isCurrentlyDragging && "shadow-lg ring-2 ring-blue-500",
+        props.isSelected && "ring-2 ring-blue-500 bg-blue-50/30"
       )}>
         <CardContent className={cn(isMobile ? "p-3" : "p-4")}>
-          <div className={cn("flex items-start", isMobile ? "gap-3" : "gap-4")}>
+          <div className={cn("flex items-start", isMobile ? "gap-3" : "gap-4")}>            
+            {/* Selection Checkbox */}
+            {props.selectionMode && (
+              <div className="flex items-center justify-center pt-1">
+                <button
+                  className="flex items-center justify-center w-5 h-5 rounded hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 transition-colors"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    props.onToggleSelection(activity.itinerary_activity_id, !props.isSelected, e);
+                  }}
+                  aria-label={`${props.isSelected ? 'Deselect' : 'Select'} ${activity.activity?.name || 'activity'}`}
+                >
+                  {props.isSelected ? (
+                    <CheckSquare2 className="h-5 w-5 text-blue-600" />
+                  ) : (
+                    <Square className="h-5 w-5 text-gray-400 hover:text-blue-500" />
+                  )}
+                </button>
+              </div>
+            )}
             {/* Drag Handle */}
             <button
               {...attributes}
@@ -463,13 +495,16 @@ function SortableActivity(props: SortableActivityProps) {
   );
 }
 
-export function ItineraryListView({ 
+export const ItineraryListView = forwardRef<ItineraryListViewRef, ItineraryListViewProps>(({ 
   showMap, 
   onToggleMap, 
-  className 
-}: ItineraryListViewProps) {
+  className,
+  targetDate
+}, ref) => {
   const { itineraryId } = useParams();
   const queryClient = useQueryClient();
+  const containerRef = useRef<HTMLDivElement>(null);
+  const dayRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const [notes, setNotes] = useState<{ [key: string]: string }>({});
   const [editingField, setEditingField] = useState<{ activityId: string; field: 'name' | 'time' | 'notes' } | null>(null);
   const [editingValues, setEditingValues] = useState<{ [key: string]: string }>({});
@@ -480,25 +515,66 @@ export function ItineraryListView({
   const [travelModes, setTravelModes] = useState<TravelMode[]>(['walking', 'driving']);
   const [filteredActivities, setFilteredActivities] = useState<FilterableActivity[]>([]);
   const [currentSearchTerm, setCurrentSearchTerm] = useState<string>('');
+  
+  // Get layout store functions
+  const { saveViewState, getViewState } = useItineraryLayoutStore();
+  
+  // Initialize expanded days from store or defaults
   const [expandedDays, setExpandedDays] = useState<Set<string>>(() => {
-    // Try to restore from localStorage first, then fall back to defaults
-    if (typeof window !== 'undefined') {
-      try {
-        const saved = localStorage.getItem(`expandedDays-${itineraryId}`);
-        if (saved) {
-          const parsedDays = JSON.parse(saved);
-          return new Set(Array.isArray(parsedDays) ? parsedDays : []);
-        }
-      } catch (error) {
-        console.warn('Failed to load expanded days from localStorage:', error);
-      }
+    const viewState = getViewState('list');
+    if (viewState.expandedDays.length > 0) {
+      return new Set(viewState.expandedDays);
     }
     
     // Initially expand today's activities and unscheduled by default
     const today = new Date().toISOString().split("T")[0];
     return new Set([today, 'unscheduled']);
   });
+
+  // Bulk selection state
+  const [selectedActivities, setSelectedActivities] = useState<Set<string>>(new Set());
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [lastSelectedId, setLastSelectedId] = useState<string | null>(null);
+  const [bulkOperationLoading, setBulkOperationLoading] = useState(false);
+  
+  // Undo functionality
+  const [undoStack, setUndoStack] = useState<{
+    operation: string;
+    data: ItineraryActivity[];
+    timestamp: number;
+  }[]>([]);
   const isMobile = useIsMobile();
+  
+  // Expose scrollToDate function and containerRef via ref
+  useImperativeHandle(ref, () => ({
+    scrollToDate: (date: Date) => {
+      const dateStr = format(date, 'yyyy-MM-dd');
+      const dayElement = dayRefs.current.get(dateStr);
+      
+      if (dayElement && containerRef.current) {
+        // Expand the day if it's collapsed
+        setExpandedDays(prev => {
+          const newSet = new Set([...prev, dateStr]);
+          // Save expanded days to store
+          saveViewState('list', {
+            expandedDays: Array.from(newSet),
+            lastScrollTarget: dateStr
+          });
+          return newSet;
+        });
+        
+        // Scroll to the day element
+        setTimeout(() => {
+          dayElement.scrollIntoView({
+            behavior: 'smooth',
+            block: 'start',
+            inline: 'nearest'
+          });
+        }, 100); // Small delay to ensure expansion animation completes
+      }
+    },
+    containerRef,
+  }), [saveViewState]);
   
   const { itineraryActivities, removeItineraryActivity, setItineraryActivities } = useItineraryActivityStore();
   
@@ -605,6 +681,82 @@ export function ItineraryListView({
 
   const handleEditingValueChange = (key: string, value: string) => {
     setEditingValues({ ...editingValues, [key]: value });
+  };
+
+  // Bulk selection handlers
+  const toggleSelectionMode = () => {
+    setSelectionMode(!selectionMode);
+    if (selectionMode) {
+      setSelectedActivities(new Set());
+      setLastSelectedId(null);
+    }
+  };
+
+  const toggleActivitySelection = (activityId: string, selected: boolean, event?: React.MouseEvent) => {
+    const newSelected = new Set(selectedActivities);
+    
+    // Handle shift+click for range selection
+    if (event?.shiftKey && lastSelectedId) {
+      const visibleActivityIds = activitiesForGrouping.map(a => a.itinerary_activity_id);
+      const lastIndex = visibleActivityIds.indexOf(lastSelectedId);
+      const currentIndex = visibleActivityIds.indexOf(activityId);
+      
+      if (lastIndex !== -1 && currentIndex !== -1) {
+        const start = Math.min(lastIndex, currentIndex);
+        const end = Math.max(lastIndex, currentIndex);
+        
+        for (let i = start; i <= end; i++) {
+          if (selected) {
+            newSelected.add(visibleActivityIds[i]);
+          } else {
+            newSelected.delete(visibleActivityIds[i]);
+          }
+        }
+      }
+    } else {
+      // Regular single selection
+      if (selected) {
+        newSelected.add(activityId);
+      } else {
+        newSelected.delete(activityId);
+      }
+    }
+    
+    setSelectedActivities(newSelected);
+    setLastSelectedId(activityId);
+    
+    // Auto-enable selection mode if activities are selected
+    if (newSelected.size > 0 && !selectionMode) {
+      setSelectionMode(true);
+    }
+  };
+
+  const selectAllVisible = () => {
+    const visibleIds = activitiesForGrouping.map(a => a.itinerary_activity_id);
+    setSelectedActivities(new Set(visibleIds));
+    setSelectionMode(true);
+  };
+
+  const selectNone = () => {
+    setSelectedActivities(new Set());
+  };
+
+  const selectDay = (date: string) => {
+    const dayActivities = groupedActivities.find(([d]) => d === date)?.[1] || [];
+    const dayActivityIds = dayActivities.map(a => a.itinerary_activity_id);
+    const newSelected = new Set(selectedActivities);
+    
+    dayActivityIds.forEach(id => newSelected.add(id));
+    setSelectedActivities(newSelected);
+    setSelectionMode(true);
+  };
+
+  const isActivitySelected = (activityId: string) => selectedActivities.has(activityId);
+  
+  const getSelectedActivities = () => {
+    return activitiesForGrouping.filter(activity => 
+      selectedActivities.has(activity.itinerary_activity_id)
+    );
   };
 
   const handleDragStart = (event: DragStartEvent) => {
@@ -848,20 +1000,241 @@ export function ItineraryListView({
       } else {
         newSet.add(dateKey);
       }
+      
+      // Save expanded days to store
+      saveViewState('list', {
+        expandedDays: Array.from(newSet)
+      });
+      
       return newSet;
     });
   };
 
   const expandAllDays = () => {
     const allDates = groupedActivities.map(([date]) => date);
-    setExpandedDays(new Set(allDates));
+    const newSet = new Set(allDates);
+    setExpandedDays(newSet);
+    
+    // Save expanded days to store
+    saveViewState('list', {
+      expandedDays: Array.from(newSet)
+    });
   };
 
   const collapseAllDays = () => {
-    setExpandedDays(new Set());
+    const newSet = new Set<string>();
+    setExpandedDays(newSet);
+    
+    // Save expanded days to store
+    saveViewState('list', {
+      expandedDays: Array.from(newSet)
+    });
   };
 
   const isExpanded = (dateKey: string) => expandedDays.has(dateKey);
+
+  // Scroll position tracking
+  const saveScrollPosition = useCallback(() => {
+    if (containerRef.current) {
+      const scrollPosition = containerRef.current.scrollTop;
+      saveViewState('list', { scrollPosition });
+    }
+  }, [saveViewState]);
+
+  const restoreScrollPosition = useCallback(() => {
+    const viewState = getViewState('list');
+    if (containerRef.current && viewState.scrollPosition > 0) {
+      // Small delay to ensure content is rendered
+      setTimeout(() => {
+        if (containerRef.current) {
+          containerRef.current.scrollTop = viewState.scrollPosition;
+        }
+      }, 100);
+    }
+  }, [getViewState]);
+
+  // Bulk action handlers
+  const saveToUndoStack = (operation: string, affectedActivities: ItineraryActivity[]) => {
+    setUndoStack(prev => [
+      ...prev.slice(-4), // Keep only last 5 operations
+      {
+        operation,
+        data: JSON.parse(JSON.stringify(affectedActivities)), // Deep clone
+        timestamp: Date.now()
+      }
+    ]);
+  };
+
+  const handleBulkDelete = async () => {
+    const selectedItems = getSelectedActivities();
+    if (selectedItems.length === 0) return;
+
+    const confirmed = window.confirm(
+      `Are you sure you want to delete ${selectedItems.length} ${selectedItems.length === 1 ? 'activity' : 'activities'}?`
+    );
+    
+    if (!confirmed) return;
+
+    // Save for undo (note: delete can't be easily undone, so we don't save to undo stack)
+    setBulkOperationLoading(true);
+    
+    try {
+      // Delete activities one by one
+      await Promise.all(
+        selectedItems.map(activity => 
+          handleRemoveActivity(activity.activity?.place_id || '')
+        )
+      );
+      
+      setSelectedActivities(new Set());
+      setSelectionMode(false);
+      toast.success(`Deleted ${selectedItems.length} ${selectedItems.length === 1 ? 'activity' : 'activities'}`);
+    } catch (error) {
+      console.error('Error deleting activities:', error);
+      toast.error('Failed to delete some activities');
+    } finally {
+      setBulkOperationLoading(false);
+    }
+  };
+
+  const handleBulkMove = async (targetDate: string) => {
+    const selectedItems = getSelectedActivities();
+    if (selectedItems.length === 0) return;
+
+    // Save original state for undo
+    saveToUndoStack('move', selectedItems);
+
+    setBulkOperationLoading(true);
+    
+    try {
+      // Move activities by updating their dates
+      const updates = selectedItems.map(activity => ({
+        itinerary_activity_id: activity.itinerary_activity_id,
+        date: targetDate === 'unscheduled' ? null : targetDate,
+        start_time: null, // Clear times when moving to new day
+        end_time: null,
+      }));
+      
+      const result = await batchUpdateItineraryActivities(updates);
+      
+      if (result.success) {
+        // Update local state
+        const updatedActivities = itineraryActivities.map(activity => {
+          const update = updates.find(u => u.itinerary_activity_id === activity.itinerary_activity_id);
+          return update ? { ...activity, ...update } : activity;
+        });
+        
+        setItineraryActivities(updatedActivities);
+        queryClient.invalidateQueries({ queryKey: ["itineraryActivities"] });
+        
+        setSelectedActivities(new Set());
+        setSelectionMode(false);
+        
+        const dateLabel = targetDate === 'unscheduled' ? 'Unscheduled' : format(new Date(targetDate), 'MMM d');
+        toast.success(`Moved ${selectedItems.length} ${selectedItems.length === 1 ? 'activity' : 'activities'} to ${dateLabel}`);
+      } else {
+        throw new Error(result.message || 'Move failed');
+      }
+    } catch (error) {
+      console.error('Error moving activities:', error);
+      toast.error('Failed to move activities');
+    } finally {
+      setBulkOperationLoading(false);
+    }
+  };
+
+  const handleBulkAddNotes = async (notes: string) => {
+    const selectedItems = getSelectedActivities();
+    if (selectedItems.length === 0 || !notes.trim()) return;
+
+    // Save original state for undo
+    saveToUndoStack('notes', selectedItems);
+
+    setBulkOperationLoading(true);
+    
+    try {
+      await Promise.all(
+        selectedItems.map(activity => 
+          setItineraryActivityNotes(
+            activity.itinerary_activity_id, 
+            activity.notes ? `${activity.notes}\n\n${notes}` : notes
+          )
+        )
+      );
+      
+      // Update local state
+      const updatedActivities = itineraryActivities.map(activity => {
+        if (selectedActivities.has(activity.itinerary_activity_id)) {
+          return {
+            ...activity,
+            notes: activity.notes ? `${activity.notes}\n\n${notes}` : notes
+          };
+        }
+        return activity;
+      });
+      
+      setItineraryActivities(updatedActivities);
+      queryClient.invalidateQueries({ queryKey: ["itineraryActivities"] });
+      
+      setSelectedActivities(new Set());
+      setSelectionMode(false);
+      
+      toast.success(`Added notes to ${selectedItems.length} ${selectedItems.length === 1 ? 'activity' : 'activities'}`);
+    } catch (error) {
+      console.error('Error adding notes:', error);
+      toast.error('Failed to add notes to some activities');
+    } finally {
+      setBulkOperationLoading(false);
+    }
+  };
+
+  const handleBulkSetTimes = async (startTime: string, endTime: string) => {
+    const selectedItems = getSelectedActivities();
+    if (selectedItems.length === 0) return;
+
+    // Save original state for undo
+    saveToUndoStack('times', selectedItems);
+
+    setBulkOperationLoading(true);
+    
+    try {
+      await Promise.all(
+        selectedItems.map(activity => 
+          setItineraryActivityTimes(
+            activity.itinerary_activity_id,
+            startTime || '',
+            endTime || ''
+          )
+        )
+      );
+      
+      // Update local state
+      const updatedActivities = itineraryActivities.map(activity => {
+        if (selectedActivities.has(activity.itinerary_activity_id)) {
+          return {
+            ...activity,
+            start_time: startTime || null,
+            end_time: endTime || null
+          };
+        }
+        return activity;
+      });
+      
+      setItineraryActivities(updatedActivities);
+      queryClient.invalidateQueries({ queryKey: ["itineraryActivities"] });
+      
+      setSelectedActivities(new Set());
+      setSelectionMode(false);
+      
+      const action = startTime || endTime ? 'Set times for' : 'Cleared times for';
+      toast.success(`${action} ${selectedItems.length} ${selectedItems.length === 1 ? 'activity' : 'activities'}`);
+    } catch (error) {
+      console.error('Error setting times:', error);
+      toast.error('Failed to set times for some activities');
+    } finally {
+      setBulkOperationLoading(false);
+    }
+  };
 
   // Keyboard support for expand/collapse
   const handleExpandKeyDown = (event: React.KeyboardEvent, dateKey: string) => {
@@ -918,6 +1291,66 @@ export function ItineraryListView({
 
   const groupedActivities = groupActivitiesByDate(activitiesForGrouping);
 
+  // Generate available dates for bulk move
+  const availableDates = useMemo(() => {
+    const dates: { date: string; label: string; count: number }[] = [];
+    
+    groupedActivities.forEach(([date, activities]) => {
+      if (date !== 'unscheduled') {
+        const dateObj = new Date(date);
+        dates.push({
+          date,
+          label: format(dateObj, 'EEEE, MMM d'),
+          count: activities.length
+        });
+      }
+    });
+    
+    return dates.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  }, [groupedActivities]);
+
+  // Bulk export handler
+  const handleBulkExport = () => {
+    const selectedItems = getSelectedActivities();
+    if (selectedItems.length === 0) return;
+    
+    try {
+      // Create CSV content
+      const csvHeader = 'Name,Date,Start Time,End Time,Address,Notes,Category,Rating,Price Level\n';
+      const csvRows = selectedItems.map(activity => {
+        const name = (activity.activity?.name || 'Unnamed Activity').replace(/"/g, '""');
+        const date = activity.date || '';
+        const startTime = activity.start_time || '';
+        const endTime = activity.end_time || '';
+        const address = (activity.activity?.address || '').replace(/"/g, '""');
+        const notes = (activity.notes || '').replace(/"/g, '""').replace(/\n/g, ' ');
+        const category = activity.activity?.types?.[0] || '';
+        const rating = activity.activity?.rating || '';
+        const priceLevel = activity.activity?.price_level || '';
+        
+        return `"${name}","${date}","${startTime}","${endTime}","${address}","${notes}","${category}","${rating}","${priceLevel}"`;
+      }).join('\n');
+      
+      const csvContent = csvHeader + csvRows;
+      
+      // Create and download file
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `selected-activities-${new Date().toISOString().split('T')[0]}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      
+      toast.success(`Exported ${selectedItems.length} ${selectedItems.length === 1 ? 'activity' : 'activities'} to CSV`);
+    } catch (error) {
+      console.error('Error exporting activities:', error);
+      toast.error('Failed to export activities');
+    }
+  };
+
   // Travel time integration
   const { 
     travelTimes, 
@@ -940,16 +1373,35 @@ export function ItineraryListView({
     { modes: travelModes }
   );
 
-  // Persist expanded states to localStorage
+  // Restore scroll position on mount and when switching to this view
   useEffect(() => {
-    if (typeof window !== 'undefined' && itineraryId) {
-      try {
-        localStorage.setItem(`expandedDays-${itineraryId}`, JSON.stringify([...expandedDays]));
-      } catch (error) {
-        console.warn('Failed to save expanded days to localStorage:', error);
-      }
-    }
-  }, [expandedDays, itineraryId]);
+    restoreScrollPosition();
+  }, [restoreScrollPosition]);
+
+  // Save scroll position on scroll
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    let scrollTimeout: NodeJS.Timeout;
+    const handleScroll = () => {
+      clearTimeout(scrollTimeout);
+      scrollTimeout = setTimeout(saveScrollPosition, 150); // Debounce scroll saves
+    };
+
+    container.addEventListener('scroll', handleScroll, { passive: true });
+    return () => {
+      container.removeEventListener('scroll', handleScroll);
+      clearTimeout(scrollTimeout);
+    };
+  }, [saveScrollPosition]);
+
+  // Save scroll position before component unmounts or view changes
+  useEffect(() => {
+    return () => {
+      saveScrollPosition();
+    };
+  }, [saveScrollPosition]);
 
   // Global keyboard shortcuts
   useEffect(() => {
@@ -965,6 +1417,40 @@ export function ItineraryListView({
             collapseAllDays();
             break;
         }
+      }
+
+      // Bulk selection shortcuts
+      if (event.ctrlKey || event.metaKey) {
+        switch (event.key.toLowerCase()) {
+          case 'a':
+            event.preventDefault();
+            selectAllVisible();
+            break;
+          case 'd':
+            event.preventDefault();
+            selectNone();
+            break;
+        }
+      }
+      
+      // Delete selected activities
+      if (event.key === 'Delete' && selectedActivities.size > 0) {
+        event.preventDefault();
+        handleBulkDelete();
+      }
+      
+      // Toggle selection mode
+      if (event.key === 'Escape' && selectionMode) {
+        event.preventDefault();
+        setSelectionMode(false);
+        setSelectedActivities(new Set());
+      }
+      
+      // Undo last bulk operation
+      if ((event.ctrlKey || event.metaKey) && event.key === 'z' && undoStack.length > 0) {
+        event.preventDefault();
+        // TODO: Implement undo functionality
+        toast.info('Undo functionality coming soon!');
       }
 
       // Alt + Arrow keys for reordering within focused activity
@@ -1034,7 +1520,7 @@ export function ItineraryListView({
   }, [activeActivities, setItineraryActivities]);
 
   return (
-    <div className={cn("space-y-6", isMobile ? "p-4" : "p-6", className)}>
+    <div ref={containerRef} className={cn("space-y-6", isMobile ? "p-4" : "p-6", className)}>
       {/* Search and Filter Component */}
       <SearchAndFilter
         activities={filterableActivities}
@@ -1042,6 +1528,25 @@ export function ItineraryListView({
         onSearchTermChange={handleSearchTermChange}
         className="-mx-2 -mt-2"
       />
+
+      {/* Bulk Action Toolbar */}
+      {selectionMode && (
+        <div role="toolbar" aria-label="Bulk actions for selected activities">
+          <BulkActionToolbar
+            selectedCount={selectedActivities.size}
+            onSelectAll={selectAllVisible}
+            onSelectNone={selectNone}
+            onBulkDelete={handleBulkDelete}
+            onBulkMove={handleBulkMove}
+            onBulkAddNotes={handleBulkAddNotes}
+            onBulkSetTimes={handleBulkSetTimes}
+            onBulkExport={handleBulkExport}
+            onToggleSelectionMode={toggleSelectionMode}
+            availableDates={availableDates}
+            loading={bulkOperationLoading}
+          />
+        </div>
+      )}
 
       {activeActivities.length === 0 ? (
         <div className="text-center py-12">
@@ -1062,7 +1567,7 @@ export function ItineraryListView({
       ) : (
         <>
           {/* Expand/Collapse All Controls */}
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between" role="region" aria-label="Activity list controls">
             <div className="text-sm text-muted-foreground">
               {filteredActivities.length === activeActivities.length 
                 ? `${groupedActivities.length} ${groupedActivities.length === 1 ? 'day' : 'days'} with activities`
@@ -1070,6 +1575,24 @@ export function ItineraryListView({
               }
             </div>
             <div className="flex items-center gap-2">
+              {/* Selection Mode Toggle */}
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={toggleSelectionMode}
+                className={cn(
+                  "text-xs flex items-center gap-1",
+                  selectionMode ? "bg-blue-100 text-blue-700" : "text-gray-600"
+                )}
+                title="Toggle selection mode (or select activities to auto-enable)"
+              >
+                {selectionMode ? (
+                  <CheckSquare2 className="h-4 w-4" />
+                ) : (
+                  <Square className="h-4 w-4" />
+                )}
+                Select
+              </Button>
               <Button
                 variant="ghost"
                 size="sm"
@@ -1093,9 +1616,9 @@ export function ItineraryListView({
                 onModesChange={setTravelModes}
                 onRefresh={() => refreshTravelTimes()}
               />
-              <div className="text-xs text-muted-foreground pl-2 border-l">
+              <div className="text-xs text-muted-foreground pl-2 border-l" aria-label="Keyboard shortcuts">
                 <span className="hidden sm:inline">Drag </span>
-                <GripVertical className="inline h-3 w-3" />
+                <GripVertical className="inline h-3 w-3" aria-hidden="true" />
                 <span className="hidden sm:inline"> or Alt+↑↓ to reorder</span>
                 <span className="sm:hidden">Alt+↑↓ reorder</span>
               </div>
@@ -1111,13 +1634,23 @@ export function ItineraryListView({
       )}
       
       {groupedActivities.length > 0 && (
-        groupedActivities.map(([date, activities]) => {
+        <div role="main" aria-label="Itinerary activities by day">
+          {groupedActivities.map(([date, activities]) => {
           const dateInfo = formatDate(date);
           const expanded = isExpanded(date);
           
           return (
             <Collapsible key={date} open={expanded} onOpenChange={() => toggleDayExpansion(date)}>
-              <div className="space-y-4">
+              <div 
+                ref={(el) => {
+                  if (el) {
+                    dayRefs.current.set(date, el);
+                  } else {
+                    dayRefs.current.delete(date);
+                  }
+                }}
+                className="space-y-4"
+              >
                 {/* Day Header - Now a clickable trigger */}
                 <CollapsibleTrigger asChild>
                   <button 
@@ -1175,6 +1708,17 @@ export function ItineraryListView({
                       <span>
                         {activities.length} {activities.length === 1 ? 'activity' : 'activities'}
                       </span>
+                      {selectionMode && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => selectDay(date)}
+                          className="text-xs text-blue-600 hover:text-blue-700 hover:bg-blue-50 p-1 h-auto"
+                          title="Select all activities in this day"
+                        >
+                          Select Day
+                        </Button>
+                      )}
                       {/* Travel time summary */}
                       {(() => {
                         const dayTravelTimes = travelTimes[date] || [];
@@ -1236,6 +1780,11 @@ export function ItineraryListView({
                                 validateTimeInput={validateTimeInput}
                                 getPriceDisplay={getPriceDisplay}
                                 isMobile={isMobile}
+                                isSelected={isActivitySelected(activity.itinerary_activity_id)}
+                                onToggleSelection={(activityId, selected, event) => 
+                                  toggleActivitySelection(activityId, selected, event)
+                                }
+                                selectionMode={selectionMode}
                               />
                               
                               {/* Travel Time Indicator */}
@@ -1324,8 +1873,11 @@ export function ItineraryListView({
               </div>
             </Collapsible>
           );
-        })
+          })}
+        </div>
       )}
     </div>
   );
-}
+});
+
+ItineraryListView.displayName = 'ItineraryListView';

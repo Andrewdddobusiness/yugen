@@ -7,6 +7,7 @@ import TimePopover from "@/components/time/timePopover";
 import { DatePickerPopover } from "@/components/date/datePickerPopover";
 
 import { useItineraryActivityStore } from "@/store/itineraryActivityStore";
+import { useItineraryLayoutStore } from "@/store/itineraryLayoutStore";
 import { NotesPopover } from "@/components/popover/notesPopover";
 import { ChevronDown, MapPin, Phone, Globe } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -28,21 +29,41 @@ export function ItineraryTableView({ showMap, onToggleMap }: ItineraryTableViewP
   const isMobile = useIsMobile();
   const { itineraryId } = useParams();
   const queryClient = useQueryClient();
+  const { saveViewState, getViewState } = useItineraryLayoutStore();
 
   /* STATE */
   const [loading, setLoading] = useState(false);
   const [notes, setNotes] = useState<{ [key: string]: string }>({});
-  const [expandedCards, setExpandedCards] = useState<{ [key: string]: boolean }>({});
+  
+  // Initialize expanded cards from store
+  const [expandedCards, setExpandedCards] = useState<{ [key: string]: boolean }>(() => {
+    const viewState = getViewState('table');
+    const expanded: { [key: string]: boolean } = {};
+    viewState.expandedCards.forEach(cardId => {
+      expanded[cardId] = true;
+    });
+    return expanded;
+  });
 
   /* STORE */
   const { itineraryActivities, removeItineraryActivity } = useItineraryActivityStore();
   const { startDate, endDate } = useDateRangeStore();
 
   const toggleCard = (id: string) => {
-    setExpandedCards((prev) => ({
-      ...prev,
-      [id]: !prev[id],
-    }));
+    setExpandedCards((prev) => {
+      const newExpanded = {
+        ...prev,
+        [id]: !prev[id],
+      };
+      
+      // Save expanded cards to store
+      const expandedCardIds = Object.keys(newExpanded).filter(cardId => newExpanded[cardId]);
+      saveViewState('table', {
+        expandedCards: expandedCardIds
+      });
+      
+      return newExpanded;
+    });
   };
 
   const handleNotesChange = (id: string, value: string) => {
