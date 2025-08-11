@@ -43,6 +43,12 @@ import { setItineraryActivityTimes, setItineraryActivityNotes, setActivityName, 
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
+import { TravelTimeIndicator } from '@/components/travel/TravelTimeIndicator';
+import { TravelTimeConflicts } from '@/components/travel/TravelTimeConflicts';
+import { TravelTimeSettings } from '@/components/travel/TravelTimeSettings';
+import { useTravelTimes } from '@/components/hooks/use-travel-times';
+import { shouldShowTravelTime, getTravelTimeColor, formatTravelTime, getTotalTravelTimeForDay } from '@/utils/travel/travelTimeUtils';
+import type { TravelMode } from '@/actions/google/travelTime';
 
 interface ItineraryListViewProps {
   showMap?: boolean;
@@ -460,6 +466,7 @@ export function ItineraryListView({
   const [draggedActivity, setDraggedActivity] = useState<ItineraryActivity | null>(null);
   const [activeId, setActiveId] = useState<UniqueIdentifier | null>(null);
   const [isReordering, setIsReordering] = useState(false);
+  const [travelModes, setTravelModes] = useState<TravelMode[]>(['walking', 'driving']);
   const [expandedDays, setExpandedDays] = useState<Set<string>>(() => {
     // Try to restore from localStorage first, then fall back to defaults
     if (typeof window !== 'undefined') {
@@ -853,6 +860,28 @@ export function ItineraryListView({
 
   const groupedActivities = groupActivitiesByDate(activeActivities);
 
+  // Travel time integration
+  const { 
+    travelTimes, 
+    loading: travelTimesLoading, 
+    error: travelTimesError,
+    refreshTravelTimes
+  } = useTravelTimes(
+    groupedActivities.map(([date, activities]) => [
+      date,
+      activities.map(activity => ({
+        itinerary_activity_id: activity.itinerary_activity_id,
+        start_time: activity.start_time,
+        end_time: activity.end_time,
+        activity: activity.activity ? {
+          name: activity.activity.name,
+          coordinates: activity.activity.coordinates
+        } : undefined
+      }))
+    ]),
+    { modes: travelModes }
+  );
+
   // Persist expanded states to localStorage
   useEffect(() => {
     if (typeof window !== 'undefined' && itineraryId) {
@@ -982,6 +1011,11 @@ export function ItineraryListView({
               >
                 Collapse All
               </Button>
+              <TravelTimeSettings
+                defaultModes={travelModes}
+                onModesChange={setTravelModes}
+                onRefresh={() => refreshTravelTimes()}
+              />
               <div className="text-xs text-muted-foreground pl-2 border-l">
                 <span className="hidden sm:inline">Drag </span>
                 <GripVertical className="inline h-3 w-3" />
@@ -1060,10 +1094,24 @@ export function ItineraryListView({
                       <Separator />
                     </div>
                     
-                    <div className="text-sm text-muted-foreground flex items-center gap-2">
+                    <div className="text-sm text-muted-foreground flex items-center gap-3">
                       <span>
                         {activities.length} {activities.length === 1 ? 'activity' : 'activities'}
                       </span>
+                      {/* Travel time summary */}
+                      {(() => {
+                        const dayTravelTimes = travelTimes[date] || [];
+                        if (dayTravelTimes.length > 0) {
+                          const totalTravel = getTotalTravelTimeForDay(dayTravelTimes);
+                          return (
+                            <span className="text-xs text-gray-500 flex items-center gap-1">
+                              <Clock className="h-3 w-3" />
+                              {totalTravel.formattedDuration} travel
+                            </span>
+                          );
+                        }
+                        return null;
+                      })()}
                       {!expanded && activities.length > 0 && (
                         <div className="h-2 w-2 bg-blue-500 rounded-full animate-pulse" 
                              title={`${activities.length} activities hidden`} />
@@ -1085,27 +1133,64 @@ export function ItineraryListView({
                       strategy={verticalListSortingStrategy}
                     >
                       <div className={cn("space-y-3", isMobile ? "ml-8" : "ml-10")}>
-                        {activities.map((activity, index) => (
-                          <SortableActivity
-                            key={activity.itinerary_activity_id}
-                            activity={activity}
-                            index={index}
-                            editingField={editingField}
-                            editingValues={editingValues}
-                            savingStates={savingStates}
-                            onStartEditing={startEditing}
-                            onCancelEditing={cancelEditing}
-                            onSaveField={saveField}
-                            onRemoveActivity={handleRemoveActivity}
-                            onEditKeyDown={handleEditKeyDown}
-                            onEditingValueChange={handleEditingValueChange}
-                            formatTime={formatTime}
-                            formatTimeForEditing={formatTimeForEditing}
-                            validateTimeInput={validateTimeInput}
-                            getPriceDisplay={getPriceDisplay}
-                            isMobile={isMobile}
-                          />
-                        ))}
+                        {activities.map((activity, index) => {
+                          const nextActivity = activities[index + 1];
+                          const dayTravelTimes = travelTimes[date] || [];
+                          const travelTimeToNext = dayTravelTimes.find(
+                            t => t.fromActivityId === activity.itinerary_activity_id
+                          );
+                          
+                          return (
+                            <React.Fragment key={activity.itinerary_activity_id}>
+                              <SortableActivity
+                                activity={activity}
+                                index={index}
+                                editingField={editingField}
+                                editingValues={editingValues}
+                                savingStates={savingStates}
+                                onStartEditing={startEditing}
+                                onCancelEditing={cancelEditing}
+                                onSaveField={saveField}
+                                onRemoveActivity={handleRemoveActivity}
+                                onEditKeyDown={handleEditKeyDown}
+                                onEditingValueChange={handleEditingValueChange}
+                                formatTime={formatTime}
+                                formatTimeForEditing={formatTimeForEditing}
+                                validateTimeInput={validateTimeInput}
+                                getPriceDisplay={getPriceDisplay}
+                                isMobile={isMobile}
+                              />
+                              
+                              {/* Travel Time Indicator */}
+                              {nextActivity && travelTimeToNext && shouldShowTravelTime(travelTimeToNext) && (
+                                <div className="flex items-center justify-center py-2">
+                                  <div className="flex items-center gap-2 text-sm text-gray-600 bg-gray-50 rounded-full px-4 py-2 border">
+                                    <div className="h-4 w-4 text-gray-400">
+                                      {travelTimeToNext.mode === 'walking' && '🚶'}
+                                      {travelTimeToNext.mode === 'driving' && '🚗'}
+                                      {travelTimeToNext.mode === 'transit' && '🚌'}
+                                      {travelTimeToNext.mode === 'bicycling' && '🚲'}
+                                    </div>
+                                    <span className={cn("font-medium", getTravelTimeColor(travelTimeToNext.durationValue))}>
+                                      {travelTimeToNext.duration}
+                                    </span>
+                                    <span className="text-gray-400">({travelTimeToNext.distance})</span>
+                                  </div>
+                                </div>
+                              )}
+                              
+                              {/* Loading state for travel time */}
+                              {nextActivity && travelTimesLoading[date] && !travelTimeToNext && (
+                                <div className="flex items-center justify-center py-2">
+                                  <div className="flex items-center gap-2 text-sm text-gray-500">
+                                    <Loader2 className="h-3 w-3 animate-spin" />
+                                    <span>Calculating travel time...</span>
+                                  </div>
+                                </div>
+                              )}
+                            </React.Fragment>
+                          );
+                        })}
                       </div>
                     </SortableContext>
 
@@ -1132,6 +1217,32 @@ export function ItineraryListView({
                       ) : null}
                     </DragOverlay>
                   </DndContext>
+
+                  {/* Travel Time Conflicts */}
+                  {(() => {
+                    const dayTravelTimes = travelTimes[date] || [];
+                    if (dayTravelTimes.length > 0) {
+                      const dayActivitiesWithCoords = activities.map(activity => ({
+                        itinerary_activity_id: activity.itinerary_activity_id,
+                        start_time: activity.start_time,
+                        end_time: activity.end_time,
+                        activity: activity.activity ? {
+                          name: activity.activity.name,
+                          coordinates: activity.activity.coordinates
+                        } : undefined
+                      }));
+                      
+                      return (
+                        <div className={cn("mt-4", isMobile ? "ml-8" : "ml-10")}>
+                          <TravelTimeConflicts
+                            activities={dayActivitiesWithCoords}
+                            travelTimes={dayTravelTimes}
+                          />
+                        </div>
+                      );
+                    }
+                    return null;
+                  })()}
                 </CollapsibleContent>
               </div>
             </Collapsible>
