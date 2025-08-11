@@ -11,8 +11,8 @@ Create an alternative text-based list view that displays daily itineraries in a 
 
 ## Acceptance Criteria
 - [x] Create day-by-day list layout with time-ordered activities
-- [ ] Implement expandable/collapsible day sections
-- [ ] Add inline editing capabilities for activities
+- [x] Implement expandable/collapsible day sections
+- [x] Add inline editing capabilities for activities
 - [ ] Create activity reordering within days
 - [x] Implement time-based grouping and sorting
 - [ ] Add travel time indicators between activities
@@ -237,8 +237,6 @@ interface ListViewState {
    - Truncated URLs for better mobile display
 
 ### Not Implemented (Future Work):
-- Expandable/collapsible day sections
-- Inline editing (uses existing popovers instead)
 - Drag-and-drop reordering within days
 - Travel time calculations and indicators
 - Search and filtering functionality
