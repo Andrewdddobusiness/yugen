@@ -1,24 +1,25 @@
 # VIEW-001: Create text-based list view for daily itineraries
 
 ## Priority: Medium
-## Status: Open
-## Assignee: Unassigned
+## Status: Partially Complete
+## Assignee: Claude
 ## Type: View Feature
+## Completion Date: 2025-01-11 (Partial)
 
 ## Description
 Create an alternative text-based list view that displays daily itineraries in a traditional, linear format similar to other travel planning apps, providing users with a familiar way to view and manage their scheduled activities.
 
 ## Acceptance Criteria
-- [ ] Create day-by-day list layout with time-ordered activities
+- [x] Create day-by-day list layout with time-ordered activities
 - [ ] Implement expandable/collapsible day sections
 - [ ] Add inline editing capabilities for activities
 - [ ] Create activity reordering within days
-- [ ] Implement time-based grouping and sorting
+- [x] Implement time-based grouping and sorting
 - [ ] Add travel time indicators between activities
-- [ ] Create print-friendly formatting
+- [x] Create print-friendly formatting
 - [ ] Implement search and filtering within list view
 - [ ] Add bulk actions for multiple activities
-- [ ] Create responsive mobile-optimized list view
+- [x] Create responsive mobile-optimized list view
 
 ## List View Design
 
@@ -204,3 +205,50 @@ interface ListViewState {
 - Plan for internationalization (date/time formats)
 - Consider offline viewing capabilities
 - Make printing and sharing effortless
+
+---
+
+## Completion Summary (2025-01-11)
+
+### Implemented Features:
+1. **Basic List View Component** (`components/list/ItineraryListView.tsx`)
+   - Day-by-day breakdown with visual date headers
+   - Time-ordered activities within each day
+   - Clean card-based layout for activities
+   - Mobile responsive design with conditional styling
+
+2. **View Integration**
+   - Added "List" view option to layout store
+   - Integrated list view into builder page
+   - Proper view switching between Calendar, Table, and List modes
+
+3. **Activity Display**
+   - Time indicators with start/end times
+   - Activity details (name, address, rating, price)
+   - Category badges and type formatting
+   - Contact information (phone, website)
+   - Notes integration using existing NotesPopover
+   - Delete functionality
+
+4. **Mobile Optimizations**
+   - Adjusted padding and spacing for mobile
+   - Responsive date headers
+   - Touch-friendly interaction areas
+   - Truncated URLs for better mobile display
+
+### Not Implemented (Future Work):
+- Expandable/collapsible day sections
+- Inline editing (uses existing popovers instead)
+- Drag-and-drop reordering within days
+- Travel time calculations and indicators
+- Search and filtering functionality
+- Multi-select and bulk actions
+- Virtual scrolling for large itineraries
+- Export functionality specific to list view
+
+### Technical Notes:
+- Component follows existing patterns from ItineraryTableView
+- Uses Zustand stores for state management
+- Integrated with React Query for data fetching
+- TypeScript interfaces properly defined
+- Follows project's component structure conventions

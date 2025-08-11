@@ -3,7 +3,7 @@ import { persist } from 'zustand/middleware';
 
 export interface ItineraryLayoutState {
   // View settings
-  currentView: 'calendar' | 'table';
+  currentView: 'calendar' | 'table' | 'list';
   timeRange: 'day' | 'week';
   showMap: boolean;
   
@@ -24,7 +24,7 @@ export interface ItineraryLayoutState {
   };
 
   // Actions
-  setCurrentView: (view: 'calendar' | 'table') => void;
+  setCurrentView: (view: 'calendar' | 'table' | 'list') => void;
   setTimeRange: (range: 'day' | 'week') => void;
   setShowMap: (show: boolean) => void;
   toggleMap: () => void;

@@ -9,11 +9,12 @@ import { useItineraryLayoutStore } from "@/store/itineraryLayoutStore";
 import Loading from "@/components/loading/loading";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ItineraryTableView } from "@/components/table/itineraryTable";
+import { ItineraryListView } from "@/components/list/ItineraryListView";
 import ErrorPage from "@/app/error/page";
 import { useParams } from "next/navigation";
 import GoogleMapView from "@/components/map/googleMapView";
 import { Button } from "@/components/ui/button";
-import { Calendar, Table, Map, X } from "lucide-react";
+import { Calendar, Table, List, Map, X } from "lucide-react";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable';
 
 export default function Builder() {
@@ -64,6 +65,14 @@ export default function Builder() {
             <Table className="h-4 w-4 mr-2" />
             Table
           </Button>
+          <Button
+            variant={currentView === 'list' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setCurrentView('list')}
+          >
+            <List className="h-4 w-4 mr-2" />
+            List
+          </Button>
         </div>
         <Button
           variant={showMap ? 'default' : 'outline'}
@@ -86,11 +95,15 @@ export default function Builder() {
                       <div className="h-full">
                         <GoogleCalendarView isLoading={false} className="h-full" />
                       </div>
-                    ) : (
+                    ) : currentView === 'table' ? (
                       <ScrollArea className="flex-1 h-full">
                         <div className="p-4">
-                          <ItineraryTableView showMap={false} onToggleMap={() => {}} />
+                          <ItineraryTableView showMap={showMap} onToggleMap={toggleMap} />
                         </div>
+                      </ScrollArea>
+                    ) : (
+                      <ScrollArea className="flex-1 h-full">
+                        <ItineraryListView showMap={showMap} onToggleMap={toggleMap} />
                       </ScrollArea>
                     )}
                   </div>
@@ -121,11 +134,15 @@ export default function Builder() {
                   <div className="h-full">
                     <GoogleCalendarView isLoading={false} className="h-full" />
                   </div>
-                ) : (
+                ) : currentView === 'table' ? (
                   <ScrollArea className="flex-1 h-full">
                     <div className="p-4">
-                      <ItineraryTableView showMap={false} onToggleMap={() => {}} />
+                      <ItineraryTableView showMap={false} onToggleMap={toggleMap} />
                     </div>
+                  </ScrollArea>
+                ) : (
+                  <ScrollArea className="flex-1 h-full">
+                    <ItineraryListView showMap={false} onToggleMap={toggleMap} />
                   </ScrollArea>
                 )}
               </div>
