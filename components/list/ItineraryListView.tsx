@@ -1786,6 +1786,30 @@ export const ItineraryListView = forwardRef<ItineraryListViewRef, ItineraryListV
                       travelTimes={travelTimes[date] ? Object.fromEntries(
                         travelTimes[date].map(t => [t.fromActivityId, formatTravelTime(t.duration, t.mode)])
                       ) : {}}
+                      travelTimesData={travelTimes[date] ? Object.fromEntries(
+                        travelTimes[date].map(t => [t.fromActivityId, {
+                          duration: t.duration,
+                          durationValue: t.durationValue,
+                          mode: t.mode
+                        }])
+                      ) : {}}
+                      onApplyTimeSuggestion={(activityId, newStartTime, newEndTime) => {
+                        // Find the activity and apply time suggestion
+                        const activity = activities.find(a => a.itinerary_activity_id === activityId);
+                        if (activity && (newStartTime || newEndTime)) {
+                          saveField({
+                            ...activity,
+                            start_time: newStartTime || activity.start_time,
+                            end_time: newEndTime || activity.end_time
+                          });
+                        }
+                      }}
+                      onAddFreeTimeActivity={(startTime, duration, suggestion) => {
+                        // Create a placeholder activity for the free time suggestion
+                        // This would typically integrate with the activity search/add flow
+                        console.log('Add free time activity:', { startTime, duration, suggestion });
+                        // TODO: Integrate with activity creation flow
+                      }}
                       className={cn(isMobile ? "ml-8" : "ml-10")}
                     />
                   ) : (

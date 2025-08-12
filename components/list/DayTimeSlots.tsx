@@ -5,9 +5,16 @@ import { format, isToday, isValid } from 'date-fns';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { useIsMobile } from '@/components/hooks/use-mobile';
 import { TimeSlotGrid } from './TimeSlotGrid';
 import { ActivityTimeBlock } from './ActivityTimeBlock';
+import { TimeConflicts, DayConflictsSummary } from './TimeConflicts';
+import { FreeTimeSuggestions, FreeTimeSummary } from './FreeTimeSuggestions';
+import { EfficiencyMetricsCard, EfficiencyScoreSummary } from './EfficiencyMetrics';
 import { processDayActivities, type DayTimeSlots as DayTimeSlotsData } from '@/utils/timeSlots';
+import { detectAllConflicts, type TimeConflict } from '@/utils/timeConflicts';
+import { detectFreeTimeGaps, getFreeTimeSummary, type FreeTimeGap } from '@/utils/freeTimeSuggestions';
+import { calculateDayEfficiency, type EfficiencyMetrics } from '@/utils/efficiencyMetrics';
 
 interface DayTimeSlotsProps {
   date: string;
@@ -20,6 +27,9 @@ interface DayTimeSlotsProps {
   selectedActivities?: Set<string>;
   editingActivity?: string;
   travelTimes?: { [key: string]: string };
+  travelTimesData?: { [key: string]: { duration: string; durationValue: number; mode: string } };
+  onApplyTimeSuggestion?: (activityId: string, newStartTime?: string, newEndTime?: string) => void;
+  onAddFreeTimeActivity?: (startTime: string, duration: number, suggestion: any) => void;
   className?: string;
 }
 
@@ -34,12 +44,36 @@ export function DayTimeSlots({
   selectedActivities = new Set(),
   editingActivity,
   travelTimes = {},
+  travelTimesData = {},
+  onApplyTimeSuggestion,
+  onAddFreeTimeActivity,
   className,
 }: DayTimeSlotsProps) {
+  const isMobile = useIsMobile();
+
   // Process activities into time slots structure
   const dayData: DayTimeSlotsData = useMemo(() => {
     return processDayActivities(activities, date);
   }, [activities, date]);
+
+  // Detect time conflicts
+  const conflicts: TimeConflict[] = useMemo(() => {
+    return detectAllConflicts(activities, travelTimesData);
+  }, [activities, travelTimesData]);
+
+  // Detect free time gaps and get summary
+  const freeTimeGaps: FreeTimeGap[] = useMemo(() => {
+    return detectFreeTimeGaps(activities);
+  }, [activities]);
+
+  const freeTimeSummary = useMemo(() => {
+    return getFreeTimeSummary(activities);
+  }, [activities]);
+
+  // Calculate efficiency metrics
+  const efficiencyMetrics: EfficiencyMetrics = useMemo(() => {
+    return calculateDayEfficiency(activities, travelTimesData);
+  }, [activities, travelTimesData]);
 
   const dateObj = new Date(date);
   const isValidDate = isValid(dateObj);
@@ -49,6 +83,12 @@ export function DayTimeSlots({
   const scheduledCount = dayData.activities.length;
   const unscheduledCount = dayData.unscheduledActivities.length;
   const totalCount = scheduledCount + unscheduledCount;
+
+  const handleApplySuggestion = (activityId: string, suggestion: any) => {
+    if (onApplyTimeSuggestion && (suggestion.newStartTime || suggestion.newEndTime)) {
+      onApplyTimeSuggestion(activityId, suggestion.newStartTime, suggestion.newEndTime);
+    }
+  };
 
   if (totalCount === 0) {
     return null; // Don't render empty days
@@ -100,6 +140,34 @@ export function DayTimeSlots({
                 )}
                 <span className="ml-2">({totalCount} total)</span>
               </div>
+              
+              {/* Conflicts Summary */}
+              {conflicts.length > 0 && (
+                <div className="mt-2">
+                  <DayConflictsSummary conflicts={conflicts} />
+                </div>
+              )}
+              
+              {/* Free Time Summary */}
+              {freeTimeGaps.length > 0 && (
+                <div className="mt-2">
+                  <FreeTimeSummary 
+                    totalFreeTime={freeTimeSummary.totalFreeTime}
+                    largestGap={freeTimeSummary.largestGap}
+                    gapCount={freeTimeSummary.gapCount}
+                  />
+                </div>
+              )}
+              
+              {/* Efficiency Score Summary */}
+              {scheduledCount > 0 && (
+                <div className="mt-2">
+                  <EfficiencyScoreSummary 
+                    score={efficiencyMetrics.score}
+                    recommendationType={efficiencyMetrics.recommendation.type}
+                  />
+                </div>
+              )}
             </div>
           </div>
         </Button>
@@ -108,6 +176,16 @@ export function DayTimeSlots({
       {/* Day Content */}
       {isExpanded && (
         <div className="space-y-4">
+          {/* Time Conflicts */}
+          {conflicts.length > 0 && (
+            <div className={cn(isMobile ? "ml-8" : "ml-10")}>
+              <TimeConflicts 
+                conflicts={conflicts} 
+                onApplySuggestion={handleApplySuggestion}
+              />
+            </div>
+          )}
+
           {/* Time Slot Grid with Scheduled Activities */}
           {scheduledCount > 0 && (
             <div className="relative">
@@ -129,6 +207,23 @@ export function DayTimeSlots({
                   />
                 ))}
               </TimeSlotGrid>
+            </div>
+          )}
+
+          {/* Free Time Suggestions */}
+          {freeTimeGaps.length > 0 && (
+            <div className={cn(isMobile ? "ml-8" : "ml-10")}>
+              <FreeTimeSuggestions 
+                gaps={freeTimeGaps} 
+                onAddActivity={onAddFreeTimeActivity}
+              />
+            </div>
+          )}
+
+          {/* Efficiency Metrics */}
+          {scheduledCount > 0 && (
+            <div className={cn(isMobile ? "ml-8" : "ml-10")}>
+              <EfficiencyMetricsCard metrics={efficiencyMetrics} />
             </div>
           )}
 
