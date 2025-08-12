@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useMemo, forwardRef, useImperativeHandle, useRef } from 'react';
 import { format, isToday } from 'date-fns';
-import { Clock, MapPin, Star, DollarSign, Phone, Globe, Edit3, Trash2, ChevronDown, ChevronRight, Check, X, Save, Loader2, GripVertical, Square, CheckSquare2, Move, FileDown, Calendar, StickyNote } from 'lucide-react';
+import { Clock, MapPin, Star, DollarSign, Phone, Globe, Edit3, Trash2, ChevronDown, ChevronRight, Check, X, Save, Loader2, GripVertical, Square, CheckSquare2, Move, FileDown, Calendar, StickyNote, Grid3x3 } from 'lucide-react';
 import {
   DndContext,
   closestCenter,
@@ -52,6 +52,7 @@ import { shouldShowTravelTime, getTravelTimeColor, formatTravelTime, getTotalTra
 import type { TravelMode } from '@/actions/google/travelTime';
 import { SearchAndFilter, FilterableActivity } from '@/components/list/SearchAndFilter';
 import { HighlightedText } from '@/components/ui/highlighted-text';
+import { DayTimeSlots } from '@/components/list/DayTimeSlots';
 import { BulkActionToolbar } from '@/components/list/BulkActionToolbar';
 
 interface ItineraryListViewProps {
@@ -537,6 +538,9 @@ export const ItineraryListView = forwardRef<ItineraryListViewRef, ItineraryListV
   const [selectionMode, setSelectionMode] = useState(false);
   const [lastSelectedId, setLastSelectedId] = useState<string | null>(null);
   const [bulkOperationLoading, setBulkOperationLoading] = useState(false);
+  
+  // View mode state
+  const [useTimeSlotView, setUseTimeSlotView] = useState(false);
   
   // Undo functionality
   const [undoStack, setUndoStack] = useState<{
@@ -1630,6 +1634,16 @@ export const ItineraryListView = forwardRef<ItineraryListViewRef, ItineraryListV
                 onModesChange={setTravelModes}
                 onRefresh={() => refreshTravelTimes()}
               />
+              <Button
+                variant={useTimeSlotView ? "default" : "outline"}
+                size="sm"
+                onClick={() => setUseTimeSlotView(!useTimeSlotView)}
+                className="text-xs"
+                title={useTimeSlotView ? "Switch to simple list view" : "Switch to time slot view"}
+              >
+                <Grid3x3 className="h-3 w-3 mr-1" />
+                {useTimeSlotView ? "Time Slots" : "Time View"}
+              </Button>
               <div className="text-xs text-muted-foreground pl-2 border-l" aria-label="Keyboard shortcuts">
                 <span className="hidden sm:inline">Drag </span>
                 <GripVertical className="inline h-3 w-3" aria-hidden="true" />
@@ -1757,23 +1771,42 @@ export const ItineraryListView = forwardRef<ItineraryListViewRef, ItineraryListV
 
                 {/* Collapsible Activities Content */}
                 <CollapsibleContent className="collapsible-content space-y-3">
-                  <DndContext
-                    sensors={sensors}
-                    collisionDetection={closestCenter}
-                    onDragStart={handleDragStart}
-                    onDragEnd={handleDragEnd}
-                  >
-                    <SortableContext
-                      items={activities.map(a => a.itinerary_activity_id)}
-                      strategy={verticalListSortingStrategy}
+                  {useTimeSlotView ? (
+                    // Time Slot View - Use DayTimeSlots component
+                    <DayTimeSlots
+                      date={date}
+                      activities={activities}
+                      isExpanded={true} // Always expanded since we're inside CollapsibleContent
+                      onToggleExpanded={() => {}} // No-op since parent Collapsible handles this
+                      onActivityEdit={(activityId) => startEditing(activityId, 'name', activities.find(a => a.itinerary_activity_id === activityId)?.activity?.name || '')}
+                      onActivityDelete={handleBulkDelete}
+                      onActivitySelect={(activityId) => toggleSelection(activityId)}
+                      selectedActivities={selectedActivities}
+                      editingActivity={editingField?.activityId}
+                      travelTimes={travelTimes[date] ? Object.fromEntries(
+                        travelTimes[date].map(t => [t.fromActivityId, formatTravelTime(t.duration, t.mode)])
+                      ) : {}}
+                      className={cn(isMobile ? "ml-8" : "ml-10")}
+                    />
+                  ) : (
+                    // Traditional List View - Existing drag-and-drop implementation
+                    <DndContext
+                      sensors={sensors}
+                      collisionDetection={closestCenter}
+                      onDragStart={handleDragStart}
+                      onDragEnd={handleDragEnd}
                     >
-                      <div className={cn("space-y-3", isMobile ? "ml-8" : "ml-10")}>
-                        {activities.map((activity, index) => {
-                          const nextActivity = activities[index + 1];
-                          const dayTravelTimes = travelTimes[date] || [];
-                          const travelTimeToNext = dayTravelTimes.find(
-                            t => t.fromActivityId === activity.itinerary_activity_id
-                          );
+                      <SortableContext
+                        items={activities.map(a => a.itinerary_activity_id)}
+                        strategy={verticalListSortingStrategy}
+                      >
+                        <div className={cn("space-y-3", isMobile ? "ml-8" : "ml-10")}>
+                          {activities.map((activity, index) => {
+                            const nextActivity = activities[index + 1];
+                            const dayTravelTimes = travelTimes[date] || [];
+                            const travelTimeToNext = dayTravelTimes.find(
+                              t => t.fromActivityId === activity.itinerary_activity_id
+                            );
                           
                           return (
                             <React.Fragment key={activity.itinerary_activity_id}>
@@ -1858,6 +1891,7 @@ export const ItineraryListView = forwardRef<ItineraryListViewRef, ItineraryListV
                       ) : null}
                     </DragOverlay>
                   </DndContext>
+                  )}
 
                   {/* Travel Time Conflicts */}
                   {(() => {
