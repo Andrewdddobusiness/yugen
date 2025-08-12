@@ -14,7 +14,6 @@ interface ViewConfig {
   label: string;
   icon: React.ComponentType<{ className?: string }>;
   description: string;
-  color: string;
 }
 
 const viewConfigs: ViewConfig[] = [
@@ -22,22 +21,19 @@ const viewConfigs: ViewConfig[] = [
     id: 'calendar',
     label: 'Calendar',
     icon: Calendar,
-    description: 'Timeline view with drag & drop',
-    color: 'bg-blue-500'
+    description: 'Timeline view with drag & drop'
   },
   {
     id: 'table',
     label: 'Table',
     icon: Table,
-    description: 'Detailed data view',
-    color: 'bg-green-500'
+    description: 'Detailed data view'
   },
   {
     id: 'list',
     label: 'List',
     icon: List,
-    description: 'Simple day-by-day view',
-    color: 'bg-purple-500'
+    description: 'Simple day-by-day view'
   }
 ];
 
@@ -161,13 +157,6 @@ export function MobileViewSelector({
                               : "text-gray-600 dark:text-gray-300"
                           )} 
                         />
-                        {isActive && (
-                          <motion.div
-                            layoutId="mobileActiveIndicator"
-                            className={cn("absolute -inset-1 rounded-full opacity-20", config.color)}
-                            transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
-                          />
-                        )}
                       </div>
                       
                       {/* Content */}

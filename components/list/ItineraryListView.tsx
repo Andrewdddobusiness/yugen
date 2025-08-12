@@ -110,6 +110,7 @@ interface SortableActivityProps {
   isSelected: boolean;
   onToggleSelection: (activityId: string, selected: boolean, event?: React.MouseEvent) => void;
   selectionMode: boolean;
+  searchTerm: string;
 }
 
 // Sortable Activity Component
@@ -316,7 +317,7 @@ function SortableActivity(props: SortableActivityProps) {
                     >
                       <HighlightedText 
                         text={activity.activity?.name || 'Unnamed Activity'}
-                        searchTerm={currentSearchTerm}
+                        searchTerm={props.searchTerm}
                       />
                     </h3>
                   )}
@@ -362,7 +363,7 @@ function SortableActivity(props: SortableActivityProps) {
                   <MapPin className="h-4 w-4 mt-0.5 flex-shrink-0" />
                   <HighlightedText 
                     text={activity.activity.address}
-                    searchTerm={currentSearchTerm}
+                    searchTerm={props.searchTerm}
                   />
                 </div>
               )}
@@ -464,7 +465,7 @@ function SortableActivity(props: SortableActivityProps) {
                           <div className="flex-1 group-hover:text-blue-600">
                             <HighlightedText 
                               text={activity.notes || ''}
-                              searchTerm={currentSearchTerm}
+                              searchTerm={props.searchTerm}
                             />
                           </div>
                         </div>
@@ -731,11 +732,6 @@ export const ItineraryListView = forwardRef<ItineraryListViewRef, ItineraryListV
     }
   };
 
-  const selectAllVisible = () => {
-    const visibleIds = activitiesForGrouping.map(a => a.itinerary_activity_id);
-    setSelectedActivities(new Set(visibleIds));
-    setSelectionMode(true);
-  };
 
   const selectNone = () => {
     setSelectedActivities(new Set());
@@ -1010,26 +1006,6 @@ export const ItineraryListView = forwardRef<ItineraryListViewRef, ItineraryListV
     });
   };
 
-  const expandAllDays = () => {
-    const allDates = groupedActivities.map(([date]) => date);
-    const newSet = new Set(allDates);
-    setExpandedDays(newSet);
-    
-    // Save expanded days to store
-    saveViewState('list', {
-      expandedDays: Array.from(newSet)
-    });
-  };
-
-  const collapseAllDays = () => {
-    const newSet = new Set<string>();
-    setExpandedDays(newSet);
-    
-    // Save expanded days to store
-    saveViewState('list', {
-      expandedDays: Array.from(newSet)
-    });
-  };
 
   const isExpanded = (dateKey: string) => expandedDays.has(dateKey);
 
@@ -1065,7 +1041,7 @@ export const ItineraryListView = forwardRef<ItineraryListViewRef, ItineraryListV
     ]);
   };
 
-  const handleBulkDelete = async () => {
+  const handleBulkDelete = useCallback(async () => {
     const selectedItems = getSelectedActivities();
     if (selectedItems.length === 0) return;
 
@@ -1095,7 +1071,7 @@ export const ItineraryListView = forwardRef<ItineraryListViewRef, ItineraryListV
     } finally {
       setBulkOperationLoading(false);
     }
-  };
+  }, [getSelectedActivities, handleRemoveActivity]);
 
   const handleBulkMove = async (targetDate: string) => {
     const selectedItems = getSelectedActivities();
@@ -1273,12 +1249,14 @@ export const ItineraryListView = forwardRef<ItineraryListViewRef, ItineraryListV
     setCurrentSearchTerm(searchTerm);
   }, []);
 
-  // Initialize filtered activities when filterable activities change
+  // Initialize filtered activities when filterable activities change  
+  const isInitialLoad = useRef(true);
   useEffect(() => {
-    if (filteredActivities.length === 0 && filterableActivities.length > 0) {
+    if (isInitialLoad.current && filterableActivities.length > 0) {
       setFilteredActivities(filterableActivities);
+      isInitialLoad.current = false;
     }
-  }, [filterableActivities, filteredActivities.length]);
+  }, [filterableActivities]);
 
   // Convert filtered activities back to the original format for grouping
   const activitiesForGrouping = useMemo(() => {
@@ -1289,7 +1267,34 @@ export const ItineraryListView = forwardRef<ItineraryListViewRef, ItineraryListV
     );
   }, [activeActivities, filteredActivities]);
 
+  const selectAllVisible = useCallback(() => {
+    const visibleIds = activitiesForGrouping.map(a => a.itinerary_activity_id);
+    setSelectedActivities(new Set(visibleIds));
+    setSelectionMode(true);
+  }, [activitiesForGrouping]);
+
   const groupedActivities = groupActivitiesByDate(activitiesForGrouping);
+
+  const expandAllDays = useCallback(() => {
+    const allDates = groupedActivities.map(([date]) => date);
+    const newSet = new Set(allDates);
+    setExpandedDays(newSet);
+    
+    // Save expanded days to store
+    saveViewState('list', {
+      expandedDays: Array.from(newSet)
+    });
+  }, [groupedActivities, saveViewState]);
+
+  const collapseAllDays = useCallback(() => {
+    const newSet = new Set<string>();
+    setExpandedDays(newSet);
+    
+    // Save expanded days to store
+    saveViewState('list', {
+      expandedDays: Array.from(newSet)
+    });
+  }, [saveViewState]);
 
   // Generate available dates for bulk move
   const availableDates = useMemo(() => {
@@ -1517,7 +1522,7 @@ export const ItineraryListView = forwardRef<ItineraryListViewRef, ItineraryListV
 
     document.addEventListener('keydown', handleGlobalKeyDown);
     return () => document.removeEventListener('keydown', handleGlobalKeyDown);
-  }, [activeActivities, setItineraryActivities]);
+  }, [activeActivities, setItineraryActivities, collapseAllDays, expandAllDays, handleBulkDelete, selectAllVisible, selectedActivities.size, selectionMode, undoStack.length]);
 
   return (
     <div ref={containerRef} className={cn("space-y-6", isMobile ? "p-4" : "p-6", className)}>
@@ -1785,6 +1790,7 @@ export const ItineraryListView = forwardRef<ItineraryListViewRef, ItineraryListV
                                   toggleActivitySelection(activityId, selected, event)
                                 }
                                 selectionMode={selectionMode}
+                                searchTerm={currentSearchTerm}
                               />
                               
                               {/* Travel Time Indicator */}

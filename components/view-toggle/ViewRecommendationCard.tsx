@@ -84,49 +84,11 @@ export function ViewRecommendationCard({
   const [recommendedView, setRecommendedView] = useState<ViewMode | null>(null);
   const [dismissedRecommendations, setDismissedRecommendations] = useState<Set<string>>(new Set());
 
-  // Check for recommendations periodically
+  // Disable recommendations - removed automatic popup functionality
   useEffect(() => {
-    if (!autoShow) return;
-
-    const checkRecommendation = () => {
-      const recommendation = getViewRecommendation();
-      
-      if (recommendation && recommendation !== currentView) {
-        const recommendationKey = `${currentView}-to-${recommendation}`;
-        
-        // Don't show if already dismissed
-        if (dismissedRecommendations.has(recommendationKey)) {
-          return;
-        }
-
-        setRecommendedView(recommendation);
-        
-        // Show with delay
-        setTimeout(() => {
-          setIsVisible(true);
-          
-          // Auto-hide after 8 seconds
-          setTimeout(() => {
-            setIsVisible(false);
-          }, 8000);
-        }, showDelay);
-      }
-    };
-
-    checkRecommendation();
-    
-    // Check every 30 seconds
-    const interval = setInterval(checkRecommendation, 30000);
-    return () => clearInterval(interval);
-  }, [
-    currentView, 
-    getViewRecommendation, 
-    autoShow, 
-    showDelay, 
-    dismissedRecommendations,
-    contextData.activityCount,
-    contextData.hasScheduledActivities
-  ]);
+    // No automatic recommendations will be shown
+    return;
+  }, []);
 
   const handleAcceptRecommendation = () => {
     if (recommendedView) {

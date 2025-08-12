@@ -27,7 +27,6 @@ interface ViewConfig {
   description: string;
   keyboardShortcut: string;
   recommendedFor: string[];
-  color: string;
 }
 
 const viewConfigs: ViewConfig[] = [
@@ -37,8 +36,7 @@ const viewConfigs: ViewConfig[] = [
     icon: Calendar,
     description: 'Visual timeline with drag-and-drop scheduling',
     keyboardShortcut: 'Ctrl+1',
-    recommendedFor: ['time-based-planning', 'visual-organization'],
-    color: 'bg-blue-500'
+    recommendedFor: ['time-based-planning', 'visual-organization']
   },
   {
     id: 'table',
@@ -46,8 +44,7 @@ const viewConfigs: ViewConfig[] = [
     icon: Table,
     description: 'Structured data view with sorting and filtering',
     keyboardShortcut: 'Ctrl+2',
-    recommendedFor: ['detailed-planning', 'data-analysis'],
-    color: 'bg-green-500'
+    recommendedFor: ['detailed-planning', 'data-analysis']
   },
   {
     id: 'list',
@@ -55,8 +52,7 @@ const viewConfigs: ViewConfig[] = [
     icon: List,
     description: 'Simple day-by-day itinerary view',
     keyboardShortcut: 'Ctrl+3',
-    recommendedFor: ['quick-overview', 'mobile-viewing'],
-    color: 'bg-purple-500'
+    recommendedFor: ['quick-overview', 'mobile-viewing']
   }
 ];
 
@@ -132,22 +128,12 @@ export function ViewToggle({
     try {
       setCurrentView(view);
       onViewChange?.(view);
-
-      // Show recommendation after view change
-      setTimeout(() => {
-        const rec = getViewRecommendation();
-        if (rec && rec !== view) {
-          setRecommendation(rec);
-          setShowRecommendation(true);
-          // Auto-hide recommendation after 5 seconds
-          setTimeout(() => setShowRecommendation(false), 5000);
-        }
-      }, 1000);
+      // Removed automatic recommendation display
     } catch (error) {
       console.error('Failed to change view:', error);
       // Could add user-facing error notification here
     }
-  }, [currentView, isTransitioning, isTransitioningView, setCurrentView, onViewChange, getViewRecommendation]);
+  }, [currentView, isTransitioning, isTransitioningView, setCurrentView, onViewChange]);
 
   // Use mobile view selector on mobile devices
   if (isMobile) {
@@ -157,33 +143,6 @@ export function ViewToggle({
           <MobileViewSelector onViewChange={onViewChange} />
         </div>
         
-        {/* View Recommendation for Mobile */}
-        <AnimatePresence>
-          {showRecommendation && recommendation && (
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.9 }}
-              className="flex items-center gap-1 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg px-2 py-1"
-            >
-              <Lightbulb className="h-3 w-3 text-yellow-600 dark:text-yellow-400" />
-              <button
-                onClick={() => handleViewChange(recommendation)}
-                className="text-xs font-medium text-yellow-800 dark:text-yellow-200 underline"
-              >
-                Try {viewConfigs.find(c => c.id === recommendation)?.label}
-              </button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setShowRecommendation(false)}
-                className="h-auto p-0.5 text-yellow-600 hover:text-yellow-800 dark:text-yellow-400 dark:hover:text-yellow-200"
-              >
-                <X className="h-3 w-3" />
-              </Button>
-            </motion.div>
-          )}
-        </AnimatePresence>
       </div>
     );
   }
@@ -210,14 +169,6 @@ export function ViewToggle({
                       isActive && "bg-white dark:bg-gray-700 shadow-sm"
                     )}
                   >
-                    {/* Active indicator */}
-                    {isActive && (
-                      <motion.div
-                        layoutId="activeIndicator"
-                        className={cn("absolute inset-0 rounded-md", config.color, "opacity-10")}
-                        transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
-                      />
-                    )}
                     
                     {/* Loading spinner */}
                     {isTransitioning && isActive && (
@@ -346,37 +297,6 @@ export function ViewToggle({
           </Tooltip>
         )}
 
-        {/* View Recommendation */}
-        <AnimatePresence>
-          {showRecommendation && recommendation && (
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9, x: 20 }}
-              animate={{ opacity: 1, scale: 1, x: 0 }}
-              exit={{ opacity: 0, scale: 0.9, x: 20 }}
-              className="flex items-center gap-2 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg px-3 py-2"
-            >
-              <Lightbulb className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />
-              <span className="text-sm text-yellow-800 dark:text-yellow-200">
-                Try{' '}
-                <button
-                  onClick={() => handleViewChange(recommendation)}
-                  className="font-medium underline hover:no-underline"
-                >
-                  {viewConfigs.find(c => c.id === recommendation)?.label}
-                </button>{' '}
-                view for better planning
-              </span>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setShowRecommendation(false)}
-                className="h-auto p-1 text-yellow-600 hover:text-yellow-800 dark:text-yellow-400 dark:hover:text-yellow-200"
-              >
-                <X className="h-3 w-3" />
-              </Button>
-            </motion.div>
-          )}
-        </AnimatePresence>
       </div>
     </TooltipProvider>
   );

@@ -125,6 +125,24 @@ export function SearchAndFilter({ activities, onFilteredActivitiesChange, onSear
   const [showFilters, setShowFilters] = useState(false);
   const debouncedSearchText = useDebounce(filters.searchText, 300);
 
+  const updateFilter = useCallback((key: keyof SearchFilters, value: any) => {
+    setFilters(prev => ({ ...prev, [key]: value }));
+  }, []);
+
+  const toggleArrayFilter = useCallback((key: keyof SearchFilters, value: string) => {
+    setFilters(prev => {
+      const currentArray = prev[key] as string[];
+      const newArray = currentArray.includes(value)
+        ? currentArray.filter(item => item !== value)
+        : [...currentArray, value];
+      return { ...prev, [key]: newArray };
+    });
+  }, []);
+
+  const clearAllFilters = useCallback(() => {
+    setFilters(DEFAULT_FILTERS);
+  }, []);
+
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -268,24 +286,6 @@ export function SearchAndFilter({ activities, onFilteredActivitiesChange, onSear
       onSearchTermChange(debouncedSearchText);
     }
   }, [filteredActivities, onFilteredActivitiesChange, onSearchTermChange, debouncedSearchText]);
-
-  const updateFilter = useCallback((key: keyof SearchFilters, value: any) => {
-    setFilters(prev => ({ ...prev, [key]: value }));
-  }, []);
-
-  const toggleArrayFilter = useCallback((key: keyof SearchFilters, value: string) => {
-    setFilters(prev => {
-      const currentArray = prev[key] as string[];
-      const newArray = currentArray.includes(value)
-        ? currentArray.filter(item => item !== value)
-        : [...currentArray, value];
-      return { ...prev, [key]: newArray };
-    });
-  }, []);
-
-  const clearAllFilters = useCallback(() => {
-    setFilters(DEFAULT_FILTERS);
-  }, []);
 
   const applyQuickFilter = useCallback((quickFilter: typeof QUICK_FILTERS[0]) => {
     setFilters(prev => ({
