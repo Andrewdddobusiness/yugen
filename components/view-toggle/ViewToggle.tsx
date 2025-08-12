@@ -123,17 +123,18 @@ export function ViewToggle({
 
   // Handle view change with transition and error handling
   const handleViewChange = useCallback((view: ViewMode) => {
-    if (view === currentView || isTransitioning || isTransitioningView) return;
+    if (view === currentView || isTransitioning || isTransitioningView) {
+      return;
+    }
     
     try {
-      setCurrentView(view);
+      // Only call onViewChange - it will handle store updates
       onViewChange?.(view);
-      // Removed automatic recommendation display
     } catch (error) {
       console.error('Failed to change view:', error);
       // Could add user-facing error notification here
     }
-  }, [currentView, isTransitioning, isTransitioningView, setCurrentView, onViewChange]);
+  }, [currentView, isTransitioning, isTransitioningView, onViewChange]);
 
   // Use mobile view selector on mobile devices
   if (isMobile) {

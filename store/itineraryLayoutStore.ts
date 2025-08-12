@@ -203,14 +203,17 @@ export const useItineraryLayoutStore = create<ItineraryLayoutState>()(
       
       setViewWithTransition: async (view) => {
         const state = get();
-        if (view === state.currentView || state.isTransitioningView) return;
+        if (view === state.currentView || state.isTransitioningView) {
+          return;
+        }
         
         set({ isTransitioningView: true });
         
         // Artificial delay for smooth transition
         await new Promise(resolve => setTimeout(resolve, state.transitionDuration));
         
-        state.setCurrentView(view);
+        // Call setCurrentView through get() to access the action
+        get().setCurrentView(view);
         set({ isTransitioningView: false });
       },
       

@@ -107,7 +107,9 @@ export function useViewRouter(options: UseViewRouterOptions = {}) {
 
   // Enhanced view change with URL sync and error handling
   const changeView = useCallback(async (view: ViewMode, date?: Date | null) => {
-    if (view === currentView && date === undefined) return;
+    if (view === currentView && date === undefined) {
+      return;
+    }
     
     try {
       // Update URL first for immediate feedback

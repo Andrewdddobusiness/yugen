@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Search, Filter, X, ChevronDown, Calendar, Clock, Star, DollarSign, MapPin, Tag, RotateCcw } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -280,12 +280,23 @@ export function SearchAndFilter({ activities, onFilteredActivitiesChange, onSear
   }, [activities, debouncedSearchText, filters]);
 
   // Notify parent component of filtered activities and search term
+  const prevFilteredActivitiesRef = useRef<FilterableActivity[]>([]);
+  const prevSearchTermRef = useRef<string>('');
+  
   useEffect(() => {
-    onFilteredActivitiesChange(filteredActivities);
-    if (onSearchTermChange) {
-      onSearchTermChange(debouncedSearchText);
+    // Only call if actual changes occurred
+    if (filteredActivities !== prevFilteredActivitiesRef.current) {
+      prevFilteredActivitiesRef.current = filteredActivities;
+      onFilteredActivitiesChange(filteredActivities);
     }
-  }, [filteredActivities, onFilteredActivitiesChange, onSearchTermChange, debouncedSearchText]);
+    
+    if (debouncedSearchText !== prevSearchTermRef.current) {
+      prevSearchTermRef.current = debouncedSearchText;
+      if (onSearchTermChange) {
+        onSearchTermChange(debouncedSearchText);
+      }
+    }
+  }, [filteredActivities, debouncedSearchText]);
 
   const applyQuickFilter = useCallback((quickFilter: typeof QUICK_FILTERS[0]) => {
     setFilters(prev => ({

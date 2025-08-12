@@ -107,11 +107,16 @@ export default function Builder() {
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
+  // Separate effects to reduce unnecessary re-runs
   useEffect(() => {
     if (data) {
       setItineraryActivities(data);
-      
-      // Update context data for smart recommendations
+    }
+  }, [data, setItineraryActivities]);
+
+  // Context data update in separate effect with memoized calculation
+  useEffect(() => {
+    if (data?.length) {
       const scheduledActivities = data.filter(a => a.start_time && a.end_time);
       const validDates = data.map(a => a.date).filter(date => date && !isNaN(new Date(date).getTime()));
       const timeSpan = validDates.length > 0 ? 
@@ -122,15 +127,15 @@ export default function Builder() {
         activityCount: data.length,
         hasScheduledActivities: scheduledActivities.length > 0,
         timeSpanDays: timeSpan,
-        lastActivity: data.length > 0 ? new Date() : null,
+        lastActivity: new Date(),
         userBehavior: {
           usesMobile: isMobile,
-          prefersDragDrop: scheduledActivities.length > data.length * 0.5, // More than 50% scheduled
+          prefersDragDrop: scheduledActivities.length > data.length * 0.5,
           prefersDetailView: data.length > 10,
         }
       });
     }
-  }, [data, setItineraryActivities, updateContextData, isMobile]);
+  }, [data?.length, isMobile, updateContextData]);
 
   if (isLoading) return <Loading />;
   if (error) {

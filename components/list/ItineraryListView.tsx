@@ -821,15 +821,15 @@ export const ItineraryListView = forwardRef<ItineraryListViewRef, ItineraryListV
       // Update local state
       setItineraryActivities(newActivities);
 
-      // Invalidate queries to refresh data
-      queryClient.invalidateQueries({ queryKey: ["itineraryActivities"] });
+      // Update cache directly instead of invalidating
+      queryClient.setQueryData(["itineraryActivities"], newActivities);
 
       toast.success('Activities reordered successfully');
     } catch (error) {
       console.error('Error reordering activities:', error);
       toast.error('Failed to reorder activities. Please try again.');
       
-      // Revert to original order by refetching
+      // Keep invalidation on error to ensure fresh data
       queryClient.invalidateQueries({ queryKey: ["itineraryActivities"] });
     } finally {
       setIsReordering(false);
@@ -939,8 +939,14 @@ export const ItineraryListView = forwardRef<ItineraryListViewRef, ItineraryListV
         
         setItineraryActivities(updatedActivities);
         
-        // Invalidate queries to refresh data
-        queryClient.invalidateQueries({ queryKey: ["itineraryActivities"] });
+        // Update cache directly for successful operations
+        queryClient.setQueryData(["itineraryActivities"], (oldData: any) => 
+          oldData?.map((activity: any) => 
+            activity.itinerary_activity_id === itinerary_activity_id 
+              ? { ...activity, start_time: startTime, end_time: endTime }
+              : activity
+          ) || []
+        );
         
         toast.success('Activity updated successfully');
         setEditingField(null);
@@ -1101,7 +1107,8 @@ export const ItineraryListView = forwardRef<ItineraryListViewRef, ItineraryListV
         });
         
         setItineraryActivities(updatedActivities);
-        queryClient.invalidateQueries({ queryKey: ["itineraryActivities"] });
+        // Update cache directly instead of invalidating
+        queryClient.setQueryData(["itineraryActivities"], updatedActivities);
         
         setSelectedActivities(new Set());
         setSelectionMode(false);
@@ -1150,7 +1157,8 @@ export const ItineraryListView = forwardRef<ItineraryListViewRef, ItineraryListV
       });
       
       setItineraryActivities(updatedActivities);
-      queryClient.invalidateQueries({ queryKey: ["itineraryActivities"] });
+      // Update cache directly instead of invalidating  
+      queryClient.setQueryData(["itineraryActivities"], updatedActivities);
       
       setSelectedActivities(new Set());
       setSelectionMode(false);
@@ -1197,7 +1205,8 @@ export const ItineraryListView = forwardRef<ItineraryListViewRef, ItineraryListV
       });
       
       setItineraryActivities(updatedActivities);
-      queryClient.invalidateQueries({ queryKey: ["itineraryActivities"] });
+      // Update cache directly instead of invalidating  
+      queryClient.setQueryData(["itineraryActivities"], updatedActivities);
       
       setSelectedActivities(new Set());
       setSelectionMode(false);
@@ -1375,7 +1384,7 @@ export const ItineraryListView = forwardRef<ItineraryListViewRef, ItineraryListV
         } : undefined
       }))
     ]),
-    { modes: travelModes }
+    { modes: travelModes, autoRefresh: false }
   );
 
   // Restore scroll position on mount and when switching to this view
