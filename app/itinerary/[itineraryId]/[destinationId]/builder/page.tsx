@@ -12,7 +12,7 @@ import { ItineraryTableView } from "@/components/table/itineraryTable";
 import { ItineraryListView } from "@/components/list/ItineraryListView";
 import ErrorPage from "@/app/error/page";
 import { useParams } from "next/navigation";
-import GoogleMapView from "@/components/map/googleMapView";
+import { ItineraryMap } from "@/components/map/ItineraryMap";
 import { Button } from "@/components/ui/button";
 import { Calendar, Table, List, Map, X } from "lucide-react";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable';
@@ -137,6 +137,20 @@ export default function Builder() {
     }
   }, [data?.length, isMobile, updateContextData]);
 
+  // Debug logging for activities
+  console.log('Builder page render:', {
+    isLoading,
+    error,
+    dataLength: data?.length,
+    itineraryActivitiesLength: itineraryActivities?.length,
+    sampleData: data?.slice(0, 2)?.map(a => ({
+      id: a.itinerary_activity_id,
+      name: a.activity?.name,
+      coordinates: a.activity?.coordinates,
+      date: a.date
+    }))
+  });
+
   if (isLoading) return <Loading />;
   if (error) {
     console.error('Builder page error:', error);
@@ -223,12 +237,38 @@ export default function Builder() {
                   className="hidden sm:block"
                 >
                   <div className="h-full">
-                    <GoogleMapView
-                      activities={itineraryActivities.filter(
+                    {(() => {
+                      const filteredActivities = itineraryActivities.filter(
                         (a) =>
                           a.activity?.coordinates && Array.isArray(a.activity.coordinates) && a.activity.coordinates.length === 2
-                      )}
-                    />
+                      );
+                      
+                      console.log('Passing to ItineraryMap:', {
+                        totalActivities: itineraryActivities.length,
+                        filteredActivities: filteredActivities.length,
+                        filteredSample: filteredActivities.slice(0, 2).map(a => ({
+                          id: a.itinerary_activity_id,
+                          name: a.activity?.name,
+                          coordinates: a.activity?.coordinates,
+                          date: a.date
+                        }))
+                      });
+                      
+                      return (
+                        <ItineraryMap
+                          activities={filteredActivities}
+                          showRoutes={true}
+                          onActivitySelect={(activityId) => {
+                            // Handle activity selection - could sync with other views
+                            console.log('Selected activity:', activityId);
+                          }}
+                          onActivityEdit={(activityId) => {
+                            // Handle activity editing
+                            console.log('Edit activity:', activityId);
+                          }}
+                        />
+                      );
+                    })()}
                   </div>
                 </ResizablePanel>
               </ResizablePanelGroup>
