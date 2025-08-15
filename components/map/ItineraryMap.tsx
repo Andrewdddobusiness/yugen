@@ -362,18 +362,45 @@ export function ItineraryMap({
     mapBounds: mapBounds?.toJSON(),
   });
 
+  // Check for required Google Maps configuration
+  if (!process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY) {
+    return (
+      <div className={cn("relative w-full h-full flex items-center justify-center bg-gray-100", className)}>
+        <div className="text-center p-6">
+          <MapPin className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+          <p className="text-gray-600 font-medium">Google Maps API key not configured</p>
+          <p className="text-sm text-gray-500 mt-2">
+            Please add NEXT_PUBLIC_GOOGLE_MAPS_API_KEY to your environment variables
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // Map ID is optional - will warn in console if missing but still work
+  if (!process.env.NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID) {
+    console.warn('NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID not configured. Map will work but advanced features may be limited.');
+  }
+
   return (
     <div className={cn("relative w-full h-full", className)}>
       <APIProvider apiKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY!} libraries={['geometry']}>
         <Map
           id="itinerary-map"
-          mapId={process.env.NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID}
+          mapId={process.env.NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID || undefined}
           defaultCenter={center}
           defaultZoom={initialZoom}
           gestureHandling="greedy"
           disableDefaultUI={true}
           onCenterChanged={handleCenterChanged}
-          onTilesLoaded={() => setMapInstance(window.google?.maps ? new google.maps.Map(document.getElementById('itinerary-map')!) : null)}
+          onTilesLoaded={() => {
+            if (window.google?.maps) {
+              const mapElement = document.getElementById('itinerary-map');
+              if (mapElement) {
+                console.log('Map tiles loaded, Google Maps ready');
+              }
+            }
+          }}
           minZoom={8}
           maxZoom={18}
         >
