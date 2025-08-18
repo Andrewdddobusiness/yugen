@@ -6,6 +6,7 @@ import { GoogleCalendarView } from "@/components/calendar/GoogleCalendarView";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useItineraryActivityStore } from "@/store/itineraryActivityStore";
 import { useItineraryLayoutStore } from "@/store/itineraryLayoutStore";
+import { useMapStore } from "@/store/mapStore";
 import Loading from "@/components/loading/loading";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ItineraryTableView } from "@/components/table/itineraryTable";
@@ -21,6 +22,8 @@ import { ViewTransition, ViewLoadingState } from "@/components/view-toggle/ViewT
 import { ViewRecommendationCard } from "@/components/view-toggle/ViewRecommendationCard";
 import { useViewRouter } from "@/hooks/useViewRouter";
 import { useViewStatePreservation } from "@/hooks/useViewStatePreservation";
+import { getDestination } from "@/actions/supabase/destinations";
+import { geocodeAddress } from "@/actions/google/maps";
 
 export default function Builder() {
   const { itineraryId, destinationId } = useParams();
@@ -36,6 +39,7 @@ export default function Builder() {
     setCurrentView, 
     toggleMap 
   } = useItineraryLayoutStore();
+  const { setItineraryCoordinates } = useMapStore();
   
   const [targetDate, setTargetDate] = useState<Date | null>(null);
   const listRef = useRef<any>(null);
@@ -96,6 +100,19 @@ export default function Builder() {
     enabled: !!itineraryId && !!destinationId,
   });
 
+  // Fetch destination data for map centering
+  const { data: destinationData } = useQuery({
+    queryKey: ["destination", destinationId],
+    queryFn: async () => {
+      const result = await getDestination(destId);
+      if (result.success && result.data) {
+        return result.data;
+      }
+      return null;
+    },
+    enabled: !!destinationId,
+  });
+
   // Detect mobile devices
   useEffect(() => {
     const checkMobile = () => {
@@ -136,6 +153,41 @@ export default function Builder() {
       });
     }
   }, [data?.length, isMobile, updateContextData]);
+
+  // Geocode destination and set map coordinates
+  useEffect(() => {
+    const geocodeDestination = async () => {
+      if (destinationData?.city && destinationData?.country) {
+        const address = `${destinationData.city}, ${destinationData.country}`;
+        console.log('🌍 Geocoding destination for map centering:', address);
+        console.log('📍 Destination data:', destinationData);
+        
+        try {
+          const result = await geocodeAddress(address);
+          console.log('🔍 Geocoding result:', result);
+          
+          if (result.success && result.data?.coordinates) {
+            const { lat, lng } = result.data.coordinates;
+            console.log('✅ Geocoded coordinates:', { lat, lng });
+            console.log('💾 Setting itinerary coordinates for map...');
+            setItineraryCoordinates([lat, lng]);
+          } else {
+            console.warn('❌ Failed to geocode destination:', result.error?.message || 'Unknown error');
+          }
+        } catch (error) {
+          console.error('💥 Error geocoding destination:', error);
+        }
+      } else {
+        console.log('⚠️ Missing destination data for geocoding:', { 
+          hasDestinationData: !!destinationData,
+          city: destinationData?.city,
+          country: destinationData?.country 
+        });
+      }
+    };
+
+    geocodeDestination();
+  }, [destinationData, setItineraryCoordinates]);
 
   // Debug logging for activities
   console.log('Builder page render:', {
@@ -258,6 +310,7 @@ export default function Builder() {
                         <ItineraryMap
                           activities={filteredActivities}
                           showRoutes={true}
+                          destinationName={destinationData ? `${destinationData.city}, ${destinationData.country}` : undefined}
                           onActivitySelect={(activityId) => {
                             // Handle activity selection - could sync with other views
                             console.log('Selected activity:', activityId);

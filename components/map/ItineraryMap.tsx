@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useMemo, useState, useEffect } from 'react';
-import { APIProvider, Map, MapCameraChangedEvent } from '@vis.gl/react-google-maps';
+import { APIProvider, Map, MapCameraChangedEvent, useMap } from '@vis.gl/react-google-maps';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Eye, EyeOff, Route as RouteIcon, MapPin, Calendar } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -13,6 +13,33 @@ import { ItineraryActivityMarker, ClusterMarker } from './ItineraryActivityMarke
 import { LocationSuggestions } from './LocationSuggestions';
 import { MapExport } from './MapExport';
 import { useMapStore } from '@/store/mapStore';
+
+// Map controller component that uses useMap hook
+function ItineraryMapController({ 
+  itineraryCoordinates, 
+  validActivities, 
+  mapBounds 
+}: { 
+  itineraryCoordinates: [number, number] | null;
+  validActivities: any[];
+  mapBounds: google.maps.LatLngBounds | null;
+}) {
+  const map = useMap("itinerary-map");
+
+  useEffect(() => {
+    if (!map) return;
+
+    if (mapBounds) {
+      map.fitBounds(mapBounds, { padding: 50 });
+    } else if (itineraryCoordinates && validActivities.length === 0) {
+      // Set appropriate zoom level for destination when no activities
+      map.setCenter({ lat: itineraryCoordinates[0], lng: itineraryCoordinates[1] });
+      map.setZoom(12); // City-level zoom
+    }
+  }, [map, mapBounds, itineraryCoordinates, validActivities.length]);
+
+  return null; // This component doesn't render anything
+}
 
 interface ItineraryActivity {
   itinerary_activity_id: string;
@@ -100,8 +127,7 @@ export function ItineraryMap({
   onAddSuggestion,
   className,
 }: ItineraryMapProps) {
-  const { centerCoordinates, initialZoom, setCenterCoordinates } = useMapStore();
-  const [mapInstance, setMapInstance] = useState<google.maps.Map | null>(null);
+  const { centerCoordinates, itineraryCoordinates, initialZoom, setCenterCoordinates } = useMapStore();
   const [showClusters, setShowClusters] = useState(true);
   const [hiddenDays, setHiddenDays] = useState<Set<string>>(new Set());
 
@@ -220,7 +246,7 @@ export function ItineraryMap({
 
   // Activity clustering logic
   const clusteredActivities = useMemo(() => {
-    if (!showClusters || !mapInstance) return { clusters: [], individual: validActivities };
+    if (!showClusters || !window.google?.maps) return { clusters: [], individual: validActivities };
     
     const clusters: ClusterGroup[] = [];
     const individual: ItineraryActivity[] = [];
@@ -277,7 +303,7 @@ export function ItineraryMap({
     });
     
     return { clusters, individual };
-  }, [validActivities, showClusters, mapInstance]);
+  }, [validActivities, showClusters]);
 
   // Calculate map bounds
   const mapBounds = useMemo(() => {
@@ -294,38 +320,48 @@ export function ItineraryMap({
     return bounds;
   }, [validActivities]);
 
-  // Auto-fit map to activities
-  useEffect(() => {
-    if (mapInstance && mapBounds) {
-      mapInstance.fitBounds(mapBounds, { padding: 50 });
-    }
-  }, [mapInstance, mapBounds]);
 
-  // Calculate center from activities instead of using mapStore
+  // Calculate center from activities, then destination, then mapStore, then default
   const center = useMemo(() => {
-    console.log('Calculating map center...');
+    console.log('🗺️ Calculating map center...');
+    console.log('📊 Available data:', {
+      validActivitiesCount: validActivities.length,
+      itineraryCoordinates,
+      centerCoordinates,
+      destinationName,
+    });
     
     if (validActivities.length > 0) {
       const coords = validActivities[0].activity?.coordinates;
-      console.log('First activity coordinates:', coords);
+      console.log('📍 First activity coordinates:', coords);
       if (coords && coords.length === 2) {
         // Ensure correct format: coordinates are [lng, lat] in our data
         const calculatedCenter = { lat: coords[1], lng: coords[0] };
-        console.log('Using calculated center from activities:', calculatedCenter);
+        console.log('✅ Using calculated center from activities:', calculatedCenter);
         return calculatedCenter;
       }
     }
     
-    // Fallback to mapStore if available
-    if (centerCoordinates) {
-      console.log('Using mapStore center:', centerCoordinates);
+    // Fallback to destination coordinates (itineraryCoordinates) if available
+    if (itineraryCoordinates && Array.isArray(itineraryCoordinates) && itineraryCoordinates.length === 2) {
+      console.log('🏙️ Using destination center:', itineraryCoordinates);
+      // itineraryCoordinates are stored as [lat, lng] from geocoding
+      const destinationCenter = { lat: itineraryCoordinates[0], lng: itineraryCoordinates[1] };
+      console.log('✅ Destination center formatted:', destinationCenter);
+      return destinationCenter;
+    }
+    
+    // Fallback to mapStore center coordinates if available
+    if (centerCoordinates && Array.isArray(centerCoordinates) && centerCoordinates.length === 2) {
+      console.log('💾 Using mapStore center:', centerCoordinates);
       return { lat: centerCoordinates[0], lng: centerCoordinates[1] };
     }
     
-    // Default to London
-    console.log('Using default center (London)');
+    // Default to London as last resort
+    console.log('⚠️ No coordinates available, using default center (London)');
+    console.log('💡 Tip: Make sure destination geocoding is working or add activities with coordinates');
     return { lat: 51.5074, lng: -0.1278 };
-  }, [validActivities, centerCoordinates]);
+  }, [validActivities, itineraryCoordinates, centerCoordinates, destinationName]);
 
   const handleCenterChanged = (e: MapCameraChangedEvent) => {
     if (e.detail?.center) {
@@ -394,16 +430,18 @@ export function ItineraryMap({
           disableDefaultUI={true}
           onCenterChanged={handleCenterChanged}
           onTilesLoaded={() => {
-            if (window.google?.maps) {
-              const mapElement = document.getElementById('itinerary-map');
-              if (mapElement) {
-                console.log('Map tiles loaded, Google Maps ready');
-              }
-            }
+            console.log('Map tiles loaded');
           }}
           minZoom={8}
           maxZoom={18}
         >
+          {/* Map Controller for auto-fitting and centering */}
+          <ItineraryMapController 
+            itineraryCoordinates={itineraryCoordinates}
+            validActivities={validActivities}
+            mapBounds={mapBounds}
+          />
+          
           {/* Individual Activity Markers */}
           {validActivities.map((activity) => {
             const dayIndex = Object.keys(dailyActivities).indexOf(activity.date!);
@@ -430,10 +468,8 @@ export function ItineraryMap({
                 position={cluster.center}
                 dayIndex={dayIndex}
                 onClick={() => {
-                  // Focus map on cluster
-                  if (mapInstance) {
-                    mapInstance.fitBounds(cluster.bounds, { padding: 100 });
-                  }
+                  // Focus map on cluster - will be handled by map click events
+                  console.log('Cluster clicked:', cluster.activities.length, 'activities');
                 }}
               />
             );
@@ -467,7 +503,6 @@ export function ItineraryMap({
       {showExport && (
         <MapExport
           activities={validActivities}
-          mapInstance={mapInstance}
           itineraryName={itineraryName}
           destinationName={destinationName}
         />
