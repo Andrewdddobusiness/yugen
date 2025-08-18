@@ -335,8 +335,9 @@ export function ItineraryMap({
       const coords = validActivities[0].activity?.coordinates;
       console.log('📍 First activity coordinates:', coords);
       if (coords && coords.length === 2) {
-        // Ensure correct format: coordinates are [lng, lat] in our data
-        const calculatedCenter = { lat: coords[1], lng: coords[0] };
+        // Coordinates are stored as [lng, lat] in our data
+        const [lng, lat] = coords;
+        const calculatedCenter = { lat, lng };
         console.log('✅ Using calculated center from activities:', calculatedCenter);
         return calculatedCenter;
       }

@@ -100,7 +100,7 @@ function mapGooglePlaceToActivity(place: any) {
   return {
     place_id: place.id,
     name: place.displayName?.text || "",
-    coordinates: [place.location.latitude, place.location.longitude],
+    coordinates: [place.location.longitude, place.location.latitude], // Store as [lng, lat] for consistency
     types: place.types || "",
     price_level: place.priceLevel ? place.priceLevel : "",
     address: place.formattedAddress || "",

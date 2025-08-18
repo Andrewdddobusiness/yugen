@@ -19,6 +19,7 @@ import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { cn } from '@/lib/utils';
+import type { SearchType } from '@/lib/googleMaps/includedTypes';
 
 interface SuggestedActivity {
   place_id: string;
@@ -85,6 +86,7 @@ export function LocationSuggestions({
     maxPriceLevel: 4,
     openNow: false,
     radius: 2000, // meters
+    searchType: 'all' as SearchType,
   });
 
   // Available activity types for filtering
@@ -106,12 +108,65 @@ export function LocationSuggestions({
     setIsLoading(true);
     
     try {
-      // In a real implementation, this would call Google Places API
-      // For now, we'll simulate suggestions based on existing activities
-      const mockSuggestions = generateMockSuggestions();
-      setSuggestions(mockSuggestions);
+      // Import the Google Places API function
+      const { fetchNearbyActivities } = await import('@/actions/google/actions');
+      
+      // Fetch real nearby activities using Google Places API
+      const nearbyActivities = await fetchNearbyActivities(
+        mapCenter.lat,
+        mapCenter.lng,
+        filters.radius,
+        filters.searchType
+      );
+      
+      // Convert to SuggestedActivity format
+      const converted = nearbyActivities.map(activity => ({
+        place_id: activity.place_id,
+        name: activity.name,
+        vicinity: activity.address || 'Address not available',
+        rating: activity.rating || undefined,
+        price_level: activity.price_level ? parseInt(activity.price_level) : undefined,
+        types: Array.isArray(activity.types) ? activity.types : (typeof activity.types === 'string' ? activity.types.split(',').map(t => t.trim()) : []),
+        geometry: {
+          location: {
+            lat: activity.coordinates[1], // Convert from [lng, lat] to lat
+            lng: activity.coordinates[0]  // Convert from [lng, lat] to lng
+          }
+        },
+        photos: activity.photo_names ? activity.photo_names.map((name, index) => ({
+          photo_reference: name,
+          width: 400,
+          height: 300
+        })) : undefined,
+        opening_hours: activity.open_hours && activity.open_hours.length > 0 ? {
+          open_now: true // We don't have real-time status, so assume open
+        } : undefined
+      }));
+      
+      // Filter out activities that already exist in the itinerary
+      const existingPlaceIds = new Set(
+        existingActivities
+          .map(a => a.activity?.place_id)
+          .filter(Boolean)
+      );
+      
+      const filteredSuggestions = converted.filter(
+        suggestion => !existingPlaceIds.has(suggestion.place_id)
+      );
+      
+      console.log('🔍 Fetched suggestions:', {
+        total: nearbyActivities.length,
+        afterFiltering: filteredSuggestions.length,
+        mapCenter,
+        radius: filters.radius
+      });
+      
+      setSuggestions(filteredSuggestions);
     } catch (error) {
       console.error('Failed to fetch location suggestions:', error);
+      // Fallback to mock suggestions if API fails
+      const mockSuggestions = generateMockSuggestions();
+      setSuggestions(mockSuggestions);
     } finally {
       setIsLoading(false);
     }
@@ -246,10 +301,10 @@ export function LocationSuggestions({
     });
   }, [suggestions, filters]);
 
-  // Fetch suggestions when center changes or component mounts
+  // Fetch suggestions when center changes, search type changes, or component mounts
   useEffect(() => {
     fetchSuggestions();
-  }, [mapCenter, existingActivities]);
+  }, [mapCenter, existingActivities, filters.searchType]);
 
   const getPriceDisplay = (priceLevel?: number) => {
     if (!priceLevel) return '';
@@ -349,6 +404,24 @@ export function LocationSuggestions({
           {/* Filters */}
           {showFilters && (
             <div className="space-y-3 pt-2 border-t">
+              {/* Search Category */}
+              <div>
+                <label className="text-xs font-medium mb-2 block">Search Category</label>
+                <select
+                  value={filters.searchType}
+                  onChange={(e) => setFilters(prev => ({ 
+                    ...prev, 
+                    searchType: e.target.value as SearchType
+                  }))}
+                  className="w-full text-xs border rounded px-2 py-1"
+                >
+                  <option value="all">All Types</option>
+                  <option value="food">🍽️ Food & Dining</option>
+                  <option value="shopping">🛍️ Shopping</option>
+                  <option value="historical">🏛️ Historical & Cultural</option>
+                </select>
+              </div>
+              
               {/* Activity Types */}
               <div>
                 <label className="text-xs font-medium mb-2 block">Activity Types</label>

@@ -319,6 +319,32 @@ export default function Builder() {
                             // Handle activity editing
                             console.log('Edit activity:', activityId);
                           }}
+                          onAddSuggestion={(suggestion, date) => {
+                            // Convert suggestion to proper format and add to itinerary
+                            console.log('📍 Adding suggestion to itinerary:', suggestion.name, 'for date:', date);
+                            
+                            // Convert Google Places format to our activity format
+                            const convertedActivity = {
+                              activity: {
+                                name: suggestion.name,
+                                address: suggestion.vicinity,
+                                coordinates: [suggestion.geometry.location.lng, suggestion.geometry.location.lat] as [number, number], // Convert to [lng, lat]
+                                types: suggestion.types,
+                                rating: suggestion.rating,
+                                price_level: suggestion.price_level?.toString(),
+                                place_id: suggestion.place_id
+                              },
+                              date: date || new Date().toISOString().split('T')[0],
+                              start_time: null,
+                              end_time: null,
+                              notes: 'Added from location suggestions'
+                            };
+                            
+                            console.log('🔄 Converted suggestion coordinates:', suggestion.geometry.location, '->', convertedActivity.activity.coordinates);
+                            
+                            // TODO: Add proper integration with itinerary store/API
+                            // For now, just log the conversion
+                          }}
                         />
                       );
                     })()}

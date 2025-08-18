@@ -66,8 +66,9 @@ export function ItineraryActivityMarker({
     return null;
   }
 
-  const [longitude, latitude] = activity.activity.coordinates;
-  const position = { lat: latitude, lng: longitude };
+  // Coordinates are stored as [lng, lat] in our data
+  const [lng, lat] = activity.activity.coordinates;
+  const position = { lat: lat, lng: lng };
   
   console.log('ItineraryActivityMarker: Rendering marker at', position, 'for', activity.activity?.name);
 
