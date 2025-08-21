@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
+import { formatDuration } from '@/utils/formatting/time';
 import { useDragContext } from './DragProvider';
 
 interface DropZoneIndicatorProps {
@@ -404,12 +405,3 @@ function formatTime(timeString: string): string {
   return `${displayHour}:${minutes.toString().padStart(2, '0')} ${period}`;
 }
 
-function formatDuration(minutes: number): string {
-  const hours = Math.floor(minutes / 60);
-  const mins = minutes % 60;
-  
-  if (hours > 0) {
-    return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`;
-  }
-  return `${mins}m`;
-}

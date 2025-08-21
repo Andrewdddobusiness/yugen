@@ -161,16 +161,6 @@ export function getEfficiencyBadgeVariant(score: number): 'default' | 'secondary
   return 'destructive'; // Red
 }
 
-/**
- * Format time duration for display
- */
-export function formatDuration(minutes: number): string {
-  const hours = Math.floor(minutes / 60);
-  const mins = minutes % 60;
-  if (hours === 0) return `${mins}m`;
-  if (mins === 0) return `${hours}h`;
-  return `${hours}h ${mins}m`;
-}
 
 /**
  * Get recommendation icon

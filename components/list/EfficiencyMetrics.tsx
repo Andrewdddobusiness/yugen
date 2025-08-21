@@ -11,10 +11,10 @@ import { cn } from '@/lib/utils';
 import { 
   EfficiencyMetrics, 
   getEfficiencyScoreColor, 
-  getEfficiencyBadgeVariant, 
-  formatDuration,
+  getEfficiencyBadgeVariant,
   getRecommendationIcon
 } from '@/utils/efficiencyMetrics';
+import { formatDuration } from '@/utils/formatting/time';
 
 interface EfficiencyMetricsProps {
   metrics: EfficiencyMetrics;

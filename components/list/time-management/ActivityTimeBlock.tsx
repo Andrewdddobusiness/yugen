@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { formatCategoryType } from '@/utils/formatting/types';
+import { formatDuration, formatTimeRange } from '@/utils/formatting/time';
 import { type ActivityTimeBlock } from '@/utils/timeSlots';
 
 interface ActivityTimeBlockProps {
@@ -44,13 +45,6 @@ export function ActivityTimeBlock({
     return levels[priceLevel] || '';
   };
 
-  const formatDuration = (minutes: number) => {
-    const hours = Math.floor(minutes / 60);
-    const mins = minutes % 60;
-    if (hours === 0) return `${mins}m`;
-    if (mins === 0) return `${hours}h`;
-    return `${hours}h ${mins}m`;
-  };
 
   return (
     <div 
@@ -94,9 +88,7 @@ export function ActivityTimeBlock({
               <div className="flex items-center gap-2 mt-1 text-xs text-gray-600 dark:text-gray-400">
                 <Clock className="h-3 w-3" />
                 <span>
-                  {startTime}
-                  {endTime && ` - ${endTime}`}
-                  {duration && ` (${formatDuration(duration)})`}
+                  {formatTimeRange(startTime, endTime, duration)}
                 </span>
               </div>
             </div>

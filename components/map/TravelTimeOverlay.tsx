@@ -18,6 +18,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 import { cn } from '@/lib/utils';
+import { formatDuration } from '@/utils/formatting/time';
 
 interface TravelTimeData {
   from: {
@@ -136,14 +137,6 @@ export function TravelTimeOverlay({
       .sort(([_, a], [__, b]) => a.duration - b.duration);
     
     return modes.length > 0 ? modes[0][0] : 'walking';
-  };
-
-  const formatDuration = (minutes: number) => {
-    const hours = Math.floor(minutes / 60);
-    const mins = minutes % 60;
-    if (hours === 0) return `${mins}m`;
-    if (mins === 0) return `${hours}h`;
-    return `${hours}h ${mins}m`;
   };
 
   const formatDistance = (meters: number) => {
@@ -324,14 +317,6 @@ function TravelTimeDetail({ segment, showAllModes, onModeSelect }: TravelTimeDet
     }
   };
 
-  const formatDuration = (minutes: number) => {
-    const hours = Math.floor(minutes / 60);
-    const mins = minutes % 60;
-    if (hours === 0) return `${mins}m`;
-    if (mins === 0) return `${hours}h`;
-    return `${hours}h ${mins}m`;
-  };
-
   const formatDistance = (meters: number) => {
     if (meters < 1000) return `${Math.round(meters)}m`;
     return `${(meters / 1000).toFixed(1)}km`;
@@ -460,14 +445,6 @@ function TravelTimeSummary({ segments }: TravelTimeSummaryProps) {
 
   const problematicSegments = segments.filter(segment => !segment.isRealistic);
   const warningSegments = segments.filter(segment => segment.warnings && segment.warnings.length > 0);
-
-  const formatDuration = (minutes: number) => {
-    const hours = Math.floor(minutes / 60);
-    const mins = minutes % 60;
-    if (hours === 0) return `${mins}m`;
-    if (mins === 0) return `${hours}h`;
-    return `${hours}h ${mins}m`;
-  };
 
   return (
     <div className="space-y-2">

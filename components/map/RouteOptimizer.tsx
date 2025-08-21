@@ -17,6 +17,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
+import { formatDuration } from '@/utils/formatting/time';
 
 interface ItineraryActivity {
   itinerary_activity_id: string;
@@ -115,14 +116,6 @@ export function RouteOptimizer({
     }));
 
     onApplyOptimization?.(optimizedActivities);
-  };
-
-  const formatDuration = (minutes: number) => {
-    const hours = Math.floor(minutes / 60);
-    const mins = minutes % 60;
-    if (hours === 0) return `${mins}m`;
-    if (mins === 0) return `${hours}h`;
-    return `${hours}h ${mins}m`;
   };
 
   const formatDistance = (meters: number) => {

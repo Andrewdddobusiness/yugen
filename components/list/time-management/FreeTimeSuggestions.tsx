@@ -7,6 +7,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { cn } from '@/lib/utils';
+import { formatDuration } from '@/utils/formatting/time';
 import { FreeTimeGap, FreeTimeSuggestion } from '@/utils/freeTimeSuggestions';
 
 interface FreeTimeSuggestionsProps {
@@ -32,13 +33,6 @@ export function FreeTimeSuggestions({ gaps, onAddActivity, className }: FreeTime
     setExpandedGaps(newExpanded);
   };
 
-  const formatDuration = (minutes: number): string => {
-    const hours = Math.floor(minutes / 60);
-    const mins = minutes % 60;
-    if (hours === 0) return `${mins}m`;
-    if (mins === 0) return `${hours}h`;
-    return `${hours}h ${mins}m`;
-  };
 
   const getGapTypeColor = (type: FreeTimeGap['type']) => {
     switch (type) {
@@ -214,13 +208,6 @@ interface FreeTimeSummaryProps {
 }
 
 export function FreeTimeSummary({ totalFreeTime, largestGap, gapCount, className }: FreeTimeSummaryProps) {
-  const formatDuration = (minutes: number): string => {
-    const hours = Math.floor(minutes / 60);
-    const mins = minutes % 60;
-    if (hours === 0) return `${mins}m`;
-    if (mins === 0) return `${hours}h`;
-    return `${hours}h ${mins}m`;
-  };
 
   if (gapCount === 0) {
     return (

@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { useIsMobile } from '@/components/hooks/use-mobile';
 import { TimeSlotGrid } from './TimeSlotGrid';
-import { ActivityTimeBlock } from './ActivityTimeBlock';
+import { TimeBlockActivityCard } from '@/components/cards/activity';
 import { TimeConflicts, DayConflictsSummary } from './TimeConflicts';
 import { FreeTimeSuggestions, FreeTimeSummary } from './FreeTimeSuggestions';
 import { EfficiencyMetricsCard, EfficiencyScoreSummary } from './EfficiencyMetrics';
@@ -194,7 +194,7 @@ export function DayTimeSlots({
               </h4>
               <TimeSlotGrid className="group">
                 {dayData.activities.map((timeBlock, index) => (
-                  <ActivityTimeBlock
+                  <TimeBlockActivityCard
                     key={timeBlock.activity.itinerary_activity_id}
                     timeBlock={timeBlock}
                     isSelected={selectedActivities.has(timeBlock.activity.itinerary_activity_id)}
@@ -202,7 +202,7 @@ export function DayTimeSlots({
                     onEdit={() => onActivityEdit?.(timeBlock.activity.itinerary_activity_id)}
                     onDelete={() => onActivityDelete?.(timeBlock.activity.itinerary_activity_id)}
                     onSelect={() => onActivitySelect?.(timeBlock.activity.itinerary_activity_id)}
-                    showTravelTime={index > 0} // Show travel time for activities after the first
+                    showTravelTimeBefore={index > 0} // Show travel time for activities after the first
                     travelTime={travelTimes[timeBlock.activity.itinerary_activity_id]}
                   />
                 ))}

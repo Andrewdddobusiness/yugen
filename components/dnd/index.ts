@@ -1,6 +1,8 @@
 // Drag and Drop System - Complete Implementation
 // This module provides a comprehensive drag-and-drop system for the calendar application
 
+import { formatDuration as sharedFormatDuration, formatTime as sharedFormatTime } from '@/utils/formatting/time';
+
 // Core Provider and Context
 export { 
   DragProvider, 
@@ -84,27 +86,10 @@ export {
 // Utility Functions and Helpers
 export const DragUtilities = {
   // Time formatting utilities
-  formatTime: (timeString: string): string => {
-    const [hours, minutes] = timeString.split(':').map(Number);
-    const displayHour = hours > 12 ? hours - 12 : hours === 0 ? 12 : hours;
-    const period = hours >= 12 ? 'PM' : 'AM';
-    
-    if (minutes === 0) {
-      return `${displayHour} ${period}`;
-    }
-    return `${displayHour}:${minutes.toString().padStart(2, '0')} ${period}`;
-  },
+  formatTime: sharedFormatTime,
 
   // Duration formatting
-  formatDuration: (minutes: number): string => {
-    const hours = Math.floor(minutes / 60);
-    const mins = minutes % 60;
-    
-    if (hours > 0) {
-      return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`;
-    }
-    return `${mins}m`;
-  },
+  formatDuration: sharedFormatDuration,
 
   // Generate unique drag IDs
   generateDragId: (type: string, itemId: string): string => {

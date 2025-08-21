@@ -6,6 +6,7 @@ import { Clock, Car, PersonStanding, Train, Bike, Navigation } from 'lucide-reac
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { formatDuration } from '@/utils/formatting/time';
 
 interface RouteSegment {
   from: {
@@ -220,14 +221,6 @@ export function DayRouteSummary({
     }
   };
 
-  const formatDuration = (minutes: number) => {
-    const hours = Math.floor(minutes / 60);
-    const mins = minutes % 60;
-    if (hours === 0) return `${mins}m`;
-    if (mins === 0) return `${hours}h`;
-    return `${hours}h ${mins}m`;
-  };
-
   const formatDistance = (meters: number) => {
     if (meters < 1000) {
       return `${Math.round(meters)}m`;
@@ -331,14 +324,6 @@ export function RouteOptimization({
   if (!optimizedRoute || !savings) {
     return null;
   }
-
-  const formatDuration = (minutes: number) => {
-    const hours = Math.floor(minutes / 60);
-    const mins = minutes % 60;
-    if (hours === 0) return `${mins}m`;
-    if (mins === 0) return `${hours}h`;
-    return `${hours}h ${mins}m`;
-  };
 
   const formatDistance = (meters: number) => {
     if (meters < 1000) return `${Math.round(meters)}m`;

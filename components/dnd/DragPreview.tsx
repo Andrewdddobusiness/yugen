@@ -4,6 +4,8 @@ import React, { useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { Clock, MapPin, Star, Calendar } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { formatDuration, formatTime } from '@/utils/formatting/time';
+import { formatCategoryType } from '@/utils/formatting/types';
 import { useDragState } from './DragProvider';
 
 interface DragPreviewProps {
@@ -135,7 +137,7 @@ function WishlistItemPreview({ item }: { item: any }) {
               key={index}
               className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded"
             >
-              {formatActivityType(type)}
+              {formatCategoryType(type)}
             </span>
           ))}
           {activity.types.length > 2 && (
@@ -241,31 +243,3 @@ export function DragGhost({
   );
 }
 
-// Utility functions
-function formatDuration(minutes: number): string {
-  const hours = Math.floor(minutes / 60);
-  const mins = minutes % 60;
-  
-  if (hours > 0) {
-    return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`;
-  }
-  return `${mins}m`;
-}
-
-function formatTime(timeString: string): string {
-  const [hours, minutes] = timeString.split(':').map(Number);
-  const displayHour = hours > 12 ? hours - 12 : hours === 0 ? 12 : hours;
-  const period = hours >= 12 ? 'PM' : 'AM';
-  
-  if (minutes === 0) {
-    return `${displayHour} ${period}`;
-  }
-  return `${displayHour}:${minutes.toString().padStart(2, '0')} ${period}`;
-}
-
-function formatActivityType(type: string): string {
-  return type
-    .split('_')
-    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(' ');
-}
