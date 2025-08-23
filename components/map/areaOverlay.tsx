@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useMap } from "@vis.gl/react-google-maps";
-import LoadingSpinner from "@/components/loading/loadingSpinner";
+import LoadingSpinner from "@/components/loading/LoadingSpinner";
 
 interface DeckGLOverlayProps {
   data: GeoJSON.FeatureCollection;

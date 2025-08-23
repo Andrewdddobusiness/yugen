@@ -1,5 +1,5 @@
 import React from "react";
-import ActivityCardHorizontal from "./activityCardHorizontal";
+import { LegacyActivityCardHorizontal } from "./ActivityCard/LegacyActivityCardHorizontal";
 import { IActivityWithLocation } from "@/store/activityStore";
 import { useSidebar } from "../ui/sidebar";
 
@@ -20,7 +20,7 @@ export default function ActivityCardsHorizontal({
   return (
     <div className={`grid ${open ? "grid-cols-1" : "grid-cols-1"} gap-4 pb-8`}>
       {activities.map((activity) => (
-        <ActivityCardHorizontal
+        <LegacyActivityCardHorizontal
           key={activity.place_id}
           activity={activity}
           onClick={() => onSelectActivity?.(activity)}

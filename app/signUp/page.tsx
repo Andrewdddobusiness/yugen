@@ -12,7 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/components/ui/use-toast";
 
-import LoadingSpinner from "@/components/loading/loadingSpinner";
+import LoadingSpinner from "@/components/loading/LoadingSpinner";
 import { GoogleSignInButton } from "@/components/auth/GoogleSignInButton";
 
 import { signup, logout, resendConfirmation } from "@/actions/auth/actions";

@@ -22,9 +22,9 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-import ItineraryChoiceDialog from "../dialog/itineraryChoiceDialog";
-import LogoutButton from "../buttons/logoutButton";
-import BackIconButton from "../buttons/backIconButton";
+import ItineraryChoiceDialog from "../shared/ItineraryChoiceDialog";
+import LogoutButton from "../buttons/LogoutButton";
+import BackIconButton from "../buttons/BackIconButton";
 
 import { MdPersonOutline } from "react-icons/md";
 

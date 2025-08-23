@@ -9,8 +9,8 @@ import { createClient } from "@/utils/supabase/client";
 
 import { Command, Plus } from "lucide-react";
 
-import { NavMain } from "@/components/sidebar/appSidebar/navMain";
-import { NavUser } from "@/components/sidebar/appSidebar/navUser";
+import { NavMain } from "@/components/sidebar/appSidebar/NavMain";
+import { NavUser } from "@/components/sidebar/appSidebar/NavUser";
 import {
   Sidebar,
   SidebarContent,
@@ -22,9 +22,9 @@ import {
   SidebarRail,
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
-import LoadingSpinner from "@/components/loading/loadingSpinner";
-import { NavMainItineraryActivity } from "./navMainItineraryActivity";
-import { ActivityCartSidebar } from "@/components/sidebar/activityCartSidebar";
+import { LoadingSpinner } from "@/components/loading";
+import { NavMainItineraryActivity } from "./NavMainItineraryActivity";
+import { ActivityCartSidebar } from "@/components/sidebar/ActivityCartSidebar";
 import { useCartStore } from "@/store/cartStore";
 
 export function AppSidebarItineraryActivityLeft() {

@@ -1,7 +1,7 @@
 "use client";
 
 import { SidebarProvider } from "@/components/ui/sidebar";
-import { AppSidebarItineraryActivityRight } from "@/components/sidebar/appSidebar/appSidebarItineraryActivityRight";
+import { AppSidebarItineraryActivityRight } from "@/components/sidebar/appSidebar/AppSidebarItineraryActivityRight";
 import { useMapStore } from "@/store/mapStore";
 
 export default function Layout({ children }: { children: React.ReactNode }) {

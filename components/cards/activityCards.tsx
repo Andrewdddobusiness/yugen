@@ -1,5 +1,5 @@
 import React from "react";
-import ActivityCard from "./activityCard";
+import LegacyActivityCard from "./ActivityCard/LegacyActivityCard";
 import { IActivityWithLocation } from "@/store/activityStore";
 import PersistedQueryProvider from "@/components/providers/persistedQueryProvider";
 import { useSidebar } from "../ui/sidebar";
@@ -22,7 +22,7 @@ export default function ActivityCards({ activities, onSelectActivity }: IActivit
         } gap-4`}
       >
         {activities.map((activity) => (
-          <ActivityCard
+          <LegacyActivityCard
             key={activity.place_id}
             activity={activity}
             onClick={() => onSelectActivity(activity)}

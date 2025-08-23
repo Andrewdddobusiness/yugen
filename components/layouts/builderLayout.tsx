@@ -19,9 +19,9 @@ import {
   DropdownMenuGroup,
 } from "@/components/ui/dropdown-menu";
 
-import ItineraryChoiceDialog from "../dialog/itineraryChoiceDialog";
+import ItineraryChoiceDialog from "../shared/ItineraryChoiceDialog";
 import { Skeleton } from "../ui/skeleton";
-import LogoutButton from "../buttons/logoutButton";
+import LogoutButton from "../buttons/LogoutButton";
 import { useSearchParams } from "next/navigation";
 
 interface PageLayoutProps {

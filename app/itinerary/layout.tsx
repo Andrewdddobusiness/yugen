@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { usePathname } from "next/navigation";
 
 import { SidebarProvider, SidebarTrigger, SidebarInset } from "@/components/ui/sidebar";
-import { AppSidebarItineraryActivityLeft } from "@/components/sidebar/appSidebar/appSidebarItineraryActivityLeft2";
+import { AppSidebarItineraryActivityLeft } from "@/components/sidebar/appSidebar/AppSidebarItineraryActivityLeft2";
 import { Separator } from "@/components/ui/separator";
 import {
   Breadcrumb,
@@ -33,8 +33,8 @@ import { IItineraryActivity, useItineraryActivityStore } from "@/store/itinerary
 import { useParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Download, Share, Users } from "lucide-react";
-import { ExportDialog } from "@/components/share/exportDialog";
-import Loading from "@/components/loading/loading";
+import { ExportDialog } from "@/components/share/ExportDialog";
+import Loading from "@/components/loading/Loading";
 import { DndContext, DragOverlay, closestCorners } from '@dnd-kit/core';
 import { WishlistItem } from '@/components/sidebar/WishlistItem';
 import { useWishlistStore } from '@/store/wishlistStore';

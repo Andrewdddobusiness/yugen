@@ -1,9 +1,9 @@
 import { useRef, useEffect } from "react";
 import { TableCell, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { DatePickerPopover } from "@/components/date/datePickerPopover";
-import TimePopover from "@/components/time/timePopover";
-import { NotesPopover } from "@/components/popover/notesPopover";
+import { DatePickerPopover } from "@/components/date/DatePickerPopover";
+import TimePopover from "@/components/shared/TimePopover";
+import { NotesPopover } from "@/components/shared/NotesPopover";
 import { MoreHorizontal, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";

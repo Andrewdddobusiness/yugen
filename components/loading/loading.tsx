@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from "react";
 import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
-import LoadingSpinner from "@/components/loading/loadingSpinner";
+import LoadingSpinner from "@/components/loading/LoadingSpinner";
 
 export default function Loading() {
   const textOptions = [

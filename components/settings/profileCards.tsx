@@ -22,7 +22,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 
-import LoadingSpinner from "@/components/loading/loadingSpinner";
+import LoadingSpinner from "@/components/loading/LoadingSpinner";
 
 // import { uploadToStorage } from "@/actions/file/actions";
 

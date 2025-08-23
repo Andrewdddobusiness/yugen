@@ -1,7 +1,7 @@
 "use client";
 import React, { useEffect, useState } from "react";
 import Image from "next/image";
-import ItineraryCards from "@/components/cards/itineraryCards";
+import ItineraryCards from "@/components/cards/ItineraryCards";
 
 import { fetchUserItineraries } from "@/actions/supabase/actions";
 import { createClient } from "@/utils/supabase/client";

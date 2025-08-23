@@ -7,12 +7,12 @@ import { Separator } from "@/components/ui/separator";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
-import ActivityCards from "@/components/cards/activityCards";
+import ActivityCards from "@/components/cards/ActivityCards";
 
-import Loading from "@/components/loading/loading";
-import ActivityTypeFilters from "@/components/filters/activityTypeFilters";
-import ActivityCostFilters from "@/components/filters/activityCostFilters";
-import ActivitySkeletonCards from "@/components/cards/activitySkeletonCards";
+import Loading from "@/components/loading/Loading";
+import ActivityTypeFilters from "@/components/filters/ActivityTypeFilters";
+import ActivityCostFilters from "@/components/filters/ActivityCostFilters";
+import ActivitySkeletonCards from "@/components/cards/ActivitySkeletonCards";
 
 import {
   fetchItineraryDestination,
@@ -34,12 +34,12 @@ import { filterActivities } from "@/utils/filters/filterActivities";
 import { activityTypeFilters, activityCostFilters } from "@/utils/filters/filters";
 
 import { Popup } from "react-map-gl";
-import GoogleMapComponent from "@/components/map/googleMap";
-import ClearHistoryButton from "@/components/buttons/clearHistoryButton";
-import ActivityOrderFilters from "@/components/filters/activityOrderFilters";
+import GoogleMapComponent from "@/components/map/GoogleMap";
+import ClearHistoryButton from "@/components/buttons/ClearHistoryButton";
+import ActivityOrderFilters from "@/components/filters/ActivityOrderFilters";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EarthIcon } from "lucide-react";
-import { ViewToggleButton } from "@/components/buttons/mapViewToggleButton";
+import { ViewToggleButton } from "@/components/buttons/MapViewToggleButton";
 import { cn } from "@/components/lib/utils";
 
 import { useSidebar } from "@/components/ui/sidebar";

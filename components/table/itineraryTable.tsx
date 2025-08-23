@@ -2,13 +2,13 @@
 import { useState } from "react";
 import { useIsMobile } from "@/components/hooks/use-mobile";
 import { Table, TableBody, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import TimePopover from "@/components/time/timePopover";
+import TimePopover from "@/components/shared/TimePopover";
 
-import { DatePickerPopover } from "@/components/date/datePickerPopover";
+import { DatePickerPopover } from "@/components/date/DatePickerPopover";
 
 import { useItineraryActivityStore } from "@/store/itineraryActivityStore";
 import { useItineraryLayoutStore } from "@/store/itineraryLayoutStore";
-import { NotesPopover } from "@/components/popover/notesPopover";
+import { NotesPopover } from "@/components/shared/NotesPopover";
 import { ChevronDown, MapPin, Phone, Globe } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
@@ -16,8 +16,8 @@ import { cn } from "@/lib/utils";
 import { useDateRangeStore } from "@/store/dateRangeStore";
 
 import { useParams } from "next/navigation";
-import ItineraryTableRow from "@/components/table/itineraryTableRow";
-import { ItineraryTableDateHeader } from "@/components/table/itineraryTableDateHeader";
+import ItineraryTableRow from "@/components/table/ItineraryTableRow";
+import { ItineraryTableDateHeader } from "@/components/table/ItineraryTableDateHeader";
 import { useQueryClient } from "@tanstack/react-query";
 
 interface ItineraryTableViewProps {
