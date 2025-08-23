@@ -1,5 +1,5 @@
 "use server";
-import { IItineraryCard } from "@/components/cards/itineraryCard";
+import { IItineraryCard } from "@/components/cards/ItineraryCard";
 import { createClient } from "@/utils/supabase/server";
 
 /*

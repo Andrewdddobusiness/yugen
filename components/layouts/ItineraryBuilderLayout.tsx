@@ -10,7 +10,7 @@ import { ItineraryToolbar } from '@/components/itinerary/ItineraryToolbar';
 import { ItinerarySidebar } from '@/components/itinerary/ItinerarySidebar';
 import { useItineraryLayoutStore } from '@/store/itineraryLayoutStore';
 import { fetchItineraryDestination, fetchItineraryDestinationDateRange } from '@/actions/supabase/actions';
-import Loading from '@/components/loading/loading';
+import Loading from '@/components/loading/Loading';
 import ErrorPage from '@/app/error/page';
 import GoogleMapView from '@/components/map/googleMapView';
 import { useItineraryActivityStore } from '@/store/itineraryActivityStore';

@@ -4,7 +4,7 @@ import React, { useState } from "react";
 import { GripVertical } from "lucide-react";
 import { BaseActivityCard, BaseActivityCardProps } from "./BaseActivityCard";
 import { DatePickerPopover } from "@/components/date/datePickerPopover";
-import TimePopover from "@/components/time/timePopover";
+import TimePopover from "@/components/shared/TimePopover";
 import { cn } from "@/lib/utils";
 import { useDateRangeStore } from "@/store/dateRangeStore";
 import { useParams } from "next/navigation";
