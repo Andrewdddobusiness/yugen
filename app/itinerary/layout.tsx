@@ -35,14 +35,13 @@ import { Button } from "@/components/ui/button";
 import { Download, Share, Users } from "lucide-react";
 import { ExportDialog } from "@/components/share/ExportDialog";
 import Loading from "@/components/loading/Loading";
-import { DndContext, DragOverlay, closestCorners } from '@dnd-kit/core';
-import { WishlistItem } from '@/components/sidebar/WishlistItem';
-import { useWishlistStore } from '@/store/wishlistStore';
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   const { itineraryId, destinationId } = useParams();
   const pathname = usePathname();
-  const [activeId, setActiveId] = useState<string | null>(null);
+  
+  // Check if we're on the builder page to conditionally render sidebar
+  const isBuilderPage = pathname.includes('/builder');
 
   //**** STORES ****//
   const { fetchItineraryActivities, setItineraryActivities } = useItineraryActivityStore();
@@ -145,100 +144,118 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   };
 
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
-  
-  // Get wishlist items for DragOverlay
-  const { wishlistItems } = useWishlistStore();
-  const activeWishlistItem = activeId ? wishlistItems.find(item => `wishlist-${item.placeId}` === activeId) : null;
 
   if (!itineraryId || !destinationId) {
     return <Loading />;
   }
 
-  const handleDragStart = (event: any) => {
-    setActiveId(event.active.id);
-  };
 
-  const handleDragEnd = () => {
-    setActiveId(null);
-  };
-
-  return (
-    <DndContext 
-      collisionDetection={closestCorners}
-      onDragStart={handleDragStart}
-      onDragEnd={handleDragEnd}
-    >
-      <div className="flex h-screen">
-        <SidebarProvider
-        style={
-          {
-            "--sidebar-width": "420px",
-            "--sidebar-width-icon": "48px",
-            "--sidebar-width-mobile": "320px",
-          } as React.CSSProperties
-        }
-      >
-        <AppSidebarItineraryActivityLeft />
-        <main className="flex-1 flex flex-col w-1/2">
-          <header className="sticky top-0 flex shrink-0 items-center gap-2 border-b bg-background p-2">
-            <div className="flex items-center gap-2 flex-1">
-              <SidebarTrigger className="-ml-1" />
-              <Separator orientation="vertical" className="mr-2 h-4" />
-              <Breadcrumb>
-                <BreadcrumbList>
-                  <BreadcrumbItem>
-                    <BreadcrumbLink href="/itineraries">Itineraries</BreadcrumbLink>
-                  </BreadcrumbItem>
-                  <BreadcrumbSeparator />
-                  <BreadcrumbItem>
-                    <BreadcrumbPage>{getBreadcrumbText()}</BreadcrumbPage>
-                  </BreadcrumbItem>
-                </BreadcrumbList>
-              </Breadcrumb>
-            </div>
-
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="outline"
-                  size="default"
-                  className="gap-2 transition-colors active:scale-95 active:bg-accent hover:bg-accent/80"
-                >
-                  <Share className="size-4" />
-                  <span>Share</span>
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent>
-                <DropdownMenuItem className="cursor-pointer">
-                  <Users className="size-4" />
-                  <span>Invite Collaborators</span>
-                </DropdownMenuItem>
-                <DropdownMenuItem className="cursor-pointer" onClick={() => setExportDialogOpen(true)}>
-                  <Download className="size-4" />
-                  <span>Export</span>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </header>
-          <div className="flex-1 overflow-auto">{children}</div>
-        </main>
-      </SidebarProvider>
-      <ExportDialog open={exportDialogOpen} onOpenChange={setExportDialogOpen} itineraryId={itineraryId as string} />
-      </div>
-      
-      {/* DragOverlay renders the dragged item above everything */}
-      <DragOverlay style={{ zIndex: 9999, pointerEvents: 'none' }}>
-        {activeId && activeWishlistItem ? (
-          <div className="bg-white border border-gray-200 rounded-lg shadow-xl p-2 opacity-90 cursor-grabbing max-w-sm">
-            <div className="font-medium text-sm truncate">
-              {activeWishlistItem.activity?.name || 'Place'}
-            </div>
-            <div className="text-xs text-gray-500 truncate">
-              Drag to calendar to schedule
-            </div>
+  // For builder page, show simpler layout without sidebar
+  if (isBuilderPage) {
+    return (
+      <div className="flex flex-col h-screen">
+        <header className="sticky top-0 flex shrink-0 items-center gap-2 border-b bg-background p-2">
+          <div className="flex items-center gap-2 flex-1">
+            <Breadcrumb>
+              <BreadcrumbList>
+                <BreadcrumbItem>
+                  <BreadcrumbLink href="/itineraries">Itineraries</BreadcrumbLink>
+                </BreadcrumbItem>
+                <BreadcrumbSeparator />
+                <BreadcrumbItem>
+                  <BreadcrumbPage>{getBreadcrumbText()}</BreadcrumbPage>
+                </BreadcrumbItem>
+              </BreadcrumbList>
+            </Breadcrumb>
           </div>
-        ) : null}
-      </DragOverlay>
-    </DndContext>
+
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="outline"
+                size="default"
+                className="gap-2 transition-colors active:scale-95 active:bg-accent hover:bg-accent/80"
+              >
+                <Share className="size-4" />
+                <span>Share</span>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent>
+              <DropdownMenuItem className="cursor-pointer">
+                <Users className="size-4" />
+                <span>Invite Collaborators</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem className="cursor-pointer" onClick={() => setExportDialogOpen(true)}>
+                <Download className="size-4" />
+                <span>Export</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </header>
+        <div className="flex-1 overflow-auto">{children}</div>
+        <ExportDialog open={exportDialogOpen} onOpenChange={setExportDialogOpen} itineraryId={itineraryId as string} />
+      </div>
+    );
+  }
+
+  // For other pages (activities, overview), show layout with sidebar
+  return (
+    <div className="flex h-screen">
+      <SidebarProvider
+      style={
+        {
+          "--sidebar-width": "420px",
+          "--sidebar-width-icon": "48px",
+          "--sidebar-width-mobile": "320px",
+        } as React.CSSProperties
+      }
+    >
+      <AppSidebarItineraryActivityLeft />
+      <main className="flex-1 flex flex-col w-1/2">
+        <header className="sticky top-0 flex shrink-0 items-center gap-2 border-b bg-background p-2">
+          <div className="flex items-center gap-2 flex-1">
+            <SidebarTrigger className="-ml-1" />
+            <Separator orientation="vertical" className="mr-2 h-4" />
+            <Breadcrumb>
+              <BreadcrumbList>
+                <BreadcrumbItem>
+                  <BreadcrumbLink href="/itineraries">Itineraries</BreadcrumbLink>
+                </BreadcrumbItem>
+                <BreadcrumbSeparator />
+                <BreadcrumbItem>
+                  <BreadcrumbPage>{getBreadcrumbText()}</BreadcrumbPage>
+                </BreadcrumbItem>
+              </BreadcrumbList>
+            </Breadcrumb>
+          </div>
+
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="outline"
+                size="default"
+                className="gap-2 transition-colors active:scale-95 active:bg-accent hover:bg-accent/80"
+              >
+                <Share className="size-4" />
+                <span>Share</span>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent>
+              <DropdownMenuItem className="cursor-pointer">
+                <Users className="size-4" />
+                <span>Invite Collaborators</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem className="cursor-pointer" onClick={() => setExportDialogOpen(true)}>
+                <Download className="size-4" />
+                <span>Export</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </header>
+        <div className="flex-1 overflow-auto">{children}</div>
+      </main>
+    </SidebarProvider>
+    <ExportDialog open={exportDialogOpen} onOpenChange={setExportDialogOpen} itineraryId={itineraryId as string} />
+    </div>
   );
 }

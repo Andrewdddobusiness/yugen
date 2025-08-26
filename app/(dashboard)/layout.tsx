@@ -10,15 +10,11 @@ import { getSubscriptionDetails } from "@/actions/stripe/actions";
 
 import { useUserStore } from "@/store/userStore";
 import { useStripeSubscriptionStore, ISubscriptionDetails } from "@/store/stripeSubscriptionStore";
-import { useWishlistInitializer } from "@/hooks/useWishlist";
 import { createClient } from "@/utils/supabase/client";
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   const { setUser, setUserLoading, setProfileUrl, setIsProfileUrlLoading } = useUserStore();
   const { setSubscription, setIsSubscriptionLoading } = useStripeSubscriptionStore();
-  
-  // Initialize wishlist data - this will load the user's wishlist and sync with store
-  useWishlistInitializer();
 
   //***** GET USER *****//
   const { data: user, isLoading: isUserLoading } = useQuery({

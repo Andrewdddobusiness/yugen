@@ -22,12 +22,6 @@ export type {
 // Visual Components
 export { DragPreview, SnapPreview, DragGhost } from './DragPreview';
 
-export { 
-  DraggableWishlistItem, 
-  useWishlistItemDrag, 
-  createWishlistDragData 
-} from './DraggableWishlistItem';
-
 // Drop Zone Components
 export { 
   DropZoneIndicator,

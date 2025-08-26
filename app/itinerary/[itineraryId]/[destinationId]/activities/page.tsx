@@ -43,8 +43,6 @@ import { ViewToggleButton } from "@/components/buttons/MapViewToggleButton";
 import { cn } from "@/components/lib/utils";
 
 import { useSidebar } from "@/components/ui/sidebar";
-import WishlistPanel from "@/components/wishlist/WishlistPanel";
-// Remove useWishlist import to prevent multiple instances
 
 export default function Activities() {
   const queryClient = useQueryClient();
@@ -55,8 +53,6 @@ export default function Activities() {
     activities,
     setActivities,
     setSelectedActivity,
-    topPlacesActivities,
-    setTopPlacesActivities,
     selectedFilters,
     selectedCostFilters,
     areaSearchActivities,
@@ -71,9 +67,6 @@ export default function Activities() {
 
   // **** STATES ****
   const [initialLoadComplete, setInitialLoadComplete] = useState(false);
-  const [showWishlist, setShowWishlist] = useState(false);
-  
-  // Remove useWishlist to prevent multiple instances
 
   const [popupInfo, setPopupInfo] = useState<{
     longitude: number;
@@ -136,13 +129,6 @@ export default function Activities() {
     }
   }, [fetchedActivities, setActivities, initialLoadComplete, setInitialLoadComplete]);
 
-  // **** TOP PLACES ACTIVITIES (DISABLED FOR NOW) ****
-  // Note: Top places functionality is disabled because the activity table 
-  // doesn't have city_id or is_top_place columns in the current schema
-  useEffect(() => {
-    // Set empty top places for now - this can be implemented later when schema is updated
-    setTopPlacesActivities([]);
-  }, [setTopPlacesActivities]);
 
   // **** GET SEARCH HISTORY ACTIVITIES ****
   const { data: searchHistoryActivitiesData, isLoading: isSearchHistoryLoading } = useQuery<{
@@ -299,7 +285,7 @@ export default function Activities() {
     setIsSidebarRightOpen(true);
   };
 
-  const handleTabChange = (tab: "top-places" | "search" | "area-search" | "history" | "wishlist") => {
+  const handleTabChange = (tab: "search" | "area-search" | "history") => {
     setSelectedTab(tab);
   };
 
@@ -321,57 +307,19 @@ export default function Activities() {
       >
         <div className="flex flex-col flex-grow overflow-hidden">
           <Tabs
-            defaultValue={selectedTab}
+            defaultValue="area-search"
             value={selectedTab}
-            onValueChange={(value) => handleTabChange(value as "top-places" | "search" | "area-search" | "history" | "wishlist")}
+            onValueChange={(value) => handleTabChange(value as "search" | "area-search" | "history")}
             className="flex flex-col h-full"
           >
             <div className="flex flex-row justify-center">
               <TabsList className="border">
-                <TabsTrigger value="top-places">Top Places</TabsTrigger>
                 <TabsTrigger value="search">Wide Search</TabsTrigger>
-                <TabsTrigger value="area-search">Area Search</TabsTrigger>
+                <TabsTrigger value="area-search">Map Search</TabsTrigger>
                 <TabsTrigger value="history">Search History</TabsTrigger>
-                <TabsTrigger value="wishlist">Wishlist</TabsTrigger>
               </TabsList>
             </div>
             <Separator className="mt-4 mb-2" />
-            <TabsContent value="top-places" className="flex-grow overflow-hidden">
-              <div className="flex flex-col h-full gap-4">
-                <div className="flex flex-row justify-between w-full px-4">
-                  <div className="flex flex-row gap-2 w-full">
-                    <ActivityCostFilters />
-                    <ActivityTypeFilters />
-                    <ActivityOrderFilters
-                      activities={topPlacesActivities as IActivityWithLocation[]}
-                      setActivities={setTopPlacesActivities}
-                    />
-                  </div>
-                </div>
-                <ScrollArea className="flex h-full px-4 pb-14 sm:pb-0">
-                  {topPlacesActivities && Array.isArray(topPlacesActivities) && topPlacesActivities.length > 0 ? (
-                    <ActivityCards
-                      activities={
-                        (selectedFilters.length > 0 || selectedCostFilters.length > 0
-                          ? filterActivities(
-                              filterActivities(
-                                topPlacesActivities as IActivityWithLocation[],
-                                selectedFilters,
-                                activityTypeFilters
-                              ),
-                              selectedCostFilters,
-                              activityCostFilters
-                            )
-                          : topPlacesActivities) as IActivityWithLocation[]
-                      }
-                      onSelectActivity={handleActivitySelect}
-                    />
-                  ) : (
-                    <ActivitySkeletonCards />
-                  )}
-                </ScrollArea>
-              </div>
-            </TabsContent>
             <TabsContent value="search" className="flex-grow overflow-hidden">
               <div className="flex flex-col h-full gap-4">
                 <div className="flex flex-row justify-between w-full px-4 pb-4">
@@ -503,49 +451,6 @@ export default function Activities() {
                     </div>
                   )}
                 </ScrollArea>
-              </div>
-            </TabsContent>
-            <TabsContent value="wishlist" className="flex-grow overflow-hidden">
-              <div className="flex flex-col h-full gap-4">
-                <WishlistPanel 
-                  className="h-full border-0 shadow-none"
-                  onPlaceSelect={(item) => {
-                    if (item.activity) {
-                      // Convert ActivityWithDetails to IActivity format
-                      const activityForSelection: IActivity = {
-                        ...item.activity,
-                        coordinates: item.activity.coordinates ? 
-                          [item.activity.coordinates.x, item.activity.coordinates.y] as [number, number] : 
-                          [0, 0] as [number, number],
-                        price_level: item.activity.price_level || '',
-                        address: item.activity.address || '',
-                        description: item.activity.description || '',
-                        google_maps_url: item.activity.google_maps_url || '',
-                        website_url: item.activity.website_url || '',
-                        photo_names: item.activity.photo_names || [],
-                        duration: typeof item.activity.duration === 'string' ? parseInt(item.activity.duration) || 0 : item.activity.duration || 0,
-                        phone_number: item.activity.phone_number || '',
-                        rating: item.activity.rating || 0,
-                        reviews: (item.activity.reviews || []).map(review => ({
-                          ...review,
-                          description: review.description || '',
-                          rating: review.rating || 0,
-                          author: review.author || '',
-                          uri: review.uri || '',
-                          publish_date_time: review.publish_date_time || ''
-                        })),
-                        open_hours: (item.activity.open_hours || []).map(oh => ({
-                          ...oh,
-                          open_hour: oh.open_hour || 0,
-                          open_minute: oh.open_minute || 0,
-                          close_hour: oh.close_hour || 0,
-                          close_minute: oh.close_minute || 0
-                        }))
-                      };
-                      handleActivitySelect(activityForSelection);
-                    }
-                  }}
-                />
               </div>
             </TabsContent>
           </Tabs>

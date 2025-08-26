@@ -1,13 +1,10 @@
 "use client";
 
 import React, { useState } from 'react';
-import { ChevronLeft, ChevronRight, Heart, Plus } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Calendar } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { WishlistPanel } from '@/components/wishlist/WishlistPanel';
-import { QuickAddPlace } from './QuickAddPlace';
 
 interface ItinerarySidebarProps {
   isCollapsed?: boolean;
@@ -20,8 +17,6 @@ export function ItinerarySidebar({
   onToggleCollapse,
   className
 }: ItinerarySidebarProps) {
-  const [activeTab, setActiveTab] = useState<'wishlist' | 'quickAdd'>('wishlist');
-
   return (
     <div className={cn(
       "relative bg-white border-r border-gray-200 transition-all duration-300 ease-in-out flex flex-col",
@@ -31,33 +26,10 @@ export function ItinerarySidebar({
       {/* Header */}
       <div className="flex items-center justify-between p-3 border-b border-gray-200 bg-gray-50">
         {!isCollapsed && (
-          <>
-            <div className="flex items-center space-x-2">
-              <Heart className="h-5 w-5 text-red-500" />
-              <h2 className="text-sm font-semibold text-gray-900">Place Library</h2>
-            </div>
-            
-            {/* Tab Switcher */}
-            <div className="flex items-center bg-white rounded-lg p-1">
-              <Button
-                variant={activeTab === 'wishlist' ? 'default' : 'ghost'}
-                size="sm"
-                onClick={() => setActiveTab('wishlist')}
-                className="h-7 px-2 text-xs"
-              >
-                Wishlist
-              </Button>
-              <Button
-                variant={activeTab === 'quickAdd' ? 'default' : 'ghost'}
-                size="sm"
-                onClick={() => setActiveTab('quickAdd')}
-                className="h-7 px-2 text-xs"
-              >
-                <Plus className="h-3 w-3 mr-1" />
-                Add
-              </Button>
-            </div>
-          </>
+          <div className="flex items-center space-x-2">
+            <Calendar className="h-5 w-5 text-blue-500" />
+            <h2 className="text-sm font-semibold text-gray-900">Itinerary</h2>
+          </div>
         )}
         
         {/* Collapse Toggle */}
@@ -78,51 +50,27 @@ export function ItinerarySidebar({
       {/* Content */}
       {!isCollapsed && (
         <div className="flex-1 overflow-hidden">
-          {activeTab === 'wishlist' && (
-            <ScrollArea className="h-full">
-              <WishlistPanel
-                className="p-0"
-                isCollapsed={false}
-                enableDragToCalendar={true}
-              />
-            </ScrollArea>
-          )}
-          
-          {activeTab === 'quickAdd' && (
+          <ScrollArea className="h-full">
             <div className="p-4">
-              <QuickAddPlace onPlaceAdded={() => setActiveTab('wishlist')} />
+              <p className="text-sm text-gray-500 text-center">
+                Simplified itinerary view coming soon
+              </p>
             </div>
-          )}
+          </ScrollArea>
         </div>
       )}
 
       {/* Collapsed State */}
       {isCollapsed && (
-        <div className="flex-1 flex flex-col items-center justify-start pt-4 space-y-3">
+        <div className="flex-1 flex flex-col items-center justify-start pt-4">
           <Button
             variant="ghost"
             size="sm"
             className="h-8 w-8 p-0"
-            title="Wishlist"
-            onClick={() => {
-              setActiveTab('wishlist');
-              onToggleCollapse?.();
-            }}
+            title="Itinerary"
+            onClick={onToggleCollapse}
           >
-            <Heart className="h-4 w-4 text-red-500" />
-          </Button>
-          
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-8 w-8 p-0"
-            title="Add Place"
-            onClick={() => {
-              setActiveTab('quickAdd');
-              onToggleCollapse?.();
-            }}
-          >
-            <Plus className="h-4 w-4" />
+            <Calendar className="h-4 w-4 text-blue-500" />
           </Button>
         </div>
       )}
