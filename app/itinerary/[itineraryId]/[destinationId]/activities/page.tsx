@@ -50,8 +50,6 @@ export default function Activities() {
 
   // **** STORES ****
   const {
-    activities,
-    setActivities,
     setSelectedActivity,
     selectedFilters,
     selectedCostFilters,
@@ -66,7 +64,6 @@ export default function Activities() {
   const { open } = useSidebar();
 
   // **** STATES ****
-  const [initialLoadComplete, setInitialLoadComplete] = useState(false);
 
   const [popupInfo, setPopupInfo] = useState<{
     longitude: number;
@@ -99,35 +96,6 @@ export default function Activities() {
     }
   }, [cityCoordinates, setCenterCoordinates, setItineraryCoordinates]);
 
-  const {
-    data: fetchedActivities,
-    isLoading: isActivitiesLoading,
-    error: activitiesError,
-    refetch: refetchActivities,
-  } = useQuery({
-    queryKey: ["nearbyActivities", itineraryCoordinates?.[0], itineraryCoordinates?.[1], mapRadius],
-    queryFn: async () => {
-      if (!itineraryCoordinates || itineraryCoordinates.length !== 2) {
-        throw new Error("Invalid center coordinates");
-      }
-
-      return fetchNearbyActivities(itineraryCoordinates[0], itineraryCoordinates[1], mapRadius);
-    },
-    enabled: Array.isArray(itineraryCoordinates) && itineraryCoordinates.length === 2 && !initialLoadComplete,
-    staleTime: 10 * 60 * 1000, // Increase stale time to 10 minutes
-    gcTime: 15 * 60 * 1000, // Keep in cache for 15 minutes
-    refetchOnWindowFocus: false,
-    refetchOnReconnect: false,
-    refetchOnMount: false, // Prevent refetch on component mount
-    retry: 1, // Reduce retry attempts
-  });
-
-  useEffect(() => {
-    if (fetchedActivities && !initialLoadComplete) {
-      setInitialLoadComplete(true);
-      setActivities(fetchedActivities as IActivity[]);
-    }
-  }, [fetchedActivities, setActivities, initialLoadComplete, setInitialLoadComplete]);
 
 
   // **** GET SEARCH HISTORY ACTIVITIES ****
@@ -285,7 +253,7 @@ export default function Activities() {
     setIsSidebarRightOpen(true);
   };
 
-  const handleTabChange = (tab: "search" | "area-search" | "history") => {
+  const handleTabChange = (tab: "area-search" | "history") => {
     setSelectedTab(tab);
   };
 
@@ -309,54 +277,16 @@ export default function Activities() {
           <Tabs
             defaultValue="area-search"
             value={selectedTab}
-            onValueChange={(value) => handleTabChange(value as "search" | "area-search" | "history")}
+            onValueChange={(value) => handleTabChange(value as "area-search" | "history")}
             className="flex flex-col h-full"
           >
             <div className="flex flex-row justify-center">
               <TabsList className="border">
-                <TabsTrigger value="search">Wide Search</TabsTrigger>
                 <TabsTrigger value="area-search">Map Search</TabsTrigger>
                 <TabsTrigger value="history">Search History</TabsTrigger>
               </TabsList>
             </div>
             <Separator className="mt-4 mb-2" />
-            <TabsContent value="search" className="flex-grow overflow-hidden">
-              <div className="flex flex-col h-full gap-4">
-                <div className="flex flex-row justify-between w-full px-4 pb-4">
-                  <div className="flex flex-row gap-2 w-full">
-                    <ActivityCostFilters />
-                    <ActivityTypeFilters />
-                    <ActivityOrderFilters
-                      activities={activities as IActivityWithLocation[]}
-                      setActivities={setActivities}
-                    />
-                  </div>
-                </div>
-
-                <ScrollArea className="h-full px-4">
-                  {activities && Array.isArray(activities) && activities.length > 0 ? (
-                    <ActivityCards
-                      activities={
-                        (selectedFilters.length > 0 || selectedCostFilters.length > 0
-                          ? filterActivities(
-                              filterActivities(
-                                activities as IActivityWithLocation[],
-                                selectedFilters,
-                                activityTypeFilters
-                              ),
-                              selectedCostFilters,
-                              activityCostFilters
-                            )
-                          : activities) as IActivityWithLocation[]
-                      }
-                      onSelectActivity={handleActivitySelect}
-                    />
-                  ) : (
-                    <ActivitySkeletonCards />
-                  )}
-                </ScrollArea>
-              </div>
-            </TabsContent>
             <TabsContent value="area-search" className="flex-grow overflow-hidden">
               <div className="flex flex-col h-full gap-4">
                 <div className="flex flex-row justify-between w-full px-4 pb-4">
@@ -365,7 +295,7 @@ export default function Activities() {
                     <ActivityTypeFilters />
                     <ActivityOrderFilters
                       activities={areaSearchActivities as IActivityWithLocation[]}
-                      setActivities={setActivities}
+                      setActivities={() => {}} // No-op since we don't need to set activities for area search
                     />
                   </div>
                 </div>

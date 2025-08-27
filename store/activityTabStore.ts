@@ -1,11 +1,11 @@
 import { create } from "zustand";
 
 interface IActivityTabStore {
-  selectedTab: "top-places" | "search" | "area-search" | "history" | "wishlist";
-  setSelectedTab: (tab: "top-places" | "search" | "area-search" | "history" | "wishlist") => void;
+  selectedTab: "area-search" | "history";
+  setSelectedTab: (tab: "area-search" | "history") => void;
 }
 
 export const useActivityTabStore = create<IActivityTabStore>((set) => ({
-  selectedTab: "top-places",
+  selectedTab: "area-search",
   setSelectedTab: (tab) => set({ selectedTab: tab }),
 }));
