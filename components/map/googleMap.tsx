@@ -10,7 +10,7 @@ import { useActivityTabStore } from "@/store/activityTabStore";
 import { getRadiusForZoom } from "./zoomRadiusMap";
 import GoogleMarkers from "./googleMarkers";
 import GoogleMarker from "./googleMarker";
-import SearchField from "../search/searchField";
+import SearchField from "../search/SearchField";
 import Circle from "./circle";
 import GoogleMapController from "./googleMapController";
 
@@ -152,9 +152,10 @@ export default function GoogleMapComponent() {
               size="lg"
             />
           )}
-          {selectedTab === "area-search" && geoJsonData && (
+          {/* DeckGLOverlay temporarily disabled - was causing blue squares on map */}
+          {/* {selectedTab === "area-search" && geoJsonData && (
             <DeckGLOverlay data={geoJsonData} onAreaClick={handleAreaClick} />
-          )}
+          )} */}
         </Map>
       </APIProvider>
 

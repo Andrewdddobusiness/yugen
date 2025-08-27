@@ -1,9 +1,11 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useCallback, useRef, useMemo } from 'react';
 import { Search, Filter, MapPin, Star, Clock, Globe, Phone } from 'lucide-react';
 import { searchPlacesByText, getNearbyPlaces } from '@/actions/google/maps';
 import { searchPlaces } from '@/actions/supabase/places';
+import { cachedSearch, SearchCache } from '@/lib/cache/searchCache';
+import { useDebounce } from '@/components/hooks/use-debounce';
 import PlaceAutocomplete from './PlaceAutocomplete';
 import type { Coordinates } from '@/types/database';
 
@@ -52,6 +54,11 @@ export default function PlaceSearch({
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [showFilterPanel, setShowFilterPanel] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
+  
+  // Debounce search query to reduce API calls
+  const debouncedQuery = useDebounce(searchQuery, 500);
   
   const [filters, setFilters] = useState<SearchFilters>({
     type: '',
@@ -60,87 +67,116 @@ export default function PlaceSearch({
     rating: 0
   });
 
-  const handleTextSearch = async () => {
-    if (!searchQuery.trim()) return;
+  const handleTextSearch = useCallback(async (queryOverride?: string) => {
+    const query = queryOverride || debouncedQuery;
+    if (!query.trim()) return;
+
+    // Cancel previous request if still running
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    abortControllerRef.current = new AbortController();
 
     setIsLoading(true);
+    setSearchError(null);
+    
     try {
-      let result;
+      // Generate cache key for this search
+      const cacheKey = SearchCache.generateSearchKey(query, location, filters.radius);
       
-      if (searchMode === 'text') {
-        result = await searchPlacesByText(searchQuery, location, filters.radius);
-      } else {
-        // Fallback to database search
-        result = await searchPlaces(searchQuery, location);
-      }
+      const result = await cachedSearch(
+        cacheKey,
+        async () => {
+          if (searchMode === 'text') {
+            return await searchPlacesByText(query, location, filters.radius);
+          } else {
+            return await searchPlaces(query, location);
+          }
+        },
+        10 * 60 * 1000 // 10 minute cache
+      );
+
+      if (abortControllerRef.current?.signal.aborted) return;
 
       if (result.success) {
         let results = result.data || [];
         
         // Apply filters
-        if (filters.type) {
-          results = results.filter((place: any) => 
-            place.types?.includes(filters.type)
-          );
-        }
-        
-        if (filters.rating > 0) {
-          results = results.filter((place: any) => 
-            place.rating && place.rating >= filters.rating
-          );
-        }
-        
-        if (filters.priceLevel) {
-          results = results.filter((place: any) => 
-            place.price_level === filters.priceLevel
-          );
-        }
-
+        results = applyFilters(results, filters);
         setSearchResults(results);
       } else {
         console.error("Search error:", result.error);
+        setSearchError(result.error?.message || "Search failed");
         setSearchResults([]);
       }
-    } catch (error) {
-      console.error("Search failed:", error);
-      setSearchResults([]);
+    } catch (error: any) {
+      if (error.name !== 'AbortError') {
+        console.error("Search failed:", error);
+        setSearchError("Search failed. Please try again.");
+        setSearchResults([]);
+      }
     } finally {
-      setIsLoading(false);
+      if (!abortControllerRef.current?.signal.aborted) {
+        setIsLoading(false);
+      }
     }
-  };
+  }, [debouncedQuery, location, filters, searchMode]);
 
-  const handleNearbySearch = async () => {
+  const handleNearbySearch = useCallback(async () => {
     if (!location) {
-      alert("Location is required for nearby search");
+      setSearchError("Location is required for nearby search");
       return;
     }
 
+    // Cancel previous request if still running
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    abortControllerRef.current = new AbortController();
+
     setIsLoading(true);
+    setSearchError(null);
+    
     try {
-      const result = await getNearbyPlaces(location, filters.radius, filters.type);
+      // Generate cache key for nearby search
+      const cacheKey = SearchCache.generateNearbyKey(
+        location.lat, 
+        location.lng, 
+        filters.radius, 
+        filters.type
+      );
+      
+      const result = await cachedSearch(
+        cacheKey,
+        () => getNearbyPlaces(location, filters.radius, filters.type),
+        15 * 60 * 1000 // 15 minute cache for nearby results
+      );
+      
+      if (abortControllerRef.current?.signal.aborted) return;
       
       if (result.success) {
         let results = result.data || [];
         
         // Apply additional filters
-        if (filters.rating > 0) {
-          results = results.filter((place: any) => 
-            place.rating && place.rating >= filters.rating
-          );
-        }
-
+        results = applyFilters(results, filters);
         setSearchResults(results);
       } else {
         console.error("Nearby search error:", result.error);
+        setSearchError(result.error?.message || "Nearby search failed");
         setSearchResults([]);
       }
-    } catch (error) {
-      console.error("Nearby search failed:", error);
-      setSearchResults([]);
+    } catch (error: any) {
+      if (error.name !== 'AbortError') {
+        console.error("Nearby search failed:", error);
+        setSearchError("Nearby search failed. Please try again.");
+        setSearchResults([]);
+      }
     } finally {
-      setIsLoading(false);
+      if (!abortControllerRef.current?.signal.aborted) {
+        setIsLoading(false);
+      }
     }
-  };
+  }, [location, filters]);
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
@@ -157,12 +193,54 @@ export default function PlaceSearch({
     );
   };
 
-  const formatTypes = (types: string[]) => {
-    return types
-      .slice(0, 2)
-      .map(type => type.replace(/_/g, ' '))
-      .join(', ');
-  };
+  // Memoized helper functions
+  const applyFilters = useMemo(() => {
+    return (results: any[], filters: SearchFilters) => {
+      return results.filter((place: any) => {
+        // Type filter
+        if (filters.type && !place.types?.includes(filters.type)) {
+          return false;
+        }
+        
+        // Rating filter
+        if (filters.rating > 0 && (!place.rating || place.rating < filters.rating)) {
+          return false;
+        }
+        
+        // Price level filter
+        if (filters.priceLevel && place.price_level !== filters.priceLevel) {
+          return false;
+        }
+        
+        return true;
+      });
+    };
+  }, []);
+
+  const formatTypes = useMemo(() => {
+    return (types: string[]) => {
+      return types
+        .slice(0, 2)
+        .map(type => type.replace(/_/g, ' '))
+        .join(', ');
+    };
+  }, []);
+
+  // Auto-search when debounced query changes
+  React.useEffect(() => {
+    if (searchMode === 'text' && debouncedQuery.trim().length >= 2) {
+      handleTextSearch();
+    }
+  }, [debouncedQuery, handleTextSearch, searchMode]);
+
+  // Cleanup abort controller on unmount
+  React.useEffect(() => {
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
+  }, []);
 
   return (
     <div className={`bg-white rounded-lg shadow-sm border border-gray-200 ${className}`}>
@@ -382,10 +460,39 @@ export default function PlaceSearch({
               </div>
             )}
 
-            {searchResults.length === 0 && !isLoading && (searchMode === 'text' ? searchQuery : true) && (
+            {/* Error State */}
+            {searchError && (
+              <div className="text-center py-8 text-red-500">
+                <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                  <p className="font-medium">Search Error</p>
+                  <p className="text-sm mt-1">{searchError}</p>
+                  <button
+                    onClick={() => {
+                      setSearchError(null);
+                      if (searchMode === 'text') {
+                        handleTextSearch(searchQuery);
+                      } else {
+                        handleNearbySearch();
+                      }
+                    }}
+                    className="mt-2 px-3 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700"
+                  >
+                    Retry
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Empty State */}
+            {!searchError && searchResults.length === 0 && !isLoading && (searchMode === 'text' ? debouncedQuery : true) && (
               <div className="text-center py-8 text-gray-500">
                 <MapPin className="h-12 w-12 mx-auto mb-4 text-gray-300" />
                 <p>No places found. Try adjusting your search or filters.</p>
+                {searchMode === 'text' && debouncedQuery && (
+                  <p className="text-sm mt-2 text-gray-400">
+                    Searched for: "{debouncedQuery}"
+                  </p>
+                )}
               </div>
             )}
           </>

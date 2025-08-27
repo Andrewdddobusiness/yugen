@@ -68,13 +68,13 @@ export const getActivityDescription = (activity: ActivityData): string | undefin
   return activityData?.description;
 };
 
-// Get activity photo URLs
+// Get activity photo URLs - use our photo proxy to handle Google API authentication
 export const getActivityPhotoUrls = (activity: ActivityData): string[] => {
   const activityData = getActivityData(activity);
   if (!activityData?.photo_names || activityData.photo_names.length === 0) return [];
   
   return activityData.photo_names.map(photoName => 
-    `https://places.googleapis.com/v1/${photoName}/media?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}&maxHeightPx=1000&maxWidthPx=1000`
+    `/api/photos/${photoName}?maxHeightPx=1000&maxWidthPx=1000`
   );
 };
 

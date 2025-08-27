@@ -122,7 +122,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     queryKey: ["itineraryActivities", itineraryId, destinationId],
     queryFn: () => fetchItineraryActivities(itineraryId as string, destinationId as string),
     enabled: !!itineraryId && !!destinationId,
-    staleTime: 0, // Always check for updates
+    staleTime: 5 * 60 * 1000, // Cache for 5 minutes instead of always refetching
+    gcTime: 10 * 60 * 1000, // Keep in cache for 10 minutes
   });
 
   useEffect(() => {

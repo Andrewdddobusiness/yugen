@@ -29,14 +29,14 @@ export const ActivityImage: React.FC<ActivityImageProps> = ({
   const priceText = formatPriceLevel(activity.price_level);
   
   const imageClasses = cn(
-    "h-full w-full object-cover",
+    "h-full w-full object-cover object-center", // Added object-center for better cropping
     variant === 'vertical' ? "rounded-t-lg" : "rounded-l-lg",
     className
   );
   
   const containerClasses = cn(
-    "h-full w-full",
-    variant === 'vertical' ? "rounded-t-lg" : ""
+    "h-full w-full overflow-hidden",
+    variant === 'vertical' ? "rounded-t-lg" : "rounded-l-lg"
   );
 
   if (loading) {
@@ -73,9 +73,9 @@ export const ActivityImage: React.FC<ActivityImageProps> = ({
       {showPrice && priceText && (
         <div className={cn(
           "absolute",
-          variant === 'vertical' ? "top-2 left-2" : "bottom-2 left-2"
+          variant === 'vertical' ? "top-3 right-3" : "top-3 right-3"
         )}>
-          <Badge className="bg-[#3A86FF]/40 backdrop-blur-sm">
+          <Badge className="bg-white/90 text-gray-700 shadow-sm backdrop-blur-sm font-medium">
             {priceText}
           </Badge>
         </div>

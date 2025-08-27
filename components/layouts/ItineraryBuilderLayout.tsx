@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, lazy, Suspense } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useParams } from 'next/navigation';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable';
@@ -12,7 +12,7 @@ import { useItineraryLayoutStore } from '@/store/itineraryLayoutStore';
 import { fetchItineraryDestination, fetchItineraryDestinationDateRange } from '@/actions/supabase/actions';
 import Loading from '@/components/loading/Loading';
 import ErrorPage from '@/app/error/page';
-import GoogleMapView from '@/components/map/googleMapView';
+const GoogleMapView = lazy(() => import('@/components/map/googleMapView'));
 import { useItineraryActivityStore } from '@/store/itineraryActivityStore';
 
 interface ItineraryBuilderLayoutProps {
@@ -150,14 +150,23 @@ export function ItineraryBuilderLayout({ children, className }: ItineraryBuilder
               className="hidden sm:block"
             >
               <div className="h-full">
-                <GoogleMapView
-                  activities={itineraryActivities.filter(
-                    (a) =>
-                      a.activity?.coordinates && 
-                      Array.isArray(a.activity.coordinates) && 
-                      a.activity.coordinates.length === 2
-                  )}
-                />
+                <Suspense fallback={
+                  <div className="h-full flex items-center justify-center bg-gray-50 dark:bg-gray-900">
+                    <div className="flex flex-col items-center space-y-2">
+                      <div className="w-8 h-8 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />
+                      <p className="text-sm text-muted-foreground">Loading map...</p>
+                    </div>
+                  </div>
+                }>
+                  <GoogleMapView
+                    activities={itineraryActivities.filter(
+                      (a) =>
+                        a.activity?.coordinates && 
+                        Array.isArray(a.activity.coordinates) && 
+                        a.activity.coordinates.length === 2
+                    )}
+                  />
+                </Suspense>
               </div>
             </ResizablePanel>
           </ResizablePanelGroup>

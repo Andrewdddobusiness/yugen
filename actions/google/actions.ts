@@ -134,6 +134,13 @@ function mapGooglePlaceToActivity(place: any) {
   };
 }
 
+// Cache key generation functions
+const generateNearbyKey = (lat: number, lng: number, radius: number, type?: string): string => {
+  const locationKey = `${lat.toFixed(4)},${lng.toFixed(4)}`;
+  const typeKey = type || 'all';
+  return `nearby:${locationKey}:${radius}:${typeKey}`;
+};
+
 export const fetchNearbyActivities = async (
   latitude: number | undefined,
   longitude: number | undefined,
@@ -146,91 +153,106 @@ export const fetchNearbyActivities = async (
 
   // Clamp radius to Google Places API limits (0 to 50,000 meters)
   const validRadius = Math.max(0, Math.min(50000, radiusInMeters));
-  if (validRadius !== radiusInMeters) {
-    console.warn(`Radius ${radiusInMeters}m is outside API limits, clamping to ${validRadius}m`);
-  }
-
-  let includedTypesForSearch;
-  switch (searchType) {
-    case "food":
-      includedTypesForSearch = foodTypes;
-      break;
-    case "shopping":
-      includedTypesForSearch = shoppingTypes;
-      break;
-    case "historical":
-      includedTypesForSearch = historicalTypes;
-      break;
-    default:
-      includedTypesForSearch = includedTypes;
-  }
-
-  const baseUrl = "https://places.googleapis.com/v1/places:searchNearby";
-
-  const requestBody = {
-    includedTypes: includedTypesForSearch,
-    excludedTypes: excludedTypes,
-    maxResultCount: 20,
-    locationRestriction: {
-      circle: {
-        center: {
-          latitude: latitude,
-          longitude: longitude,
-        },
-        radius: validRadius,
-      },
-    },
-  };
-
+  
+  // Import caching functionality
+  const { cachedSearch } = await import("@/lib/cache/searchCache");
+  
+  // Generate cache key for this search
+  const cacheKey = generateNearbyKey(latitude, longitude, validRadius, searchType);
+  
   try {
-    console.log("Making Google Places API request:", {
-      url: baseUrl,
-      requestBody,
-      originalRadius: radiusInMeters,
-      validatedRadius: validRadius,
-      apiKeyExists: !!process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
-    });
+    // Check cache first, then perform search if not cached
+    return await cachedSearch(
+      cacheKey,
+      async () => {
+        let includedTypesForSearch;
+        switch (searchType) {
+          case "food":
+            includedTypesForSearch = foodTypes;
+            break;
+          case "shopping":
+            includedTypesForSearch = shoppingTypes;
+            break;
+          case "historical":
+            includedTypesForSearch = historicalTypes;
+            break;
+          default:
+            includedTypesForSearch = includedTypes;
+        }
 
-    const response = await fetch(baseUrl, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-Goog-Api-Key": process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY as string,
-        "X-Goog-FieldMask": [
-          "places.id",
-          "places.displayName",
-          "places.formattedAddress",
-          "places.location",
-          "places.photos",
-          "places.types",
-          "places.currentOpeningHours",
-          "places.nationalPhoneNumber",
-          "places.priceLevel",
-          "places.rating",
-          "places.editorialSummary",
-          "places.reviews",
-          "places.websiteUri",
-        ].join(","),
-        Referer: process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000",
+        const baseUrl = "https://places.googleapis.com/v1/places:searchNearby";
+
+        const requestBody = {
+          includedTypes: includedTypesForSearch,
+          excludedTypes: excludedTypes,
+          maxResultCount: 20,
+          locationRestriction: {
+            circle: {
+              center: {
+                latitude: latitude,
+                longitude: longitude,
+              },
+              radius: validRadius,
+            },
+          },
+        };
+
+        console.log("Making cached Google Places API request:", {
+          searchType,
+          validatedRadius: validRadius,
+          cacheKey,
+        });
+
+        const response = await fetch(baseUrl, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Goog-Api-Key": process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY as string,
+            "X-Goog-FieldMask": [
+              "places.id",
+              "places.displayName",
+              "places.formattedAddress",
+              "places.location",
+              "places.photos",
+              "places.types",
+              "places.currentOpeningHours",
+              "places.nationalPhoneNumber",
+              "places.priceLevel",
+              "places.rating",
+              "places.editorialSummary",
+              "places.reviews",
+              "places.websiteUri",
+            ].join(","),
+            Referer: process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000",
+          },
+          body: JSON.stringify(requestBody),
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error("Google Places API error:", {
+            status: response.status,
+            statusText: response.statusText,
+            body: errorText,
+            requestBody,
+          });
+          throw new Error(`Failed to fetch nearby activities: ${response.status} ${response.statusText}`);
+        }
+
+        const data = await response.json();
+        
+        if (!data.places) {
+          console.warn("No places returned from API");
+          return [];
+        }
+
+        const activities: IActivity[] = data.places.map(mapGooglePlaceToActivity);
+        console.log(`Fetched ${activities.length} activities for ${searchType} search`);
+        
+        return activities;
       },
-      body: JSON.stringify(requestBody),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error("Google Places API error:", {
-        status: response.status,
-        statusText: response.statusText,
-        body: errorText,
-        requestBody
-      });
-      throw new Error(`Failed to fetch nearby activities: ${response.status} ${response.statusText}`);
-    }
-
-    const data = await response.json();
-    const activities: IActivity[] = data.places.map(mapGooglePlaceToActivity);
-
-    return activities;
+      15 * 60 * 1000 // 15 minute cache
+    );
   } catch (error) {
     console.error("Error fetching nearby activities:", error);
     throw error;
@@ -243,52 +265,72 @@ export async function getGoogleMapsAutocomplete(
   longitude: number | undefined,
   radiusInMeters: number
 ) {
-  const baseUrl = "https://places.googleapis.com/v1/places:autocomplete";
-
-  const requestBody = {
-    input: input,
-    locationBias: {
-      circle: {
-        center: {
-          latitude: latitude,
-          longitude: longitude,
-        },
-        radius: radiusInMeters,
-      },
-    },
-  };
-
-  try {
-    const response = await fetch(baseUrl, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-Goog-Api-Key": process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY as string,
-        "X-Goog-FieldMask": [
-          "suggestions.placePrediction.place",
-          "suggestions.placePrediction.structuredFormat",
-          "suggestions.placePrediction.types",
-        ].join(","),
-        Referer: process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000",
-      },
-      body: JSON.stringify(requestBody),
-    });
-
-    if (!response.ok) {
-      throw new Error(`Failed to fetch autocomplete results: ${response.statusText}`);
-    }
-
-    const data = await response.json();
-    return data.suggestions.map((suggestion: any) => ({
-      placeId: suggestion.placePrediction.place,
-      mainText: suggestion.placePrediction.structuredFormat.mainText.text,
-      secondaryText: suggestion.placePrediction.structuredFormat.secondaryText.text,
-      types: suggestion.placePrediction.types,
-    }));
-  } catch (error) {
-    console.error("Error fetching autocomplete results:", error);
+  if (!input || input.trim().length < 2) {
     return [];
   }
+
+  // Import caching functionality
+  const { cachedSearch } = await import("@/lib/cache/searchCache");
+  
+  const cacheKey = `autocomplete:${input.trim().toLowerCase()}:${latitude || 'no-lat'}:${longitude || 'no-lng'}:${radiusInMeters}`;
+  
+  return await cachedSearch(
+    cacheKey,
+    async () => {
+      const baseUrl = "https://places.googleapis.com/v1/places:autocomplete";
+
+      const requestBody = {
+        input: input.trim(),
+        locationBias: {
+          circle: {
+            center: {
+              latitude: latitude,
+              longitude: longitude,
+            },
+            radius: radiusInMeters,
+          },
+        },
+      };
+
+      try {
+        const response = await fetch(baseUrl, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Goog-Api-Key": process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY as string,
+            "X-Goog-FieldMask": [
+              "suggestions.placePrediction.place",
+              "suggestions.placePrediction.structuredFormat",
+              "suggestions.placePrediction.types",
+            ].join(","),
+            Referer: process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000",
+          },
+          body: JSON.stringify(requestBody),
+        });
+
+        if (!response.ok) {
+          throw new Error(`Failed to fetch autocomplete results: ${response.statusText}`);
+        }
+
+        const data = await response.json();
+        
+        if (!data.suggestions) {
+          return [];
+        }
+
+        return data.suggestions.map((suggestion: any) => ({
+          placeId: suggestion.placePrediction.place,
+          mainText: suggestion.placePrediction.structuredFormat.mainText.text,
+          secondaryText: suggestion.placePrediction.structuredFormat.secondaryText.text,
+          types: suggestion.placePrediction.types,
+        }));
+      } catch (error) {
+        console.error("Error fetching autocomplete results:", error);
+        return [];
+      }
+    },
+    5 * 60 * 1000 // 5 minute cache for autocomplete
+  );
 }
 
 export const fetchPlaceDetails = async (placeId: string): Promise<IActivity> => {

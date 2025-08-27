@@ -89,17 +89,20 @@ export const SIZE_CONFIGS = {
 export const VARIANT_CONFIGS = {
   vertical: {
     layout: "flex-col",
-    imageHeight: "h-40",
-    contentSpacing: "mt-5",
-    titleClamp: "line-clamp-1",
+    imageHeight: "h-48", // Fixed consistent height
+    cardHeight: "h-[400px]", // Fixed total card height
+    contentSpacing: "flex-1",
+    titleClamp: "line-clamp-2",
     descriptionClamp: "line-clamp-2"
   },
   "horizontal-full": {
-    layout: "flex-row",
-    imageWidth: "w-[250px]",
-    contentSpacing: "p-4",
-    titleClamp: "line-clamp-1",
-    descriptionClamp: "line-clamp-3"
+    layout: "flex-row", 
+    imageWidth: "w-48", // Reduced from w-64 for better proportions
+    imageHeight: "h-32", // Fixed height for horizontal images
+    cardHeight: "h-32", // Fixed total card height
+    contentSpacing: "flex-1",
+    titleClamp: "line-clamp-2",
+    descriptionClamp: "line-clamp-2"
   },
   "horizontal-simple": {
     layout: "flex-row",

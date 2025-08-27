@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, lazy, Suspense } from "react";
 import { useParams } from "next/navigation";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 
@@ -34,7 +34,8 @@ import { filterActivities } from "@/utils/filters/filterActivities";
 import { activityTypeFilters, activityCostFilters } from "@/utils/filters/filters";
 
 import { Popup } from "react-map-gl";
-import GoogleMapComponent from "@/components/map/GoogleMap";
+// Lazy load heavy Google Maps component
+const GoogleMapComponent = lazy(() => import("@/components/map/GoogleMap"));
 import ClearHistoryButton from "@/components/buttons/ClearHistoryButton";
 import ActivityOrderFilters from "@/components/filters/ActivityOrderFilters";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -96,8 +97,6 @@ export default function Activities() {
     }
   }, [cityCoordinates, setCenterCoordinates, setItineraryCoordinates]);
 
-
-
   // **** GET SEARCH HISTORY ACTIVITIES ****
   const { data: searchHistoryActivitiesData, isLoading: isSearchHistoryLoading } = useQuery<{
     activities: IActivity[];
@@ -109,8 +108,8 @@ export default function Activities() {
       if (result.error) throw result.error;
       return result;
     },
-    enabled: !!itineraryId && !!destinationId,
-    staleTime: 5 * 60 * 1000, // 5 minutes stale time
+    enabled: !!itineraryId && !!destinationId && selectedTab === "history", // Only fetch when history tab is active
+    staleTime: 15 * 60 * 1000, // 15 minutes stale time - increased for better caching
     gcTime: 10 * 60 * 1000, // Keep in cache for 10 minutes
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
@@ -152,98 +151,114 @@ export default function Activities() {
   const [isProcessingMissingActivities, setIsProcessingMissingActivities] = useState(false);
 
   useEffect(() => {
-    const fetchActivities = async () => {
-      if (
-        !searchHistoryActivitiesData ||
-        isProcessingMissingActivities ||
-        !Array.isArray(searchHistoryActivitiesData.activities)
-      ) {
+    // Only process search history when the history tab is active
+    if (selectedTab !== "history") {
+      return;
+    }
+
+    // Set existing activities immediately for faster UI response
+    if (
+      searchHistoryActivitiesData &&
+      Array.isArray(searchHistoryActivitiesData.activities) &&
+      searchHistoryActivitiesData.activities.length > 0
+    ) {
+      setSearchHistoryActivities(searchHistoryActivitiesData.activities);
+    }
+
+    // Defer heavy processing to avoid blocking navigation - increased from 100ms to 1000ms
+    const deferredProcessing = setTimeout(() => {
+      // Only process if user hasn't navigated away and page is still visible
+      if (document.visibilityState !== "visible") {
         return;
       }
-
-      // Set existing activities immediately
-      if (searchHistoryActivitiesData.activities.length > 0) {
-        setSearchHistoryActivities(searchHistoryActivitiesData.activities);
-      }
-
-      const missingPlaceIds = searchHistoryActivitiesData.missingPlaceIds || [];
-      
-      // Filter out already processed place IDs
-      const newMissingPlaceIds = missingPlaceIds.filter(
-        (placeId: string) => !processedPlaceIds.has(placeId)
-      );
-
-      if (newMissingPlaceIds.length === 0) {
-        return;
-      }
-
-      setIsProcessingMissingActivities(true);
-
-      try {
-        // Process missing activities in batches to avoid overwhelming the API
-        const batchSize = 3;
-        const batches = [];
-        for (let i = 0; i < newMissingPlaceIds.length; i += batchSize) {
-          batches.push(newMissingPlaceIds.slice(i, i + batchSize));
+      const fetchActivities = async () => {
+        if (
+          !searchHistoryActivitiesData ||
+          isProcessingMissingActivities ||
+          !Array.isArray(searchHistoryActivitiesData.activities)
+        ) {
+          return;
         }
 
-        for (const batch of batches) {
-          // Process batch in parallel but limit concurrency
-          const batchPromises = batch.map(async (placeId: string) => {
-            try {
-              // Mark as processed immediately to prevent duplicate requests
-              setProcessedPlaceIds(prev => new Set([...prev, placeId]));
-              
-              const placeDetails = await placeDetailsQuery(placeId);
-              if (placeDetails) {
-                return await insertActivityMutation.mutateAsync(placeDetails);
+        const missingPlaceIds = searchHistoryActivitiesData.missingPlaceIds || [];
+
+        // Filter out already processed place IDs
+        const newMissingPlaceIds = missingPlaceIds.filter((placeId: string) => !processedPlaceIds.has(placeId));
+
+        if (newMissingPlaceIds.length === 0) {
+          return;
+        }
+
+        setIsProcessingMissingActivities(true);
+
+        try {
+          // Process missing activities in batches to avoid overwhelming the API
+          const batchSize = 3;
+          const batches = [];
+          for (let i = 0; i < newMissingPlaceIds.length; i += batchSize) {
+            batches.push(newMissingPlaceIds.slice(i, i + batchSize));
+          }
+
+          for (const batch of batches) {
+            // Process batch in parallel but limit concurrency
+            const batchPromises = batch.map(async (placeId: string) => {
+              try {
+                // Mark as processed immediately to prevent duplicate requests
+                setProcessedPlaceIds((prev) => new Set([...prev, placeId]));
+
+                const placeDetails = await placeDetailsQuery(placeId);
+                if (placeDetails) {
+                  return await insertActivityMutation.mutateAsync(placeDetails);
+                }
+                return null;
+              } catch (error) {
+                console.error(`Error processing place ID ${placeId}:`, error);
+                return null;
               }
-              return null;
-            } catch (error) {
-              console.error(`Error processing place ID ${placeId}:`, error);
-              return null;
-            }
-          });
-
-          const batchResults = await Promise.allSettled(batchPromises);
-          const newActivities = batchResults
-            .filter((result): result is PromiseFulfilledResult<any> => 
-              result.status === 'fulfilled' && result.value !== null
-            )
-            .map(result => result.value);
-
-          // Update activities with new batch results
-          if (newActivities.length > 0) {
-            setSearchHistoryActivities((current: IActivity[] | undefined) => {
-              const currentArray = Array.isArray(current) ? current : [];
-              const existingPlaceIds = new Set(currentArray.map((a: IActivity) => a.place_id));
-              const uniqueNewActivities = newActivities.filter((a: IActivity) => 
-                !existingPlaceIds.has(a.place_id)
-              );
-              return [...currentArray, ...uniqueNewActivities];
             });
-          }
 
-          // Add small delay between batches to prevent API rate limiting
-          if (batches.indexOf(batch) < batches.length - 1) {
-            await new Promise(resolve => setTimeout(resolve, 100));
+            const batchResults = await Promise.allSettled(batchPromises);
+            const newActivities = batchResults
+              .filter(
+                (result): result is PromiseFulfilledResult<any> =>
+                  result.status === "fulfilled" && result.value !== null
+              )
+              .map((result) => result.value);
+
+            // Update activities with new batch results
+            if (newActivities.length > 0) {
+              setSearchHistoryActivities((current: IActivity[] | undefined) => {
+                const currentArray = Array.isArray(current) ? current : [];
+                const existingPlaceIds = new Set(currentArray.map((a: IActivity) => a.place_id));
+                const uniqueNewActivities = newActivities.filter((a: IActivity) => !existingPlaceIds.has(a.place_id));
+                return [...currentArray, ...uniqueNewActivities];
+              });
+            }
+
+            // Add small delay between batches to prevent API rate limiting
+            if (batches.indexOf(batch) < batches.length - 1) {
+              await new Promise((resolve) => setTimeout(resolve, 100));
+            }
           }
+        } catch (error) {
+          console.error("Error processing missing activities:", error);
+        } finally {
+          setIsProcessingMissingActivities(false);
         }
-      } catch (error) {
-        console.error("Error processing missing activities:", error);
-      } finally {
-        setIsProcessingMissingActivities(false);
-      }
-    };
+      };
 
-    fetchActivities();
+      fetchActivities();
+    }, 1000); // Defer by 1000ms to avoid blocking navigation
+
+    return () => clearTimeout(deferredProcessing);
   }, [
+    selectedTab, // Add selectedTab to trigger processing when tab changes
     searchHistoryActivitiesData?.activities,
     searchHistoryActivitiesData?.missingPlaceIds,
     // Remove the problematic dependencies that cause infinite loops:
     // - isProcessingMissingActivities (causes loop with setIsProcessingMissingActivities)
     // - insertActivityMutation (not stable)
-    // - processedPlaceIds (updated inside effect)  
+    // - processedPlaceIds (updated inside effect)
     // - setSearchHistoryActivities (Zustand setter not stable)
   ]);
 
@@ -353,7 +368,7 @@ export default function Activities() {
                       </div>
                     </div>
                   )}
-                  
+
                   {searchHistoryActivities &&
                   Array.isArray(searchHistoryActivities) &&
                   searchHistoryActivities.length > 0 ? (
@@ -401,7 +416,18 @@ export default function Activities() {
             </div>
           </div>
         ) : cityCoordinates ? (
-          <GoogleMapComponent />
+          <Suspense
+            fallback={
+              <div className="w-full h-full flex items-center justify-center bg-muted">
+                <div className="flex flex-col items-center gap-2">
+                  <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                  <span className="text-sm text-muted-foreground">Loading map...</span>
+                </div>
+              </div>
+            }
+          >
+            <GoogleMapComponent />
+          </Suspense>
         ) : null}
         {popupInfo && (
           <Popup

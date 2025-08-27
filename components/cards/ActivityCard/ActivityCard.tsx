@@ -105,26 +105,22 @@ export const ActivityCard = memo<ActivityCardProps>(({
   const displayStartTime = startTime || (isItineraryActivity(activity) ? activity.start_time : undefined);
   const displayEndTime = endTime || (isItineraryActivity(activity) ? activity.end_time : undefined);
   
-  // Build card classes
+  // Build card classes - with consistent heights
   const cardClasses = cn(
-    "relative cursor-pointer",
+    "relative cursor-pointer overflow-hidden rounded-lg shadow-sm border border-gray-200 dark:border-gray-700",
     TRANSITIONS.card,
-    TRANSITIONS.hover,
-    "border-l-4",
-    borderColor || typeColor.border,
+    "hover:shadow-lg hover:border-gray-300 dark:hover:border-gray-600",
     variantConfig.layout,
-    variantConfig.height,
-    isSelected && TRANSITIONS.selected,
-    isEditing && TRANSITIONS.editing,
-    isDragging && TRANSITIONS.drag,
+    variantConfig.cardHeight, // Use consistent cardHeight for all variants
+    isSelected && "ring-2 ring-blue-500 border-blue-500",
+    isEditing && "ring-2 ring-yellow-500 border-yellow-500",
+    isDragging && "opacity-50 shadow-xl scale-105",
     className
   );
   
-  // Build content classes
+  // Build content classes - no padding for full image coverage
   const contentClasses = cn(
-    "flex h-full",
-    sizeConfig.padding,
-    variantConfig.contentSpacing,
+    "flex h-full p-0",
     variantConfig.layout
   );
 
@@ -152,8 +148,9 @@ export const ActivityCard = memo<ActivityCardProps>(({
           {/* Image section for vertical and horizontal-full variants */}
           {shouldShowImage && (variant === 'vertical' || variant === 'horizontal-full') && (
             <div className={cn(
-              variant === 'vertical' ? 'relative w-full' : 'relative flex-shrink-0',
-              variant === 'vertical' ? variantConfig.imageHeight : variantConfig.imageWidth
+              "relative flex-shrink-0",
+              variant === 'vertical' ? 'w-full' : variantConfig.imageWidth,
+              variant === 'vertical' ? variantConfig.imageHeight : variantConfig.imageHeight
             )}>
               {customImage || (
                 <ActivityImage 
@@ -166,28 +163,21 @@ export const ActivityCard = memo<ActivityCardProps>(({
             </div>
           )}
           
-          {/* Content section */}
+          {/* Content section with proper padding and spacing */}
           <div className={cn(
-            "flex-1 min-w-0",
+            "flex-1 min-w-0 p-3 overflow-hidden", // Reduced padding from p-4 to p-3, added overflow-hidden
             variant === 'horizontal-full' && "relative",
-            sizeConfig.gap
+            "flex flex-col gap-1.5" // Reduced gap from 2 to 1.5 for better space utilization
           )}>
             {/* Title and actions row */}
             <div className="flex items-start justify-between gap-2">
-              <h4 className={cn(
-                "font-semibold leading-tight",
-                sizeConfig.title,
-                variantConfig.titleClamp
-              )}>
+              <h4 className="font-semibold text-sm leading-tight text-gray-900 dark:text-gray-100 line-clamp-2 flex-1">
                 {capitalizeFirstLetterOfEachWord(getActivityName(activity))}
               </h4>
               
               {/* Inline actions for some variants */}
               {showActions && variant !== 'vertical' && (
-                <div className={cn(
-                  "flex-shrink-0",
-                  variant === 'horizontal-full' && "absolute top-0 right-0"
-                )}>
+                <div className="flex-shrink-0">
                   {customActions || (
                     <ActivityActions
                       isAdded={false}
@@ -199,60 +189,62 @@ export const ActivityCard = memo<ActivityCardProps>(({
                       onDelete={onDelete}
                       variant="inline"
                       size={size}
-                      showHoverOnly={variant === 'horizontal-full'}
+                      showHoverOnly={false}
                     />
                   )}
                 </div>
               )}
             </div>
             
+            {/* Address - moved higher for better hierarchy */}
+            {showAddress && activityData?.address && shouldShowMetadata && (
+              <div className="flex items-center gap-1 text-xs text-gray-600 dark:text-gray-400">
+                <svg className="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+                <span className="truncate">{activityData.address}</span>
+              </div>
+            )}
+            
+            {/* Metadata row - improved spacing and styling */}
+            {shouldShowMetadata && (
+              <div className="flex items-center gap-3">
+                <ActivityMetadata
+                  activity={activityData!}
+                  showRating={showRating}
+                  showPrice={showPrice}
+                  showCategory={showCategory}
+                  size={size}
+                />
+              </div>
+            )}
+            
+            {/* Description - better typography */}
+            {shouldShowDescription && activityData?.description && (
+              <div className="text-xs text-gray-600 dark:text-gray-400 line-clamp-2 leading-relaxed">
+                {activityData.description}
+              </div>
+            )}
+            
             {/* Time display */}
             {showTime && (displayStartTime || displayEndTime) && shouldShowMetadata && (
-              <ActivityTimeInfo
-                startTime={displayStartTime}
-                endTime={displayEndTime}
-                duration={duration}
-                size={size}
-              />
-            )}
-            
-            {/* Address */}
-            {showAddress && activityData?.address && shouldShowMetadata && (
-              <ActivityTimeInfo
-                address={activityData.address}
-                size={size}
-              />
-            )}
-            
-            {/* Metadata row */}
-            {shouldShowMetadata && (
-              <ActivityMetadata
-                activity={activityData!}
-                showRating={showRating}
-                showPrice={showPrice}
-                showCategory={showCategory}
-                size={size}
-              />
-            )}
-            
-            {/* Description */}
-            {shouldShowDescription && activityData?.description && (
-              <div className={cn(
-                "text-gray-500",
-                sizeConfig.text,
-                variantConfig.descriptionClamp
-              )}>
-                {activityData.description}
+              <div className="flex items-center gap-1 text-xs text-blue-600 dark:text-blue-400 font-medium">
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <ActivityTimeInfo
+                  startTime={displayStartTime}
+                  endTime={displayEndTime}
+                  duration={duration}
+                  size={size}
+                />
               </div>
             )}
             
             {/* Notes for itinerary activities */}
             {showNotes && isItineraryActivity(activity) && activity.notes && (
-              <div className={cn(
-                "text-gray-700 dark:text-gray-300",
-                sizeConfig.text,
-                "line-clamp-2"
-              )}>
+              <div className="text-xs text-gray-700 dark:text-gray-300 line-clamp-1 italic border-l-2 border-gray-200 pl-2">
                 {activity.notes}
               </div>
             )}
@@ -261,7 +253,7 @@ export const ActivityCard = memo<ActivityCardProps>(({
         
         {/* Footer actions for vertical variant */}
         {showActions && variant === 'vertical' && (
-          <CardFooter className="p-0 absolute bottom-0 left-0 right-0 z-20">
+          <CardFooter className="p-2 border-t border-gray-100 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-800/50">
             {customFooter || (
               <ActivityActions
                 isAdded={false}
