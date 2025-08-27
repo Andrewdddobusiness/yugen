@@ -2,6 +2,7 @@
 
 import React, { useState, memo } from "react";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { 
   ActivityCardProps, 
@@ -160,6 +161,21 @@ export const ActivityCard = memo<ActivityCardProps>(({
                   showPrice={showPrice}
                 />
               )}
+              
+              {/* Category badge overlay */}
+              {showCategory && activityData?.types && activityData.types.length > 0 && (
+                <div className="absolute top-2 left-2 z-10">
+                  <Badge 
+                    variant="secondary" 
+                    className={cn(
+                      "px-2 py-1 text-xs font-medium bg-white/90 text-gray-700 shadow-sm backdrop-blur-sm",
+                      typeColor?.badge || "bg-gray-100 text-gray-800"
+                    )}
+                  >
+                    {capitalizeFirstLetterOfEachWord(activityData.types[0]?.replace(/_/g, ' ') || '')}
+                  </Badge>
+                </div>
+              )}
             </div>
           )}
           
@@ -214,7 +230,7 @@ export const ActivityCard = memo<ActivityCardProps>(({
                   activity={activityData!}
                   showRating={showRating}
                   showPrice={showPrice}
-                  showCategory={showCategory}
+                  showCategory={!shouldShowImage && showCategory} // Only show category in metadata if no image
                   size={size}
                 />
               </div>

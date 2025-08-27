@@ -205,14 +205,15 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex h-screen">
       <SidebarProvider
-      style={
-        {
-          "--sidebar-width": "420px",
-          "--sidebar-width-icon": "48px",
-          "--sidebar-width-mobile": "320px",
-        } as React.CSSProperties
-      }
-    >
+        defaultOpen={false}
+        style={
+          {
+            "--sidebar-width": "420px",
+            "--sidebar-width-icon": "48px",
+            "--sidebar-width-mobile": "320px",
+          } as React.CSSProperties
+        }
+      >
       <AppSidebarItineraryActivityLeft />
       <main className="flex-1 flex flex-col w-1/2">
         <header className="sticky top-0 flex shrink-0 items-center gap-2 border-b bg-background p-2">

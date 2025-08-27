@@ -32,7 +32,7 @@ export default function GoogleMarkers({ color }: { color?: TColor }) {
     if (currentActivities && Array.isArray(currentActivities)) {
       coordinates = currentActivities
         .filter((activity) => activity?.coordinates?.length === 2)
-        .map((activity) => [activity.coordinates[0], activity.coordinates[1]]);
+        .map((activity) => [activity.coordinates[0], activity.coordinates[1]]); // Keep as [lng, lat] for internal use
     }
 
     setMarkerCoordinates(coordinates);
@@ -64,8 +64,8 @@ export default function GoogleMarkers({ color }: { color?: TColor }) {
         return (
           <GoogleMarker
             key={`${selectedTab}-marker-${index}`}
-            latitude={coordinate[0]}
-            longitude={coordinate[1]}
+            latitude={coordinate[1]}
+            longitude={coordinate[0]}
             activity={activity}
             number={index + 1}
             color={color || (colors.Blue as TColor)}
