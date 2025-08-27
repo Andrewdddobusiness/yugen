@@ -24,14 +24,13 @@ import {
 } from "@/components/ui/sidebar";
 
 import { NavUser } from "./NavUser";
-import { ItineraryListView } from "@/components/list/containers/ItineraryListView";
+import { SimplifiedItinerarySidebar } from "@/components/sidebar/SimplifiedItinerarySidebar";
 import { DateRange } from "react-day-picker";
 import { Skeleton } from "@/components/ui/skeleton";
 import { DatePickerWithRangePopover3 } from "@/components/date/DateRangePickerPopover3";
 import { useEffect, useState } from "react";
 import { fetchItineraryDestination, setItineraryDestinationDateRange } from "@/actions/supabase/actions";
 import { Separator } from "@/components/ui/separator";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { useDateRangeStore } from '@/store/dateRangeStore';
 
 
@@ -202,9 +201,7 @@ export function AppSidebarItineraryActivityLeft() {
           <Separator />
         </div>
         <SidebarContent className="h-full w-full">
-          <ScrollArea className="h-full">
-            <ItineraryListView />
-          </ScrollArea>
+          <SimplifiedItinerarySidebar />
         </SidebarContent>
       </Sidebar>
 

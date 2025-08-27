@@ -29,6 +29,7 @@ interface IItineraryStore {
   fetchItineraryActivities: (itineraryId: string, destinationId: string) => Promise<IItineraryActivity[]>;
   updateItineraryActivity: (activity: Partial<IItineraryActivity>) => Promise<void>;
   setItineraryActivities: (activities: IItineraryActivity[]) => void;
+  reorderItineraryActivities: (activities: IItineraryActivity[]) => void;
   insertItineraryActivity: (
     activity: IActivityWithLocation,
     itineraryId: string,
@@ -88,6 +89,7 @@ export const useItineraryActivityStore = create<IItineraryStore>((set, get) => (
     }
   },
   setItineraryActivities: (activities: IItineraryActivity[]) => set({ itineraryActivities: activities }),
+  reorderItineraryActivities: (activities: IItineraryActivity[]) => set({ itineraryActivities: activities }),
   insertItineraryActivity: async (activity: IActivityWithLocation, itineraryId: string, destinationId: string) => {
     if (!activity || !itineraryId) return { success: false, error: undefined };
 

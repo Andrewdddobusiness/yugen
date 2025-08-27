@@ -40,8 +40,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const { itineraryId, destinationId } = useParams();
   const pathname = usePathname();
   
-  // Check if we're on the builder page to conditionally render sidebar
-  const isBuilderPage = pathname.includes('/builder');
+  // Removed isBuilderPage check - now showing sidebar on all pages including builder
 
   //**** STORES ****//
   const { fetchItineraryActivities, setItineraryActivities } = useItineraryActivityStore();
@@ -151,6 +150,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
 
   // For builder page, show simpler layout without sidebar
+  // Commented out to show sidebar on builder page as well
+  /*
   if (isBuilderPage) {
     return (
       <div className="flex flex-col h-screen">
@@ -197,6 +198,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       </div>
     );
   }
+  */
 
   // For other pages (activities, overview), show layout with sidebar
   return (
