@@ -4,22 +4,17 @@ import { useState, useEffect } from "react";
 
 import { useMapStore } from "@/store/mapStore";
 import { useActivitiesStore } from "@/store/activityStore";
-import { useActivityTabStore } from "@/store/activityTabStore";
 
 import { getRadiusForZoom } from "./zoomRadiusMap";
 import GoogleMarkers from "./GoogleMarkers";
-import GoogleMarker from "./GoogleMarker";
 import SearchField from "../search/SearchField";
-import Circle from "./Circle";
 import GoogleMapController from "./GoogleMapController";
 
-import { colors, TColor } from "@/lib/colors/colors";
 import { ActivityOverlay } from "./ActivityOverlay";
 
 export default function GoogleMapComponent() {
-  const { centerCoordinates, initialZoom, setRadius, tempMarker, setCenterCoordinates, mapRadius } = useMapStore();
-  const { selectedActivity, setSelectedActivity, isActivitiesLoading } = useActivitiesStore();
-  const { selectedTab } = useActivityTabStore();
+  const { centerCoordinates, initialZoom, setRadius, setCenterCoordinates } = useMapStore();
+  const { selectedActivity, setSelectedActivity } = useActivitiesStore();
 
   const center = centerCoordinates
     ? { lat: centerCoordinates[0], lng: centerCoordinates[1] }
@@ -74,15 +69,6 @@ export default function GoogleMapComponent() {
         >
           <GoogleMapController />
           <GoogleMarkers />
-          {tempMarker && (
-            <GoogleMarker
-              latitude={tempMarker.latitude}
-              longitude={tempMarker.longitude}
-              activity={tempMarker.activity}
-              color={colors.Red as TColor}
-              size="lg"
-            />
-          )}
           
         </Map>
       </APIProvider>
