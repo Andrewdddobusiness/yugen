@@ -94,7 +94,7 @@ export default function SignUpPage() {
           <div className="mx-auto grid w-[350px] gap-6">
             <div className="grid gap-2 text-center">
               <h1 className="text-4xl font-bold text-[#3A86FF]">Sign Up</h1>
-              <p className="text-muted-foreground text-lg">You're one step closer to planning your next trip!</p>
+              <p className="text-muted-foreground text-lg">You&apos;re one step closer to planning your next trip!</p>
             </div>
 
             <Form {...form}>
@@ -200,7 +200,7 @@ export default function SignUpPage() {
               <h1 className="text-3xl font-bold text-[#3A86FF]">Welcome aboard!</h1>
               <div className="space-y-2">
                 <p className="text-lg text-muted-foreground">
-                  We've sent a verification email to:
+                  We&apos;ve sent a verification email to:
                 </p>
                 <p className="font-semibold text-lg">{user.user?.email}</p>
               </div>
@@ -215,7 +215,7 @@ export default function SignUpPage() {
                   </Button>
                 </Link>
                 <p className="text-sm text-muted-foreground">
-                  Didn't receive the email? Check your spam folder or{" "}
+                  Didn&apos;t receive the email? Check your spam folder or{" "}
                   <button
                     onClick={async () => {
                       if (user.user?.email) {

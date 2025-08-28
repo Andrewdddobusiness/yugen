@@ -14,7 +14,7 @@ import { exportToMyMaps } from "@/utils/export/mapsExport";
 import { generateKML } from "@/utils/export/kmlExport";
 import { Button } from "@/components/ui/button";
 import { exportToExcel } from "@/utils/export/excelExport";
-import { ExportDownloadState } from "@/components/share/exportDownloadState";
+import { ExportDownloadState } from "@/components/share/ExportDownloadState";
 import { useState } from "react";
 
 interface ExportOption {
@@ -175,7 +175,7 @@ export function ExportDialog({ open, onOpenChange, itineraryId }: ExportDialogPr
                       Google My Maps
                     </Link>
                   </li>
-                  <li>Click the "Import" button</li>
+                  <li>Click the &quot;Import&quot; button</li>
                   <li>Select the KML file you just downloaded</li>
                   <li>Your itinerary locations will appear on the map</li>
                 </ol>

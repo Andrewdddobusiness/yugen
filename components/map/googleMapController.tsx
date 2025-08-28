@@ -24,13 +24,13 @@ export default function GoogleMapController() {
           if (!activity.coordinates || activity.coordinates.length !== 2) return;
 
           map.panTo({
-            lat: activity.coordinates[0],
-            lng: activity.coordinates[1],
+            lat: activity.coordinates[1],  // coordinates are stored as [lng, lat]
+            lng: activity.coordinates[0],
           });
 
           setTempMarker({
-            latitude: activity.coordinates[0],
-            longitude: activity.coordinates[1],
+            latitude: activity.coordinates[1],   // coordinates are stored as [lng, lat]
+            longitude: activity.coordinates[0],
             activity: activity,
           });
 

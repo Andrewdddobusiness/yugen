@@ -228,9 +228,9 @@ export default function DestinationSearch({ onDestinationSelect, onBack }: Desti
             <div className="bg-blue-50 rounded-lg p-4">
               <h4 className="font-medium text-blue-900 mb-2">Search Tips</h4>
               <ul className="text-sm text-blue-700 space-y-1">
-                <li>• Try searching for specific cities like "Paris" or "Tokyo"</li>
-                <li>• Include country names for better results: "Rome, Italy"</li>
-                <li>• Search for landmarks: "Eiffel Tower" or "Times Square"</li>
+                <li>• Try searching for specific cities like &ldquo;Paris&rdquo; or &ldquo;Tokyo&rdquo;</li>
+                <li>• Include country names for better results: &ldquo;Rome, Italy&rdquo;</li>
+                <li>• Search for landmarks: &ldquo;Eiffel Tower&rdquo; or &ldquo;Times Square&rdquo;</li>
               </ul>
             </div>
           </div>

@@ -1,7 +1,5 @@
 "use server";
 
-import axios from "axios";
-import { excludedTypes } from "@/lib/googleMaps/excludedTypes";
 import { IActivity, IReview } from "@/store/activityStore";
 import { foodTypes, shoppingTypes, historicalTypes, SearchType, includedTypes } from "@/lib/googleMaps/includedTypes";
 
@@ -141,6 +139,115 @@ const generateNearbyKey = (lat: number, lng: number, radius: number, type?: stri
   return `nearby:${locationKey}:${radius}:${typeKey}`;
 };
 
+// Text search function using proper Google Places Text Search API
+export const searchPlacesByText = async (
+  textQuery: string,
+  latitude: number | undefined,
+  longitude: number | undefined,
+  radiusInMeters: number = 5000
+) => {
+  if (typeof latitude !== "number" || typeof longitude !== "number") {
+    throw new Error("Invalid coordinates provided");
+  }
+
+  if (!textQuery || textQuery.trim().length < 2) {
+    throw new Error("Search query must be at least 2 characters");
+  }
+
+  const validRadius = Math.max(0, Math.min(50000, radiusInMeters));
+  
+  // Import caching functionality
+  const { cachedSearch } = await import("@/lib/cache/searchCache");
+  
+  // Generate cache key for this text search
+  const cacheKey = `textSearch:${textQuery.toLowerCase().trim()}:${latitude.toFixed(4)},${longitude.toFixed(4)}:${validRadius}`;
+  
+  try {
+    return await cachedSearch(
+      cacheKey,
+      async () => {
+        // Use the correct Google Places Text Search API endpoint
+        const baseUrl = "https://places.googleapis.com/v1/places:searchText";
+
+        // Construct a natural language query
+        const searchQuery = textQuery.toLowerCase().includes('restaurant') ? 
+          textQuery : 
+          `${textQuery} restaurants near me`;
+
+        const requestBody = {
+          textQuery: searchQuery,
+          pageSize: 20,
+          locationBias: {
+            circle: {
+              center: {
+                latitude: latitude,
+                longitude: longitude,
+              },
+              radius: validRadius,
+            },
+          },
+          // Optional: Add type restriction to focus on restaurants
+          includedType: "restaurant",
+          // Optional: Minimum rating filter
+          minRating: 2.0
+        };
+
+        const response = await fetch(baseUrl, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Goog-Api-Key": process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY!,
+            "X-Goog-FieldMask": [
+              "places.id",
+              "places.displayName", 
+              "places.formattedAddress",
+              "places.location",
+              "places.types",
+              "places.rating",
+              "places.userRatingCount",
+              "places.priceLevel",
+              "places.photos",
+              "places.editorialSummary",
+              "places.currentOpeningHours",
+              "places.websiteUri",
+              "places.nationalPhoneNumber",
+              "places.reviews"
+            ].join(","),
+          },
+          body: JSON.stringify(requestBody),
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error("Google Places Text Search API Error Response:", {
+            status: response.status,
+            statusText: response.statusText,
+            headers: Object.fromEntries(response.headers.entries()),
+            body: errorText,
+            requestBody
+          });
+          throw new Error(`Google Places Text Search API error: ${response.status} ${response.statusText}`);
+        }
+
+        const data = await response.json();
+
+        if (!data.places || !Array.isArray(data.places)) {
+          return [];
+        }
+
+        // Map the results using our existing mapping function
+        const mappedActivities = data.places.map(mapGooglePlaceToActivity);
+        
+        return mappedActivities;
+      },
+      5 * 60 * 1000 // 5 minute cache for text searches
+    );
+  } catch (error) {
+    console.error("Error in searchPlacesByText:", error);
+    throw error;
+  }
+};
+
 export const fetchNearbyActivities = async (
   latitude: number | undefined,
   longitude: number | undefined,
@@ -148,7 +255,13 @@ export const fetchNearbyActivities = async (
   searchType: SearchType = "all"
 ) => {
   if (typeof latitude !== "number" || typeof longitude !== "number") {
+    console.error("Invalid coordinates:", { latitude, longitude, radiusInMeters, searchType });
     throw new Error("Invalid coordinates provided");
+  }
+
+  if (isNaN(latitude) || isNaN(longitude) || Math.abs(latitude) > 90 || Math.abs(longitude) > 180) {
+    console.error("Invalid coordinate values:", { latitude, longitude });
+    throw new Error("Coordinate values out of valid range");
   }
 
   // Clamp radius to Google Places API limits (0 to 50,000 meters)
@@ -182,9 +295,11 @@ export const fetchNearbyActivities = async (
 
         const baseUrl = "https://places.googleapis.com/v1/places:searchNearby";
 
+        // Limit includedTypes to avoid request size issues
+        const limitedIncludedTypes = includedTypesForSearch.slice(0, 10);
+        
         const requestBody = {
-          includedTypes: includedTypesForSearch,
-          excludedTypes: excludedTypes,
+          includedTypes: limitedIncludedTypes,
           maxResultCount: 20,
           locationRestriction: {
             circle: {
@@ -197,11 +312,7 @@ export const fetchNearbyActivities = async (
           },
         };
 
-        console.log("Making cached Google Places API request:", {
-          searchType,
-          validatedRadius: validRadius,
-          cacheKey,
-        });
+
 
         const response = await fetch(baseUrl, {
           method: "POST",
@@ -230,9 +341,10 @@ export const fetchNearbyActivities = async (
 
         if (!response.ok) {
           const errorText = await response.text();
-          console.error("Google Places API error:", {
+          console.error("Google Places Nearby Search API Error:", {
             status: response.status,
             statusText: response.statusText,
+            headers: Object.fromEntries(response.headers.entries()),
             body: errorText,
             requestBody,
           });
@@ -247,7 +359,6 @@ export const fetchNearbyActivities = async (
         }
 
         const activities: IActivity[] = data.places.map(mapGooglePlaceToActivity);
-        console.log(`Fetched ${activities.length} activities for ${searchType} search`);
         
         return activities;
       },
@@ -336,9 +447,9 @@ export async function getGoogleMapsAutocomplete(
 export const fetchPlaceDetails = async (placeId: string): Promise<IActivity> => {
   try {
     const url = `https://places.googleapis.com/v1/places/${placeId}`;
-    const response = await axios.get(url, {
+    const response = await fetch(url, {
       headers: {
-        "X-Goog-Api-Key": GOOGLE_MAPS_API_KEY,
+        "X-Goog-Api-Key": GOOGLE_MAPS_API_KEY as string,
         "X-Goog-FieldMask": [
           "id",
           "displayName",
@@ -354,12 +465,15 @@ export const fetchPlaceDetails = async (placeId: string): Promise<IActivity> => 
           "currentOpeningHours",
           "reviews",
         ].join(","),
+        "Referer": process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000",
       },
     });
 
-    // console.log("response.data: ", response.data);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch place details: ${response.status} ${response.statusText}`);
+    }
 
-    const place = response.data;
+    const place = await response.json();
     const activity = mapGooglePlaceToActivity(place);
     // Ensure coordinates is a tuple of [number, number]
     if (!Array.isArray(activity.coordinates) || activity.coordinates.length !== 2) {
@@ -372,7 +486,7 @@ export const fetchPlaceDetails = async (placeId: string): Promise<IActivity> => 
   }
 };
 
-export async function fetchAreaActivities(areaName: string, cityName: string, polygonCoordinates: number[][]) {
+export async function fetchAreaActivities(polygonCoordinates: number[][]) {
   try {
     const bounds = polygonCoordinates.reduce(
       (acc, coord) => ({
@@ -397,9 +511,27 @@ export async function fetchAreaActivities(areaName: string, cityName: string, po
     );
 
     const url = "https://places.googleapis.com/v1/places:searchNearby";
-    const response = await axios.post(
-      url,
-      {
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Goog-Api-Key": GOOGLE_MAPS_API_KEY as string,
+        "X-Goog-FieldMask": [
+          "places.id",
+          "places.displayName",
+          "places.formattedAddress",
+          "places.location",
+          "places.types",
+          "places.priceLevel",
+          "places.rating",
+          "places.editorialSummary",
+          "places.websiteUri",
+          "places.photos",
+          "places.currentOpeningHours",
+        ].join(","),
+        "Referer": process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000",
+      },
+      body: JSON.stringify({
         locationRestriction: {
           circle: {
             center: center,
@@ -408,44 +540,22 @@ export async function fetchAreaActivities(areaName: string, cityName: string, po
         },
         includedTypes: includedTypes,
         maxResultCount: 20,
-      },
-      {
-        headers: {
-          "Content-Type": "application/json",
-          "X-Goog-Api-Key": GOOGLE_MAPS_API_KEY,
-          "X-Goog-FieldMask": [
-            "places.id",
-            "places.displayName",
-            "places.formattedAddress",
-            "places.location",
-            "places.types",
-            "places.priceLevel",
-            "places.rating",
-            "places.editorialSummary",
-            "places.websiteUri",
-            "places.photos",
-            "places.currentOpeningHours",
-          ].join(","),
-          Referer: process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000",
-        },
-      }
-    );
+      }),
+    });
 
-    const activities = response.data.places.map(mapGooglePlaceToActivity);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch area activities: ${response.status} ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    const activities = data.places.map(mapGooglePlaceToActivity);
 
     // Filter results to only include places within the polygon
     return activities.filter((activity: any) =>
       isPointInPolygon([activity.coordinates[1], activity.coordinates[0]], polygonCoordinates)
     );
   } catch (error) {
-    if (axios.isAxiosError(error)) {
-      console.error("Error fetching area activities:", {
-        status: error.response?.status,
-        message: error.response?.data?.error?.message || error.message,
-      });
-    } else {
-      console.error("Error fetching area activities:", error);
-    }
+    console.error("Error fetching area activities:", error);
     throw error;
   }
 }

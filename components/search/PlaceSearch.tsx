@@ -1,13 +1,12 @@
 "use client";
 
-import React, { useState, useCallback, useRef, useMemo } from 'react';
-import { Search, Filter, MapPin, Star, Clock, Globe, Phone } from 'lucide-react';
-import { searchPlacesByText, getNearbyPlaces } from '@/actions/google/maps';
-import { searchPlaces } from '@/actions/supabase/places';
-import { cachedSearch, SearchCache } from '@/lib/cache/searchCache';
-import { useDebounce } from '@/components/hooks/use-debounce';
-import PlaceAutocomplete from './PlaceAutocomplete';
-import type { Coordinates } from '@/types/database';
+import React, { useState, useCallback, useRef, useMemo } from "react";
+import { Search, Filter, MapPin, Star, Clock, Globe, Phone } from "lucide-react";
+import { searchPlacesByText, fetchNearbyActivities } from "@/actions/google/actions";
+import { cachedSearch } from "@/lib/cache/searchCache";
+import { useDebounce } from "@/components/hooks/use-debounce";
+import PlaceAutocomplete from "./PlaceAutocomplete";
+import type { Coordinates } from "@/types/database";
 
 interface PlaceSearchProps {
   onPlaceSelect: (place: any) => void;
@@ -24,103 +23,96 @@ interface SearchFilters {
 }
 
 const PLACE_TYPES = [
-  { value: '', label: 'All Places' },
-  { value: 'restaurant', label: 'Restaurants' },
-  { value: 'tourist_attraction', label: 'Attractions' },
-  { value: 'lodging', label: 'Hotels' },
-  { value: 'shopping_mall', label: 'Shopping' },
-  { value: 'museum', label: 'Museums' },
-  { value: 'park', label: 'Parks' },
-  { value: 'church', label: 'Religious Sites' },
-  { value: 'night_club', label: 'Nightlife' },
+  { value: "", label: "All Places" },
+  { value: "restaurant", label: "Restaurants" },
+  { value: "tourist_attraction", label: "Attractions" },
+  { value: "lodging", label: "Hotels" },
+  { value: "shopping_mall", label: "Shopping" },
+  { value: "museum", label: "Museums" },
+  { value: "park", label: "Parks" },
+  { value: "church", label: "Religious Sites" },
+  { value: "night_club", label: "Nightlife" },
 ];
 
 const RADIUS_OPTIONS = [
-  { value: 1000, label: '1 km' },
-  { value: 5000, label: '5 km' },
-  { value: 10000, label: '10 km' },
-  { value: 25000, label: '25 km' },
-  { value: 50000, label: '50 km' },
+  { value: 1000, label: "1 km" },
+  { value: 5000, label: "5 km" },
+  { value: 10000, label: "10 km" },
+  { value: 25000, label: "25 km" },
+  { value: 50000, label: "50 km" },
 ];
 
-export default function PlaceSearch({
-  onPlaceSelect,
-  location,
-  className = "",
-  showFilters = true
-}: PlaceSearchProps) {
-  const [searchMode, setSearchMode] = useState<'autocomplete' | 'text' | 'nearby'>('autocomplete');
+export default function PlaceSearch({ onPlaceSelect, location, className = "", showFilters = true }: PlaceSearchProps) {
+  const [searchMode, setSearchMode] = useState<"autocomplete" | "text" | "nearby">("autocomplete");
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [showFilterPanel, setShowFilterPanel] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
-  
+
   // Debounce search query to reduce API calls
   const debouncedQuery = useDebounce(searchQuery, 500);
-  
+
   const [filters, setFilters] = useState<SearchFilters>({
-    type: '',
+    type: "",
     radius: 10000,
-    priceLevel: '',
-    rating: 0
+    priceLevel: "",
+    rating: 0,
   });
 
-  const handleTextSearch = useCallback(async (queryOverride?: string) => {
-    const query = queryOverride || debouncedQuery;
-    if (!query.trim()) return;
+  const handleTextSearch = useCallback(
+    async (queryOverride?: string) => {
+      const query = queryOverride || debouncedQuery;
+      if (!query.trim()) return;
 
-    // Cancel previous request if still running
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-    }
-    abortControllerRef.current = new AbortController();
+      // Cancel previous request if still running
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+      abortControllerRef.current = new AbortController();
 
-    setIsLoading(true);
-    setSearchError(null);
-    
-    try {
-      // Generate cache key for this search
-      const cacheKey = SearchCache.generateSearchKey(query, location, filters.radius);
-      
-      const result = await cachedSearch(
-        cacheKey,
-        async () => {
-          if (searchMode === 'text') {
-            return await searchPlacesByText(query, location, filters.radius);
-          } else {
-            return await searchPlaces(query, location);
-          }
-        },
-        10 * 60 * 1000 // 10 minute cache
-      );
+      setIsLoading(true);
+      setSearchError(null);
 
-      if (abortControllerRef.current?.signal.aborted) return;
+      try {
+        // Generate cache key for this search
+        const cacheKey = `textSearch:${query.toLowerCase()}:${location?.lat || 'no-lat'}:${location?.lng || 'no-lng'}:${filters.radius}`;
 
-      if (result.success) {
-        let results = result.data || [];
-        
+        const result = await cachedSearch(
+          cacheKey,
+          async () => {
+            if (location) {
+              return await searchPlacesByText(query, location.lat, location.lng, filters.radius);
+            } else {
+              throw new Error("Location is required for search");
+            }
+          },
+          10 * 60 * 1000 // 10 minute cache
+        );
+
+        if (abortControllerRef.current?.signal.aborted) return;
+
+        // The result is already the activities array from our API
+        let results = Array.isArray(result) ? result : [];
+
         // Apply filters
         results = applyFilters(results, filters);
         setSearchResults(results);
-      } else {
-        console.error("Search error:", result.error);
-        setSearchError(result.error?.message || "Search failed");
-        setSearchResults([]);
+      } catch (error: any) {
+        if (error.name !== "AbortError") {
+          console.error("Search failed:", error);
+          setSearchError("Search failed. Please try again.");
+          setSearchResults([]);
+        }
+      } finally {
+        if (!abortControllerRef.current?.signal.aborted) {
+          setIsLoading(false);
+        }
       }
-    } catch (error: any) {
-      if (error.name !== 'AbortError') {
-        console.error("Search failed:", error);
-        setSearchError("Search failed. Please try again.");
-        setSearchResults([]);
-      }
-    } finally {
-      if (!abortControllerRef.current?.signal.aborted) {
-        setIsLoading(false);
-      }
-    }
-  }, [debouncedQuery, location, filters, searchMode]);
+    },
+    [debouncedQuery, location, filters, searchMode]
+  );
 
   const handleNearbySearch = useCallback(async () => {
     if (!location) {
@@ -136,37 +128,27 @@ export default function PlaceSearch({
 
     setIsLoading(true);
     setSearchError(null);
-    
+
     try {
       // Generate cache key for nearby search
-      const cacheKey = SearchCache.generateNearbyKey(
-        location.lat, 
-        location.lng, 
-        filters.radius, 
-        filters.type
-      );
-      
+      const cacheKey = `nearby:${location.lat.toFixed(4)},${location.lng.toFixed(4)}:${filters.radius}:${filters.type || 'all'}`;
+
       const result = await cachedSearch(
         cacheKey,
-        () => getNearbyPlaces(location, filters.radius, filters.type),
+        () => fetchNearbyActivities(location.lng, location.lat, filters.radius, filters.type as any),
         15 * 60 * 1000 // 15 minute cache for nearby results
       );
-      
+
       if (abortControllerRef.current?.signal.aborted) return;
-      
-      if (result.success) {
-        let results = result.data || [];
-        
-        // Apply additional filters
-        results = applyFilters(results, filters);
-        setSearchResults(results);
-      } else {
-        console.error("Nearby search error:", result.error);
-        setSearchError(result.error?.message || "Nearby search failed");
-        setSearchResults([]);
-      }
+
+      // The result is already the activities array from our API
+      let results = Array.isArray(result) ? result : [];
+
+      // Apply additional filters
+      results = applyFilters(results, filters);
+      setSearchResults(results);
     } catch (error: any) {
-      if (error.name !== 'AbortError') {
+      if (error.name !== "AbortError") {
         console.error("Nearby search failed:", error);
         setSearchError("Nearby search failed. Please try again.");
         setSearchResults([]);
@@ -179,7 +161,7 @@ export default function PlaceSearch({
   }, [location, filters]);
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
+    if (e.key === "Enter") {
       handleTextSearch();
     }
   };
@@ -201,17 +183,17 @@ export default function PlaceSearch({
         if (filters.type && !place.types?.includes(filters.type)) {
           return false;
         }
-        
+
         // Rating filter
         if (filters.rating > 0 && (!place.rating || place.rating < filters.rating)) {
           return false;
         }
-        
+
         // Price level filter
         if (filters.priceLevel && place.price_level !== filters.priceLevel) {
           return false;
         }
-        
+
         return true;
       });
     };
@@ -221,14 +203,14 @@ export default function PlaceSearch({
     return (types: string[]) => {
       return types
         .slice(0, 2)
-        .map(type => type.replace(/_/g, ' '))
-        .join(', ');
+        .map((type) => type.replace(/_/g, " "))
+        .join(", ");
     };
   }, []);
 
   // Auto-search when debounced query changes
   React.useEffect(() => {
-    if (searchMode === 'text' && debouncedQuery.trim().length >= 2) {
+    if (searchMode === "text" && debouncedQuery.trim().length >= 2) {
       handleTextSearch();
     }
   }, [debouncedQuery, handleTextSearch, searchMode]);
@@ -248,31 +230,31 @@ export default function PlaceSearch({
       <div className="border-b border-gray-200">
         <nav className="flex space-x-8 px-6 py-3">
           <button
-            onClick={() => setSearchMode('autocomplete')}
+            onClick={() => setSearchMode("autocomplete")}
             className={`py-2 px-1 border-b-2 font-medium text-sm ${
-              searchMode === 'autocomplete'
-                ? 'border-blue-500 text-blue-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700'
+              searchMode === "autocomplete"
+                ? "border-blue-500 text-blue-600"
+                : "border-transparent text-gray-500 hover:text-gray-700"
             }`}
           >
             Autocomplete
           </button>
           <button
-            onClick={() => setSearchMode('text')}
+            onClick={() => setSearchMode("text")}
             className={`py-2 px-1 border-b-2 font-medium text-sm ${
-              searchMode === 'text'
-                ? 'border-blue-500 text-blue-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700'
+              searchMode === "text"
+                ? "border-blue-500 text-blue-600"
+                : "border-transparent text-gray-500 hover:text-gray-700"
             }`}
           >
             Text Search
           </button>
           <button
-            onClick={() => setSearchMode('nearby')}
+            onClick={() => setSearchMode("nearby")}
             className={`py-2 px-1 border-b-2 font-medium text-sm ${
-              searchMode === 'nearby'
-                ? 'border-blue-500 text-blue-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700'
+              searchMode === "nearby"
+                ? "border-blue-500 text-blue-600"
+                : "border-transparent text-gray-500 hover:text-gray-700"
             }`}
             disabled={!location}
           >
@@ -282,7 +264,7 @@ export default function PlaceSearch({
       </div>
 
       <div className="p-6">
-        {searchMode === 'autocomplete' && (
+        {searchMode === "autocomplete" && (
           <PlaceAutocomplete
             onPlaceSelect={onPlaceSelect}
             location={location}
@@ -292,11 +274,11 @@ export default function PlaceSearch({
           />
         )}
 
-        {(searchMode === 'text' || searchMode === 'nearby') && (
+        {(searchMode === "text" || searchMode === "nearby") && (
           <>
             {/* Search Input and Filters */}
             <div className="flex space-x-2 mb-4">
-              {searchMode === 'text' && (
+              {searchMode === "text" && (
                 <div className="flex-1 relative">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
                   <input
@@ -309,22 +291,22 @@ export default function PlaceSearch({
                   />
                 </div>
               )}
-              
+
               {showFilters && (
                 <button
                   onClick={() => setShowFilterPanel(!showFilterPanel)}
                   className={`px-4 py-2 border border-gray-300 rounded-lg flex items-center space-x-2 hover:bg-gray-50 ${
-                    showFilterPanel ? 'bg-gray-50' : ''
+                    showFilterPanel ? "bg-gray-50" : ""
                   }`}
                 >
                   <Filter className="h-4 w-4" />
                   <span>Filters</span>
                 </button>
               )}
-              
+
               <button
-                onClick={searchMode === 'text' ? handleTextSearch : handleNearbySearch}
-                disabled={isLoading || (searchMode === 'text' && !searchQuery.trim())}
+                onClick={() => (searchMode === "text" ? handleTextSearch() : handleNearbySearch())}
+                disabled={isLoading || (searchMode === "text" && !searchQuery.trim())}
                 className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center space-x-2"
               >
                 {isLoading ? (
@@ -332,7 +314,7 @@ export default function PlaceSearch({
                 ) : (
                   <Search className="h-4 w-4" />
                 )}
-                <span>{isLoading ? 'Searching...' : 'Search'}</span>
+                <span>{isLoading ? "Searching..." : "Search"}</span>
               </button>
             </div>
 
@@ -341,15 +323,13 @@ export default function PlaceSearch({
               <div className="bg-gray-50 rounded-lg p-4 mb-4 space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Place Type
-                    </label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Place Type</label>
                     <select
                       value={filters.type}
-                      onChange={(e) => setFilters(prev => ({ ...prev, type: e.target.value }))}
+                      onChange={(e) => setFilters((prev) => ({ ...prev, type: e.target.value }))}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     >
-                      {PLACE_TYPES.map(type => (
+                      {PLACE_TYPES.map((type) => (
                         <option key={type.value} value={type.value}>
                           {type.label}
                         </option>
@@ -358,15 +338,13 @@ export default function PlaceSearch({
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Radius
-                    </label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Radius</label>
                     <select
                       value={filters.radius}
-                      onChange={(e) => setFilters(prev => ({ ...prev, radius: Number(e.target.value) }))}
+                      onChange={(e) => setFilters((prev) => ({ ...prev, radius: Number(e.target.value) }))}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     >
-                      {RADIUS_OPTIONS.map(option => (
+                      {RADIUS_OPTIONS.map((option) => (
                         <option key={option.value} value={option.value}>
                           {option.label}
                         </option>
@@ -375,12 +353,10 @@ export default function PlaceSearch({
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Min Rating
-                    </label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Min Rating</label>
                     <select
                       value={filters.rating}
-                      onChange={(e) => setFilters(prev => ({ ...prev, rating: Number(e.target.value) }))}
+                      onChange={(e) => setFilters((prev) => ({ ...prev, rating: Number(e.target.value) }))}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     >
                       <option value={0}>Any Rating</option>
@@ -391,12 +367,10 @@ export default function PlaceSearch({
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Price Level
-                    </label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Price Level</label>
                     <select
                       value={filters.priceLevel}
-                      onChange={(e) => setFilters(prev => ({ ...prev, priceLevel: e.target.value }))}
+                      onChange={(e) => setFilters((prev) => ({ ...prev, priceLevel: e.target.value }))}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     >
                       <option value="">Any Price</option>
@@ -413,9 +387,7 @@ export default function PlaceSearch({
             {/* Search Results */}
             {searchResults.length > 0 && (
               <div className="space-y-3">
-                <h3 className="text-lg font-medium text-gray-900">
-                  Search Results ({searchResults.length})
-                </h3>
+                <h3 className="text-lg font-medium text-gray-900">Search Results ({searchResults.length})</h3>
                 <div className="grid gap-4">
                   {searchResults.map((place, index) => (
                     <button
@@ -433,9 +405,7 @@ export default function PlaceSearch({
                             </span>
                           </div>
                           {place.types && place.types.length > 0 && (
-                            <p className="text-sm text-gray-500 mt-1">
-                              {formatTypes(place.types)}
-                            </p>
+                            <p className="text-sm text-gray-500 mt-1">{formatTypes(place.types)}</p>
                           )}
                           <div className="flex items-center space-x-4 mt-2">
                             {place.rating && formatRating(place.rating)}
@@ -469,8 +439,8 @@ export default function PlaceSearch({
                   <button
                     onClick={() => {
                       setSearchError(null);
-                      if (searchMode === 'text') {
-                        handleTextSearch(searchQuery);
+                      if (searchMode === "text") {
+                        handleTextSearch();
                       } else {
                         handleNearbySearch();
                       }
@@ -484,17 +454,18 @@ export default function PlaceSearch({
             )}
 
             {/* Empty State */}
-            {!searchError && searchResults.length === 0 && !isLoading && (searchMode === 'text' ? debouncedQuery : true) && (
-              <div className="text-center py-8 text-gray-500">
-                <MapPin className="h-12 w-12 mx-auto mb-4 text-gray-300" />
-                <p>No places found. Try adjusting your search or filters.</p>
-                {searchMode === 'text' && debouncedQuery && (
-                  <p className="text-sm mt-2 text-gray-400">
-                    Searched for: "{debouncedQuery}"
-                  </p>
-                )}
-              </div>
-            )}
+            {!searchError &&
+              searchResults.length === 0 &&
+              !isLoading &&
+              (searchMode === "text" ? debouncedQuery : true) && (
+                <div className="text-center py-8 text-gray-500">
+                  <MapPin className="h-12 w-12 mx-auto mb-4 text-gray-300" />
+                  <p>No places found. Try adjusting your search or filters.</p>
+                  {searchMode === "text" && debouncedQuery && (
+                    <p className="text-sm mt-2 text-gray-400">Searched for: &quot;{debouncedQuery}&quot;</p>
+                  )}
+                </div>
+              )}
           </>
         )}
       </div>

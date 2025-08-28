@@ -70,7 +70,7 @@ export default function TestimonialsSection() {
             </span>
           </h2>
           <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-            Join thousands of travelers who've discovered the joy of stress-free trip planning
+            Join thousands of travelers who&apos;ve discovered the joy of stress-free trip planning
           </p>
         </motion.div>
 
@@ -122,7 +122,7 @@ export default function TestimonialsSection() {
 
               {/* Testimonial Text */}
               <blockquote className="text-gray-700 leading-relaxed mb-6">
-                "{testimonial.text}"
+                &quot;{testimonial.text}&quot;
               </blockquote>
 
               {/* Trip Info */}
@@ -174,7 +174,7 @@ export default function TestimonialsSection() {
               Ready to Join the Journey Community?
             </h3>
             <p className="text-blue-100 mb-6 max-w-2xl mx-auto">
-              Start planning your next adventure with the tool that's already helped 50,000+ travelers create unforgettable trips.
+              Start planning your next adventure with the tool that&apos;s already helped 50,000+ travelers create unforgettable trips.
             </p>
             <button className="bg-white text-blue-600 font-semibold px-8 py-3 rounded-xl hover:bg-gray-50 transition-colors duration-300">
               Start Planning Free

@@ -25,7 +25,7 @@ export default function SearchField() {
   const { setSelectedTab } = useActivityTabStore();
   const { addToHistory, selectedSearchQuery, setSelectedSearchQuery } = useSearchHistoryStore();
   const { itineraryCoordinates, centerCoordinates, mapRadius } = useMapStore();
-  const { setActivities, isActivitiesLoading, setIsActivitiesLoading, setAreaSearchActivities } = useActivitiesStore();
+  const { isActivitiesLoading, setIsActivitiesLoading, setAreaSearchActivities } = useActivitiesStore();
 
   // **** STATES ****
   const [autocompleteResults, setAutocompleteResults] = useState<Array<ISearchHistoryItem>>([]);
@@ -157,6 +157,157 @@ export default function SearchField() {
     }, 150); // Slightly longer delay to allow clicks
   }, []);
 
+  const handleTextSearch = useCallback(async (query: string) => {
+    if (!centerCoordinates || !query.trim()) return;
+
+    // Cancel previous request
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    abortControllerRef.current = new AbortController();
+
+    setIsActivitiesLoading(true);
+    setIsVisible(false);
+    setIsExactSearch(false);
+    setSearchTypeArea(true);
+    setSearchError(null);
+    setSelectedSearchQuery(query);
+
+    try {
+      const keyword = query.toLowerCase().trim();
+      
+      // Determine the best search type based on keyword
+      let searchType: SearchType = "all";
+      if (keyword.includes('restaurant') || keyword.includes('food') || keyword.includes('eat') || 
+          keyword.includes('japanese') || keyword.includes('italian') || keyword.includes('chinese') ||
+          keyword.includes('korean') || keyword.includes('thai') || keyword.includes('indian') ||
+          keyword.includes('pizza') || keyword.includes('burger') || keyword.includes('sushi') ||
+          keyword.includes('ramen') || keyword.includes('noodle') || keyword.includes('cuisine') ||
+          keyword.includes('cafe') || keyword.includes('coffee') || keyword.includes('bar') ||
+          keyword.includes('bakery') || keyword.includes('bistro') || keyword.includes('grill')) {
+        searchType = "food";
+      }
+
+      console.log("Text search params:", {
+        query,
+        keyword,
+        searchType,
+        coordinates: centerCoordinates,
+        radius: mapRadius
+      });
+      
+      // Get nearby activities of the relevant type using the same radius as "Search This Area"
+      const allActivities = await fetchNearbyActivities(
+        centerCoordinates[0], 
+        centerCoordinates[1], 
+        mapRadius, 
+        searchType
+      );
+
+      console.log("Fetched activities:", allActivities.length);
+
+      // Function to normalize text for flexible matching
+      const normalizeText = (text: string): string => {
+        return text
+          .toLowerCase()
+          .replace(/['''`]/g, '') // Remove apostrophes and quotes
+          .replace(/[^\w\s]/g, ' ') // Replace punctuation with spaces
+          .replace(/\s+/g, ' ') // Collapse multiple spaces
+          .trim();
+      };
+
+      const normalizedKeyword = normalizeText(keyword);
+
+      // Improved keyword matching with better scoring
+      const scoredActivities = allActivities.map((activity: any) => {
+        const name = activity.name?.toLowerCase() || '';
+        const normalizedName = normalizeText(activity.name || '');
+        const description = activity.description?.toLowerCase() || '';
+        const normalizedDescription = normalizeText(activity.description || '');
+        const types = Array.isArray(activity.types) ? activity.types.join(' ').toLowerCase() : '';
+        const address = activity.address?.toLowerCase() || '';
+        
+        let score = 0;
+        
+        // Exact name match gets highest score
+        if (name.includes(keyword)) score += 10;
+        
+        // Flexible normalized matching for names (handles punctuation)
+        if (normalizedName.includes(normalizedKeyword)) score += 12;
+        
+        // Word-based matching (split by spaces and check if all words match)
+        const keywordWords = normalizedKeyword.split(' ').filter(w => w.length > 0);
+        const nameWords = normalizedName.split(' ').filter(w => w.length > 0);
+        
+        const wordsMatched = keywordWords.filter(kw => 
+          nameWords.some(nw => nw.includes(kw) || kw.includes(nw))
+        );
+        
+        if (wordsMatched.length === keywordWords.length && keywordWords.length > 0) {
+          score += 8; // All keyword words found in name
+        } else if (wordsMatched.length > 0) {
+          score += 4 * wordsMatched.length; // Partial word matches
+        }
+        
+        // Type-specific matching for cuisine keywords
+        if (keyword.includes('japanese')) {
+          if (types.includes('japanese_restaurant') || types.includes('sushi_restaurant')) score += 15;
+          if (name.includes('sushi') || name.includes('ramen') || name.includes('japanese')) score += 8;
+          if (name.includes('yakitori') || name.includes('izakaya') || name.includes('udon')) score += 6;
+        } else if (keyword.includes('italian')) {
+          if (types.includes('italian_restaurant')) score += 15;
+          if (name.includes('pizza') || name.includes('pasta') || name.includes('italian')) score += 8;
+        } else if (keyword.includes('chinese')) {
+          if (types.includes('chinese_restaurant')) score += 15;
+          if (name.includes('chinese') || name.includes('dim sum') || name.includes('noodle')) score += 8;
+        } else if (keyword.includes('coffee') || keyword.includes('cafe')) {
+          if (types.includes('cafe') || types.includes('coffee_shop')) score += 15;
+          if (name.includes('coffee') || name.includes('cafe') || name.includes('espresso')) score += 8;
+        } else if (keyword.includes('bar')) {
+          if (types.includes('bar')) score += 15;
+          if (name.includes('bar') || name.includes('pub') || name.includes('brewery')) score += 8;
+        } else {
+          // Generic keyword matching
+          if (types.includes(keyword)) score += 8;
+          if (description.includes(keyword)) score += 5;
+          if (normalizedDescription.includes(normalizedKeyword)) score += 6;
+          if (address.includes(keyword)) score += 2;
+        }
+        
+        return { ...activity, score };
+      }).filter(activity => activity.score > 0)
+        .sort((a, b) => b.score - a.score); // Sort by score descending
+
+      console.log("Scored activities:", {
+        totalFetched: allActivities.length,
+        afterFiltering: scoredActivities.length,
+        topScores: scoredActivities.slice(0, 3).map(a => ({ name: a.name, score: a.score }))
+      });
+
+      if (!abortControllerRef.current?.signal.aborted) {
+        setAreaSearchActivities(scoredActivities);
+        setSelectedTab("area-search");
+        // Reset search type area after successful search
+        setTimeout(() => {
+          setSearchTypeArea(false);
+        }, 500);
+      }
+    } catch (error: any) {
+      if (error.name !== 'AbortError') {
+        console.error("Error searching for text:", error);
+        setSearchError(`Failed to search for "${query}". Please try again.`);
+      }
+    } finally {
+      if (!abortControllerRef.current?.signal.aborted) {
+        setIsActivitiesLoading(false);
+        // Reset search type area to allow button to reappear on map movement
+        setTimeout(() => {
+          setSearchTypeArea(false);
+        }, 1000);
+      }
+    }
+  }, [centerCoordinates, mapRadius, setSelectedSearchQuery, setAreaSearchActivities, setSelectedTab, setIsActivitiesLoading]);
+
   const handleSearchTypeSelect = useCallback(async (type: SearchType = selectedType) => {
     if (!centerCoordinates) return;
 
@@ -226,7 +377,7 @@ export default function SearchField() {
     return () => {
       clearTimeout(timeout);
     };
-  }, [centerCoordinates, mapRadius]);
+  }, [centerCoordinates, mapRadius, searchAreaTimeout]);
 
   const handleClearSearch = useCallback(() => {
     setSelectedSearchQuery("");
@@ -295,7 +446,7 @@ export default function SearchField() {
         )}
 
         {/* Autocomplete results */}
-        {isVisible && (autocompleteResults.length > 0 || isAutocompleteLoading) && (
+        {isVisible && ((autocompleteResults.length > 0 || debouncedQuery.length >= 2) || isAutocompleteLoading) && (
           <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-gray-200 rounded-xl shadow-xl z-30 max-h-64 overflow-y-auto">
             {isAutocompleteLoading && autocompleteResults.length === 0 ? (
               <div className="flex items-center justify-center py-6">
@@ -304,6 +455,27 @@ export default function SearchField() {
               </div>
             ) : (
               <div className="py-2">
+                {/* Text search option - appears first if user has typed something */}
+                {debouncedQuery.length >= 2 && (
+                  <button
+                    onClick={() => handleTextSearch(debouncedQuery)}
+                    className="w-full text-left px-4 py-3 hover:bg-green-50 transition-colors group border-b border-gray-100"
+                  >
+                    <div className="flex items-center gap-3">
+                      <Search className="h-4 w-4 text-green-500 group-hover:text-green-600 flex-shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium text-sm text-gray-900 truncate">
+                          Search for &quot;{debouncedQuery}&quot;
+                        </div>
+                        <div className="text-xs text-gray-500 mt-0.5 truncate">
+                          Find places matching this keyword nearby
+                        </div>
+                      </div>
+                    </div>
+                  </button>
+                )}
+                
+                {/* Place autocomplete results */}
                 {autocompleteResults.map((result, index) => (
                   <button
                     key={`${result.placeId}-${index}`}
@@ -319,6 +491,13 @@ export default function SearchField() {
                     </div>
                   </button>
                 ))}
+                
+                {/* No results message */}
+                {!isAutocompleteLoading && autocompleteResults.length === 0 && debouncedQuery.length >= 2 && (
+                  <div className="px-4 py-3 text-sm text-gray-500 text-center">
+                    No specific places found. Try the keyword search above.
+                  </div>
+                )}
               </div>
             )}
           </div>

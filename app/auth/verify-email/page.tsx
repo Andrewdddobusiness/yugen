@@ -51,18 +51,18 @@ export default function VerifyEmailPage() {
           </div>
           <CardTitle>Verify Your Email</CardTitle>
           <CardDescription>
-            We've sent a confirmation email to <strong>{email}</strong>
+            We&apos;ve sent a confirmation email to <strong>{email}</strong>
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="text-center text-sm text-muted-foreground">
             <p>Please check your email and click the confirmation link to verify your account.</p>
-            <p className="mt-2">Don't forget to check your spam folder!</p>
+            <p className="mt-2">Don&apos;t forget to check your spam folder!</p>
           </div>
 
           <div className="text-center">
             <p className="text-sm text-muted-foreground mb-4">
-              Didn't receive the email?
+              Didn&apos;t receive the email?
             </p>
             <Button
               onClick={handleResendConfirmation}

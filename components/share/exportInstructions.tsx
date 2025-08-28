@@ -15,7 +15,7 @@ export function ExportInstructions({ open, onOpenChange }: ExportInstructionsPro
             <ol className="list-decimal pl-4 space-y-2 mt-4">
               <li>Your KML file has been downloaded</li>
               <li>A new Google My Maps tab will open</li>
-              <li>Click the "Import" button in My Maps</li>
+              <li>Click the &quot;Import&quot; button in My Maps</li>
               <li>Select the KML file you just downloaded</li>
               <li>Your itinerary locations will appear on the map</li>
             </ol>

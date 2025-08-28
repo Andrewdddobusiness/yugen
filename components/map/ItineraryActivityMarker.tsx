@@ -1,20 +1,12 @@
 "use client";
 
-import React, { useMemo, useState } from 'react';
-import { AdvancedMarker, InfoWindow } from '@vis.gl/react-google-maps';
-import { 
-  Clock, 
-  MapPin, 
-  Star, 
-  DollarSign, 
-  Calendar,
-  Route,
-  User
-} from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { cn } from '@/lib/utils';
-import { formatCategoryType } from '@/utils/formatting/types';
+import React, { useMemo, useState } from "react";
+import { AdvancedMarker, InfoWindow } from "@vis.gl/react-google-maps";
+import { Clock, MapPin, Star, DollarSign, Calendar, Route, User } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
+import { formatCategoryType } from "@/utils/formatting/types";
 
 interface ItineraryActivity {
   itinerary_activity_id: string;
@@ -60,92 +52,100 @@ export function ItineraryActivityMarker({
 }: ItineraryActivityMarkerProps) {
   const [showInfoWindow, setShowInfoWindow] = useState(false);
 
+  // Marker color based on day and type - moved before early return
+  const markerColor = useMemo(() => {
+    const dayColors = [
+      "#3B82F6", // Blue
+      "#EF4444", // Red
+      "#10B981", // Green
+      "#F59E0B", // Amber
+      "#8B5CF6", // Purple
+      "#F97316", // Orange
+      "#06B6D4", // Cyan
+    ];
+
+    if (isSelected) return "#1D4ED8"; // Dark blue for selected
+    if (isHighlighted) return "#DC2626"; // Dark red for highlighted
+
+    return dayColors[dayIndex % dayColors.length];
+  }, [dayIndex, isSelected, isHighlighted]);
+
   // Don't render if no coordinates
-  if (!activity.activity?.coordinates || !Array.isArray(activity.activity.coordinates) || activity.activity.coordinates.length !== 2) {
-    console.log('ItineraryActivityMarker: No valid coordinates for', activity.activity?.name, activity.activity?.coordinates);
+  if (
+    !activity.activity?.coordinates ||
+    !Array.isArray(activity.activity.coordinates) ||
+    activity.activity.coordinates.length !== 2
+  ) {
+    console.log(
+      "ItineraryActivityMarker: No valid coordinates for",
+      activity.activity?.name,
+      activity.activity?.coordinates
+    );
     return null;
   }
 
   // Coordinates are stored as [lng, lat] in our data
   const [lng, lat] = activity.activity.coordinates;
   const position = { lat: lat, lng: lng };
-  
-  console.log('ItineraryActivityMarker: Rendering marker at', position, 'for', activity.activity?.name);
+
+  console.log("ItineraryActivityMarker: Rendering marker at", position, "for", activity.activity?.name);
 
   // Get activity type for marker styling
-  const primaryType = activity.activity?.types?.[0] || 'tourist_attraction';
-  
-  // Marker color based on day and type
-  const markerColor = useMemo(() => {
-    const dayColors = [
-      '#3B82F6', // Blue
-      '#EF4444', // Red  
-      '#10B981', // Green
-      '#F59E0B', // Amber
-      '#8B5CF6', // Purple
-      '#F97316', // Orange
-      '#06B6D4', // Cyan
-    ];
-    
-    if (isSelected) return '#1D4ED8'; // Dark blue for selected
-    if (isHighlighted) return '#DC2626'; // Dark red for highlighted
-    
-    return dayColors[dayIndex % dayColors.length];
-  }, [dayIndex, isSelected, isHighlighted]);
+  const primaryType = activity.activity?.types?.[0] || "tourist_attraction";
 
   // Get icon for activity type
   const getActivityIcon = (types: string[] = []) => {
     const type = types[0];
     switch (type) {
-      case 'restaurant':
-      case 'meal_takeaway':
-      case 'food':
-        return '🍽️';
-      case 'lodging':
-        return '🏨';
-      case 'tourist_attraction':
-      case 'museum':
-        return '🏛️';
-      case 'park':
-        return '🌳';
-      case 'shopping_mall':
-      case 'store':
-        return '🛍️';
-      case 'church':
-      case 'place_of_worship':
-        return '⛪';
-      case 'hospital':
-        return '🏥';
-      case 'school':
-      case 'university':
-        return '🏫';
-      case 'bank':
-        return '🏦';
-      case 'gas_station':
-        return '⛽';
-      case 'pharmacy':
-        return '💊';
-      case 'gym':
-        return '💪';
-      case 'spa':
-        return '🧖‍♀️';
-      case 'beach':
-        return '🏖️';
-      case 'zoo':
-        return '🦁';
-      case 'amusement_park':
-        return '🎢';
+      case "restaurant":
+      case "meal_takeaway":
+      case "food":
+        return "🍽️";
+      case "lodging":
+        return "🏨";
+      case "tourist_attraction":
+      case "museum":
+        return "🏛️";
+      case "park":
+        return "🌳";
+      case "shopping_mall":
+      case "store":
+        return "🛍️";
+      case "church":
+      case "place_of_worship":
+        return "⛪";
+      case "hospital":
+        return "🏥";
+      case "school":
+      case "university":
+        return "🏫";
+      case "bank":
+        return "🏦";
+      case "gas_station":
+        return "⛽";
+      case "pharmacy":
+        return "💊";
+      case "gym":
+        return "💪";
+      case "spa":
+        return "🧖‍♀️";
+      case "beach":
+        return "🏖️";
+      case "zoo":
+        return "🦁";
+      case "amusement_park":
+        return "🎢";
       default:
-        return '📍';
+        return "📍";
     }
   };
 
   const formatTime = (time: string) => {
     try {
-      const [hours, minutes] = time.split(':').map(Number);
+      const [hours, minutes] = time.split(":").map(Number);
       const date = new Date();
       date.setHours(hours, minutes);
-      return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+      return date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
     } catch {
       return time;
     }
@@ -153,21 +153,21 @@ export function ItineraryActivityMarker({
 
   const getPriceDisplay = (priceLevel: string) => {
     const levels: Record<string, string> = {
-      '1': '$',
-      '2': '$$', 
-      '3': '$$$',
-      '4': '$$$$',
+      "1": "$",
+      "2": "$$",
+      "3": "$$$",
+      "4": "$$$$",
     };
-    return levels[priceLevel] || '';
+    return levels[priceLevel] || "";
   };
 
   const formatDate = (dateString: string) => {
     try {
       const date = new Date(dateString);
-      return date.toLocaleDateString([], { 
-        weekday: 'short', 
-        month: 'short', 
-        day: 'numeric' 
+      return date.toLocaleDateString([], {
+        weekday: "short",
+        month: "short",
+        day: "numeric",
       });
     } catch {
       return dateString;
@@ -195,9 +195,7 @@ export function ItineraryActivityMarker({
             )}
             style={{ backgroundColor: markerColor }}
           >
-            <span className="text-white text-lg font-semibold">
-              {getActivityIcon(activity.activity?.types)}
-            </span>
+            <span className="text-white text-lg font-semibold">{getActivityIcon(activity.activity?.types)}</span>
           </div>
 
           {/* Time Badge */}
@@ -218,18 +216,14 @@ export function ItineraryActivityMarker({
 
       {/* Info Window */}
       {showInfoWindow && (
-        <InfoWindow
-          position={position}
-          onCloseClick={() => setShowInfoWindow(false)}
-          maxWidth={300}
-        >
+        <InfoWindow position={position} onCloseClick={() => setShowInfoWindow(false)} maxWidth={300}>
           <div className="p-2 space-y-3 max-w-sm">
             {/* Header */}
             <div className="space-y-2">
               <h3 className="font-semibold text-base leading-tight text-gray-900">
-                {activity.activity?.name || 'Unnamed Activity'}
+                {activity.activity?.name || "Unnamed Activity"}
               </h3>
-              
+
               {activity.activity?.address && (
                 <div className="flex items-start gap-2 text-sm text-gray-600">
                   <MapPin className="h-3 w-3 mt-0.5 flex-shrink-0" />
@@ -246,7 +240,7 @@ export function ItineraryActivityMarker({
                   <span>{formatDate(activity.date)}</span>
                 </div>
               )}
-              
+
               {activity.start_time && (
                 <div className="flex items-center gap-1 text-gray-700">
                   <Clock className="h-3 w-3" />
@@ -266,7 +260,7 @@ export function ItineraryActivityMarker({
                   {formatCategoryType(activity.activity.types[0])}
                 </Badge>
               )}
-              
+
               {/* Rating */}
               {activity.activity?.rating && (
                 <div className="flex items-center gap-1">
@@ -274,7 +268,7 @@ export function ItineraryActivityMarker({
                   <span className="text-sm font-medium">{activity.activity.rating}</span>
                 </div>
               )}
-              
+
               {/* Price */}
               {activity.activity?.price_level && (
                 <div className="flex items-center gap-1">
@@ -287,11 +281,7 @@ export function ItineraryActivityMarker({
             </div>
 
             {/* Notes */}
-            {activity.notes && (
-              <div className="text-sm text-gray-700 p-2 bg-gray-50 rounded">
-                {activity.notes}
-              </div>
-            )}
+            {activity.notes && <div className="text-sm text-gray-700 p-2 bg-gray-50 rounded">{activity.notes}</div>}
 
             {/* Actions */}
             <div className="flex gap-2 pt-2 border-t">
@@ -306,14 +296,14 @@ export function ItineraryActivityMarker({
               >
                 Edit
               </Button>
-              
+
               {activity.activity?.place_id && (
                 <Button
-                  variant="outline" 
+                  variant="outline"
                   size="sm"
                   onClick={() => {
-                    const url = `https://www.google.com/maps/place/?q=place_id:${activity.activity.place_id}`;
-                    window.open(url, '_blank');
+                    const url = `https://www.google.com/maps/place/?q=place_id:${activity.activity?.place_id}`;
+                    window.open(url, "_blank");
                   }}
                   className="flex-1 text-xs"
                 >
@@ -337,20 +327,12 @@ interface ClusterMarkerProps {
   dayIndex?: number;
 }
 
-export function ClusterMarker({ 
-  activities, 
-  position, 
-  onClick,
-  dayIndex = 0
-}: ClusterMarkerProps) {
+export function ClusterMarker({ activities, position, onClick, dayIndex = 0 }: ClusterMarkerProps) {
   const [showInfoWindow, setShowInfoWindow] = useState(false);
-  
+
   const count = activities.length;
-  const dayColors = [
-    '#3B82F6', '#EF4444', '#10B981', '#F59E0B', 
-    '#8B5CF6', '#F97316', '#06B6D4'
-  ];
-  
+  const dayColors = ["#3B82F6", "#EF4444", "#10B981", "#F59E0B", "#8B5CF6", "#F97316", "#06B6D4"];
+
   const clusterColor = dayColors[dayIndex % dayColors.length];
 
   return (
@@ -372,25 +354,17 @@ export function ClusterMarker({
       </AdvancedMarker>
 
       {showInfoWindow && (
-        <InfoWindow
-          position={position}
-          onCloseClick={() => setShowInfoWindow(false)}
-          maxWidth={250}
-        >
+        <InfoWindow position={position} onCloseClick={() => setShowInfoWindow(false)} maxWidth={250}>
           <div className="p-2">
-            <h4 className="font-semibold mb-2">
-              {count} Activities in this area
-            </h4>
+            <h4 className="font-semibold mb-2">{count} Activities in this area</h4>
             <div className="space-y-1 max-h-32 overflow-y-auto">
               {activities.slice(0, 5).map((activity) => (
                 <div key={activity.itinerary_activity_id} className="text-sm text-gray-700">
-                  {activity.activity?.name || 'Unnamed Activity'}
+                  {activity.activity?.name || "Unnamed Activity"}
                 </div>
               ))}
               {activities.length > 5 && (
-                <div className="text-xs text-gray-500">
-                  And {activities.length - 5} more...
-                </div>
+                <div className="text-xs text-gray-500">And {activities.length - 5} more...</div>
               )}
             </div>
           </div>

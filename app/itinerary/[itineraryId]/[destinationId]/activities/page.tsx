@@ -33,7 +33,7 @@ import { useActivityTabStore } from "@/store/activityTabStore";
 import { filterActivities } from "@/utils/filters/filterActivities";
 import { activityTypeFilters, activityCostFilters } from "@/utils/filters/filters";
 
-import { Popup } from "react-map-gl";
+import { InfoWindow } from "@vis.gl/react-google-maps";
 // Lazy load heavy Google Maps component
 const GoogleMapComponent = lazy(() => import("@/components/map/GoogleMap"));
 import ClearHistoryButton from "@/components/buttons/ClearHistoryButton";
@@ -430,16 +430,12 @@ export default function Activities() {
           </Suspense>
         ) : null}
         {popupInfo && (
-          <Popup
-            longitude={popupInfo.longitude}
-            latitude={popupInfo.latitude}
-            anchor="bottom"
-            closeButton={false}
-            closeOnClick={false}
-            className="z-50"
+          <InfoWindow
+            position={{ lat: popupInfo.latitude, lng: popupInfo.longitude }}
+            onCloseClick={() => setPopupInfo(null)}
           >
             <div className="px-2 py-1 text-sm font-medium">{popupInfo.name}</div>
-          </Popup>
+          </InfoWindow>
         )}
       </div>
       <ViewToggleButton isMapView={isMapView} onToggle={toggleView} />

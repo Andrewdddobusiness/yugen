@@ -9,7 +9,7 @@ const getStripe = () => {
     return null;
   }
   return new Stripe(secretKey, {
-    apiVersion: "2024-10-28.acacia",
+    apiVersion: "2025-02-24.acacia",
   });
 };
 
@@ -133,10 +133,10 @@ export async function getSubscriptionDetails() {
 
     // Call the Supabase function
     const { data: subscription, error } = await supabase
-      .rpc<string, ISubscriptionOutput>("get_user_subscription", {
+      .rpc("get_user_subscription", {
         user_uuid: user.id,
       })
-      .single();
+      .single() as { data: ISubscriptionOutput | null; error: any };
     console.log("subscription", subscription);
     if (error) {
       console.error("Subscription query error:", error);

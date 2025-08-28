@@ -196,7 +196,7 @@ export default function PopularDestinations({
         className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-4 text-center"
       >
         <h3 className="text-sm font-semibold text-gray-900 mb-2">
-          Don't see your destination?
+          Don&apos;t see your destination?
         </h3>
         <p className="text-xs text-gray-600 mb-3">
           Search from over 195 countries and thousands of cities worldwide

@@ -1,3 +1,19 @@
 {
-  "extends": "next/core-web-vitals"
+  "extends": "next/core-web-vitals",
+  "rules": {
+    // Disable performance-heavy rules during development
+    "react-hooks/exhaustive-deps": "warn",
+    "@next/next/no-img-element": "warn",
+    // Keep critical rules as errors
+    "react/no-unescaped-entities": "error",
+    "react-hooks/rules-of-hooks": "error"
+  },
+  "settings": {
+    // Speed up imports resolution
+    "import/resolver": {
+      "typescript": {
+        "alwaysTryTypes": true
+      }
+    }
+  }
 }

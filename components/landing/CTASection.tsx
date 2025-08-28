@@ -85,7 +85,7 @@ export default function CTASection() {
           </h2>
           
           <p className="text-xl text-blue-100 mb-8 max-w-2xl mx-auto leading-relaxed">
-            Join over 50,000 travelers who've discovered the joy of stress-free trip planning. 
+            Join over 50,000 travelers who&apos;ve discovered the joy of stress-free trip planning. 
             Your perfect itinerary is just a few clicks away.
           </p>
 
