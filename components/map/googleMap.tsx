@@ -17,11 +17,10 @@ import GoogleMapController from "./googleMapController";
 import { colors, TColor } from "@/lib/colors/colors";
 import { ActivityOverlay } from "./activityOverlay";
 import { DeckGLOverlay } from "./areaOverlay";
-import { fetchAreaActivities } from "@/actions/google/actions";
 
 export default function GoogleMapComponent() {
   const { centerCoordinates, initialZoom, setRadius, tempMarker, setCenterCoordinates } = useMapStore();
-  const { selectedActivity, setSelectedActivity, setAreaSearchActivities } = useActivitiesStore();
+  const { selectedActivity, setSelectedActivity } = useActivitiesStore();
   const { selectedTab } = useActivityTabStore();
 
   // Add Bondi Beach area GeoJSON data
@@ -100,20 +99,6 @@ export default function GoogleMapComponent() {
     }
   };
 
-  const handleAreaClick = async (properties: any) => {
-    try {
-      const feature = geoJsonData?.features.find(
-        (f: any) => f.properties?.name === properties.name && f.properties?.city === properties.city
-      );
-
-      if (feature && feature.geometry.type === "Polygon") {
-        const activities = await fetchAreaActivities(properties.name, properties.city, feature.geometry.coordinates[0]);
-        setAreaSearchActivities(activities); // Store the activities in the global store
-      }
-    } catch (error) {
-      console.error(`Error fetching activities for ${properties.name}:`, error);
-    }
-  };
 
   return (
     <div className="relative w-full h-full shadow-md">

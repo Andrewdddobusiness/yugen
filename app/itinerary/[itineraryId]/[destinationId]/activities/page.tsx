@@ -20,8 +20,7 @@ import {
   insertActivity,
   deleteItinerarySearchHistory,
 } from "@/actions/supabase/actions";
-import { fetchCityCoordinates, fetchPlaceDetails } from "@/actions/google/actions";
-import { fetchNearbyActivities } from "@/actions/google/actions";
+import { fetchPlaceDetails, fetchCityCoordinates } from "@/actions/google/actions";
 
 import { IActivity, IActivityWithLocation, useActivitiesStore } from "@/store/activityStore";
 
