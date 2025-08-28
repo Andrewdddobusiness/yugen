@@ -44,6 +44,24 @@ export const searchPlacesByText = async (
   return await cachedSearch(
     cacheKey,
     async () => {
+      const requestBody = {
+        textQuery,
+        pageSize: 20,
+        locationBias: {
+          circle: {
+            center: { latitude, longitude },
+            radius: validRadius,
+          },
+        },
+      };
+
+      console.log("Text Search API request:", { 
+        requestBody, 
+        apiKey: GOOGLE_MAPS_API_KEY ? "present" : "missing",
+        coordinates: { latitude, longitude },
+        validRadius 
+      });
+
       const response = await fetch("https://places.googleapis.com/v1/places:searchText", {
         method: "POST",
         headers: {
@@ -51,23 +69,24 @@ export const searchPlacesByText = async (
           "X-Goog-Api-Key": GOOGLE_MAPS_API_KEY!,
           "X-Goog-FieldMask": "places.id,places.displayName,places.formattedAddress,places.location,places.types,places.rating,places.priceLevel,places.photos,places.editorialSummary,places.websiteUri,places.nationalPhoneNumber",
         },
-        body: JSON.stringify({
-          textQuery,
-          pageSize: 20,
-          locationBias: {
-            circle: {
-              center: { latitude, longitude },
-              radius: validRadius,
-            },
-          },
-        }),
+        body: JSON.stringify(requestBody),
       });
 
       if (!response.ok) {
-        throw new Error(`Text search failed: ${response.status} ${response.statusText}`);
+        const errorBody = await response.text();
+        console.error("Text Search API error:", response.status, response.statusText, errorBody);
+        throw new Error(`Text search failed: ${response.status} ${response.statusText} - ${errorBody}`);
       }
 
       const data = await response.json();
+      console.log("Text Search API response:", { 
+        placesCount: data.places?.length || 0, 
+        firstPlace: data.places?.[0] ? {
+          id: data.places[0].id,
+          displayName: data.places[0].displayName,
+          location: data.places[0].location
+        } : null 
+      });
       return data.places?.map(mapGooglePlaceToActivity) || [];
     },
     5 * 60 * 1000

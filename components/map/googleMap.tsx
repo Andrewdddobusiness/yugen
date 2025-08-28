@@ -1,79 +1,25 @@
 import { APIProvider, Map, MapCameraChangedEvent } from "@vis.gl/react-google-maps";
 import { motion, AnimatePresence } from "framer-motion";
 import { useState, useEffect } from "react";
-import { GeoJSON } from "geojson";
 
 import { useMapStore } from "@/store/mapStore";
 import { useActivitiesStore } from "@/store/activityStore";
 import { useActivityTabStore } from "@/store/activityTabStore";
 
 import { getRadiusForZoom } from "./zoomRadiusMap";
-import GoogleMarkers from "./googleMarkers";
-import GoogleMarker from "./googleMarker";
+import GoogleMarkers from "./GoogleMarkers";
+import GoogleMarker from "./GoogleMarker";
 import SearchField from "../search/SearchField";
-import Circle from "./circle";
-import GoogleMapController from "./googleMapController";
+import Circle from "./Circle";
+import GoogleMapController from "./GoogleMapController";
 
 import { colors, TColor } from "@/lib/colors/colors";
-import { ActivityOverlay } from "./activityOverlay";
-import { DeckGLOverlay } from "./areaOverlay";
+import { ActivityOverlay } from "./ActivityOverlay";
 
 export default function GoogleMapComponent() {
-  const { centerCoordinates, initialZoom, setRadius, tempMarker, setCenterCoordinates } = useMapStore();
-  const { selectedActivity, setSelectedActivity } = useActivitiesStore();
+  const { centerCoordinates, initialZoom, setRadius, tempMarker, setCenterCoordinates, mapRadius } = useMapStore();
+  const { selectedActivity, setSelectedActivity, isActivitiesLoading } = useActivitiesStore();
   const { selectedTab } = useActivityTabStore();
-
-  // Add Bondi Beach area GeoJSON data
-  const sydneySuburbGeoJson: GeoJSON.FeatureCollection = {
-    type: "FeatureCollection",
-    features: [
-      {
-        type: "Feature",
-        properties: {
-          name: "Bondi Beach",
-          city: "Sydney",
-        },
-        geometry: {
-          type: "Polygon",
-          coordinates: [
-            [
-              [151.2744, -33.8915], // Bondi Beach coordinates
-              [151.2845, -33.8915],
-              [151.2845, -33.8965],
-              [151.2744, -33.8965],
-              [151.2744, -33.8915],
-            ],
-          ],
-        },
-      },
-      {
-        type: "Feature",
-        properties: {
-          name: "Surry Hills",
-          city: "Sydney",
-        },
-        geometry: {
-          type: "Polygon",
-          coordinates: [
-            [
-              [151.207, -33.8845],
-              [151.217, -33.8845],
-              [151.217, -33.89],
-              [151.207, -33.89],
-              [151.207, -33.8845],
-            ],
-          ],
-        },
-      },
-    ],
-  };
-
-  const [geoJsonData, setGeoJsonData] = useState<GeoJSON.FeatureCollection | null>(null);
-
-  // Set the GeoJSON data when component mounts
-  useEffect(() => {
-    setGeoJsonData(sydneySuburbGeoJson);
-  }, []);
 
   const center = centerCoordinates
     ? { lat: centerCoordinates[0], lng: centerCoordinates[1] }
@@ -137,10 +83,7 @@ export default function GoogleMapComponent() {
               size="lg"
             />
           )}
-          {/* DeckGLOverlay temporarily disabled - was causing blue squares on map */}
-          {/* {selectedTab === "area-search" && geoJsonData && (
-            <DeckGLOverlay data={geoJsonData} onAreaClick={handleAreaClick} />
-          )} */}
+          
         </Map>
       </APIProvider>
 

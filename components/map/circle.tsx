@@ -4,9 +4,22 @@ import { useMap } from "@vis.gl/react-google-maps";
 interface CircleProps {
   center: { lat: number; lng: number };
   radius: number;
+  fillColor?: string;
+  fillOpacity?: number;
+  strokeColor?: string;
+  strokeOpacity?: number;
+  strokeWeight?: number;
 }
 
-export default function Circle({ center, radius }: CircleProps) {
+export default function Circle({ 
+  center, 
+  radius, 
+  fillColor = "#3B82F6", // Default blue
+  fillOpacity = 0.1,
+  strokeColor = "#3B82F6", // Default blue
+  strokeOpacity = 0.8,
+  strokeWeight = 2
+}: CircleProps) {
   const map = useMap();
   const circleRef = useRef<google.maps.Circle | null>(null);
 
@@ -19,17 +32,22 @@ export default function Circle({ center, radius }: CircleProps) {
         map,
         center,
         radius,
-        fillColor: "#FF0000", //red
-        fillOpacity: 0.15,
-        strokeColor: "#FF0000",
-        strokeOpacity: 0.7,
-        strokeWeight: 2,
+        fillColor,
+        fillOpacity,
+        strokeColor,
+        strokeOpacity,
+        strokeWeight,
       });
     } else {
       // Update existing circle
       circleRef.current.setOptions({
         center,
         radius,
+        fillColor,
+        fillOpacity,
+        strokeColor,
+        strokeOpacity,
+        strokeWeight,
       });
     }
 
@@ -39,7 +57,7 @@ export default function Circle({ center, radius }: CircleProps) {
         circleRef.current = null;
       }
     };
-  }, [map, center, radius]);
+  }, [map, center, radius, fillColor, fillOpacity, strokeColor, strokeOpacity, strokeWeight]);
 
   return null;
 }

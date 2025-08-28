@@ -81,6 +81,7 @@ export default function LegacyActivityCard({
       onRemoveFromItinerary={isAdded ? handleRemoveFromItinerary : undefined}
       onOptionsClick={onOptionsClick}
       isLoading={loading}
+      showActions={true}
       showSaveButton={true}
       className="h-[365px]"
     />

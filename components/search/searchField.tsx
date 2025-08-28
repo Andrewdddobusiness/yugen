@@ -4,7 +4,7 @@ import { useParams } from "next/navigation";
 import { Utensils, ShoppingCart, Landmark, Loader2, X, Search, MapPin } from "lucide-react";
 
 import { addSearchHistoryItem } from "@/actions/supabase/actions";
-import { fetchNearbyActivities, getGoogleMapsAutocomplete } from "@/actions/google/actions";
+import { fetchNearbyActivities, getGoogleMapsAutocomplete, searchPlacesByText } from "@/actions/google/actions";
 import { useDebounce } from "@/components/hooks/use-debounce";
 
 import { Input } from "../ui/input";
@@ -37,76 +37,85 @@ export default function SearchField() {
   const [searchTypeArea, setSearchTypeArea] = useState(false);
   const [isAutocompleteLoading, setIsAutocompleteLoading] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
-  
+
   const abortControllerRef = useRef<AbortController | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  
+
   // Debounce the search query to reduce API calls
   const debouncedQuery = useDebounce(selectedSearchQuery, 300);
 
-  const searchTypes = useMemo(() => [
-    { id: "food", label: "Restaurants & Cafes", icon: <Utensils size={16} /> },
-    { id: "shopping", label: "Shopping Places", icon: <ShoppingCart size={16} /> },
-    { id: "historical", label: "Historical Sites", icon: <Landmark size={16} /> },
-  ], []);
+  const searchTypes = useMemo(
+    () => [
+      { id: "food", label: "Restaurants & Cafes", icon: <Utensils size={16} /> },
+      { id: "shopping", label: "Shopping Places", icon: <ShoppingCart size={16} /> },
+      { id: "historical", label: "Historical Sites", icon: <Landmark size={16} /> },
+    ],
+    []
+  );
 
   // **** HANDLERS ****
-  const handleSearchChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
-    setSelectedSearchQuery(value);
-    setSearchError(null);
+  const handleSearchChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const value = e.target.value;
+      setSelectedSearchQuery(value);
+      setSearchError(null);
 
-    if (!value || value.length === 0) {
-      setSearchTypeArea(false);
-      setAutocompleteResults([]);
-      setIsVisible(false);
-      return;
-    }
-    
-    setIsVisible(true);
-  }, [setSelectedSearchQuery]);
-  
-  // Cached autocomplete search function
-  const performAutocompleteSearch = useCallback(async (query: string) => {
-    if (!query || query.length < 2) {
-      setAutocompleteResults([]);
-      return;
-    }
-    
-    // Cancel previous request
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-    }
-    abortControllerRef.current = new AbortController();
-    
-    setIsAutocompleteLoading(true);
-    setSearchError(null);
-    
-    try {
-      // Caching is now handled inside getGoogleMapsAutocomplete
-      const results = await getGoogleMapsAutocomplete(
-        query,
-        itineraryCoordinates?.[0],
-        itineraryCoordinates?.[1],
-        3000
-      );
-      
-      if (!abortControllerRef.current?.signal.aborted) {
-        setAutocompleteResults(results || []);
-      }
-    } catch (error: any) {
-      if (error.name !== 'AbortError') {
-        console.error('Autocomplete search error:', error);
-        setSearchError('Search failed. Please try again.');
+      if (!value || value.length === 0) {
+        setSearchTypeArea(false);
         setAutocompleteResults([]);
+        setIsVisible(false);
+        return;
       }
-    } finally {
-      if (!abortControllerRef.current?.signal.aborted) {
-        setIsAutocompleteLoading(false);
+
+      setIsVisible(true);
+    },
+    [setSelectedSearchQuery]
+  );
+
+  // Cached autocomplete search function
+  const performAutocompleteSearch = useCallback(
+    async (query: string) => {
+      if (!query || query.length < 2) {
+        setAutocompleteResults([]);
+        return;
       }
-    }
-  }, [itineraryCoordinates]);
-  
+
+      // Cancel previous request
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+      abortControllerRef.current = new AbortController();
+
+      setIsAutocompleteLoading(true);
+      setSearchError(null);
+
+      try {
+        // Caching is now handled inside getGoogleMapsAutocomplete
+        const results = await getGoogleMapsAutocomplete(
+          query,
+          itineraryCoordinates?.[0],
+          itineraryCoordinates?.[1],
+          3000
+        );
+
+        if (!abortControllerRef.current?.signal.aborted) {
+          setAutocompleteResults(results || []);
+        }
+      } catch (error: any) {
+        if (error.name !== "AbortError") {
+          console.error("Autocomplete search error:", error);
+          setSearchError("Search failed. Please try again.");
+          setAutocompleteResults([]);
+        }
+      } finally {
+        if (!abortControllerRef.current?.signal.aborted) {
+          setIsAutocompleteLoading(false);
+        }
+      }
+    },
+    [itineraryCoordinates]
+  );
+
   // Effect to trigger autocomplete search when debounced query changes
   useEffect(() => {
     if (debouncedQuery && debouncedQuery.length >= 2) {
@@ -127,22 +136,25 @@ export default function SearchField() {
     },
   });
 
-  const handleAutocompleteSelect = useCallback(async (item: ISearchHistoryItem) => {
-    try {
-      setSelectedSearchQuery(item.mainText);
-      setIsVisible(false);
-      setIsExactSearch(true);
-      addToHistory(item);
-      setSelectedTab("history");
+  const handleAutocompleteSelect = useCallback(
+    async (item: ISearchHistoryItem) => {
+      try {
+        setSelectedSearchQuery(item.mainText);
+        setIsVisible(false);
+        setIsExactSearch(true);
+        addToHistory(item);
+        setSelectedTab("history");
 
-      if (item.placeId) {
-        await addSearchHistoryMutation.mutateAsync(item);
+        if (item.placeId) {
+          await addSearchHistoryMutation.mutateAsync(item);
+        }
+      } catch (error) {
+        console.error("Error adding search history item:", error);
+        setSearchError("Failed to save search history.");
       }
-    } catch (error) {
-      console.error("Error adding search history item:", error);
-      setSearchError("Failed to save search history.");
-    }
-  }, [setSelectedSearchQuery, addToHistory, setSelectedTab, addSearchHistoryMutation]);
+    },
+    [setSelectedSearchQuery, addToHistory, setSelectedTab, addSearchHistoryMutation]
+  );
 
   const handleInputFocus = useCallback(() => {
     setIsVisible(true);
@@ -157,210 +169,224 @@ export default function SearchField() {
     }, 150); // Slightly longer delay to allow clicks
   }, []);
 
-  const handleTextSearch = useCallback(async (query: string) => {
-    if (!centerCoordinates || !query.trim()) return;
+  const handleTextSearch = useCallback(
+    async (query: string) => {
+      if (!centerCoordinates || !query.trim()) return;
 
-    // Cancel previous request
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-    }
-    abortControllerRef.current = new AbortController();
-
-    setIsActivitiesLoading(true);
-    setIsVisible(false);
-    setIsExactSearch(false);
-    setSearchTypeArea(true);
-    setSearchError(null);
-    setSelectedSearchQuery(query);
-
-    try {
-      const keyword = query.toLowerCase().trim();
-      
-      // Determine the best search type based on keyword
-      let searchType: SearchType = "all";
-      if (keyword.includes('restaurant') || keyword.includes('food') || keyword.includes('eat') || 
-          keyword.includes('japanese') || keyword.includes('italian') || keyword.includes('chinese') ||
-          keyword.includes('korean') || keyword.includes('thai') || keyword.includes('indian') ||
-          keyword.includes('pizza') || keyword.includes('burger') || keyword.includes('sushi') ||
-          keyword.includes('ramen') || keyword.includes('noodle') || keyword.includes('cuisine') ||
-          keyword.includes('cafe') || keyword.includes('coffee') || keyword.includes('bar') ||
-          keyword.includes('bakery') || keyword.includes('bistro') || keyword.includes('grill')) {
-        searchType = "food";
+      // Cancel previous request
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
       }
+      abortControllerRef.current = new AbortController();
 
-      console.log("Text search params:", {
-        query,
-        keyword,
-        searchType,
-        coordinates: centerCoordinates,
-        radius: mapRadius
-      });
-      
-      // Get nearby activities of the relevant type using the same radius as "Search This Area"
-      const allActivities = await fetchNearbyActivities(
-        centerCoordinates[0], 
-        centerCoordinates[1], 
-        mapRadius, 
-        searchType
-      );
+      setIsActivitiesLoading(true);
+      setIsVisible(false);
+      setIsExactSearch(false);
+      setSearchTypeArea(true);
+      setSearchError(null);
+      setSelectedSearchQuery(query);
 
-      console.log("Fetched activities:", allActivities.length);
+      try {
+        let activities: any[] = [];
 
-      // Function to normalize text for flexible matching
-      const normalizeText = (text: string): string => {
-        return text
-          .toLowerCase()
-          .replace(/['''`]/g, '') // Remove apostrophes and quotes
-          .replace(/[^\w\s]/g, ' ') // Replace punctuation with spaces
-          .replace(/\s+/g, ' ') // Collapse multiple spaces
-          .trim();
-      };
+        try {
+          // Try proper Text Search API first
+          activities = await searchPlacesByText(
+            query,
+            centerCoordinates[0], // latitude
+            centerCoordinates[1], // longitude
+            mapRadius
+          );
+          console.log("Text search successful:", activities.length, "results");
+        } catch (textSearchError: any) {
+          console.warn("Text Search API failed, falling back to nearby search with filtering:", textSearchError);
+          
+          // Fallback to nearby search with client-side filtering
+          const keyword = query.toLowerCase().trim();
+          
+          // Determine the best search type based on keyword
+          let searchType: SearchType = "all";
+          if (
+            keyword.includes("restaurant") ||
+            keyword.includes("food") ||
+            keyword.includes("eat") ||
+            keyword.includes("japanese") ||
+            keyword.includes("italian") ||
+            keyword.includes("chinese") ||
+            keyword.includes("korean") ||
+            keyword.includes("thai") ||
+            keyword.includes("indian") ||
+            keyword.includes("pizza") ||
+            keyword.includes("burger") ||
+            keyword.includes("sushi") ||
+            keyword.includes("ramen") ||
+            keyword.includes("noodle") ||
+            keyword.includes("cuisine") ||
+            keyword.includes("cafe") ||
+            keyword.includes("coffee") ||
+            keyword.includes("bar") ||
+            keyword.includes("bakery") ||
+            keyword.includes("bistro") ||
+            keyword.includes("grill")
+          ) {
+            searchType = "food";
+          }
 
-      const normalizedKeyword = normalizeText(keyword);
+          // Get nearby activities of the relevant type
+          const allActivities = await fetchNearbyActivities(
+            centerCoordinates[0],
+            centerCoordinates[1],
+            mapRadius,
+            searchType
+          );
 
-      // Improved keyword matching with better scoring
-      const scoredActivities = allActivities.map((activity: any) => {
-        const name = activity.name?.toLowerCase() || '';
-        const normalizedName = normalizeText(activity.name || '');
-        const description = activity.description?.toLowerCase() || '';
-        const normalizedDescription = normalizeText(activity.description || '');
-        const types = Array.isArray(activity.types) ? activity.types.join(' ').toLowerCase() : '';
-        const address = activity.address?.toLowerCase() || '';
-        
-        let score = 0;
-        
-        // Exact name match gets highest score
-        if (name.includes(keyword)) score += 10;
-        
-        // Flexible normalized matching for names (handles punctuation)
-        if (normalizedName.includes(normalizedKeyword)) score += 12;
-        
-        // Word-based matching (split by spaces and check if all words match)
-        const keywordWords = normalizedKeyword.split(' ').filter(w => w.length > 0);
-        const nameWords = normalizedName.split(' ').filter(w => w.length > 0);
-        
-        const wordsMatched = keywordWords.filter(kw => 
-          nameWords.some(nw => nw.includes(kw) || kw.includes(nw))
-        );
-        
-        if (wordsMatched.length === keywordWords.length && keywordWords.length > 0) {
-          score += 8; // All keyword words found in name
-        } else if (wordsMatched.length > 0) {
-          score += 4 * wordsMatched.length; // Partial word matches
+          // Filter activities by keyword
+          const normalizeText = (text: string): string => {
+            return text
+              .toLowerCase()
+              .replace(/['''`]/g, "") // Remove apostrophes and quotes
+              .replace(/[^\w\s]/g, " ") // Replace punctuation with spaces
+              .replace(/\s+/g, " ") // Collapse multiple spaces
+              .trim();
+          };
+
+          const normalizedKeyword = normalizeText(keyword);
+          
+          activities = allActivities
+            .map((activity: any) => {
+              const name = activity.name?.toLowerCase() || "";
+              const normalizedName = normalizeText(activity.name || "");
+              const description = activity.description?.toLowerCase() || "";
+              const normalizedDescription = normalizeText(activity.description || "");
+              const types = Array.isArray(activity.types) ? activity.types.join(" ").toLowerCase() : "";
+
+              let score = 0;
+
+              // Exact name match gets highest score
+              if (name.includes(keyword)) score += 10;
+
+              // Flexible normalized matching for names (handles punctuation)
+              if (normalizedName.includes(normalizedKeyword)) score += 12;
+
+              // Word-based matching
+              const keywordWords = normalizedKeyword.split(" ").filter((w) => w.length > 0);
+              const nameWords = normalizedName.split(" ").filter((w) => w.length > 0);
+
+              const wordsMatched = keywordWords.filter((kw) =>
+                nameWords.some((nw) => nw.includes(kw) || kw.includes(nw))
+              );
+
+              if (wordsMatched.length === keywordWords.length && keywordWords.length > 0) {
+                score += 8;
+              } else if (wordsMatched.length > 0) {
+                score += 4 * wordsMatched.length;
+              }
+
+              // Type and description matching
+              if (types.includes(keyword)) score += 8;
+              if (description.includes(keyword)) score += 5;
+              if (normalizedDescription.includes(normalizedKeyword)) score += 6;
+
+              return { ...activity, score };
+            })
+            .filter((activity) => activity.score > 0)
+            .sort((a, b) => b.score - a.score);
         }
-        
-        // Type-specific matching for cuisine keywords
-        if (keyword.includes('japanese')) {
-          if (types.includes('japanese_restaurant') || types.includes('sushi_restaurant')) score += 15;
-          if (name.includes('sushi') || name.includes('ramen') || name.includes('japanese')) score += 8;
-          if (name.includes('yakitori') || name.includes('izakaya') || name.includes('udon')) score += 6;
-        } else if (keyword.includes('italian')) {
-          if (types.includes('italian_restaurant')) score += 15;
-          if (name.includes('pizza') || name.includes('pasta') || name.includes('italian')) score += 8;
-        } else if (keyword.includes('chinese')) {
-          if (types.includes('chinese_restaurant')) score += 15;
-          if (name.includes('chinese') || name.includes('dim sum') || name.includes('noodle')) score += 8;
-        } else if (keyword.includes('coffee') || keyword.includes('cafe')) {
-          if (types.includes('cafe') || types.includes('coffee_shop')) score += 15;
-          if (name.includes('coffee') || name.includes('cafe') || name.includes('espresso')) score += 8;
-        } else if (keyword.includes('bar')) {
-          if (types.includes('bar')) score += 15;
-          if (name.includes('bar') || name.includes('pub') || name.includes('brewery')) score += 8;
-        } else {
-          // Generic keyword matching
-          if (types.includes(keyword)) score += 8;
-          if (description.includes(keyword)) score += 5;
-          if (normalizedDescription.includes(normalizedKeyword)) score += 6;
-          if (address.includes(keyword)) score += 2;
+
+        if (!abortControllerRef.current?.signal.aborted) {
+          setAreaSearchActivities(activities);
+          setSelectedTab("area-search");
+          // Reset search type area after successful search
+          setTimeout(() => {
+            setSearchTypeArea(false);
+          }, 500);
         }
-        
-        return { ...activity, score };
-      }).filter(activity => activity.score > 0)
-        .sort((a, b) => b.score - a.score); // Sort by score descending
-
-      console.log("Scored activities:", {
-        totalFetched: allActivities.length,
-        afterFiltering: scoredActivities.length,
-        topScores: scoredActivities.slice(0, 3).map(a => ({ name: a.name, score: a.score }))
-      });
-
-      if (!abortControllerRef.current?.signal.aborted) {
-        setAreaSearchActivities(scoredActivities);
-        setSelectedTab("area-search");
-        // Reset search type area after successful search
-        setTimeout(() => {
-          setSearchTypeArea(false);
-        }, 500);
+      } catch (error: any) {
+        if (error.name !== "AbortError") {
+          console.error("Error searching for text:", error);
+          setSearchError(`Failed to search for "${query}". Please try again.`);
+        }
+      } finally {
+        if (!abortControllerRef.current?.signal.aborted) {
+          setIsActivitiesLoading(false);
+          // Reset search type area to allow button to reappear on map movement
+          setTimeout(() => {
+            setSearchTypeArea(false);
+          }, 1000);
+        }
       }
-    } catch (error: any) {
-      if (error.name !== 'AbortError') {
-        console.error("Error searching for text:", error);
-        setSearchError(`Failed to search for "${query}". Please try again.`);
-      }
-    } finally {
-      if (!abortControllerRef.current?.signal.aborted) {
-        setIsActivitiesLoading(false);
-        // Reset search type area to allow button to reappear on map movement
-        setTimeout(() => {
-          setSearchTypeArea(false);
-        }, 1000);
-      }
-    }
-  }, [centerCoordinates, mapRadius, setSelectedSearchQuery, setAreaSearchActivities, setSelectedTab, setIsActivitiesLoading]);
+    },
+    [
+      centerCoordinates,
+      mapRadius,
+      setSelectedSearchQuery,
+      setAreaSearchActivities,
+      setSelectedTab,
+      setIsActivitiesLoading,
+    ]
+  );
 
-  const handleSearchTypeSelect = useCallback(async (type: SearchType = selectedType) => {
-    if (!centerCoordinates) return;
+  const handleSearchTypeSelect = useCallback(
+    async (type: SearchType = selectedType) => {
+      if (!centerCoordinates) return;
 
-    // Cancel previous request
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-    }
-    abortControllerRef.current = new AbortController();
-
-    setIsActivitiesLoading(true);
-    setIsVisible(false);
-    setIsExactSearch(false);
-    setSearchTypeArea(true);
-    setSearchError(null);
-
-    const selectedTypeInfo = searchTypes.find((t) => t.id === type);
-    if (selectedTypeInfo) {
-      setSelectedSearchQuery(selectedTypeInfo.label);
-      setSelectedType(type);
-    }
-
-    try {
-      // Caching is now handled inside fetchNearbyActivities
-      const activities = await fetchNearbyActivities(
-        centerCoordinates[0], 
-        centerCoordinates[1], 
-        mapRadius, 
-        type
-      );
-      
-      if (!abortControllerRef.current?.signal.aborted) {
-        setAreaSearchActivities(activities);
-        setSelectedTab("area-search");
-        // Reset search type area after successful search
-        setTimeout(() => {
-          setSearchTypeArea(false);
-        }, 500);
+      // Cancel previous request
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
       }
-    } catch (error: any) {
-      if (error.name !== 'AbortError') {
-        console.error("Error generating activities:", error);
-        setSearchError("Failed to search for activities. Please try again.");
+      abortControllerRef.current = new AbortController();
+
+      setIsActivitiesLoading(true);
+      setIsVisible(false);
+      setIsExactSearch(false);
+      setSearchTypeArea(true);
+      setSearchError(null);
+
+      const selectedTypeInfo = searchTypes.find((t) => t.id === type);
+      if (selectedTypeInfo) {
+        setSelectedSearchQuery(selectedTypeInfo.label);
+        setSelectedType(type);
       }
-    } finally {
-      if (!abortControllerRef.current?.signal.aborted) {
-        setIsActivitiesLoading(false);
-        // Reset search type area to allow button to reappear on map movement
-        setTimeout(() => {
-          setSearchTypeArea(false);
-        }, 1000);
+
+      try {
+        // Caching is now handled inside fetchNearbyActivities
+        const activities = await fetchNearbyActivities(centerCoordinates[0], centerCoordinates[1], mapRadius, type);
+
+        if (!abortControllerRef.current?.signal.aborted) {
+          setAreaSearchActivities(activities);
+          setSelectedTab("area-search");
+          // Reset search type area after successful search
+          setTimeout(() => {
+            setSearchTypeArea(false);
+          }, 500);
+        }
+      } catch (error: any) {
+        if (error.name !== "AbortError") {
+          console.error("Error generating activities:", error);
+          setSearchError("Failed to search for activities. Please try again.");
+        }
+      } finally {
+        if (!abortControllerRef.current?.signal.aborted) {
+          setIsActivitiesLoading(false);
+          // Reset search type area to allow button to reappear on map movement
+          setTimeout(() => {
+            setSearchTypeArea(false);
+          }, 1000);
+        }
       }
-    }
-  }, [centerCoordinates, mapRadius, selectedType, searchTypes, setSelectedSearchQuery, setSelectedType, setAreaSearchActivities, setSelectedTab, setIsActivitiesLoading]);
+    },
+    [
+      centerCoordinates,
+      mapRadius,
+      selectedType,
+      searchTypes,
+      setSelectedSearchQuery,
+      setSelectedType,
+      setAreaSearchActivities,
+      setSelectedTab,
+      setIsActivitiesLoading,
+    ]
+  );
 
   // Optimized map change effect with proper cleanup
   useEffect(() => {
@@ -420,9 +446,7 @@ export default function SearchField() {
           />
           {/* Right side controls */}
           <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-2">
-            {isAutocompleteLoading && (
-              <Loader2 className="h-4 w-4 animate-spin text-blue-500" />
-            )}
+            {isAutocompleteLoading && <Loader2 className="h-4 w-4 animate-spin text-blue-500" />}
             {selectedSearchQuery && (
               <button
                 onClick={handleClearSearch}
@@ -446,7 +470,7 @@ export default function SearchField() {
         )}
 
         {/* Autocomplete results */}
-        {isVisible && ((autocompleteResults.length > 0 || debouncedQuery.length >= 2) || isAutocompleteLoading) && (
+        {isVisible && (autocompleteResults.length > 0 || debouncedQuery.length >= 2 || isAutocompleteLoading) && (
           <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-gray-200 rounded-xl shadow-xl z-30 max-h-64 overflow-y-auto">
             {isAutocompleteLoading && autocompleteResults.length === 0 ? (
               <div className="flex items-center justify-center py-6">
@@ -474,7 +498,7 @@ export default function SearchField() {
                     </div>
                   </button>
                 )}
-                
+
                 {/* Place autocomplete results */}
                 {autocompleteResults.map((result, index) => (
                   <button
@@ -491,7 +515,7 @@ export default function SearchField() {
                     </div>
                   </button>
                 ))}
-                
+
                 {/* No results message */}
                 {!isAutocompleteLoading && autocompleteResults.length === 0 && debouncedQuery.length >= 2 && (
                   <div className="px-4 py-3 text-sm text-gray-500 text-center">
@@ -514,14 +538,12 @@ export default function SearchField() {
             onClick={() => handleSearchTypeSelect(type.id as SearchType)}
             disabled={isActivitiesLoading}
             className={`flex items-center gap-2 text-xs font-medium px-3 py-2 rounded-lg whitespace-nowrap transition-all ${
-              selectedType === type.id 
-                ? "bg-blue-500 hover:bg-blue-600 text-white shadow-md" 
+              selectedType === type.id
+                ? "bg-blue-500 hover:bg-blue-600 text-white shadow-md"
                 : "bg-white hover:bg-gray-50 text-gray-700 border-gray-200 hover:border-gray-300"
             }`}
           >
-            <div className={`${selectedType === type.id ? "text-white" : "text-gray-500"}`}>
-              {type.icon}
-            </div>
+            <div className={`${selectedType === type.id ? "text-white" : "text-gray-500"}`}>{type.icon}</div>
             <span className="hidden sm:inline">{type.label}</span>
           </Button>
         ))}
