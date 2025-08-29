@@ -1,8 +1,8 @@
 "use client";
 import React, { useEffect, useState, useRef, lazy, Suspense } from "react";
 import { useQuery } from "@tanstack/react-query";
-import DragDropCalendar from "@/components/calendar/Calendar";
-import { GoogleCalendarView } from "@/components/calendar/GoogleCalendarView";
+import DragDropCalendar from "@/components/view/calendar/Calendar";
+import { GoogleCalendarView } from "@/components/view/calendar/GoogleCalendarView";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useItineraryActivityStore } from "@/store/itineraryActivityStore";
 import { useItineraryLayoutStore } from "@/store/itineraryLayoutStore";
@@ -17,9 +17,9 @@ const ItineraryMap = lazy(() => import("@/components/map/ItineraryMap").then(mod
 import { Button } from "@/components/ui/button";
 import { Calendar, Table, List, Map, X } from "lucide-react";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable';
-import { ViewToggle } from "@/components/view-toggle/ViewToggle";
-import { ViewTransition, ViewLoadingState } from "@/components/view-toggle/ViewTransition";
-import { ViewRecommendationCard } from "@/components/view-toggle/ViewRecommendationCard";
+import { ViewToggle } from "@/components/view/toggle/ViewToggle";
+import { ViewTransition, ViewLoadingState } from "@/components/view/toggle/ViewTransition";
+import { ViewRecommendationCard } from "@/components/view/toggle/ViewRecommendationCard";
 import { useViewRouter } from "@/hooks/useViewRouter";
 import { useViewStatePreservation } from "@/hooks/useViewStatePreservation";
 import { getDestination } from "@/actions/supabase/destinations";

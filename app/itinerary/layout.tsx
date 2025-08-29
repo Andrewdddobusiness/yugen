@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { usePathname } from "next/navigation";
 
 import { SidebarProvider, SidebarTrigger, SidebarInset } from "@/components/ui/sidebar";
-import { AppSidebarItineraryActivityLeft } from "@/components/sidebar/appSidebar/AppSidebarItineraryActivityLeft2";
+import { AppSidebarItineraryActivityLeft2 as AppSidebarItineraryActivityLeft } from "@/components/layout/sidebar/app/AppSidebarItineraryActivityLeft2";
 import { Separator } from "@/components/ui/separator";
 import {
   Breadcrumb,
@@ -33,7 +33,7 @@ import { IItineraryActivity, useItineraryActivityStore } from "@/store/itinerary
 import { useParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Download, Share, Users } from "lucide-react";
-import { ExportDialog } from "@/components/share/ExportDialog";
+import { ShareExportDialog as ExportDialog } from "@/components/dialog/export/ShareExportDialog";
 import Loading from "@/components/loading/Loading";
 
 export default function Layout({ children }: { children: React.ReactNode }) {

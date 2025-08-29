@@ -7,12 +7,12 @@ import { Separator } from "@/components/ui/separator";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
-import ActivityCards from "@/components/cards/ActivityCards";
+import ActivityCards from "@/components/card/activity/ActivityCards";
 
 import Loading from "@/components/loading/Loading";
 import ActivityTypeFilters from "@/components/filters/ActivityTypeFilters";
 import ActivityCostFilters from "@/components/filters/ActivityCostFilters";
-import ActivitySkeletonCards from "@/components/cards/ActivitySkeletonCards";
+import ActivitySkeletonCards from "@/components/card/activity/ActivitySkeletonCards";
 
 import {
   fetchItineraryDestination,
@@ -35,11 +35,11 @@ import { activityTypeFilters, activityCostFilters } from "@/utils/filters/filter
 import { InfoWindow } from "@vis.gl/react-google-maps";
 // Lazy load heavy Google Maps component
 const GoogleMapComponent = lazy(() => import("@/components/map/GoogleMap"));
-import ClearHistoryButton from "@/components/buttons/ClearHistoryButton";
+import ClearHistoryButton from "@/components/button/map/ClearHistoryButton";
 import ActivityOrderFilters from "@/components/filters/ActivityOrderFilters";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EarthIcon } from "lucide-react";
-import { ViewToggleButton } from "@/components/buttons/MapViewToggleButton";
+import { ViewToggleButton } from "@/components/button/map/MapViewToggleButton";
 import { cn } from "@/components/lib/utils";
 
 import { useSidebar } from "@/components/ui/sidebar";

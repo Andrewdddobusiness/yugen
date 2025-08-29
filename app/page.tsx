@@ -1,6 +1,6 @@
 "use client";
 
-import HomeLayout from "@/components/layouts/homeLayout";
+import HomeLayout from "@/components/layout/HomeLayout";
 import HeroSection from "@/components/landing/HeroSection";
 import FeatureShowcase from "@/components/landing/FeatureShowcase";
 import TestimonialsSection from "@/components/landing/TestimonialsSection";
