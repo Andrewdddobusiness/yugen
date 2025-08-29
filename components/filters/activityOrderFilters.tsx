@@ -5,7 +5,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { ArrowUpDown, Check, ChevronsUpDown, X, Star, DollarSign, MapPin, TrendingUp } from "lucide-react";
 import { cn } from "@/components/lib/utils";
 import { ArrowDownAZ, ArrowUpAZ } from "lucide-react";
-import { IActivityWithLocation } from "@/store/activityStore";
+import { IActivityWithLocation, useActivitiesStore } from "@/store/activityStore";
 
 interface ActivityOrderFiltersProps {
   activities: IActivityWithLocation[];
@@ -14,16 +14,8 @@ interface ActivityOrderFiltersProps {
 
 const ActivityOrderFilters: React.FC<ActivityOrderFiltersProps> = ({ activities, setActivities }) => {
   const [open, setOpen] = React.useState(false);
-  const [selectedOrder, setSelectedOrder] = React.useState<string>("");
-  const originalOrderRef = useRef<IActivityWithLocation[]>([]);
+  const { sortOrder, setSortOrder } = useActivitiesStore();
 
-  // Store original order on first render or when activities change
-  React.useEffect(() => {
-    if (originalOrderRef.current.length === 0 || 
-        originalOrderRef.current.length !== activities.length) {
-      originalOrderRef.current = [...activities];
-    }
-  }, [activities]);
 
   const orders = [
     { name: "A to Z", icon: <ArrowDownAZ size={16} />, description: "Name ascending" },
@@ -35,90 +27,20 @@ const ActivityOrderFilters: React.FC<ActivityOrderFiltersProps> = ({ activities,
     { name: "Relevance", icon: <TrendingUp size={16} />, description: "Most relevant first" },
   ];
 
-  const getPriceLevel = (priceLevel: string | undefined): number => {
-    if (!priceLevel) return 0;
-    // Handle both numeric strings and text formats
-    if (priceLevel === "PRICE_LEVEL_INEXPENSIVE" || priceLevel === "1") return 1;
-    if (priceLevel === "PRICE_LEVEL_MODERATE" || priceLevel === "2") return 2;
-    if (priceLevel === "PRICE_LEVEL_EXPENSIVE" || priceLevel === "3") return 3;
-    if (priceLevel === "PRICE_LEVEL_VERY_EXPENSIVE" || priceLevel === "4") return 4;
-    return parseInt(priceLevel) || 0;
-  };
-
   const handleOrderSelect = (order: string) => {
-    if (selectedOrder === order) {
-      // Toggle off - restore original order
-      setSelectedOrder("");
-      setActivities([...originalOrderRef.current]);
+    if (sortOrder === order) {
+      // Toggle off - clear sorting
+      setSortOrder("");
       return;
     }
-
-    setSelectedOrder(order);
-    const sortedActivities = [...activities].sort((a, b) => {
-      switch (order) {
-        case "A to Z":
-          return a.name.localeCompare(b.name);
-        
-        case "Z to A":
-          return b.name.localeCompare(a.name);
-        
-        case "Rating High to Low":
-          const ratingA = a.rating || 0;
-          const ratingB = b.rating || 0;
-          if (ratingA === ratingB) {
-            // Secondary sort by name if ratings are equal
-            return a.name.localeCompare(b.name);
-          }
-          return ratingB - ratingA;
-        
-        case "Rating Low to High":
-          const ratingA2 = a.rating || 0;
-          const ratingB2 = b.rating || 0;
-          if (ratingA2 === ratingB2) {
-            return a.name.localeCompare(b.name);
-          }
-          return ratingA2 - ratingB2;
-        
-        case "Price Low to High":
-          const priceA = getPriceLevel(a.price_level);
-          const priceB = getPriceLevel(b.price_level);
-          if (priceA === priceB) {
-            return a.name.localeCompare(b.name);
-          }
-          return priceA - priceB;
-        
-        case "Price High to Low":
-          const priceA2 = getPriceLevel(a.price_level);
-          const priceB2 = getPriceLevel(b.price_level);
-          if (priceA2 === priceB2) {
-            return a.name.localeCompare(b.name);
-          }
-          return priceB2 - priceA2;
-        
-        case "Relevance":
-          // Sort by rating first, then by name as a tiebreaker
-          const relevanceA = (a.rating || 0) * 10 + (a.name.length < 30 ? 5 : 0);
-          const relevanceB = (b.rating || 0) * 10 + (b.name.length < 30 ? 5 : 0);
-          if (relevanceA === relevanceB) {
-            return a.name.localeCompare(b.name);
-          }
-          return relevanceB - relevanceA;
-        
-        default:
-          return 0;
-      }
-    });
-    
-    setActivities(sortedActivities);
+    setSortOrder(order);
   };
 
   const handleClearOrder = (e: React.MouseEvent) => {
     e.stopPropagation();
-    setSelectedOrder("");
-    setActivities([...originalOrderRef.current]);
+    setSortOrder("");
   };
 
-  const selectedOrderInfo = orders.find(order => order.name === selectedOrder);
 
   return (
     <div className="flex flex-row gap-2 items-center justify-center">
@@ -128,7 +50,7 @@ const ActivityOrderFilters: React.FC<ActivityOrderFiltersProps> = ({ activities,
             variant="outline" 
             className={cn(
               "h-8 justify-start rounded-full",
-              selectedOrder 
+              sortOrder 
                 ? "border-blue-500 text-blue-700 bg-blue-50" 
                 : "text-gray-500"
             )}
@@ -136,10 +58,10 @@ const ActivityOrderFilters: React.FC<ActivityOrderFiltersProps> = ({ activities,
             <span>
               <ArrowUpDown className="h-4 w-4" />
             </span>
-            {selectedOrder && (
+            {sortOrder && (
               <>
                 <span className="ml-2 text-xs font-medium max-w-24 truncate">
-                  {selectedOrder}
+                  {sortOrder}
                 </span>
                 <button
                   onClick={handleClearOrder}
@@ -149,7 +71,7 @@ const ActivityOrderFilters: React.FC<ActivityOrderFiltersProps> = ({ activities,
                 </button>
               </>
             )}
-            {!selectedOrder && (
+            {!sortOrder && (
               <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
             )}
           </Button>
@@ -168,7 +90,7 @@ const ActivityOrderFilters: React.FC<ActivityOrderFiltersProps> = ({ activities,
                       setOpen(false);
                     }}
                   >
-                    <Check className={cn("mr-2 h-4 w-4", selectedOrder === order.name ? "opacity-100" : "opacity-0")} />
+                    <Check className={cn("mr-2 h-4 w-4", sortOrder === order.name ? "opacity-100" : "opacity-0")} />
                     <div className="flex items-center flex-1">
                       <span className="text-blue-600 mr-2">
                         {order.icon}

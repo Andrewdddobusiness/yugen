@@ -156,6 +156,9 @@ class SearchCache {
 // Global cache instance
 export const searchCache = new SearchCache();
 
+// Export the class for static method access
+export { SearchCache };
+
 /**
  * Cached wrapper for search functions
  */

@@ -228,7 +228,7 @@ export async function updateActivitySchedule(
       .is("deleted_at", null)
       .single();
 
-    if (checkError || activity?.itinerary?.user_id !== user.id) {
+    if (checkError || !activity || (activity as any)?.itinerary?.user_id !== user.id) {
       return {
         success: false,
         error: { message: "Scheduled activity not found or access denied" }
@@ -305,7 +305,7 @@ export async function removeActivityFromSchedule(activityId: number): Promise<Da
       .is("deleted_at", null)
       .single();
 
-    if (checkError || activity?.itinerary?.user_id !== user.id) {
+    if (checkError || !activity || (activity as any)?.itinerary?.user_id !== user.id) {
       return {
         success: false,
         error: { message: "Scheduled activity not found or access denied" }
@@ -463,7 +463,7 @@ export async function reorderActivities(
       .in("itinerary_activity_id", activityIds)
       .is("deleted_at", null);
 
-    if (checkError || activities?.some(activity => activity.itinerary?.user_id !== user.id)) {
+    if (checkError || !activities || (activities as any[])?.some(activity => activity.itinerary?.user_id !== user.id)) {
       return {
         success: false,
         error: { message: "One or more activities not found or access denied" }
@@ -481,7 +481,7 @@ export async function reorderActivities(
     await Promise.all(updatePromises);
 
     // Get itinerary ID for revalidation
-    const itineraryId = activities?.[0]?.itinerary?.itinerary_id;
+    const itineraryId = (activities as any)?.[0]?.itinerary?.itinerary_id;
     if (itineraryId) {
       revalidatePath(`/itinerary/${itineraryId}`);
     }

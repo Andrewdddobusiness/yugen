@@ -49,6 +49,7 @@ interface IActivityStore {
   selectedCostFilters: string[];
   searchHistoryActivities: IActivity[];
   areaSearchActivities: IActivity[];
+  sortOrder: string;
   isActivitiesLoading: boolean;
   fetchActivities: (itineraryId: string) => Promise<any[]>;
   setActivities: (activities: IActivity[]) => void;
@@ -60,6 +61,7 @@ interface IActivityStore {
   setSelectedCostFilters: (updater: (prev: string[]) => string[]) => void;
   setSearchHistoryActivities: (searchHistory: IActivity[] | any) => void;
   setAreaSearchActivities: (areaSearch: IActivity[]) => void;
+  setSortOrder: (sortOrder: string) => void;
   setIsActivitiesLoading: (isLoading: boolean) => void;
 }
 
@@ -71,6 +73,7 @@ export const useActivitiesStore = create<IActivityStore>((set, get) => ({
   selectedCostFilters: [],
   searchHistoryActivities: [],
   areaSearchActivities: [],
+  sortOrder: "",
   isActivitiesLoading: false,
   fetchActivities: async (itineraryId: string): Promise<any[]> => {
     try {
@@ -100,5 +103,6 @@ export const useActivitiesStore = create<IActivityStore>((set, get) => ({
     set({ selectedCostFilters: updater(get().selectedCostFilters) }),
   setSearchHistoryActivities: (searchHistory: IActivity[]) => set({ searchHistoryActivities: searchHistory }),
   setAreaSearchActivities: (areaSearch: IActivity[]) => set({ areaSearchActivities: areaSearch }),
+  setSortOrder: (sortOrder: string) => set({ sortOrder }),
   setIsActivitiesLoading: (isLoading: boolean) => set({ isActivitiesLoading: isLoading }),
 }));

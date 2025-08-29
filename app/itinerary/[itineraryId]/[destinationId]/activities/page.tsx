@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useState, lazy, Suspense } from "react";
+import React, { useEffect, useState, lazy, Suspense, useMemo } from "react";
 import { useParams } from "next/navigation";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 
@@ -54,8 +54,11 @@ export default function Activities() {
     selectedFilters,
     selectedCostFilters,
     areaSearchActivities,
+    setAreaSearchActivities,
     searchHistoryActivities,
     setSearchHistoryActivities,
+    sortOrder,
+    setSortOrder,
   } = useActivitiesStore();
   const { mapRadius, setCenterCoordinates, itineraryCoordinates, setItineraryCoordinates, isMapView, setIsMapView } =
     useMapStore();
@@ -277,6 +280,95 @@ export default function Activities() {
 
   const toggleView = () => setIsMapView(!isMapView);
 
+  // Sorting utility function
+  const sortActivities = (activities: IActivityWithLocation[], order: string): IActivityWithLocation[] => {
+    if (!order) return activities;
+
+    const getPriceLevel = (priceLevel: string | undefined): number => {
+      if (!priceLevel) return 0;
+      if (priceLevel === "PRICE_LEVEL_INEXPENSIVE" || priceLevel === "1") return 1;
+      if (priceLevel === "PRICE_LEVEL_MODERATE" || priceLevel === "2") return 2;
+      if (priceLevel === "PRICE_LEVEL_EXPENSIVE" || priceLevel === "3") return 3;
+      if (priceLevel === "PRICE_LEVEL_VERY_EXPENSIVE" || priceLevel === "4") return 4;
+      return parseInt(priceLevel) || 0;
+    };
+
+    return [...activities].sort((a, b) => {
+      switch (order) {
+        case "A to Z":
+          return a.name.localeCompare(b.name);
+        case "Z to A":
+          return b.name.localeCompare(a.name);
+        case "Rating High to Low":
+          const ratingA = a.rating || 0;
+          const ratingB = b.rating || 0;
+          return ratingA === ratingB ? a.name.localeCompare(b.name) : ratingB - ratingA;
+        case "Rating Low to High":
+          const ratingA2 = a.rating || 0;
+          const ratingB2 = b.rating || 0;
+          return ratingA2 === ratingB2 ? a.name.localeCompare(b.name) : ratingA2 - ratingB2;
+        case "Price Low to High":
+          const priceA = getPriceLevel(a.price_level);
+          const priceB = getPriceLevel(b.price_level);
+          return priceA === priceB ? a.name.localeCompare(b.name) : priceA - priceB;
+        case "Price High to Low":
+          const priceA2 = getPriceLevel(a.price_level);
+          const priceB2 = getPriceLevel(b.price_level);
+          return priceA2 === priceB2 ? a.name.localeCompare(b.name) : priceB2 - priceA2;
+        case "Relevance":
+          const relevanceA = (a.rating || 0) * 10 + (a.name.length < 30 ? 5 : 0);
+          const relevanceB = (b.rating || 0) * 10 + (b.name.length < 30 ? 5 : 0);
+          return relevanceA === relevanceB ? a.name.localeCompare(b.name) : relevanceB - relevanceA;
+        default:
+          return 0;
+      }
+    });
+  };
+
+  // Compute filtered and sorted activities for area search
+  const filteredAreaSearchActivities = React.useMemo(() => {
+    if (!areaSearchActivities || !Array.isArray(areaSearchActivities)) return [];
+    
+    let filtered = areaSearchActivities as IActivityWithLocation[];
+    
+    // Apply type filters
+    if (selectedFilters.length > 0) {
+      filtered = filterActivities(filtered, selectedFilters, activityTypeFilters);
+    }
+    
+    // Apply cost filters
+    if (selectedCostFilters.length > 0) {
+      filtered = filterActivities(filtered, selectedCostFilters, activityCostFilters);
+    }
+    
+    // Apply sorting
+    filtered = sortActivities(filtered, sortOrder);
+    
+    return filtered;
+  }, [areaSearchActivities, selectedFilters, selectedCostFilters, sortOrder]);
+
+  // Compute filtered and sorted activities for search history
+  const filteredSearchHistoryActivities = React.useMemo(() => {
+    if (!searchHistoryActivities || !Array.isArray(searchHistoryActivities)) return [];
+    
+    let filtered = searchHistoryActivities as IActivityWithLocation[];
+    
+    // Apply type filters
+    if (selectedFilters.length > 0) {
+      filtered = filterActivities(filtered, selectedFilters, activityTypeFilters);
+    }
+    
+    // Apply cost filters
+    if (selectedCostFilters.length > 0) {
+      filtered = filterActivities(filtered, selectedCostFilters, activityCostFilters);
+    }
+    
+    // Apply sorting
+    filtered = sortActivities(filtered, sortOrder);
+    
+    return filtered;
+  }, [searchHistoryActivities, selectedFilters, selectedCostFilters, sortOrder]);
+
   if (isCoordinatesLoading || isDestinationLoading) return <Loading />;
 
   return (
@@ -308,8 +400,8 @@ export default function Activities() {
                     <ActivityCostFilters />
                     <ActivityTypeFilters />
                     <ActivityOrderFilters
-                      activities={areaSearchActivities as IActivityWithLocation[]}
-                      setActivities={() => {}} // No-op since we don't need to set activities for area search
+                      activities={filteredAreaSearchActivities}
+                      setActivities={setAreaSearchActivities}
                     />
                   </div>
                 </div>
@@ -317,19 +409,7 @@ export default function Activities() {
                 <ScrollArea className="h-full px-4">
                   {areaSearchActivities && Array.isArray(areaSearchActivities) && areaSearchActivities.length > 0 ? (
                     <ActivityCards
-                      activities={
-                        (selectedFilters.length > 0 || selectedCostFilters.length > 0
-                          ? filterActivities(
-                              filterActivities(
-                                areaSearchActivities as IActivityWithLocation[],
-                                selectedFilters,
-                                activityTypeFilters
-                              ),
-                              selectedCostFilters,
-                              activityCostFilters
-                            )
-                          : areaSearchActivities) as IActivityWithLocation[]
-                      }
+                      activities={filteredAreaSearchActivities}
                       onSelectActivity={handleActivitySelect}
                     />
                   ) : (
@@ -347,7 +427,7 @@ export default function Activities() {
                         <ActivityCostFilters />
                         <ActivityTypeFilters />
                         <ActivityOrderFilters
-                          activities={searchHistoryActivities as IActivityWithLocation[]}
+                          activities={filteredSearchHistoryActivities}
                           setActivities={setSearchHistoryActivities}
                         />
                       </div>
@@ -372,19 +452,7 @@ export default function Activities() {
                   Array.isArray(searchHistoryActivities) &&
                   searchHistoryActivities.length > 0 ? (
                     <ActivityCards
-                      activities={
-                        (selectedFilters.length > 0 || selectedCostFilters.length > 0
-                          ? filterActivities(
-                              filterActivities(
-                                searchHistoryActivities as IActivityWithLocation[],
-                                selectedFilters,
-                                activityTypeFilters
-                              ),
-                              selectedCostFilters,
-                              activityCostFilters
-                            )
-                          : searchHistoryActivities) as IActivityWithLocation[]
-                      }
+                      activities={filteredSearchHistoryActivities}
                       onSelectActivity={handleActivitySelect}
                     />
                   ) : isSearchHistoryLoading || isProcessingMissingActivities ? (

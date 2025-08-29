@@ -64,7 +64,10 @@ export const useItineraryActivityStore = create<IItineraryStore>((set, get) => (
       );
 
       if (result.success && result.data) {
-        return result.data as unknown as IItineraryActivity[];
+        // Filter out soft-deleted activities
+        const activeActivities = (result.data as unknown as IItineraryActivity[])
+          .filter(activity => activity.deleted_at === null);
+        return activeActivities;
       }
       return [];
     } catch (error) {
@@ -117,11 +120,30 @@ export const useItineraryActivityStore = create<IItineraryStore>((set, get) => (
           ["itinerary_id", "itinerary_destination_id", "activity_id"]
         );
 
-        set((state) => ({
-          itineraryActivities: state.itineraryActivities.map((a) =>
-            a.activity?.place_id === activity.place_id ? { ...a } : a
-          ),
-        }));
+        // Since we now remove activities from the array, we need to re-add it
+        const { data: reactivatedActivity } = await fetchFilteredTableData2(
+          "itinerary_activity",
+          `
+            itinerary_activity_id, 
+            itinerary_destination_id, 
+            activity_id,
+            date, 
+            start_time, 
+            end_time,
+            deleted_at,
+            activity:activity(*)
+          `,
+          {
+            itinerary_id: itineraryId,
+            activity_id: activityId,
+          }
+        );
+        
+        if (reactivatedActivity && reactivatedActivity[0]) {
+          set((state) => ({
+            itineraryActivities: [...state.itineraryActivities, reactivatedActivity[0] as IItineraryActivity],
+          }));
+        }
 
         return { success: true, error: undefined };
       } catch (error) {
@@ -249,8 +271,9 @@ export const useItineraryActivityStore = create<IItineraryStore>((set, get) => (
       if (!result.success) throw result.error;
 
       set((state) => ({
-        itineraryActivities: state.itineraryActivities.map((activity) =>
-          activity.activity?.place_id === placeId ? { ...activity, deleted_at: new Date().toISOString() } : activity
+        // Remove the activity from the array instead of just marking it as deleted
+        itineraryActivities: state.itineraryActivities.filter(
+          (activity) => activity.activity?.place_id !== placeId
         ),
       }));
 

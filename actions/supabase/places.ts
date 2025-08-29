@@ -11,7 +11,7 @@ import type {
   DatabaseResponse,
   Coordinates
 } from "@/types/database";
-import { searchCache, cachedSearch } from "@/lib/cache/searchCache";
+import { SearchCache, searchCache, cachedSearch } from "@/lib/cache/searchCache";
 
 // Type definitions for place operations
 type CreatePlaceData = CreateActivityData;
@@ -193,7 +193,7 @@ export async function searchPlaces(
     }
 
     // Generate cache key
-    const cacheKey = searchCache.generateSearchKey(query, location, 50000);
+    const cacheKey = SearchCache.generateSearchKey(query, location, 50000);
     
     // Try to get from cache first
     const cached = searchCache.get<DatabaseResponse<any[]>>(cacheKey);

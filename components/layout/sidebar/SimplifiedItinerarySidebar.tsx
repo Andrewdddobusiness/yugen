@@ -172,6 +172,9 @@ export function SimplifiedItinerarySidebar() {
   const [collapsedDates, setCollapsedDates] = useState<Set<string>>(new Set());
   const [activeId, setActiveId] = useState<string | null>(null);
   const MAX_VISIBLE_ACTIVITIES = 3;
+  
+  // Filter out deleted activities
+  const activeActivities = itineraryActivities.filter(activity => !activity.deleted_at);
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -181,14 +184,14 @@ export function SimplifiedItinerarySidebar() {
   );
 
   // Group activities by date
-  const activitiesByDate = itineraryActivities.reduce((acc, activity) => {
+  const activitiesByDate = activeActivities.reduce((acc, activity) => {
     const date = activity.date ? format(new Date(activity.date), 'yyyy-MM-dd') : 'Unscheduled';
     if (!acc[date]) {
       acc[date] = [];
     }
     acc[date].push(activity);
     return acc;
-  }, {} as Record<string, typeof itineraryActivities>);
+  }, {} as Record<string, typeof activeActivities>);
 
   // Sort dates
   const sortedDates = Object.keys(activitiesByDate).sort((a, b) => {
@@ -300,7 +303,7 @@ export function SimplifiedItinerarySidebar() {
         const reorderedDateActivities = arrayMove(dateActivities, oldIndex, newIndex);
         
         // Update the store with reordered activities
-        const allOtherActivities = itineraryActivities.filter(
+        const allOtherActivities = activeActivities.filter(
           (activity) => {
             const activityDate = activity.date 
               ? format(new Date(activity.date), 'yyyy-MM-dd') 
@@ -362,7 +365,7 @@ export function SimplifiedItinerarySidebar() {
           Itinerary Overview
         </h3>
         <p className="text-xs text-muted-foreground mt-1">
-          {itineraryActivities.length} {itineraryActivities.length === 1 ? 'activity' : 'activities'} added
+          {activeActivities.length} {activeActivities.length === 1 ? 'activity' : 'activities'} added
         </p>
       </div>
 
