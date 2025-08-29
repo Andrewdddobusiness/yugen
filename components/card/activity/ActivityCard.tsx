@@ -37,6 +37,7 @@ export const ActivityCard = memo<ActivityCardProps>(({
   isDragging = false,
   isEditing = false,
   isLoading = false,
+  isAdded = false,
   
   // Event handlers
   onClick,
@@ -196,7 +197,7 @@ export const ActivityCard = memo<ActivityCardProps>(({
                 <div className="flex-shrink-0">
                   {customActions || (
                     <ActivityActions
-                      isAdded={false}
+                      isAdded={isAdded}
                       isLoading={isLoading}
                       onAdd={onAddToItinerary}
                       onRemove={onRemoveFromItinerary}
@@ -272,7 +273,7 @@ export const ActivityCard = memo<ActivityCardProps>(({
           <CardFooter className="p-2 border-t border-gray-100 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-800/50">
             {customFooter || (
               <ActivityActions
-                isAdded={false}
+                isAdded={isAdded}
                 isLoading={isLoading}
                 onAdd={onAddToItinerary}
                 onRemove={onRemoveFromItinerary}

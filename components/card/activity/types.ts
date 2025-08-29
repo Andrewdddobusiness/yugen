@@ -63,6 +63,9 @@ export interface ActivityCardProps extends BaseActivityCardProps {
   onRemoveFromItinerary?: () => void;
   onOptionsClick?: () => void;
   
+  // State for button display
+  isAdded?: boolean;
+  
   // Additional variant-specific options
   showSaveButton?: boolean; // For wishlist functionality
 }

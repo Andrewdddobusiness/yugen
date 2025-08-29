@@ -3,7 +3,6 @@ export { ActivityCard } from './ActivityCard';
 export { ActivityCardSkeleton } from './ActivityCardSkeleton';
 
 // Legacy wrappers for backward compatibility
-export { default as LegacyActivityCard } from './LegacyActivityCard';
 export { LegacyActivityCardHorizontal } from './LegacyActivityCardHorizontal';
 
 // Time management specific component

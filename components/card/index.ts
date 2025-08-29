@@ -12,7 +12,6 @@ export { default as TimeBlockActivityCard } from './activity/TimeBlockActivityCa
 export { default as BaseActivityCard } from './activity/legacy/BaseActivityCard';
 export { default as DraggableActivityCard } from './activity/legacy/DraggableActivityCard';
 export { default as ListActivityCard } from './activity/legacy/ListActivityCard';
-export { default as LegacyActivityCard } from './activity/LegacyActivityCard';
 export { default as LegacyActivityCardHorizontal } from './activity/LegacyActivityCardHorizontal';
 
 // Activity card components
