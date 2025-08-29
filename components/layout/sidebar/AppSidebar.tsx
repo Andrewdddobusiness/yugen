@@ -9,8 +9,8 @@ import { Command, Plus } from "lucide-react";
 
 import { useStripeSubscriptionStore } from "@/store/stripeSubscriptionStore";
 
-import { NavMain } from "@/components/sidebar/appSidebar/NavMain";
-import { NavUser } from "@/components/sidebar/appSidebar/NavUser";
+import { NavMain } from "@/components/layout/sidebar/app/NavMain";
+import { NavUser } from "@/components/layout/sidebar/app/NavUser";
 import {
   Sidebar,
   SidebarContent,
@@ -25,7 +25,7 @@ import { Button } from "@/components/ui/button";
 import LoadingSpinner from "@/components/loading/LoadingSpinner";
 
 // Dynamically import PopUpCreateItinerary with no SSR
-const PopUpCreateItinerary = dynamic(() => import("@/components/popUp/PopUpCreateItinerary"), {
+const PopUpCreateItinerary = dynamic(() => import("@/components/dialog/itinerary/CreateItineraryDialog"), {
   ssr: false,
   loading: () => (
     <Button

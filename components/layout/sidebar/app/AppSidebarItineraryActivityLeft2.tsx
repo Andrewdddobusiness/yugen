@@ -24,10 +24,10 @@ import {
 } from "@/components/ui/sidebar";
 
 import { NavUser } from "./NavUser";
-import { SimplifiedItinerarySidebar } from "@/components/sidebar/SimplifiedItinerarySidebar";
+import { SimplifiedItinerarySidebar } from "@/components/layout/sidebar/SimplifiedItinerarySidebar";
 import { DateRange } from "react-day-picker";
 import { Skeleton } from "@/components/ui/skeleton";
-import { DatePickerWithRangePopover3 } from "@/components/date/DateRangePickerPopover3";
+import { DatePickerWithRangePopover3 } from "@/components/form/date/DateRangePickerPopover3";
 import { useEffect, useState } from "react";
 import { fetchItineraryDestination, setItineraryDestinationDateRange } from "@/actions/supabase/actions";
 import { Separator } from "@/components/ui/separator";

@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { useIsMobile } from '@/components/hooks/use-mobile';
 import { TimeSlotGrid } from './TimeSlotGrid';
-import { TimeBlockActivityCard } from '@/components/cards/ActivityCard/TimeBlockActivityCard';
+import { TimeBlockActivityCard } from '@/components/card/activity/TimeBlockActivityCard';
 import { TimeConflicts, DayConflictsSummary } from './TimeConflicts';
 import { FreeTimeSuggestions, FreeTimeSummary } from './FreeTimeSuggestions';
 import { EfficiencyMetricsCard, EfficiencyScoreSummary } from '../EfficiencyMetrics';

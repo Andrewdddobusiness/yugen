@@ -34,8 +34,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
-import LogoutButton from "@/components/buttons/LogoutButton";
-import PopUpCreateItinerary from "@/components/popUp/PopUpCreateItinerary";
+import LogoutButton from "@/components/button/auth/LogoutButton";
+import PopUpCreateItinerary from "@/components/dialog/itinerary/CreateItineraryDialog";
 
 import { Menu, Plus } from "lucide-react";
 

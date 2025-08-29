@@ -1,6 +1,6 @@
 import React from "react";
-import { ActivityCardSkeleton } from "./ActivityCard";
-import { useSidebar } from "../ui/sidebar";
+import { ActivityCardSkeleton } from "./ActivityCardSkeleton";
+import { useSidebar } from "@/components/ui/sidebar";
 
 
 export default function ActivitySkeletonCards() {

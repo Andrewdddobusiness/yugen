@@ -8,9 +8,9 @@ import * as z from "zod";
 import { useQueryClient } from "@tanstack/react-query";
 import * as VisuallyHidden from "@radix-ui/react-visually-hidden";
 
-import { Button } from "../ui/button";
+import { Button } from "@/components/ui/button";
 import { Plus, Minus, Loader2, MapPin } from "lucide-react";
-import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger } from "../ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 
 import { ComboBox } from "@/components/comboBox/comboBox";
@@ -23,7 +23,7 @@ import { capitalizeFirstLetterOfEachWord } from "@/utils/formatting/capitalise";
 import { createItinerary } from "@/actions/supabase/itinerary";
 import { createClient } from "@/utils/supabase/client";
 import { useCreateItineraryStore } from "@/store/createItineraryStore";
-import { DatePickerWithRangePopover2 } from "../date/dateRangePickerPopover2";
+import { DatePickerWithRangePopover2 } from "@/components/form/date/DateRangePickerPopover2";
 
 interface Destination {
   id: string;

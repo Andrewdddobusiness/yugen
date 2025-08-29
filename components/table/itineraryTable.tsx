@@ -2,13 +2,13 @@
 import { useState } from "react";
 import { useIsMobile } from "@/components/hooks/use-mobile";
 import { Table, TableBody, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import TimePopover from "@/components/shared/TimePopover";
+import TimePopover from "@/components/form/TimePopover";
 
-import { DatePickerPopover } from "@/components/date/DatePickerPopover";
+import { DatePickerPopover } from "@/components/form/date/DatePickerPopover";
 
 import { useItineraryActivityStore } from "@/store/itineraryActivityStore";
 import { useItineraryLayoutStore } from "@/store/itineraryLayoutStore";
-import { NotesPopover } from "@/components/shared/NotesPopover";
+import { NotesPopover } from "@/components/form/NotesPopover";
 import { ChevronDown, MapPin, Phone, Globe } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";

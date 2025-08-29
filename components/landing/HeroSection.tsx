@@ -5,7 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Plane, Plus, Play, Loader2, ArrowRight, MapPin, Calendar, Heart } from "lucide-react";
-import PopUpCreateItinerary from "@/components/popUp/PopUpCreateItinerary";
+import PopUpCreateItinerary from "@/components/dialog/itinerary/CreateItineraryDialog";
 import { motion } from "framer-motion";
 
 interface HeroSectionProps {

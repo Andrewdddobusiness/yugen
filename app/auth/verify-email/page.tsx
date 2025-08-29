@@ -5,7 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { resendConfirmation } from "@/actions/auth/actions";
-import { useAuth } from "@/components/auth/AuthProvider";
+import { useAuth } from "@/components/provider/auth/AuthProvider";
 import { toast } from "sonner";
 import { Mail, RefreshCw } from "lucide-react";
 import Link from "next/link";

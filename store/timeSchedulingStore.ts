@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { TimeGridConfig, DEFAULT_TIME_CONFIG } from '@/components/calendar/TimeGrid';
+import { TimeGridConfig, DEFAULT_TIME_CONFIG } from '@/components/view/calendar/TimeGrid';
 
 interface ConflictSettings {
   autoResolve: boolean;

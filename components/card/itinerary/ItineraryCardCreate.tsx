@@ -1,5 +1,5 @@
 import { Plus } from "lucide-react";
-import PopUpCreateItinerary from "../popUp/PopUpCreateItinerary";
+import PopUpCreateItinerary from "@/components/dialog/itinerary/CreateItineraryDialog";
 
 export default function ItineraryCardCreate() {
   return (

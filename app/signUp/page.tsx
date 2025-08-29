@@ -13,7 +13,7 @@ import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from "
 import { useToast } from "@/components/ui/use-toast";
 
 import LoadingSpinner from "@/components/loading/LoadingSpinner";
-import { GoogleSignInButton } from "@/components/auth/GoogleSignInButton";
+import { GoogleSignInButton } from "@/components/form/auth/GoogleSignInButton";
 
 import { signup, logout, resendConfirmation } from "@/actions/auth/actions";
 import { signUpSchema } from "@/schemas/loginSchema";

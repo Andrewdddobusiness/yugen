@@ -14,7 +14,7 @@ import { exportToMyMaps } from "@/utils/export/mapsExport";
 import { generateKML } from "@/utils/export/kmlExport";
 import { Button } from "@/components/ui/button";
 import { exportToExcel } from "@/utils/export/excelExport";
-import { ExportDownloadState } from "@/components/share/ExportDownloadState";
+import { ExportDownloadState } from "@/components/dialog/export/ExportDownloadState";
 import { useState } from "react";
 
 interface ExportOption {

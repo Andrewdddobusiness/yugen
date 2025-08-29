@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 
-import { AppSidebar } from "@/components/sidebar/appSidebar/AppSidebar";
+import { AppSidebar } from "@/components/layout/sidebar/AppSidebar";
 
 import { getSubscriptionDetails } from "@/actions/stripe/actions";
 

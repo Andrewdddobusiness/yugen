@@ -2,7 +2,7 @@
 
 import { motion } from "framer-motion";
 import { MapPin, Star, TrendingUp } from "lucide-react";
-import DestinationCard from "./DestinationCard";
+import DestinationCard from "@/components/card/destination/DestinationCard";
 
 interface Destination {
   id: string;

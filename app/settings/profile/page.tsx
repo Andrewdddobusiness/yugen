@@ -12,7 +12,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { updateProfile } from "@/actions/auth/actions";
 import { createClient } from "@/utils/supabase/client";
-import { useAuth } from "@/components/auth/AuthProvider";
+import { useAuth } from "@/components/provider/auth/AuthProvider";
 
 const profileSchema = z.object({
   display_name: z.string().min(1, "Display name is required").max(100, "Display name too long"),

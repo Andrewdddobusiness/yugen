@@ -1,6 +1,6 @@
 import React, { ReactNode } from "react";
-import Navigation from "@/components/shared/Navigation";
-import Footer from "@/components/shared/Footer";
+import Navigation from "@/components/layout/navigation/Navigation";
+import Footer from "@/components/layout/footer/Footer";
 
 interface PageLayoutProps {
   children: ReactNode;

@@ -6,7 +6,7 @@ import { useSearchParams } from "next/navigation";
 import { Separator } from "@/components/ui/separator";
 
 import BuilderLayout from "@/components/layouts/BuilderLayout";
-import PopUpGetStarted from "@/components/popUp/PopUpGetStarted";
+import PopUpGetStarted from "@/components/dialog/onboarding/GetStartedDialog";
 
 import { createClient } from "@/utils/supabase/client";
 import { capitalizeFirstLetter } from "@/utils/formatting/capitalise";

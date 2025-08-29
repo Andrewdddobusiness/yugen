@@ -20,7 +20,7 @@ import { ImageIcon, MoreHorizontal } from "lucide-react";
 
 import { capitalizeFirstLetter } from "@/utils/formatting/capitalise";
 import { formatUserFriendlyDate } from "@/utils/formatting/datetime";
-import { Skeleton } from "../ui/skeleton";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export interface IItineraryCard {
   itinerary_id: number;

@@ -1,8 +1,8 @@
 import React from "react";
-import LegacyActivityCard from "./ActivityCard/LegacyActivityCard";
+import LegacyActivityCard from "./LegacyActivityCard";
 import { IActivityWithLocation } from "@/store/activityStore";
-import PersistedQueryProvider from "@/components/providers/persistedQueryProvider";
-import { useSidebar } from "../ui/sidebar";
+import PersistedQueryProvider from "@/components/provider/query/PersistedQueryProvider";
+import { useSidebar } from "@/components/ui/sidebar";
 
 interface IActivityCardsProps {
   activities: IActivityWithLocation[];

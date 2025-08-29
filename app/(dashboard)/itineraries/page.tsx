@@ -1,13 +1,13 @@
 "use client";
 import React, { useEffect, useState } from "react";
 import Image from "next/image";
-import ItineraryCards from "@/components/cards/ItineraryCards";
+import ItineraryCards from "@/components/card/itinerary/ItineraryCards";
 
 import { fetchUserItineraries } from "@/actions/supabase/actions";
 import { createClient } from "@/utils/supabase/client";
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import ItinerarySkeletonCard from "@/components/cards/itinerarySkeletonCard";
+import ItinerarySkeletonCard from "@/components/card/itinerary/ItinerarySkeletonCard";
 
 export default function Itineraries() {
   const supabase = createClient();

@@ -14,7 +14,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { SidebarMenu, SidebarMenuButton, SidebarMenuItem, useSidebar } from "@/components/ui/sidebar";
 import { Skeleton } from "@/components/ui/skeleton";
 
-import LogoutButton from "@/components/buttons/LogoutButton";
+import LogoutButton from "@/components/button/auth/LogoutButton";
 
 import { BadgeCheck, ChevronsUpDown, LogOut, Settings, Sparkles } from "lucide-react";
 

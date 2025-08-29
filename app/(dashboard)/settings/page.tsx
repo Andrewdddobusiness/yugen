@@ -5,7 +5,7 @@ import Link from "next/link";
 import { getSubscriptionDetails } from "@/actions/stripe/actions";
 
 import { Card, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import ManageSubscriptionButton from "@/components/buttons/stripe/manageSubscriptionButton";
+import ManageSubscriptionButton from "@/components/button/subscription/ManageSubscriptionButton";
 import ProfileCards from "@/components/settings/profileCards";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
