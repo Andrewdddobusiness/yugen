@@ -86,7 +86,6 @@ export default function ActivityCards({ activities, onSelectActivity }: IActivit
               isAdded={isAdded}
               showActions={true}
               showSaveButton={true}
-              className="h-[365px]"
             />
           );
         })}

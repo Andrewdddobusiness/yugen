@@ -1,18 +1,17 @@
 // Card component exports
 
 // Activity cards
-export { default as ActivityCard } from './activity/ActivityCard';
+export { ActivityCard } from './activity/ActivityCard';
 export { default as ActivityCards } from './activity/ActivityCards';
 export { default as ActivityCardsHorizontal } from './activity/ActivityCardsHorizontal';
 export { default as ActivitySkeletonCards } from './activity/ActivitySkeletonCards';
-export { default as ActivityCardSkeleton } from './activity/ActivityCardSkeleton';
-export { default as TimeBlockActivityCard } from './activity/TimeBlockActivityCard';
+export { ActivityCardSkeleton } from './activity/ActivityCardSkeleton';
+export { TimeBlockActivityCard } from './activity/TimeBlockActivityCard';
 
 // Legacy activity cards
 export { default as BaseActivityCard } from './activity/legacy/BaseActivityCard';
 export { default as DraggableActivityCard } from './activity/legacy/DraggableActivityCard';
 export { default as ListActivityCard } from './activity/legacy/ListActivityCard';
-export { default as LegacyActivityCardHorizontal } from './activity/LegacyActivityCardHorizontal';
 
 // Activity card components
 export * from './activity/components/ActivityActions';
@@ -36,7 +35,7 @@ export { default as ItinerarySkeletonCard } from './itinerary/ItinerarySkeletonC
 export { default as ItineraryDropDown } from './itinerary/ItineraryDropDown';
 
 // Landing cards
-export { default as FeatureCard } from './landing/FeatureCard';
+export { FeatureCard } from './landing/FeatureCard';
 
 // Place cards
 export { default as PlaceCard } from './place/PlaceCard';

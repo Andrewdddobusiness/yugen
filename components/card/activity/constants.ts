@@ -90,7 +90,7 @@ export const VARIANT_CONFIGS = {
   vertical: {
     layout: "flex-col",
     imageHeight: "h-48", // Fixed consistent height
-    cardHeight: "h-[400px]", // Fixed total card height
+    cardHeight: "h-[420px]", // Fixed height to accommodate descriptions
     contentSpacing: "flex-1",
     titleClamp: "line-clamp-2",
     descriptionClamp: "line-clamp-2"
