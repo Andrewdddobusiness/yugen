@@ -1,5 +1,5 @@
 "use server";
-import { IItineraryCard } from "@/components/cards/ItineraryCard";
+import { IItineraryCard } from "@/components/card/itinerary/ItineraryCard";
 import { createClient } from "@/utils/supabase/server";
 
 /*
@@ -464,8 +464,16 @@ export const fetchCityDetails = async (itineraryId: any) => {
     .from("itinerary_destination")
     .select(
       `
+      itinerary_destination_id,
+      city,
+      country,
+      from_date,
+      to_date,
+      order_number,
+      accommodation_notes,
+      transportation_notes,
       destination_city_id,
-      cities!itinerary_destination_destination_city_id_fkey (
+      cities!destination_city_id (
         city_name,
         city_description,
         broadband_speed,
@@ -477,8 +485,7 @@ export const fetchCityDetails = async (itineraryId: any) => {
         emergency_fire,
         emergency_police,
         emergency_ambulance,
-        country_id,
-        countries!cities_country_id_fkey (
+        countries!country_id (
           country_name
         )
       )

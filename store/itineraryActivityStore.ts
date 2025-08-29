@@ -3,10 +3,8 @@ import {
   checkEntryExists,
   fetchFilteredTableData,
   fetchFilteredTableData2,
-  fetchTableData,
   insertTableData,
   fetchActivityIdByPlaceId,
-  softDeleteTableData,
   setTableDataWithCheck,
   softDeleteTableData2,
 } from "@/actions/supabase/actions";
@@ -16,9 +14,9 @@ export interface IItineraryActivity {
   itinerary_activity_id: string;
   itinerary_destination_id: string;
   activity_id: string;
-  date: string;
-  start_time: string;
-  end_time: string;
+  date: string | null; // Allow null for unscheduled activities
+  start_time: string | null; // Allow null for unscheduled activities
+  end_time: string | null; // Allow null for unscheduled activities
   deleted_at: string | null;
   activity?: IActivity;
 }
@@ -132,65 +130,20 @@ export const useItineraryActivityStore = create<IItineraryStore>((set, get) => (
       }
     }
 
-    // If the activity hasn't been added before, continue with the existing logic
-    // INSERT COUNTRY IF IT DOESN'T EXIST
-    let countryId: string | undefined; // Allow countryId to be undefined
-    try {
-      const { exists: countryExists } = await checkEntryExists("country", {
-        country_name: activity.country_name,
-      });
-
-      if (!countryExists) {
-        await insertTableData("country", {
-          country_name: activity.country_name,
-        });
-      }
-
-      const { data: countryDataResponse }: any = await fetchTableData("country", "country_id");
-      if (Array.isArray(countryDataResponse) && countryDataResponse.length > 0) {
-        countryId = countryDataResponse[0]?.country_id;
-      }
-    } catch (error) {
-      console.error("Error handling country:", error);
-    }
-    console.log("countryId: ", countryId);
-
-    // INSERT CITY IF IT DOESN'T EXIST
-    let cityId: string | undefined;
-    try {
-      const { exists: cityExists } = await checkEntryExists("city", {
-        city_name: activity.city_name,
-      });
-
-      if (!cityExists && countryId) {
-        await insertTableData("city", {
-          city_name: activity.city_name,
-          country_id: countryId,
-        });
-      }
-
-      const { data: cityDataResponse }: any = await fetchTableData("city", "city_id");
-      if (Array.isArray(cityDataResponse) && cityDataResponse.length > 0) {
-        cityId = cityDataResponse[0]?.city_id;
-      }
-    } catch (error) {
-      console.error("Error handling city:", error);
-    }
-    console.log("cityId: ", cityId);
+    // Activities don't need country/city references - they're location-agnostic
+    // Location association happens through itinerary_destination when scheduled
 
     // INSERT ACTIVITY IF IT DOESN'T EXIST
     let activityId: string | undefined; // Allow activityId to be undefined
     try {
       const { exists: activityExists } = await checkEntryExists("activity", {
-        name: activity.name,
-        city_id: cityId,
+        place_id: activity.place_id,
       });
       console.log("activityExists: ", activityExists);
       if (!activityExists) {
         const activityDataToInsert = {
           place_id: activity.place_id,
           name: activity.name,
-          city_id: cityId,
           types: activity.types,
           price_level: activity.price_level,
           address: activity.address,
@@ -201,7 +154,7 @@ export const useItineraryActivityStore = create<IItineraryStore>((set, get) => (
           photo_names: activity.photo_names,
           duration: activity.duration,
           phone_number: activity.phone_number,
-          coordinates: [Number(activity.coordinates[0].toFixed(9)), Number(activity.coordinates[1].toFixed(9))],
+          coordinates: `(${Number(activity.coordinates[1].toFixed(9))}, ${Number(activity.coordinates[0].toFixed(9))})`,
         };
 
         await insertTableData("activity", activityDataToInsert);
@@ -220,51 +173,8 @@ export const useItineraryActivityStore = create<IItineraryStore>((set, get) => (
       activityId = activityDataResponse[0]?.activity_id;
     }
 
-    // INSERT REVIEW IF IT DOESN'T EXIST
-    try {
-      if (activityId) {
-        const { exists: reviewExists } = await checkEntryExists("review", {
-          activity_id: activityId,
-        });
-        console.log("reviewExists: ", reviewExists);
-
-        if (!reviewExists) {
-          await insertTableData("review", {
-            activity_id: activityId,
-            description: activity.description,
-            rating: activity.rating,
-            author: activity.reviews[0]?.author,
-            uri: activity.google_maps_url,
-            publish_date_time: activity.reviews[0]?.publish_date_time,
-          });
-        }
-      }
-    } catch (error) {
-      console.error("Error handling review:", error);
-    }
-
-    // INSERT OPEN HOURS IF IT DOESN'T EXIST
-    try {
-      if (activityId) {
-        const { exists: openHoursExists } = await checkEntryExists("open_hours", {
-          activity_id: activityId,
-        });
-        console.log("openHoursExists: ", openHoursExists);
-
-        if (!openHoursExists && activity.open_hours && activity.open_hours.length > 0) {
-          await insertTableData("open_hours", {
-            activity_id: activityId,
-            day: activity.open_hours[0].day,
-            open_hour: activity.open_hours[0].open_hour,
-            open_minute: activity.open_hours[0].open_minute,
-            close_hour: activity.open_hours[0].close_hour,
-            close_minute: activity.open_hours[0].close_minute,
-          });
-        }
-      }
-    } catch (error) {
-      console.error("Error handling open hours:", error);
-    }
+    // Reviews and opening hours are handled separately when needed
+    // The activity creation focuses only on core activity data
 
     try {
       const { exists: itineraryActivityExists } = await checkEntryExists("itinerary_activity", {
@@ -277,6 +187,9 @@ export const useItineraryActivityStore = create<IItineraryStore>((set, get) => (
           itinerary_id: itineraryId,
           activity_id: activityId,
           itinerary_destination_id: destinationId,
+          date: null,  // Leave unscheduled for user to assign later
+          start_time: null, // Leave unscheduled for user to assign later
+          end_time: null, // Leave unscheduled for user to assign later
           deleted_at: null,
         });
         set((state) => ({
@@ -284,11 +197,11 @@ export const useItineraryActivityStore = create<IItineraryStore>((set, get) => (
             ...state.itineraryActivities,
             {
               itinerary_activity_id: "",
-              itinerary_destination_id: activity.itinerary_destination_id,
+              itinerary_destination_id: destinationId,
               activity_id: activityId,
-              date: "",
-              start_time: "",
-              end_time: "",
+              date: null, // Unscheduled
+              start_time: null, // Unscheduled
+              end_time: null, // Unscheduled
               activity: activity,
               deleted_at: null,
             },

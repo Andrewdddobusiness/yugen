@@ -27,7 +27,7 @@ export async function insertTopPlaces(topPlaces: TopPlace[]) {
 
     // Step 2: Check if country exists, if not insert it
     let { data: countryData, error: countryError } = await supabase
-      .from("country")
+      .from("countries")
       .select("country_id")
       .eq("country_name", country)
       .single();
@@ -35,7 +35,7 @@ export async function insertTopPlaces(topPlaces: TopPlace[]) {
     if (countryError && countryError.code === "PGRST116") {
       // Country doesn't exist, insert it
       const { data: newCountry, error: insertCountryError } = await supabase
-        .from("country")
+        .from("countries")
         .insert({ country_name: country })
         .select("country_id")
         .single();
@@ -52,7 +52,7 @@ export async function insertTopPlaces(topPlaces: TopPlace[]) {
 
     // Step 3: Check if city exists, if not insert it
     let { data: cityData, error: cityError } = await supabase
-      .from("city")
+      .from("cities")
       .select("city_id")
       .eq("city_name", city)
       .eq("country_id", countryData?.country_id)
@@ -61,7 +61,7 @@ export async function insertTopPlaces(topPlaces: TopPlace[]) {
     if (cityError && cityError.code === "PGRST116") {
       // City doesn't exist, insert it
       const { data: newCity, error: insertCityError } = await supabase
-        .from("city")
+        .from("cities")
         .insert({ city_name: city, country_id: countryData?.country_id })
         .select("city_id")
         .single();
@@ -81,7 +81,6 @@ export async function insertTopPlaces(topPlaces: TopPlace[]) {
       .from("activity")
       .select("activity_id")
       .eq("place_id", placeDetails.place_id)
-      .eq("city_id", cityData?.city_id)
       .single();
 
     if (existingActivityError && existingActivityError.code !== "PGRST116") {
@@ -125,7 +124,6 @@ export async function insertTopPlaces(topPlaces: TopPlace[]) {
         .from("activity")
         .insert({
           place_id: placeDetails.place_id,
-          city_id: cityData?.city_id,
           name: placeDetails.name,
           types: placeDetails.types,
           price_level: placeDetails.price_level,
@@ -243,7 +241,7 @@ async function getPlaceDetails(city: string, country: string, activityName: stri
     return {
       place_id: place.id,
       name: place.displayName?.text || "",
-      coordinates: [place.location.latitude, place.location.longitude],
+      coordinates: `(${place.location.longitude}, ${place.location.latitude})`,
       types: place.types || [],
       price_level: place.priceLevel || "",
       address: place.formattedAddress || "",
