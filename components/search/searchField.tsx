@@ -138,26 +138,6 @@ export default function SearchField() {
     },
   });
 
-  const handleAutocompleteSelect = useCallback(
-    async (item: ISearchHistoryItem) => {
-      try {
-        setSelectedSearchQuery(item.mainText);
-        setIsVisible(false);
-        setIsExactSearch(true);
-        addToHistory(item);
-        setSelectedTab("history");
-
-        if (item.placeId) {
-          await addSearchHistoryMutation.mutateAsync(item);
-        }
-      } catch (error) {
-        console.error("Error adding search history item:", error);
-        setSearchError("Failed to save search history.");
-      }
-    },
-    [setSelectedSearchQuery, addToHistory, setSelectedTab, addSearchHistoryMutation]
-  );
-
   const handleInputFocus = useCallback(() => {
     setIsVisible(true);
     if (!selectedSearchQuery || selectedSearchQuery.length < 2) {
@@ -326,6 +306,28 @@ export default function SearchField() {
       setSelectedTab,
       setIsActivitiesLoading,
     ]
+  );
+
+  const handleAutocompleteSelect = useCallback(
+    async (item: ISearchHistoryItem) => {
+      try {
+        setSelectedSearchQuery(item.mainText);
+        setIsVisible(false);
+        setIsExactSearch(true);
+        addToHistory(item);
+
+        // Perform text search instead of switching to history tab
+        await handleTextSearch(item.mainText);
+
+        if (item.placeId) {
+          await addSearchHistoryMutation.mutateAsync(item);
+        }
+      } catch (error) {
+        console.error("Error adding search history item:", error);
+        setSearchError("Failed to save search history.");
+      }
+    },
+    [setSelectedSearchQuery, addToHistory, addSearchHistoryMutation, handleTextSearch]
   );
 
   const handleSearchTypeSelect = useCallback(
