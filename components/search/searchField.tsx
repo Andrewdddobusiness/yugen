@@ -64,6 +64,8 @@ export default function SearchField() {
         setSearchTypeArea(false);
         setAutocompleteResults([]);
         setIsVisible(false);
+        setSelectedType("all"); // Reset the selected type when input is cleared
+        setIsExactSearch(false);
         return;
       }
 
@@ -411,6 +413,8 @@ export default function SearchField() {
     setSearchTypeArea(false);
     setMapHasChanged(false);
     setSearchError(null);
+    setSelectedType("all"); // Reset the selected type to clear button highlights
+    setIsExactSearch(false);
     if (inputRef.current) {
       inputRef.current.focus();
     }
@@ -530,23 +534,28 @@ export default function SearchField() {
 
       {/* Search type buttons */}
       <div className="flex gap-2 mt-3 overflow-x-auto pb-1">
-        {searchTypes.map((type) => (
-          <Button
-            key={type.id}
-            variant={selectedType === type.id ? "default" : "outline"}
-            size="sm"
-            onClick={() => handleSearchTypeSelect(type.id as SearchType)}
-            disabled={isActivitiesLoading}
-            className={`flex items-center gap-2 text-xs font-medium px-3 py-2 rounded-lg whitespace-nowrap transition-all ${
-              selectedType === type.id
-                ? "bg-blue-500 hover:bg-blue-600 text-white shadow-md"
-                : "bg-white hover:bg-gray-50 text-gray-700 border-gray-200 hover:border-gray-300"
-            }`}
-          >
-            <div className={`${selectedType === type.id ? "text-white" : "text-gray-500"}`}>{type.icon}</div>
-            <span className="hidden sm:inline">{type.label}</span>
-          </Button>
-        ))}
+        {searchTypes.map((type) => {
+          const isSelected = selectedType === type.id;
+          return (
+            <Button
+              key={type.id}
+              variant={isSelected ? "default" : "outline"}
+              size="sm"
+              onClick={() => handleSearchTypeSelect(type.id as SearchType)}
+              disabled={isActivitiesLoading}
+              className={`flex items-center gap-2 text-xs font-medium px-3 py-2.5 rounded-full whitespace-nowrap transition-all duration-200 transform hover:scale-105 active:scale-95 ${
+                isSelected
+                  ? "bg-blue-500 hover:bg-blue-600 text-white shadow-lg border-blue-500"
+                  : "bg-white hover:bg-blue-50 text-gray-700 border-gray-200 hover:border-blue-300 hover:text-blue-600 shadow-sm hover:shadow-md"
+              } ${isActivitiesLoading ? "opacity-50 cursor-not-allowed" : ""}`}
+            >
+              <div className={`transition-colors ${isSelected ? "text-white" : "text-gray-500"}`}>
+                {type.icon}
+              </div>
+              <span className="hidden sm:inline font-medium">{type.label}</span>
+            </Button>
+          );
+        })}
       </div>
 
       {/* Search this area button */}
