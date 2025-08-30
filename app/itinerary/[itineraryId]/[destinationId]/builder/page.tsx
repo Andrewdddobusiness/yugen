@@ -1,21 +1,18 @@
 "use client";
 import React, { useEffect, useState, useRef, lazy, Suspense } from "react";
 import { useQuery } from "@tanstack/react-query";
-import DragDropCalendar from "@/components/view/calendar/Calendar";
 import { GoogleCalendarView } from "@/components/view/calendar/GoogleCalendarView";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useItineraryActivityStore } from "@/store/itineraryActivityStore";
 import { useItineraryLayoutStore } from "@/store/itineraryLayoutStore";
 import { useMapStore } from "@/store/mapStore";
 import Loading from "@/components/loading/Loading";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ItineraryTableView } from "@/components/table/ItineraryTable";
 import { ItineraryListView } from "@/components/list/containers/ItineraryListView";
-import ErrorPage from "@/app/error/page";
 import { useParams } from "next/navigation";
 const ItineraryMap = lazy(() => import("@/components/map/ItineraryMap").then(module => ({ default: module.ItineraryMap })));
 import { Button } from "@/components/ui/button";
-import { Calendar, Table, List, Map, X } from "lucide-react";
+import { Map, X } from "lucide-react";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable';
 import { ViewToggle } from "@/components/view/toggle/ViewToggle";
 import { ViewTransition, ViewLoadingState } from "@/components/view/toggle/ViewTransition";
@@ -26,11 +23,21 @@ import { getDestination } from "@/actions/supabase/destinations";
 import { geocodeAddress } from "@/actions/google/maps";
 
 export default function Builder() {
-  const { itineraryId, destinationId } = useParams();
-  const itinId = itineraryId.toString();
-  const destId = destinationId.toString();
+  try {
+    console.log('Builder component rendering...');
+    
+    const { itineraryId, destinationId } = useParams();
+    const itinId = itineraryId?.toString();
+    const destId = destinationId?.toString();
+    
+    console.log('Builder params:', { itineraryId, destinationId, itinId, destId });
 
-  const { itineraryActivities, fetchItineraryActivities, setItineraryActivities } = useItineraryActivityStore();
+    if (!itineraryId || !destinationId) {
+      console.error('Missing required route params');
+      return <div>Error: Missing itinerary or destination ID</div>;
+    }
+
+    const { itineraryActivities, fetchItineraryActivities, setItineraryActivities } = useItineraryActivityStore();
   const { 
     currentView, 
     showMap, 
@@ -402,4 +409,15 @@ export default function Builder() {
       <ViewRecommendationCard autoShow={true} showDelay={5000} />
     </div>
   );
+  } catch (error) {
+    console.error('Error in Builder component:', error);
+    return (
+      <div className="h-full flex items-center justify-center">
+        <div className="text-center">
+          <h2 className="text-2xl font-bold mb-4">Something went wrong</h2>
+          <p className="text-muted-foreground">Unable to load the builder page</p>
+        </div>
+      </div>
+    );
+  }
 }

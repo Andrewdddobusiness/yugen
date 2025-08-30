@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { useParams, usePathname } from "next/navigation";
+import { useParams, usePathname, useRouter } from "next/navigation";
 import { Binoculars, NotebookPen, SquareChevronLeft, TextSearch } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -36,6 +36,7 @@ import { useDateRangeStore } from '@/store/dateRangeStore';
 export function AppSidebarItineraryActivityLeft() {
   const { itineraryId, destinationId } = useParams();
   const pathname = usePathname();
+  const router = useRouter();
 
   const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
 
@@ -87,6 +88,19 @@ export function AppSidebarItineraryActivityLeft() {
       href: `/itinerary/${itineraryId}/${destinationId}/builder`,
     },
   ];
+
+  // Debug logging
+  console.log('Sidebar Navigation Debug:', {
+    itineraryId,
+    destinationId,
+    pathname,
+    navItems: navItems.map(item => ({ title: item.title, href: item.href }))
+  });
+
+  // Navigation debug logging
+  const logNavigation = (href: string, title: string) => {
+    console.log(`Navigating to ${title}:`, href);
+  };
 
   const handleDateRangeConfirm = async (dateRange: DateRange | undefined) => {
     try {
@@ -153,7 +167,12 @@ export function AppSidebarItineraryActivityLeft() {
                         "transition-colors"
                       )}
                     >
-                      <Link href={item.href}>
+                      <Link 
+                        href={item.href}
+                        onClick={() => {
+                          console.log('Navigation clicked:', item.title, 'href:', item.href);
+                        }}
+                      >
                         <item.icon className="h-4 w-4" />
                         <span>{item.title}</span>
                       </Link>

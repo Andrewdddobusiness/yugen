@@ -134,6 +134,3 @@ export function NavMainItineraryActivity() {
     </>
   );
 }
-function fetchItineraryDateRange(arg0: string): any {
-  throw new Error("Function not implemented.");
-}
