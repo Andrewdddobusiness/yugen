@@ -5,7 +5,7 @@ export { default as LogoutButton } from './auth/LogoutButton';
 
 // Map buttons
 export { default as ClearHistoryButton } from './map/ClearHistoryButton';
-export { default as MapViewToggleButton } from './map/MapViewToggleButton';
+export { ViewToggleButton as MapViewToggleButton } from './map/MapViewToggleButton';
 
 // Navigation buttons
 export { default as BackIconButton } from './navigation/BackIconButton';

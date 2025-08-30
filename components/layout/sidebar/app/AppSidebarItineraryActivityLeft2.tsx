@@ -4,8 +4,8 @@ import * as React from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useParams, usePathname } from "next/navigation";
-import { Binoculars, Command, NotebookPen, SquareChevronLeft, TextSearch } from "lucide-react";
-import { cn } from "@/components/lib/utils";
+import { Binoculars, NotebookPen, SquareChevronLeft, TextSearch } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 
@@ -20,7 +20,6 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarRail,
-  useSidebar,
 } from "@/components/ui/sidebar";
 
 import { NavUser } from "./NavUser";
@@ -45,7 +44,7 @@ export function AppSidebarItineraryActivityLeft() {
   // Get the date range store to sync with table components
   const { setDateRange: setStoreDateRange } = useDateRangeStore();
 
-  const { data: destinationData, isLoading: isDestinationLoading } = useQuery({
+  const { data: destinationData } = useQuery({
     queryKey: ["itineraryDestination", itineraryId],
     queryFn: () => fetchItineraryDestination(itineraryId as string),
     enabled: !!itineraryId,
@@ -148,10 +147,6 @@ export function AppSidebarItineraryActivityLeft() {
                 {navItems.map((item) => (
                   <SidebarMenuItem key={item.title}>
                     <SidebarMenuButton
-                      tooltip={{
-                        children: item.title,
-                        hidden: false,
-                      }}
                       asChild
                       className={cn(
                         pathname === item.href && "bg-sidebar-accent text-sidebar-accent-foreground",

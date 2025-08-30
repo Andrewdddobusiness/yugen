@@ -8,10 +8,6 @@ export { default as ActivitySkeletonCards } from './activity/ActivitySkeletonCar
 export { ActivityCardSkeleton } from './activity/ActivityCardSkeleton';
 export { TimeBlockActivityCard } from './activity/TimeBlockActivityCard';
 
-// Legacy activity cards
-export { default as BaseActivityCard } from './activity/legacy/BaseActivityCard';
-export { default as DraggableActivityCard } from './activity/legacy/DraggableActivityCard';
-export { default as ListActivityCard } from './activity/legacy/ListActivityCard';
 
 // Activity card components
 export * from './activity/components/ActivityActions';

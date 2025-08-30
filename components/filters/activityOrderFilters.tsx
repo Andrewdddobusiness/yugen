@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ArrowUpDown, Check, ChevronsUpDown, X, Star, DollarSign, MapPin, TrendingUp } from "lucide-react";
-import { cn } from "@/components/lib/utils";
+import { cn } from "@/lib/utils";
 import { ArrowDownAZ, ArrowUpAZ } from "lucide-react";
 import { IActivityWithLocation, useActivitiesStore } from "@/store/activityStore";
 

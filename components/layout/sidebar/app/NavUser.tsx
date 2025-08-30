@@ -21,7 +21,7 @@ import { BadgeCheck, ChevronsUpDown, LogOut, Settings, Sparkles } from "lucide-r
 import { useUserStore } from "@/store/userStore";
 import { useStripeSubscriptionStore } from "@/store/stripeSubscriptionStore";
 
-import { cn } from "@/components/lib/utils";
+import { cn } from "@/lib/utils";
 
 export function NavUser() {
   const { user, isUserLoading, profileUrl, isProfileUrlLoading } = useUserStore();

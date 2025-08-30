@@ -3,7 +3,6 @@
 // Export dialogs
 export { default as BulkExportDialog } from './export/BulkExportDialog';
 export { default as ExportDialog } from './export/ExportDialog';
-export { default as LegacyExportDialog } from './export/LegacyExportDialog';
 export { default as ShareExportDialog } from './export/ShareExportDialog';
 export { default as ExportDownloadState } from './export/ExportDownloadState';
 export { default as ExportInstructions } from './export/ExportInstructions';

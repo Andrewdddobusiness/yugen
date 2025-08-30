@@ -40,7 +40,7 @@ import ActivityOrderFilters from "@/components/filters/ActivityOrderFilters";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EarthIcon } from "lucide-react";
 import { ViewToggleButton } from "@/components/button/map/MapViewToggleButton";
-import { cn } from "@/components/lib/utils";
+import { cn } from "@/lib/utils";
 
 import { useSidebar } from "@/components/ui/sidebar";
 
@@ -250,7 +250,7 @@ export default function Activities() {
       };
 
       fetchActivities();
-    }, 1000); // Defer by 1000ms to avoid blocking navigation
+    }, 100); // Reduced delay to 100ms for better responsiveness
 
     return () => clearTimeout(deferredProcessing);
   }, [

@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { usePathname } from "next/navigation";
 
-import { SidebarProvider, SidebarTrigger, SidebarInset } from "@/components/ui/sidebar";
+import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebarItineraryActivityLeft } from "@/components/layout/sidebar/app/AppSidebarItineraryActivityLeft2";
 import { Separator } from "@/components/ui/separator";
 import {
@@ -27,7 +27,6 @@ import { useUserStore } from "@/store/userStore";
 import { useStripeSubscriptionStore, ISubscriptionDetails } from "@/store/stripeSubscriptionStore";
 import { createClient } from "@/utils/supabase/client";
 
-import { useCartStore } from "@/store/cartStore";
 
 import { IItineraryActivity, useItineraryActivityStore } from "@/store/itineraryActivityStore";
 import { useParams } from "next/navigation";
@@ -46,7 +45,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const { fetchItineraryActivities, setItineraryActivities } = useItineraryActivityStore();
   const { setUser, setUserLoading, setProfileUrl, setIsProfileUrlLoading } = useUserStore();
   const { setSubscription, setIsSubscriptionLoading } = useStripeSubscriptionStore();
-  const { setIsCartOpen, isCartOpen } = useCartStore();
   
   // Remove useWishlist from here to prevent multiple instances
 
@@ -90,7 +88,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
       // If file exists (array has items and one is named "profile")
       if (fileExists && fileExists.some((file) => file.name === "profile")) {
-        const { data } = await supabase.storage.from("avatars").getPublicUrl(user?.id + "/profile");
+        const { data } = supabase.storage.from("avatars").getPublicUrl(user?.id + "/profile");
         return data.publicUrl;
       }
 
@@ -103,10 +101,10 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     setProfileUrl(profileUrl || "");
     setIsProfileUrlLoading(false);
-  }, [profileUrl]);
+  }, [profileUrl, setProfileUrl, setIsProfileUrlLoading]);
 
   //***** GET SUBSCRIPTION DETAILS *****//
-  const { data: subscription, isLoading: isSubscriptionLoading } = useQuery({
+  const { data: subscription } = useQuery({
     queryKey: ["subscription", user?.id],
     queryFn: getSubscriptionDetails,
     enabled: !!user,
@@ -115,15 +113,15 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     setSubscription(subscription as ISubscriptionDetails);
     setIsSubscriptionLoading(false);
-  }, [subscription]);
+  }, [subscription, setSubscription, setIsSubscriptionLoading]);
 
   //**** GET ITINERARY ACTIVITIES ****//
-  const { data: itineraryActivities, isLoading: isItineraryActivitiesLoading } = useQuery({
+  const { data: itineraryActivities } = useQuery({
     queryKey: ["itineraryActivities", itineraryId, destinationId],
     queryFn: () => fetchItineraryActivities(itineraryId as string, destinationId as string),
     enabled: !!itineraryId && !!destinationId,
-    staleTime: 5 * 60 * 1000, // Cache for 5 minutes instead of always refetching
-    gcTime: 10 * 60 * 1000, // Keep in cache for 10 minutes
+    staleTime: 10 * 60 * 1000, // Cache for 10 minutes to reduce refetching
+    gcTime: 20 * 60 * 1000, // Keep in cache for 20 minutes
   });
 
   useEffect(() => {

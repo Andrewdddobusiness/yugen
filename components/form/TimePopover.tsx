@@ -5,7 +5,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Button } from "@/components/ui/button";
 import { Loader2, Clock } from "lucide-react";
 import { formatTime } from "@/utils/formatting/datetime";
-import { cn } from "@/components/lib/utils";
+import { cn } from "@/lib/utils";
 import { setItineraryActivityTimes } from "@/actions/supabase/actions";
 import { useQueryClient } from "@tanstack/react-query";
 

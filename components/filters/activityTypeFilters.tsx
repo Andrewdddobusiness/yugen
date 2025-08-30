@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Check, ChevronsUpDown, ListFilter } from "lucide-react";
-import { cn } from "@/components/lib/utils";
+import { cn } from "@/lib/utils";
 
 const ActivityTypeFilters: React.FC = () => {
   const { selectedFilters, setSelectedFilters } = useActivitiesStore();

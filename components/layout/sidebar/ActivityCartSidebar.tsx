@@ -7,7 +7,7 @@ import { useSidebar } from "@/components/ui/sidebar";
 
 import ActivityCardsHorizontal from "@/components/cards/ActivityCardsHorizontal";
 
-import { cn } from "@/components/lib/utils";
+import { cn } from "@/lib/utils";
 
 import { X } from "lucide-react";
 

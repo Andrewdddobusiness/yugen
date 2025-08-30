@@ -40,7 +40,6 @@ export { default as PrintView } from './print/PrintView';
 
 // Toggle views
 export { default as ViewToggle } from './toggle/ViewToggle';
-export { default as LegacyViewToggle } from './toggle/LegacyViewToggle';
 export { default as MobileViewSelector } from './toggle/MobileViewSelector';
 export { default as ViewRecommendationCard } from './toggle/ViewRecommendationCard';
 export { default as ViewTransition } from './toggle/ViewTransition';
