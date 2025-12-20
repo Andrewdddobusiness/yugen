@@ -1,13 +1,12 @@
 "use client";
 import React, { useEffect, useState, lazy, Suspense, useMemo } from "react";
+import dynamic from "next/dynamic";
 import { useParams } from "next/navigation";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-
-import ActivityCards from "@/components/card/activity/ActivityCards";
 
 import Loading from "@/components/loading/Loading";
 import ActivityTypeFilters from "@/components/filters/ActivityTypeFilters";
@@ -32,9 +31,15 @@ import { useActivityTabStore } from "@/store/activityTabStore";
 import { filterActivities } from "@/utils/filters/filterActivities";
 import { activityTypeFilters, activityCostFilters } from "@/utils/filters/filters";
 
-import { InfoWindow } from "@vis.gl/react-google-maps";
-// Lazy load heavy Google Maps component
+// Lazy load heavy components to reduce initial bundle
+const ActivityCards = dynamic(() => import("@/components/card/activity/ActivityCards"), {
+  loading: () => <ActivitySkeletonCards />,
+  ssr: false,
+});
 const GoogleMapComponent = lazy(() => import("@/components/map/GoogleMap"));
+const InfoWindow = lazy(() =>
+  import("@vis.gl/react-google-maps").then((mod) => ({ default: mod.InfoWindow }))
+);
 import ClearHistoryButton from "@/components/button/map/ClearHistoryButton";
 import ActivityOrderFilters from "@/components/filters/ActivityOrderFilters";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -497,12 +502,14 @@ export default function Activities() {
           </Suspense>
         ) : null}
         {popupInfo && (
-          <InfoWindow
-            position={{ lat: popupInfo.latitude, lng: popupInfo.longitude }}
-            onCloseClick={() => setPopupInfo(null)}
-          >
-            <div className="px-2 py-1 text-sm font-medium">{popupInfo.name}</div>
-          </InfoWindow>
+          <Suspense fallback={null}>
+            <InfoWindow
+              position={{ lat: popupInfo.latitude, lng: popupInfo.longitude }}
+              onCloseClick={() => setPopupInfo(null)}
+            >
+              <div className="px-2 py-1 text-sm font-medium">{popupInfo.name}</div>
+            </InfoWindow>
+          </Suspense>
         )}
       </div>
       <ViewToggleButton isMapView={isMapView} onToggle={toggleView} />

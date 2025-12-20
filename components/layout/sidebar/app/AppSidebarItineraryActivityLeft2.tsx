@@ -127,15 +127,17 @@ export function AppSidebarItineraryActivityLeft() {
             <SidebarMenuItem>
               <SidebarMenuButton size="lg" asChild className="md:h-8 md:p-0 mt-1">
                 <Link href="/">
-                  <Image
-                    className="w-full h-full"
-                    src="/yugi-mark.svg"
-                    alt="Yugi Logo"
-                    width={100}
-                    height={100}
-                    priority
-                    draggable={false}
-                  />
+                  <div className="relative w-9 h-9">
+                    <Image
+                      className="object-contain"
+                      src="/assets/yugi-mascot-1.png"
+                      alt="Yugi Logo"
+                      fill
+                      priority
+                      sizes="36px"
+                      draggable={false}
+                    />
+                  </div>
                 </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
