@@ -13,6 +13,7 @@ import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from "
 import { useToast } from "@/components/ui/use-toast";
 
 import LoadingSpinner from "@/components/loading/LoadingSpinner";
+import LoadingOverlay from "@/components/loading/LoadingOverlay";
 import { GoogleSignInButton } from "@/components/form/auth/GoogleSignInButton";
 
 import { login } from "@/actions/auth/actions";
@@ -127,17 +128,13 @@ export default function LoginPage() {
                 )}
               />
 
-              {loading ? (
-                <LoadingSpinner />
-              ) : (
-                <Button
-                  type="submit"
-                  disabled={loading}
-                  className="rounded-xl shadow-lg hover:scale-105 transition-all duration-300 bg-[#2A3B63] text-white hover:bg-[#3F5FA3]"
-                >
-                  Login
-                </Button>
-              )}
+              <Button
+                type="submit"
+                disabled={loading}
+                className="rounded-xl shadow-lg hover:scale-105 transition-all duration-300 bg-[#2A3B63] text-white hover:bg-[#3F5FA3]"
+              >
+                {loading ? <LoadingSpinner /> : "Login"}
+              </Button>
             </form>
           </Form>
 
@@ -166,6 +163,8 @@ export default function LoginPage() {
           </div>
         </div>
       </div>
+
+      <LoadingOverlay show={loading} message="Signing you in..." />
     </div>
   );
 }

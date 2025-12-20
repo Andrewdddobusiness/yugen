@@ -48,20 +48,19 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             <SidebarMenuButton size="lg" asChild>
               <Link href="/">
                 <div className="flex items-center justify-center">
-                  <div className="w-[35px] h-[35px]">
+                  <div className="w-9 h-9 relative">
                     <Image
-                      className="w-full h-full"
-                      src="/yugi-mark.svg"
+                      src="/assets/yugi-mascot-1.png"
                       alt="Yugi Logo"
-                      width={100}
-                      height={100}
+                      fill
                       priority
-                      draggable={false}
+                      sizes="36px"
+                      className="object-contain"
                     />
                   </div>
                 </div>
                 <div className="grid flex-1 text-left text-sm leading-tight">
-                  <span className="truncate text-sm font-bold text-brand-600">Yugi</span>
+                  <span className="truncate text-sm font-bold text-brand-600 font-logo">Yugi</span>
                   <span className="truncate text-xs text-gray-500">
                     {subscription?.status === "active" ? "Pro Traveler" : "Free"}
                   </span>
