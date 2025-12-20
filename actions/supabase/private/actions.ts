@@ -241,7 +241,7 @@ async function getPlaceDetails(city: string, country: string, activityName: stri
     return {
       place_id: place.id,
       name: place.displayName?.text || "",
-      coordinates: `(${place.location.longitude}, ${place.location.latitude})`,
+      coordinates: `(${place.location.longitude}, ${place.location.latitude})` as any,
       types: place.types || [],
       price_level: place.priceLevel || "",
       address: place.formattedAddress || "",

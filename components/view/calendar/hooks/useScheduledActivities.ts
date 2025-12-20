@@ -41,13 +41,13 @@ export function useScheduledActivities(days: Date[], timeSlots: TimeSlot[]): Sch
     return itineraryActivities
       .filter(activity => activity.date && activity.start_time && activity.end_time)
       .map(activity => {
-        const activityDate = new Date(activity.date);
+        const activityDate = new Date(activity.date as string);
         const dayIndex = days.findIndex(day => isSameDay(day, activityDate));
         
         if (dayIndex === -1) return null;
 
-        const [startHour, startMinute] = activity.start_time.split(':').map(Number);
-        const [endHour, endMinute] = activity.end_time.split(':').map(Number);
+        const [startHour, startMinute] = (activity.start_time as string).split(':').map(Number);
+        const [endHour, endMinute] = (activity.end_time as string).split(':').map(Number);
         
         const startSlot = timeSlots.findIndex(slot => 
           slot.hour === startHour && slot.minute === startMinute
@@ -64,8 +64,8 @@ export function useScheduledActivities(days: Date[], timeSlots: TimeSlot[]): Sch
           activityId: activity.activity_id || '',
           placeId: activity.activity?.place_id || '',
           date: activityDate,
-          startTime: activity.start_time,
-          endTime: activity.end_time,
+          startTime: activity.start_time as string,
+          endTime: activity.end_time as string,
           duration,
           position: {
             day: dayIndex,

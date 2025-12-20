@@ -115,7 +115,7 @@ export default function ItineraryCard({ itinerary, onDelete }: ItineraryCardProp
           <Image
             src={`${
               process.env.NEXT_PUBLIC_SUPABASE_URL
-            }/storage/v1/object/public/cities/${itinerary.country.toLowerCase()}-${itinerary.city.toLowerCase()}/1.jpg`}
+            }/storage/v1/object/public/cities/${itinerary.country.toLowerCase()}-${(itinerary.city || '').toLowerCase()}/1.jpg`}
             alt="City Image"
             width={1920}
             height={1080}
@@ -147,7 +147,7 @@ export default function ItineraryCard({ itinerary, onDelete }: ItineraryCardProp
           <DropdownMenuTrigger
             onClick={(e: any) => e.stopPropagation()}
             className={`absolute z-50 top-2 right-2 p-1 bg-white rounded-lg transition-opacity duration-300 text-gray-500 hover:text-white ${
-              isHovered ? "opacity-100 hover:bg-[#3A86FF]" : "opacity-100 sm:opacity-0"
+              isHovered ? "opacity-100 hover:bg-[#3F5FA3]" : "opacity-100 sm:opacity-0"
             }`}
           >
             <MoreHorizontal className={`h-5 w-5`} />

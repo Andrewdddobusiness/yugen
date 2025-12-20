@@ -224,7 +224,7 @@ export async function setItineraryActivityNotes(itineraryActivityId: string, not
   return { success: true, message: "Set notes successful", data };
 }
 
-export async function batchUpdateItineraryActivities(updates: { id: string; order?: number; start_time?: string; end_time?: string }[]) {
+export async function batchUpdateItineraryActivities(updates: { id: string; order?: number; start_time?: string | null; end_time?: string | null; date?: string | null }[]) {
   const supabase = createClient();
 
   try {

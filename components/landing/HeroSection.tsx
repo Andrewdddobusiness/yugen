@@ -19,8 +19,9 @@ export default function HeroSection({ user, isUserLoading }: HeroSectionProps) {
   return (
     <section className="relative min-h-screen flex flex-col items-center justify-center overflow-hidden">
       {/* Background Pattern */}
-      <div className="absolute inset-0 bg-gradient-to-br from-blue-50 via-white to-indigo-50">
-        <div className="absolute inset-0 bg-[url('/grid-pattern.svg')] opacity-20"></div>
+      <div className="absolute inset-0 bg-gradient-to-br from-bg-50 via-white to-bg-100">
+        <div className="absolute inset-0 route-pattern" />
+        <div className="absolute inset-0 bg-gradient-to-b from-brand-500/10 via-white to-bg-50" />
       </div>
 
       {/* Floating Elements */}
@@ -30,12 +31,12 @@ export default function HeroSection({ user, isUserLoading }: HeroSectionProps) {
         transition={{ duration: 0.8, delay: 0.2 }}
         className="absolute top-20 left-10 lg:left-20 hidden md:block"
       >
-        <div className="bg-white rounded-2xl shadow-lg p-4 border border-gray-100">
+        <div className="glass rounded-2xl p-4 shadow-card">
           <div className="flex items-center space-x-2">
-            <MapPin className="h-5 w-5 text-blue-600" />
-            <span className="text-sm font-medium text-gray-700">Paris, France</span>
+            <MapPin className="h-5 w-5 text-teal-500" />
+            <span className="text-sm font-medium text-ink-700">Paris, France</span>
           </div>
-          <div className="mt-2 text-xs text-gray-500">3 days • 12 places</div>
+          <div className="mt-2 text-xs text-ink-500">3 days • 12 places</div>
         </div>
       </motion.div>
 
@@ -45,13 +46,13 @@ export default function HeroSection({ user, isUserLoading }: HeroSectionProps) {
         transition={{ duration: 0.8, delay: 0.4 }}
         className="absolute top-32 right-10 lg:right-20 hidden md:block"
       >
-        <div className="bg-white rounded-2xl shadow-lg p-4 border border-gray-100">
+        <div className="glass rounded-2xl p-4 shadow-card">
           <div className="flex items-center space-x-2">
-            <Calendar className="h-5 w-5 text-green-600" />
-            <span className="text-sm font-medium text-gray-700">Day 2</span>
+            <Calendar className="h-5 w-5 text-brand-500" />
+            <span className="text-sm font-medium text-ink-700">Day 2</span>
           </div>
-          <div className="mt-2 text-xs text-gray-500">Louvre Museum</div>
-          <div className="text-xs text-gray-500">9:00 AM - 12:00 PM</div>
+          <div className="mt-2 text-xs text-ink-500">Louvre Museum</div>
+          <div className="text-xs text-ink-500">9:00 AM - 12:00 PM</div>
         </div>
       </motion.div>
 
@@ -61,12 +62,12 @@ export default function HeroSection({ user, isUserLoading }: HeroSectionProps) {
         transition={{ duration: 0.8, delay: 0.6 }}
         className="absolute bottom-32 left-16 hidden lg:block"
       >
-        <div className="bg-white rounded-2xl shadow-lg p-4 border border-gray-100">
+        <div className="glass rounded-2xl p-4 shadow-card">
           <div className="flex items-center space-x-2">
-            <Heart className="h-5 w-5 text-red-500 fill-current" />
-            <span className="text-sm font-medium text-gray-700">Wishlist</span>
+            <Heart className="h-5 w-5 text-coral-500 fill-current" />
+            <span className="text-sm font-medium text-ink-700">Wishlist</span>
           </div>
-          <div className="mt-2 text-xs text-gray-500">8 saved places</div>
+          <div className="mt-2 text-xs text-ink-500">8 saved places</div>
         </div>
       </motion.div>
 
@@ -75,23 +76,16 @@ export default function HeroSection({ user, isUserLoading }: HeroSectionProps) {
         <motion.div
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8 }}
-          className="mb-8"
-        >
-          <h1 className="text-4xl sm:text-5xl lg:text-7xl font-bold text-gray-900 mb-6 leading-tight">
-            Plan Your Perfect Trip
-            <br />
-            <span className="bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
-              Like a Pro
-            </span>
+        transition={{ duration: 0.8 }}
+        className="mb-8"
+      >
+          <h1 className="text-4xl sm:text-5xl lg:text-7xl font-bold text-ink-900 mb-4 leading-tight font-logo">
+            Plan every day with precision.
           </h1>
 
-          <p className="text-xl sm:text-2xl text-gray-600 mb-8 max-w-3xl mx-auto leading-relaxed">
-            The only travel planner that brings together
-            <span className="font-semibold text-blue-600"> destination discovery</span>,
-            <span className="font-semibold text-green-600"> wishlist building</span>, and
-            <span className="font-semibold text-purple-600"> drag-and-drop scheduling</span>
-            in one beautiful app.
+          <p className="text-xl sm:text-2xl text-ink-700 mb-8 max-w-3xl mx-auto leading-relaxed">
+            Drag activities onto a calendar, keep backup options for uncertain slots, see hours/closures before you commit,
+            collaborate live, and export or navigate on mobile.
           </p>
         </motion.div>
 
@@ -100,45 +94,39 @@ export default function HeroSection({ user, isUserLoading }: HeroSectionProps) {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 1.4 }}
-          className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-16"
-        >
-          {isUserLoading ? (
-            <Button size="lg" className="text-lg rounded-xl px-8 py-4 bg-blue-600 hover:bg-blue-700" disabled>
-              <Loader2 className="h-5 w-5 animate-spin mr-2" />
-              Loading...
-            </Button>
+        className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-16"
+      >
+        {isUserLoading ? (
+          <Button size="lg" className="text-lg px-8 py-4 shadow-pressable" disabled>
+            <Loader2 className="h-5 w-5 animate-spin mr-2" />
+            Loading...
+          </Button>
           ) : user ? (
             <PopUpCreateItinerary>
-              <Button
-                size="lg"
-                className="text-lg bg-blue-600 hover:bg-blue-700 text-white rounded-xl px-8 py-4 shadow-lg transition-all duration-300 hover:scale-105 hover:shadow-xl"
-              >
+              <Button size="lg" className="text-lg px-8 py-4 shadow-pressable hover:-translate-y-0">
                 <Plus className="h-5 w-5 mr-2" />
-                Start Planning Free
+                Start planning with Yugi
                 <ArrowRight className="h-5 w-5 ml-2" />
               </Button>
             </PopUpCreateItinerary>
           ) : (
             <Link href="/signUp">
-              <Button
-                size="lg"
-                className="text-lg bg-blue-600 hover:bg-blue-700 text-white rounded-xl px-8 py-4 shadow-lg transition-all duration-300 hover:scale-105 hover:shadow-xl"
-              >
+              <Button size="lg" className="text-lg px-8 py-4 shadow-pressable">
                 <Plane className="h-5 w-5 mr-2" />
-                Start Planning Free
+                Start planning with Yugi
                 <ArrowRight className="h-5 w-5 ml-2" />
               </Button>
             </Link>
           )}
 
           <Button
-            variant="outline"
+            variant="secondary"
             size="lg"
-            className="text-lg rounded-xl px-8 py-4 border-2 border-gray-300 hover:border-blue-600 hover:text-blue-600 transition-all duration-300"
+            className="text-lg px-8 py-4 border border-stroke-200 text-brand-700 hover:bg-white/80"
             onClick={() => setIsVideoPlaying(true)}
           >
             <Play className="h-5 w-5 mr-2" />
-            See How It Works
+            See how it works
           </Button>
         </motion.div>
 
@@ -149,24 +137,24 @@ export default function HeroSection({ user, isUserLoading }: HeroSectionProps) {
           transition={{ duration: 0.8, delay: 1.6 }}
           className="relative max-w-5xl mx-auto"
         >
-          <div className="relative rounded-2xl overflow-hidden shadow-2xl border border-gray-200">
+          <div className="relative rounded-[20px] overflow-hidden shadow-float border border-stroke-200/70 bg-white">
             {/* Browser Chrome */}
-            <div className="bg-gray-100 px-4 py-3 flex items-center space-x-2 border-b border-gray-200">
+            <div className="bg-bg-100 px-4 py-3 flex items-center space-x-2 border-b border-stroke-200/70">
               <div className="flex space-x-2">
-                <div className="w-3 h-3 rounded-full bg-red-500"></div>
-                <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
-                <div className="w-3 h-3 rounded-full bg-green-500"></div>
+                <div className="w-3 h-3 rounded-full bg-coral-500"></div>
+                <div className="w-3 h-3 rounded-full bg-amber-500"></div>
+                <div className="w-3 h-3 rounded-full bg-lime-500"></div>
               </div>
-              <div className="flex-1 bg-white rounded-md px-3 py-1 mx-4">
-                <span className="text-sm text-gray-500">journey.app</span>
+              <div className="flex-1 bg-white rounded-md px-3 py-1 mx-4 shadow-inner">
+                <span className="text-sm text-ink-500">yugi.app</span>
               </div>
             </div>
 
             {/* Demo Image */}
-            <div className="relative aspect-video bg-gradient-to-br from-blue-50 to-indigo-100">
+            <div className="relative aspect-video bg-gradient-to-br from-brand-300/20 via-white to-teal-500/10">
               <Image
                 src="/popup-itinerary-builder.jpg"
-                alt="Journey App Demo - Travel Itinerary Planner"
+                alt="Yugi App Demo - Soft Navigator Travel Planner"
                 fill
                 className="object-cover"
                 priority
@@ -177,9 +165,9 @@ export default function HeroSection({ user, isUserLoading }: HeroSectionProps) {
                 <div className="absolute inset-0 flex items-center justify-center bg-black/20">
                   <button
                     onClick={() => setIsVideoPlaying(true)}
-                    className="bg-white/90 backdrop-blur-sm rounded-full p-6 hover:bg-white transition-all duration-300 hover:scale-110 shadow-xl"
+                    className="bg-white/90 backdrop-blur-sm rounded-full p-6 hover:bg-white transition-all duration-300 hover:scale-110 shadow-float"
                   >
-                    <Play className="h-8 w-8 text-blue-600 ml-1" fill="currentColor" />
+                    <Play className="h-8 w-8 text-brand-500 ml-1" fill="currentColor" />
                   </button>
                 </div>
               )}
@@ -191,20 +179,20 @@ export default function HeroSection({ user, isUserLoading }: HeroSectionProps) {
             initial={{ opacity: 0, scale: 0.8 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.6, delay: 2.0 }}
-            className="absolute -bottom-6 left-4 bg-white rounded-xl shadow-lg p-4 border border-gray-200 hidden lg:block"
+            className="absolute -bottom-6 left-4 glass rounded-xl p-4 hidden lg:block"
           >
-            <div className="text-2xl font-bold text-blue-600">50K+</div>
-            <div className="text-sm text-gray-600">Trips Planned</div>
+            <div className="text-2xl font-bold text-brand-500">50K+</div>
+            <div className="text-sm text-ink-600">Trips planned</div>
           </motion.div>
 
           <motion.div
             initial={{ opacity: 0, scale: 0.8 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.6, delay: 2.2 }}
-            className="absolute -bottom-6 right-4 bg-white rounded-xl shadow-lg p-4 border border-gray-200 hidden lg:block"
+            className="absolute -bottom-6 right-4 glass rounded-xl p-4 hidden lg:block"
           >
-            <div className="text-2xl font-bold text-green-600">4.9★</div>
-            <div className="text-sm text-gray-600">User Rating</div>
+            <div className="text-2xl font-bold text-teal-500">4.9★</div>
+            <div className="text-sm text-ink-600">User rating</div>
           </motion.div>
         </motion.div>
       </div>

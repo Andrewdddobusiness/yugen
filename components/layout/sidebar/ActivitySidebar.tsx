@@ -9,14 +9,14 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 
-import CommentsCarousel from "../carousel/reviewsCarousel";
-import ImagesCarousel from "../carousel/imagesCarousel";
+import CommentsCarousel from "@/components/carousel/ReviewsCarousel";
+import ImagesCarousel from "@/components/carousel/ImagesCarousel";
 
 import { Globe, Clock, Loader2, X, Phone } from "lucide-react";
 
 import { capitalizeFirstLetterOfEachWord } from "@/utils/formatting/capitalise";
 
-import Rating from "../rating/rating";
+import Rating from "@/components/rating/Rating";
 
 import { useItineraryActivityStore } from "@/store/itineraryActivityStore";
 import { IActivityWithLocation } from "@/store/activityStore";

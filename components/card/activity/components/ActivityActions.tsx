@@ -60,7 +60,7 @@ export const ActivityActions: React.FC<ActivityActionsProps> = ({
         )}
         <Button
           variant="default"
-          className="flex w-1/4 justify-center items-center px-3 py-1 text-sm font-medium rounded-l-none rounded-tr-none hover:bg-[#3A86FF]/90 bg-[#3A86FF] text-white"
+          className="flex w-1/4 justify-center items-center px-3 py-1 text-sm font-medium rounded-l-none rounded-tr-none hover:bg-[#3F5FA3]/90 bg-[#3F5FA3] text-white"
           onClick={(e) => {
             e.stopPropagation();
             onOptions?.();

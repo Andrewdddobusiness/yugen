@@ -6,7 +6,7 @@ import { AlertTriangle, CheckCircle, Clock, MapPin, Calendar } from 'lucide-reac
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import type { DraggedItem, DropValidation } from './DragProvider';
+import type { DraggedItem, DropValidation } from '@/components/provider/dnd/DragProvider';
 
 interface DropValidationProps {
   validation: DropValidation;

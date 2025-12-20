@@ -1,37 +1,37 @@
-# Journey Email Templates
+# Yugi Email Templates
 
-This directory contains custom branded email templates for the Journey travel planning application.
+This directory contains custom branded email templates for the Yugi travel planning application.
 
 ## Available Templates
 
 ### 1. **confirmation.html** - Email Verification
-- **Subject**: "Welcome to Journey - Confirm your email ✈️"
+- **Subject**: "Welcome to Yugi - Confirm your email ✈️"
 - **Used for**: New user email verification
 - **Variables**: `{{ .ConfirmationURL }}`
 - **Design**: Blue gradient header, welcoming tone with travel emoji
 
 ### 2. **recovery.html** - Password Reset
-- **Subject**: "Reset your Journey password 🔐"
+- **Subject**: "Reset your Yugi password 🔐"
 - **Used for**: Password reset requests
 - **Variables**: `{{ .ConfirmationURL }}`
 - **Design**: Security-focused with warning notices and expiry information
 
 ### 3. **invite.html** - User Invitations
-- **Subject**: "You're invited to Journey! 🎉"
+- **Subject**: "You're invited to Yugi! 🎉"
 - **Used for**: Inviting new users to the platform
 - **Variables**: `{{ .ConfirmationURL }}`
 - **Design**: Pink/purple gradient, features grid showcasing app benefits
 
 ### 4. **magic_link.html** - Passwordless Sign-in
-- **Subject**: "Your Journey magic link ✨"
+- **Subject**: "Your Yugi magic link ✨"
 - **Used for**: Magic link authentication
 - **Variables**: `{{ .ConfirmationURL }}`
 - **Design**: Teal gradient, emphasizes security and ease of use
 
 ## Brand Colors Used
 
-- **Primary Blue**: `#3A86FF` (main brand color)
-- **Dark Blue**: `#032bc0` (CTAs and buttons)
+- **Primary Blue**: `#3F5FA3` (main brand color)
+- **Dark Blue**: `#2A3B63` (CTAs and buttons)
 - **Pink**: `#FF006E` (accent color)
 - **Purple**: `#8338EC` (secondary accent)
 - **Teal**: `#06d6a0` (magic link theme)
@@ -49,7 +49,7 @@ All templates use Supabase's template variables:
 
 - **Mobile Responsive**: All templates work on mobile devices
 - **Modern Design**: Clean, professional appearance
-- **Brand Consistency**: Uses Journey brand colors and typography
+- **Brand Consistency**: Uses Yugi brand colors and typography
 - **Accessibility**: Good contrast ratios and readable fonts
 - **Security Notices**: Appropriate warnings and expiry information
 - **Fallback Links**: Copy-paste URLs for button accessibility
@@ -65,8 +65,8 @@ To modify templates:
 Update CSS custom properties in the `<style>` section of each template:
 ```css
 :root {
-  --primary-color: #3A86FF;
-  --primary-dark: #032bc0;
+  --primary-color: #3F5FA3;
+  --primary-dark: #2A3B63;
   --accent-color: #FF006E;
 }
 ```

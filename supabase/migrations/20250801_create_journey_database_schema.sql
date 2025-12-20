@@ -1,11 +1,11 @@
--- Journey Travel Itinerary Application - Complete Database Schema
+-- Yugi Travel Itinerary Application - Complete Database Schema
 -- Created: 2025-08-01
--- Description: Creates all tables, indexes, RLS policies, and triggers for the Journey app
+-- Description: Creates all tables, indexes, RLS policies, and triggers for the Yugi app
 
 -- Enable necessary extensions
 create extension if not exists "uuid-ossp";
 
--- Create tables for the Journey travel itinerary application
+-- Create tables for the Yugi travel itinerary application
 
 -- Users table (extends Supabase auth.users)
 create table if not exists public.profiles (

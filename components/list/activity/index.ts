@@ -1,6 +1,6 @@
 // Main components
 export { SortableActivityItem } from './SortableActivityItem';
-export { ItineraryActivityEditor } from './ItineraryActivityEditor';
+export { useItineraryActivityEditor } from './ItineraryActivityEditor';
 export { ItineraryActivityList } from './ItineraryActivityList';
 
 // Sub-components

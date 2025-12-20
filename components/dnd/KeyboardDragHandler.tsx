@@ -7,8 +7,7 @@ import {
   ArrowDown, 
   ArrowLeft, 
   ArrowRight, 
-  Enter, 
-  Escape,
+  CornerDownLeft, 
   Space,
   Calendar,
   Check,
@@ -17,7 +16,7 @@ import {
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { useDragContext } from './DragProvider';
+import { useDragContext } from '@/components/provider/dnd/DragProvider';
 
 interface KeyboardDragState {
   isActive: boolean;
@@ -220,7 +219,7 @@ export function KeyboardDragHandler({
       case 'Escape':
         endKeyboardDrag(false);
         break;
-      case 'Home':
+      case 'Home': {
         // Jump to first slot of current day
         const slotsPerDay = 26;
         const currentDayStart = Math.floor(keyboardState.selectedSlotIndex / slotsPerDay) * slotsPerDay;
@@ -229,14 +228,17 @@ export function KeyboardDragHandler({
           selectedSlotIndex: currentDayStart
         }));
         break;
-      case 'End':
+      }
+      case 'End': {
         // Jump to last slot of current day  
+        const slotsPerDay = 26;
         const currentDayEnd = Math.floor(keyboardState.selectedSlotIndex / slotsPerDay) * slotsPerDay + slotsPerDay - 1;
         setKeyboardState(prev => ({
           ...prev,
           selectedSlotIndex: Math.min(currentDayEnd, prev.availableSlots.length - 1)
         }));
         break;
+      }
     }
   }, [keyboardState, navigateSlots, endKeyboardDrag]);
 
@@ -329,11 +331,11 @@ export function KeyboardDragHandler({
               <span>Next day</span>
             </div>
             <div className="flex items-center space-x-2">
-              <Enter className="h-4 w-4" />
+              <CornerDownLeft className="h-4 w-4" />
               <span>Schedule here</span>
             </div>
             <div className="flex items-center space-x-2">
-              <Escape className="h-4 w-4" />
+              <X className="h-4 w-4" />
               <span>Cancel</span>
             </div>
           </div>
@@ -377,7 +379,7 @@ export function KeyboardDragHandler({
  * Hook to provide keyboard drag functionality to components
  */
 export function useKeyboardDrag() {
-  const [handler, setHandler] = useState<KeyboardDragHandler | null>(null);
+  const [handler, setHandler] = useState<any | null>(null);
   
   const startDrag = useCallback((item: any) => {
     // This would integrate with the KeyboardDragHandler

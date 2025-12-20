@@ -5,7 +5,9 @@ import { Search, Tag, Clock, Calendar, DollarSign, X } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { formatCategoryType } from '@/utils/formatting/types';
 import { SearchFilters } from './types';
-import { TIME_PERIODS, ACTIVITY_STATUS, PRICE_LEVELS, DAYS_OF_WEEK } from './constants';
+import { TIME_PERIODS, ACTIVITY_STATUS, FILTER_PRICE_LEVELS, DAYS_OF_WEEK } from './constants';
+
+
 import { FilterBadge } from './badges';
 
 interface ActiveFilterBadgesProps {
@@ -75,7 +77,7 @@ export function ActiveFilterBadges({
 
       {/* Price Level Badges */}
       {filters.priceLevel.map(price => {
-        const priceConfig = PRICE_LEVELS.find(p => p.value === price);
+        const priceConfig = FILTER_PRICE_LEVELS.find(p => p.value === price);
         const label = priceConfig?.label || price;
         return (
           <FilterBadge

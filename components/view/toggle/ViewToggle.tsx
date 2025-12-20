@@ -3,19 +3,10 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
-import { Calendar, Table, List, Map, X, Lightbulb, ChevronDown } from "lucide-react";
+import { Calendar, Table, List, Map, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useItineraryLayoutStore } from "@/store/itineraryLayoutStore";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Badge } from "@/components/ui/badge";
-import { 
-  DropdownMenu, 
-  DropdownMenuContent, 
-  DropdownMenuItem, 
-  DropdownMenuTrigger,
-  DropdownMenuSeparator,
-  DropdownMenuLabel
-} from "@/components/ui/dropdown-menu";
 import { MobileViewSelector } from "./MobileViewSelector";
 
 export type ViewMode = 'calendar' | 'table' | 'list';
@@ -78,16 +69,11 @@ export function ViewToggle({
   const { 
     currentView, 
     showMap, 
-    viewHistory,
-    defaultView,
     isTransitioningView,
     setCurrentView, 
-    toggleMap,
-    getViewRecommendation
+    toggleMap
   } = useItineraryLayoutStore();
 
-  const [showRecommendation, setShowRecommendation] = useState(false);
-  const [recommendation, setRecommendation] = useState<ViewMode | null>(null);
 
   // Get current view config
   const currentConfig = viewConfigs.find(config => config.id === currentView);
@@ -210,70 +196,6 @@ export function ViewToggle({
           })}
         </div>
 
-        {/* View Options Dropdown */}
-        <DropdownMenu>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm">
-                  <ChevronDown className="h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-            </TooltipTrigger>
-            <TooltipContent>
-              <p>View options and preferences</p>
-            </TooltipContent>
-          </Tooltip>
-          <DropdownMenuContent align="end" className="w-64">
-            <DropdownMenuLabel>View Preferences</DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            
-            {/* Recent Views */}
-            {viewHistory.length > 0 && (
-              <>
-                <DropdownMenuLabel className="text-xs text-muted-foreground">
-                  Recent Views
-                </DropdownMenuLabel>
-                {viewHistory.slice(0, 3).map((view, index) => {
-                  const config = viewConfigs.find(c => c.id === view);
-                  if (!config) return null;
-                  const Icon = config.icon;
-                  
-                  return (
-                    <DropdownMenuItem
-                      key={`${view}-${index}`}
-                      onClick={() => handleViewChange(view)}
-                    >
-                      <Icon className="h-4 w-4 mr-2" />
-                      {config.label}
-                    </DropdownMenuItem>
-                  );
-                })}
-                <DropdownMenuSeparator />
-              </>
-            )}
-            
-            {/* Default View Setting */}
-            <DropdownMenuLabel className="text-xs text-muted-foreground">
-              Set as Default
-            </DropdownMenuLabel>
-            {viewConfigs.map((config) => {
-              const Icon = config.icon;
-              const isDefault = defaultView === config.id;
-              
-              return (
-                <DropdownMenuItem
-                  key={`default-${config.id}`}
-                  onClick={() => useItineraryLayoutStore.getState().setDefaultView(config.id)}
-                >
-                  <Icon className="h-4 w-4 mr-2" />
-                  {config.label}
-                  {isDefault && <Badge variant="secondary" className="ml-auto text-xs">Default</Badge>}
-                </DropdownMenuItem>
-              );
-            })}
-          </DropdownMenuContent>
-        </DropdownMenu>
 
         {/* Map Toggle */}
         {showMapToggle && (

@@ -139,13 +139,13 @@ export function CalendarGridEnhanced({
     return itineraryActivities
       .filter(activity => activity.date && activity.start_time && activity.end_time)
       .map(activity => {
-        const activityDate = new Date(activity.date);
+        const activityDate = new Date(activity.date as string);
         const dayIndex = days.findIndex(day => isSameDay(day, activityDate));
         
         if (dayIndex === -1) return null;
 
-        const [startHour, startMinute] = activity.start_time.split(':').map(Number);
-        const [endHour, endMinute] = activity.end_time.split(':').map(Number);
+        const [startHour, startMinute] = (activity.start_time as string).split(':').map(Number);
+        const [endHour, endMinute] = (activity.end_time as string).split(':').map(Number);
         
         const startSlot = timeSlots.findIndex(slot => 
           slot.hour === startHour && slot.minute === startMinute
@@ -234,12 +234,14 @@ export function CalendarGridEnhanced({
                                parseInt(dropData.timeSlot.split(':')[1]) + duration;
       const proposedEndTime = `${Math.floor(proposedEndMinutes / 60).toString().padStart(2, '0')}:${(proposedEndMinutes % 60).toString().padStart(2, '0')}:00`;
 
-      const existingActivities = itineraryActivities.map(act => ({
-        id: act.itinerary_activity_id,
-        date: act.date,
-        startTime: act.start_time,
-        endTime: act.end_time
-      }));
+      const existingActivities = itineraryActivities
+        .filter(act => act.date && act.start_time && act.end_time)
+        .map(act => ({
+          id: act.itinerary_activity_id,
+          date: act.date as string,
+          startTime: act.start_time as string,
+          endTime: act.end_time as string
+        }));
 
       conflicts = detectConflicts(
         {

@@ -197,7 +197,7 @@ export function useAvailableCategories(activities: FilterableActivity[]) {
   }, [activities]);
 }
 
-export function useKeyboardShortcuts(
+export function useSearchKeyboardShortcuts(
   showFilters: boolean,
   setShowFilters: (show: boolean) => void,
   searchText: string,

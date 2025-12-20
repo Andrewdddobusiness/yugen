@@ -4,89 +4,106 @@
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 0 0% 3.9%;
+    /* Base Colors */
+    --background: 0 0% 100%; /* bg.0 */
+    --foreground: 222 47% 11%; /* ink.900 */
 
+    /* Brand Colors (Slate Blue) */
+    --brand-700: 222 40% 28%; /* #2A3B63 */
+    --brand-600: 221 41% 34%; /* #334A7A */
+    --brand-500: 221 44% 44%; /* #3F5FA3 */
+    --brand-400: 223 50% 58%; /* #5C7BCB */
+    --brand-300: 223 65% 73%; /* #8FA8E6 */
+
+    /* Neutrals */
+    --bg-0: 0 0% 100%;      /* #FFFFFF */
+    --bg-50: 225 20% 98%;   /* #F7F8FB */
+    --bg-100: 220 27% 95%;  /* #EEF1F7 */
+    
+    /* Ink */
+    --ink-900: 222 47% 9%;  /* #0D1321 */
+    --ink-700: 222 24% 22%; /* #2A3245 */
+    --ink-500: 222 18% 41%; /* #55607A */
+
+    /* Stroke */
+    --stroke-200: 221 33% 90%; /* #DDE3F0 */
+
+    /* Accents */
+    --tan-500: 23 39% 39%;   /* #8A5A3C */
+    --tan-200: 23 48% 81%;   /* #E6C9B7 */
+    --teal-500: 178 69% 43%; /* #22B8B2 */
+    --coral-500: 354 100% 68%; /* #FF5A6B */
+    --lime-500: 144 63% 54%; /* #40D57C */
+    --amber-500: 39 100% 56%; /* #FFB020 */
+
+    /* Shadcn Mappings */
     --card: 0 0% 100%;
-    --card-foreground: 0 0% 3.9%;
-
+    --card-foreground: 222 47% 11%;
     --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 3.9%;
+    --popover-foreground: 222 47% 11%;
+    --primary: 221 44% 44%; /* brand.500 */
+    --primary-foreground: 0 0% 100%;
+    --secondary: 220 27% 95%; /* bg.100 */
+    --secondary-foreground: 222 40% 28%; /* brand.700 */
+    --muted: 220 27% 95%;
+    --muted-foreground: 222 18% 41%;
+    --accent: 220 27% 95%;
+    --accent-foreground: 222 40% 28%;
+    --destructive: 354 100% 68%; /* coral.500 */
+    --destructive-foreground: 0 0% 100%;
+    --border: 221 33% 90%; /* stroke.200 */
+    --input: 221 33% 90%;
+    --ring: 221 44% 44%; /* brand.500 */
+    --radius: 0.875rem; /* 14px default */
 
-    --primary: 0 0% 9%;
-    --primary-foreground: 0 0% 98%;
-
-    --secondary: 0 0% 96.1%;
-    --secondary-foreground: 0 0% 9%;
-
-    --muted: 0 0% 96.1%;
-    --muted-foreground: 0 0% 45.1%;
-
-    --accent: 0 0% 96.1%;
-    --accent-foreground: 0 0% 9%;
-
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 0 0% 98%;
-
-    --border: 0 0% 89.8%;
-    --input: 0 0% 89.8%;
-    --ring: 0 0% 3.9%;
-
-    --radius: 0.5rem;
-
-    --sidebar-background: 0 0% 98%;
-
-    --sidebar-foreground: 240 5.3% 26.1%;
-
-    --sidebar-primary: 240 5.9% 10%;
-
-    --sidebar-primary-foreground: 0 0% 98%;
-
-    --sidebar-accent: 240 4.8% 95.9%;
-
-    --sidebar-accent-foreground: 240 5.9% 10%;
-
-    --sidebar-border: 220 13% 91%;
-
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    /* Sidebar */
+    --sidebar-background: 225 20% 98%;
+    --sidebar-foreground: 222 24% 22%;
+    --sidebar-primary: 221 44% 44%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 220 27% 95%;
+    --sidebar-accent-foreground: 222 40% 28%;
+    --sidebar-border: 221 33% 90%;
+    --sidebar-ring: 221 44% 44%;
   }
 
   .dark {
-    --background: 0 0% 3.9%;
+    /* Dark Mode Overrides */
+    --background: 222 47% 9%; /* ink.900 */
     --foreground: 0 0% 98%;
 
-    --card: 0 0% 3.9%;
+    /* Adjust brand colors for dark mode if needed, usually same but context changes */
+    
+    --bg-0: 222 41% 12%; /* slightly lighter than ink.900 */
+    --bg-50: 222 47% 9%;
+    --bg-100: 222 40% 15%;
+
+    --card: 222 41% 12%;
     --card-foreground: 0 0% 98%;
-
-    --popover: 0 0% 3.9%;
+    --popover: 222 41% 12%;
     --popover-foreground: 0 0% 98%;
-
-    --primary: 0 0% 98%;
-    --primary-foreground: 0 0% 9%;
-
-    --secondary: 0 0% 14.9%;
+    --primary: 223 50% 58%; /* brand.400 for better contrast */
+    --primary-foreground: 0 0% 100%;
+    --secondary: 222 40% 15%;
     --secondary-foreground: 0 0% 98%;
-
-    --muted: 0 0% 14.9%;
-    --muted-foreground: 0 0% 63.9%;
-
-    --accent: 0 0% 14.9%;
+    --muted: 222 40% 15%;
+    --muted-foreground: 215 20% 65%;
+    --accent: 222 40% 15%;
     --accent-foreground: 0 0% 98%;
-
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 0 0% 98%;
-
-    --border: 0 0% 14.9%;
-    --input: 0 0% 14.9%;
-    --ring: 0 0% 83.1%;
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
+    --destructive: 354 100% 68%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 217 33% 18%;
+    --input: 217 33% 18%;
+    --ring: 223 50% 58%;
+    
+    --sidebar-background: 222 47% 9%;
+    --sidebar-foreground: 215 20% 65%;
+    --sidebar-primary: 223 50% 58%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --sidebar-accent: 222 40% 15%;
+    --sidebar-accent-foreground: 0 0% 98%;
+    --sidebar-border: 217 33% 18%;
+    --sidebar-ring: 223 50% 58%;
   }
 }
 
@@ -95,7 +112,41 @@
     @apply border-border;
   }
   body {
-    @apply bg-background text-foreground;
+    @apply bg-bg-50 text-ink-900 antialiased;
+    font-family: var(--font-nunito), system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+}
+
+@layer utilities {
+  .glass {
+    @apply bg-white/75 backdrop-blur-2xl border border-stroke-200/60 shadow-float;
+  }
+  .dark .glass {
+    @apply bg-ink-900/55 border-white/10 backdrop-blur-2xl;
+  }
+
+  /* Subtle route-line background for large canvases */
+  .route-pattern {
+    background-image:
+      radial-gradient(circle at 1px 1px, rgba(34, 184, 178, 0.12) 1px, transparent 0),
+      linear-gradient(90deg, rgba(63, 95, 163, 0.08) 1px, transparent 1px),
+      linear-gradient(180deg, rgba(63, 95, 163, 0.08) 1px, transparent 1px);
+    background-size: 24px 24px, 120px 120px, 120px 120px;
+  }
+
+  /* Gentle grain overlay for hero sections only */
+  .noise-soft {
+    background-image: url("/home/noise.svg");
+    opacity: 0.08;
+    mix-blend-mode: soft-light;
+  }
+
+  .font-logo {
+    font-family: var(--font-londrina-solid), "Londrina Solid", cursive;
+  }
+
+  .font-sketch {
+    font-family: var(--font-londrina-sketch), "Londrina Sketch", cursive;
   }
 }
 

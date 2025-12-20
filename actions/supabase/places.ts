@@ -339,7 +339,7 @@ export async function getPlacesByDestination(destinationId: string): Promise<Dat
       .eq("itinerary_destination_id", destinationId)
       .single();
 
-    if (destError || destination?.itinerary?.user_id !== user.id) {
+    if (destError || (destination?.itinerary as any)?.user_id !== user.id) {
       return {
         success: false,
         error: { message: "Destination not found or access denied" }

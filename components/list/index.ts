@@ -8,7 +8,7 @@ export * from './bulk-actions';
 export * from './containers';
 
 // Drag and drop components  
-export * from './drag-drop';
+// export * from './drag-drop';
 
 // Search and filter components
 export * from './search-filter';
@@ -26,6 +26,6 @@ export * from './hooks';
 export * from './components';
 
 // Remaining top-level components
-export { EfficiencyMetrics } from './EfficiencyMetrics';
+export { EfficiencyMetricsCard } from './EfficiencyMetrics';
 export { ItineraryDayHeader } from './ItineraryDayHeader';
 export { SearchAndFilter } from './SearchAndFilter';

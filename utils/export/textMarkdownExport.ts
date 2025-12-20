@@ -492,6 +492,7 @@ export class TextMarkdownExporter {
   private groupActivitiesByDate(activities: IItineraryActivity[]) {
     return activities.reduce((groups: { [key: string]: IItineraryActivity[] }, activity) => {
       const date = activity.date;
+      if (!date) return groups;
       if (!groups[date]) {
         groups[date] = [];
       }

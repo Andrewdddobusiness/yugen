@@ -19,9 +19,9 @@ import {
   DropdownMenuGroup,
 } from "@/components/ui/dropdown-menu";
 
-import ItineraryChoiceDialog from "../shared/ItineraryChoiceDialog";
+import ItineraryChoiceDialog from "@/components/dialog/itinerary/ItineraryChoiceDialog";
 import { Skeleton } from "../ui/skeleton";
-import LogoutButton from "../buttons/LogoutButton";
+import LogoutButton from "@/components/button/auth/LogoutButton";
 import { useSearchParams } from "next/navigation";
 
 interface PageLayoutProps {
@@ -214,7 +214,7 @@ export default function BuilderLayout({
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem>
-                    <LogoutButton />
+                    <LogoutButton>Sign out</LogoutButton>
                   </DropdownMenuItem>
                 </DropdownMenuGroup>
               </DropdownMenuContent>

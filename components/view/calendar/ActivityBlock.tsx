@@ -55,7 +55,7 @@ export function ActivityBlock({
   const [popoverPosition, setPopoverPosition] = useState({ x: 0, y: 0 });
   const [previewDuration, setPreviewDuration] = useState<number>(activity.duration);
   const [previewHeight, setPreviewHeight] = useState<number>(0);
-  const blockRef = useRef<HTMLDivElement>(null);
+  const blockRef = useRef<HTMLDivElement | null>(null);
   const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
   const {

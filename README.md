@@ -1,4 +1,6 @@
-This is a [Next.js](https://nextjs.org/) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
+# Yugi — Soft Navigator Travel Planner
+
+This is the Yugi web app, a Next.js experience built around calm, glassy navigation and tactile buttons for confident trip planning.
 
 ## Getting Started
 
@@ -35,16 +37,18 @@ The easiest way to deploy your Next.js app is to use the [Vercel Platform](https
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/deployment) for more details.
 
-## Colors
+## Typography
+- Logo / Title: Londrina Solid
+- Accent Titles: Londrina Sketch (use sparingly for landing highlights)
+- Body / UI: Nunito
 
-Dark Blue: #032bc0
-Blue: #3A86FF
-Pink: #FF006E
-Purple: #8338EC
-Orange: #FB5607
-Yellow: #FFBE0B
-Green: #5AD63E
-Gray: #808080
+## Colors (Yugi Palette)
+
+- Brand Slate: `#2A3B63`, `#334A7A`, `#3F5FA3`, `#5C7BCB`, `#8FA8E6`
+- Neutrals: `#FFFFFF`, `#F7F8FB`, `#EEF1F7`
+- Ink: `#0D1321`, `#2A3245`, `#55607A`
+- Stroke: `#DDE3F0`
+- Accents: teal `#22B8B2`, coral `#FF5A6B`, lime `#40D57C`, amber `#FFB020`
 
 ## Supabase
 

@@ -151,7 +151,7 @@ export function ActivityBlockContent({
             <div className="font-medium text-sm text-gray-900 leading-tight truncate">
               {activity.activity?.name || 'Untitled Activity'}
             </div>
-            {category && blockSize !== 'compact' && (
+            {category && (
               <div className="text-xs text-gray-500 truncate mt-0.5">
                 {category}
               </div>

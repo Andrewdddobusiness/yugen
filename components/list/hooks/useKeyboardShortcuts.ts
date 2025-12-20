@@ -147,7 +147,7 @@ export function useKeyboardShortcuts({
         });
 
         // Update local state
-        setItineraryActivities(newActivities);
+        setItineraryActivities(newActivities as any);
 
         // Show feedback
         toast.success(`Moved ${activity.activity?.name || 'activity'} ${event.key === 'ArrowUp' ? 'up' : 'down'}`);

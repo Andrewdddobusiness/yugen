@@ -5,14 +5,14 @@ import { useQuery } from '@tanstack/react-query';
 import { useParams } from 'next/navigation';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable';
 import { cn } from '@/lib/utils';
-import { ItineraryHeader } from '@/components/itinerary/ItineraryHeader';
-import { ItineraryToolbar } from '@/components/itinerary/ItineraryToolbar';
-import { ItinerarySidebar } from '@/components/itinerary/ItinerarySidebar';
+import ItineraryHeader from '@/components/layout/header/ItineraryHeader';
+import ItineraryToolbar from '@/components/layout/header/ItineraryToolbar';
+import ItinerarySidebar from '@/components/layout/sidebar/ItinerarySidebar';
 import { useItineraryLayoutStore } from '@/store/itineraryLayoutStore';
 import { fetchItineraryDestination, fetchItineraryDestinationDateRange } from '@/actions/supabase/actions';
 import Loading from '@/components/loading/Loading';
 import ErrorPage from '@/app/error/page';
-const GoogleMapView = lazy(() => import('@/components/map/googleMapView'));
+const GoogleMapView = lazy(() => import('@/components/map/GoogleMapView'));
 import { useItineraryActivityStore } from '@/store/itineraryActivityStore';
 
 interface ItineraryBuilderLayoutProps {

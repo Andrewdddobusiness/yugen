@@ -20,32 +20,13 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
 import { useQueryClient } from '@tanstack/react-query';
-import { useItineraryActivityStore } from '@/store/itineraryActivityStore';
+import { useItineraryActivityStore, IItineraryActivity } from '@/store/itineraryActivityStore';
 import { Card, CardContent } from '@/components/ui/card';
 import { GripVertical, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-interface ItineraryActivity {
-  itinerary_activity_id: string;
-  date: string | null;
-  start_time: string | null;
-  end_time: string | null;
-  notes?: string;
-  activity?: {
-    activity_id?: string;
-    name: string;
-    address?: string;
-    coordinates?: [number, number];
-    types?: string[];
-    rating?: number;
-    price_level?: string;
-    phone_number?: string;
-    website_url?: string;
-    photo_names?: string[];
-    place_id?: string;
-  };
-  deleted_at?: string | null;
-}
+// Use the interface from the store
+type ItineraryActivity = IItineraryActivity;
 
 interface ItineraryDragDropProviderProps {
   children: React.ReactNode;

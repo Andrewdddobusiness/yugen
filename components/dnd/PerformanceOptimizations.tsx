@@ -8,8 +8,9 @@ import React, {
   useState,
   memo
 } from 'react';
+// @ts-ignore
 import { debounce, throttle } from 'lodash';
-import { useDragContext } from './DragProvider';
+import { useDragContext } from '@/components/provider/dnd/DragProvider';
 
 /**
  * Performance monitoring and optimization utilities for drag-and-drop operations
@@ -474,7 +475,7 @@ export function useBatchDragUpdates() {
       pendingUpdates.current = [];
 
       // Use React's batch update mechanism
-      React.unstable_batchedUpdates(() => {
+      (React as any).unstable_batchedUpdates(() => {
         updates.forEach(update => update());
       });
     }, 0);

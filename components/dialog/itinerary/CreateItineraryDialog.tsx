@@ -13,7 +13,7 @@ import { Plus, Minus, Loader2, MapPin } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 
-import { ComboBox } from "@/components/comboBox/comboBox";
+import { ComboBox } from "@/components/form/ComboBox";
 import { Skeleton } from "@/components/ui/skeleton";
 import DestinationSelector from "@/components/destination/DestinationSelector";
 
@@ -406,7 +406,7 @@ export default function PopUpCreateItinerary({ children, className, ...props }: 
                     </div>
                     <Button
                       type="button"
-                      className="flex w-28 bg-[#3A86FF] rounded-xl shadow-md shadow-[#3A86FF] text-white hover:bg-[#3A86FF]/90 active:scale-95 transition-all duration-300"
+                      className="flex w-28 bg-[#3F5FA3] rounded-xl shadow-md shadow-[#3F5FA3] text-white hover:bg-[#3F5FA3]/90 active:scale-95 transition-all duration-300"
                       onClick={handleNext}
                       disabled={!isStepValid() || loading}
                     >

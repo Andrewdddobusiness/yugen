@@ -19,6 +19,7 @@ interface ShareOptions {
   expirationDays?: number;
   password?: string;
   publicView: boolean;
+  format?: 'web' | 'pdf' | 'excel' | 'google_maps' | 'calendar' | 'text' | 'mobile';
 }
 
 interface ShareableLink {
@@ -106,7 +107,7 @@ export class ShareableLinkGenerator {
 
     for (const format of formats) {
       const formatShareId = `${baseShareId}-${format}`;
-      await this.storeSharedItinerary(formatShareId, itinerary, { ...options, format });
+      await this.storeSharedItinerary(formatShareId, itinerary, { ...options, format: format as any });
 
       const fullUrl = `${this.BASE_URL}${this.SHARE_BASE_PATH}/${formatShareId}`;
       const shortUrl = await this.generateShortUrl(fullUrl);
@@ -243,7 +244,7 @@ export class ShareableLinkGenerator {
     itinerary: ShareableItinerary,
     options: ShareOptions
   ): any {
-    const sanitized = {
+    const sanitized: any = {
       city: itinerary.city,
       country: itinerary.country,
       fromDate: itinerary.fromDate,

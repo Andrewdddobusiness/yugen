@@ -65,13 +65,3 @@ export * from './ui';
 
 // View components
 export * from './view';
-
-// Re-export commonly used components for backwards compatibility
-export { default as ActivityCard } from './card/activity/ActivityCard';
-export { default as ActivityCards } from './card/activity/ActivityCards';
-export { default as ItineraryCard } from './card/itinerary/ItineraryCard';
-export { default as GoogleMap } from './map/GoogleMap';
-export { default as Calendar } from './view/calendar/Calendar';
-export { default as ViewToggle } from './view/toggle/ViewToggle';
-export { default as Navigation } from './layout/navigation/Navigation';
-export { default as Footer } from './layout/footer/Footer';

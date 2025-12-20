@@ -32,7 +32,7 @@ import { IItineraryActivity, useItineraryActivityStore } from "@/store/itinerary
 import { useParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Download, Share, Users } from "lucide-react";
-import { ExportDialog } from "@/components/dialog/export/ShareExportDialog";
+import { ShareExportDialog } from "@/components/dialog/export/ShareExportDialog";
 import Loading from "@/components/loading/Loading";
 
 export default function Layout({ children }: { children: React.ReactNode }) {
@@ -257,7 +257,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         <div className="flex-1 overflow-auto">{children}</div>
       </main>
     </SidebarProvider>
-    <ExportDialog open={exportDialogOpen} onOpenChange={setExportDialogOpen} itineraryId={itineraryId as string} />
+    <ShareExportDialog open={exportDialogOpen} onOpenChange={setExportDialogOpen} itineraryId={itineraryId as string} />
     </div>
   );
 }

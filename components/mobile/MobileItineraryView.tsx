@@ -3,8 +3,7 @@
 import React, { useState, useCallback, useMemo } from 'react';
 import { Plus, Calendar, List, Edit3, Trash2, Move, Filter } from 'lucide-react';
 import { useMobileEnhanced } from '@/components/hooks/use-mobile-enhanced';
-import { MobileTopBar } from './MobileNavigation';
-import { MobileViewSwitcher, MobileFAB } from './MobileNavigation';
+import { MobileTopBar, MobileViewSwitcher, MobileFAB } from '../navigation/MobileNavigation';
 import { MobileTimeSlots } from './MobileTimeSlots';
 import { MobileActivityCard } from './MobileActivityCard';
 import { SwipeActionCard, SwipeNavigation } from './SwipeGestures';

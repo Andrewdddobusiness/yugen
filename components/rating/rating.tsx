@@ -1,5 +1,5 @@
-import FullStar from "@/components/rating/fullStar";
-import EmptyStar from "@/components/rating/emptyStar";
+import FullStar from "@/components/rating/FullStar";
+import EmptyStar from "@/components/rating/EmptyStar";
 
 interface RatingProps {
   rating: number;

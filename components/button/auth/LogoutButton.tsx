@@ -5,7 +5,7 @@ import { useToast } from "@/components/ui/use-toast";
 import { logout } from "@/actions/auth/actions";
 import { ReactNode } from "react";
 
-export default function LogoutButton({ children }: { children: ReactNode }) {
+export default function LogoutButton({ children, className }: { children: ReactNode; className?: string }) {
   const router = useRouter();
   const { toast } = useToast();
 
@@ -37,7 +37,7 @@ export default function LogoutButton({ children }: { children: ReactNode }) {
   };
 
   return (
-    <span className="cursor-pointe w-full h-full" onClick={handleLogout}>
+    <span className={`cursor-pointer w-full h-full ${className || ''}`} onClick={handleLogout}>
       {children}
     </span>
   );

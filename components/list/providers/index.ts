@@ -1,1 +1,1 @@
-export { ItineraryListProvider, useItineraryListContext } from './ItineraryListProvider';
+export { useItineraryListContext } from '@/components/provider/list/ItineraryListProvider';

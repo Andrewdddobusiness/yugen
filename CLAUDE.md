@@ -307,8 +307,8 @@ const Button = forwardRef<
 #### **Color System & Theme Adherence**
 
 **Primary Brand Colors (from README.md):**
-- **Dark Blue**: `#032bc0` - Primary navigation, headers
-- **Blue**: `#3A86FF` - Primary actions, links, highlights
+- **Dark Blue**: `#2A3B63` - Primary navigation, headers
+- **Blue**: `#3F5FA3` - Primary actions, links, highlights
 - **Pink**: `#FF006E` - Accent colors, CTAs
 - **Purple**: `#8338EC` - Secondary actions, tags
 - **Orange**: `#FB5607` - Warning states, alerts

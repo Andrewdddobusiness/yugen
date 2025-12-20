@@ -1,7 +1,8 @@
 "use client";
 
 import React, { useMemo, useState, useEffect } from 'react';
-import { InfoWindow, Circle } from '@vis.gl/react-google-maps';
+import { InfoWindow } from '@vis.gl/react-google-maps';
+import Circle from './Circle';
 import { 
   Clock, 
   Car, 
@@ -172,7 +173,6 @@ export function TravelTimeOverlay({
                 onCheckedChange={(checked) => {
                   // This would be handled by parent component
                 }}
-                size="sm"
               />
             </div>
             
@@ -183,7 +183,6 @@ export function TravelTimeOverlay({
                 onCheckedChange={(checked) => {
                   // This would be handled by parent component
                 }}
-                size="sm"
               />
             </div>
           </div>
@@ -253,13 +252,11 @@ export function TravelTimeOverlay({
                 key={`${activity.itinerary_activity_id}-${zone.minutes}`}
                 center={center}
                 radius={zone.radius}
-                options={{
-                  fillColor: zone.color,
-                  fillOpacity: zone.opacity,
-                  strokeColor: zone.color,
-                  strokeOpacity: 0.6,
-                  strokeWeight: 1,
-                }}
+                fillColor={zone.color}
+                fillOpacity={zone.opacity}
+                strokeColor={zone.color}
+                strokeOpacity={0.6}
+                strokeWeight={1}
               />
             ))}
           </div>
@@ -357,7 +354,7 @@ function TravelTimeDetail({ segment, showAllModes, onModeSelect }: TravelTimeDet
         {Object.entries(segment.modes)
           .filter(([mode, data]) => showAllModes || data.reliable)
           .sort(([_, a], [__, b]) => a.duration - b.duration)
-          .map(([mode, data]) => (
+          .map(([mode, data]: [string, any]) => (
             <div
               key={mode}
               className={cn(

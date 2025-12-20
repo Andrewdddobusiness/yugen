@@ -26,7 +26,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover';
-import { useDragContext, DragOperation } from './DragProvider';
+import { useDragContext, DragOperation } from '@/components/provider/dnd/DragProvider';
 
 interface UndoRedoControlsProps {
   position?: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' | 'inline';

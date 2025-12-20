@@ -244,8 +244,8 @@ export const ActivityCard = memo<ActivityCardProps>(
                     />
                   </svg>
                   <ActivityTimeInfo
-                    startTime={displayStartTime}
-                    endTime={displayEndTime}
+                    startTime={displayStartTime || undefined}
+                    endTime={displayEndTime || undefined}
                     duration={duration}
                     size={size}
                   />

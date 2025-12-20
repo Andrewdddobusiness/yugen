@@ -87,8 +87,8 @@ export class EnhancedExcelExporter {
       .filter(activity => !activity.deleted_at)
       .map((activity, index) => ({
         '#': index + 1,
-        'Date': format(new Date(activity.date), 'yyyy-MM-dd'),
-        'Day': format(new Date(activity.date), 'EEEE'),
+        'Date': activity.date ? format(new Date(activity.date), 'yyyy-MM-dd') : '',
+        'Day': activity.date ? format(new Date(activity.date), 'EEEE') : '',
         'Start Time': activity.start_time || '',
         'End Time': activity.end_time || '',
         'Duration (min)': activity.start_time && activity.end_time 
@@ -325,7 +325,7 @@ export class EnhancedExcelExporter {
         'Phone': activity.activity?.phone_number || '',
         'Website': activity.activity?.website_url || '',
         'Address': activity.activity?.address || '',
-        'Date Scheduled': format(new Date(activity.date), 'yyyy-MM-dd'),
+        'Date Scheduled': activity.date ? format(new Date(activity.date), 'yyyy-MM-dd') : '',
         'Time': activity.start_time || '',
       }));
 
@@ -402,6 +402,7 @@ export class EnhancedExcelExporter {
   private groupActivitiesByDate(activities: IItineraryActivity[]) {
     return activities.reduce((groups: { [key: string]: IItineraryActivity[] }, activity) => {
       const date = activity.date;
+      if (!date) return groups;
       if (!groups[date]) {
         groups[date] = [];
       }
@@ -449,6 +450,7 @@ export class EnhancedExcelExporter {
     
     activities.forEach(activity => {
       const date = activity.date;
+      if (!date) return;
       const cost = this.estimateActivityCost(activity);
       
       if (!daily[date]) {

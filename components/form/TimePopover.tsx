@@ -29,22 +29,22 @@ export default function TimePopover({
   styled = true,
 }: {
   itineraryActivityId: number;
-  storeStartTime: string;
-  storeEndTime: string;
+  storeStartTime: string | null;
+  storeEndTime: string | null;
   showText?: boolean;
   styled?: boolean;
 }) {
   const queryClient = useQueryClient();
 
-  const [startTime, setStartTime] = useState(storeStartTime);
-  const [endTime, setEndTime] = useState(storeEndTime);
+  const [startTime, setStartTime] = useState(storeStartTime || "");
+  const [endTime, setEndTime] = useState(storeEndTime || "");
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
 
   useEffect(() => {
-    setStartTime(storeStartTime);
-    setEndTime(storeEndTime);
+    setStartTime(storeStartTime || "");
+    setEndTime(storeEndTime || "");
   }, [storeStartTime, storeEndTime]);
 
   const handleTimeChange = (type: "start" | "end", value: string) => {
@@ -161,7 +161,7 @@ export default function TimePopover({
           <Button
             onClick={handleSave}
             disabled={!startTime || !endTime || !!error || isLoading}
-            className="bg-[#3A86FF] hover:bg-[#3A86FF]/80 rounded-xl shadow-lg text-white active:scale-95 transition-all duration-300 ease-in-out"
+            className="bg-[#3F5FA3] hover:bg-[#3F5FA3]/80 rounded-xl shadow-lg text-white active:scale-95 transition-all duration-300 ease-in-out"
           >
             {isLoading ? (
               <>

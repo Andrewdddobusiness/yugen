@@ -1,69 +1,61 @@
-import { Twitter } from "lucide-react";
-
-import { Instagram } from "lucide-react";
-
-import { Facebook } from "lucide-react";
+import { Twitter, Instagram, Facebook, MapPin } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 
 export default function Footer() {
   return (
-    <footer className="relative w-full bg-[#032bc0] text-white">
-      {/* Noise texture overlay */}
-      <div className="absolute inset-0 pointer-events-none opacity-50">
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          viewBox="0 0 1000 1000"
-          preserveAspectRatio="xMidYMid slice"
-          className="absolute w-full h-full opacity-[0.3] mix-blend-overlay"
-        >
-          <image href="/home/noise.svg" width="100%" height="100%" />
-        </svg>
-      </div>
+    <footer className="relative w-full overflow-hidden bg-gradient-to-br from-brand-700 via-brand-600 to-ink-900 text-white">
+      <div className="absolute inset-0 route-pattern opacity-30 pointer-events-none" />
+      <div className="absolute inset-0 noise-soft pointer-events-none" />
 
-      {/* Footer content */}
-      <div className="container mx-auto px-4 py-12 mt-8">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+      <div className="container mx-auto px-4 py-14 mt-4 relative z-10">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-10">
           {/* Company Info */}
-          <div className="flex flex-col items-start">
-            <Link href="/" className="flex flex-row items-center gap-1">
-              <div className="hidden sm:block w-[35px] h-[35px] group cursor-pointer select-none">
+          <div className="flex flex-col items-start space-y-4">
+            <Link href="/" className="flex flex-row items-center gap-3">
+              <div className="w-[40px] h-[40px] group cursor-pointer select-none">
                 <Image
-                  className="w-full h-full transition-transform duration-500 ease-in-out transform group-hover:rotate-45 t"
-                  src="/journey1.svg"
-                  alt="Journey Logo"
+                  className="w-full h-full transition-transform duration-500 ease-in-out transform group-hover:rotate-6"
+                  src="/assets/yugi-mascot-1.png"
+                  alt="Yugi Logo"
                   width={100}
                   height={100}
                   priority
                   draggable={false}
                 />
               </div>
-              <h3 className="text-2xl font-semibold">Journey</h3>
+              <div>
+                <h3 className="text-2xl font-semibold leading-tight font-logo">Yugi</h3>
+                <p className="text-white/70 text-sm">Soft navigator for calm, confident travel planning.</p>
+              </div>
             </Link>
-            <p className="text-white/80">Your ultimate travel companion for creating perfect itineraries.</p>
+            <div className="flex items-center gap-2 rounded-full bg-white/10 border border-white/15 px-3 py-2 text-sm">
+              <MapPin className="h-4 w-4 text-amber-300" />
+              <span className="text-white/80">Guiding travelers worldwide</span>
+            </div>
           </div>
 
           {/* Quick Links */}
           <div>
-            <h3 className="text-lg font-semibold mb-4">Quick Links</h3>
-            <ul className="space-y-2">
+            <h3 className="text-lg font-semibold mb-4">Explore</h3>
+            <ul className="space-y-2 text-white/80">
               <li>
-                <Link href="/about" className="text-white/80 hover:text-white transition-colors">
-                  About Us
+                <Link href="/about" className="hover:text-white transition-colors">
+                  About
                 </Link>
               </li>
               <li>
-                <Link href="/contact" className="text-white/80 hover:text-white transition-colors">
+                <Link href="/contact" className="hover:text-white transition-colors">
                   Contact
                 </Link>
               </li>
               <li>
-                <Link href="/privacy" className="text-white/80 hover:text-white transition-colors">
+                <Link href="/privacy" className="hover:text-white transition-colors">
                   Privacy Policy
                 </Link>
               </li>
               <li>
-                <Link href="/terms" className="text-white/80 hover:text-white transition-colors">
+                <Link href="/terms" className="hover:text-white transition-colors">
                   Terms of Service
                 </Link>
               </li>
@@ -72,14 +64,14 @@ export default function Footer() {
 
           {/* Contact Info */}
           <div>
-            <h3 className="text-lg font-semibold mb-4">Contact Us</h3>
-            <ul className="space-y-2">
-              <li className="text-white/80">
-                <a href="mailto:support@journey.com" className="hover:text-white transition-colors">
-                  support@journey.com
+            <h3 className="text-lg font-semibold mb-4">Stay in touch</h3>
+            <ul className="space-y-3 text-white/80">
+              <li>
+                <a href="mailto:support@yugi.app" className="hover:text-white transition-colors">
+                  support@yugi.app
                 </a>
               </li>
-              <li className="flex space-x-4 pt-4">
+              <li className="flex space-x-4 pt-2">
                 <a href="#" className="text-white/80 hover:text-white transition-colors">
                   <Twitter className="h-6 w-6" />
                 </a>
@@ -94,19 +86,9 @@ export default function Footer() {
           </div>
         </div>
 
-        <div className="flex flex-col sm:flex-row items-center justify-between border-t border-white/10 mt-8 text-white/60 pt-8">
-          <p className="hidden sm:block text-sm">&copy; {new Date().getFullYear()} Journey. All rights reserved.</p>
-          <div className="flex justify-center w-full sm:w-[200px] h-[35px] group cursor-pointer select-none">
-            <Image
-              className="w-full h-full transition-transform duration-500 ease-in-out transform group-hover:rotate-12 invert brightness-0"
-              src="/theTravelCompanyLogo.svg"
-              alt="The Travel Company Logo"
-              width={500}
-              height={500}
-              priority
-              draggable={false}
-            />
-          </div>
+        <div className="flex flex-col sm:flex-row items-center justify-between border-t border-white/15 mt-10 text-white/70 pt-6">
+          <p className="text-sm">&copy; {new Date().getFullYear()} Yugi. All rights reserved.</p>
+          <p className="text-sm mt-3 sm:mt-0">Built for planners who like clarity, warmth, and gentle guidance.</p>
         </div>
       </div>
     </footer>

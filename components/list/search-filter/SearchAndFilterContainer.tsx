@@ -14,7 +14,7 @@ import {
   useSearchFilters, 
   useActivityFiltering, 
   useAvailableCategories,
-  useKeyboardShortcuts,
+  useSearchKeyboardShortcuts,
   useFilterChangeNotification
 } from './hooks';
 
@@ -61,7 +61,7 @@ export function SearchAndFilterContainer({
   const availableCategories = useAvailableCategories(activities);
 
   // Set up keyboard shortcuts
-  useKeyboardShortcuts(
+  useSearchKeyboardShortcuts(
     showFilters,
     setShowFilters,
     filters.searchText,

@@ -6,7 +6,7 @@ import {
   timeToMinutes
 } from '@/utils/calendar/collisionDetection';
 import { estimateActivityDuration } from '@/utils/calendar/durationEstimation';
-import { ItineraryActivity } from '@/store/itineraryActivityStore';
+import { IItineraryActivity } from '@/store/itineraryActivityStore';
 import { TimeSlot } from '../TimeGrid';
 
 /**
@@ -26,7 +26,7 @@ export interface ActivitySchedulingContext {
   };
 }
 
-export interface WishlistItem {
+export interface SchedulerWishlistItem {
   placeId: string;
   activity: any;
   notes?: string;
@@ -43,14 +43,14 @@ export interface SchedulingResult {
 export class ActivityScheduler {
   constructor(
     private context: ActivitySchedulingContext,
-    private itineraryActivities: ItineraryActivity[]
+    private itineraryActivities: IItineraryActivity[]
   ) {}
 
   /**
    * Schedules a wishlist item to a specific date and time slot
    */
   async scheduleWishlistItem(
-    wishlistItem: WishlistItem,
+    wishlistItem: SchedulerWishlistItem,
     targetDate: Date,
     targetSlot: TimeSlot,
     destinationId: string
@@ -134,12 +134,14 @@ export class ActivityScheduler {
     const proposedStartTime = `${targetSlot.hour.toString().padStart(2, '0')}:${targetSlot.minute.toString().padStart(2, '0')}:00`;
     
     // Check for collisions
-    const existingActivities = this.itineraryActivities.map(act => ({
-      id: act.itinerary_activity_id,
-      date: act.date,
-      startTime: act.start_time,
-      endTime: act.end_time
-    }));
+    const existingActivities = this.itineraryActivities
+      .filter(act => act.date && act.start_time && act.end_time)
+      .map(act => ({
+        id: act.itinerary_activity_id,
+        date: act.date as string,
+        startTime: act.start_time as string,
+        endTime: act.end_time as string
+      }));
     
     const validSlot = findNearestValidSlot(
       proposedStartTime,
@@ -267,12 +269,14 @@ export class ActivityScheduler {
   ) {
     const proposedEndTime = `${Math.floor((timeToMinutes(proposedStartTime) + duration) / 60).toString().padStart(2, '0')}:${((timeToMinutes(proposedStartTime) + duration) % 60).toString().padStart(2, '0')}:00`;
     
-    const existingActivities = this.itineraryActivities.map(act => ({
-      id: act.itinerary_activity_id,
-      date: act.date,
-      startTime: act.start_time,
-      endTime: act.end_time
-    }));
+    const existingActivities = this.itineraryActivities
+      .filter(act => act.date && act.start_time && act.end_time)
+      .map(act => ({
+        id: act.itinerary_activity_id,
+        date: act.date as string,
+        startTime: act.start_time as string,
+        endTime: act.end_time as string
+      }));
     
     return detectConflicts(
       {

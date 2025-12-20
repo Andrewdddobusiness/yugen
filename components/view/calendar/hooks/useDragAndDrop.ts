@@ -5,7 +5,7 @@ import { useParams } from 'next/navigation';
 import { useToast } from '@/components/ui/use-toast';
 import { useItineraryActivityStore } from '@/store/itineraryActivityStore';
 import { useSchedulingContext } from '@/store/timeSchedulingStore';
-import { ActivityScheduler, WishlistItem } from '../services/activityScheduler';
+import { ActivityScheduler, SchedulerWishlistItem } from '../services/activityScheduler';
 import { ScheduledActivity } from './useScheduledActivities';
 import { TimeSlot } from '../TimeGrid';
 
@@ -132,7 +132,7 @@ export function useDragAndDrop(
     });
   }, [days, timeSlots, scheduledActivities, scheduler]);
 
-  const handleWishlistItemDrop = useCallback(async (wishlistItem: WishlistItem, targetDate: Date, targetSlot: TimeSlot) => {
+  const handleWishlistItemDrop = useCallback(async (wishlistItem: SchedulerWishlistItem, targetDate: Date, targetSlot: TimeSlot) => {
     setIsSaving(true);
     
     const result = await scheduler.scheduleWishlistItem(
@@ -267,9 +267,9 @@ export function useDragAndDrop(
       activityId,
       newDuration,
       resizeDirection,
-      activityToResize.start_time,
-      activityToResize.end_time,
-      activityToResize.date
+      activityToResize.start_time as string,
+      activityToResize.end_time as string,
+      activityToResize.date as string
     );
 
     if (result.success && result.data) {

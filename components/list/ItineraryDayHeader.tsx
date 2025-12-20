@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { CollapsibleTrigger } from '@/components/ui/collapsible';
 import { getTotalTravelTimeForDay } from '@/utils/travel/travelTimeUtils';
-import type { TravelTimeData } from '@/components/hooks/use-travel-times';
+import type { TravelTimeResult } from '@/utils/travel/travelTimeUtils';
 
 interface ItineraryActivity {
   itinerary_activity_id: string;
@@ -40,7 +40,7 @@ interface ItineraryDayHeaderProps {
   onSelectDay?: (date: string) => void;
   selectionMode: boolean;
   isMobile: boolean;
-  travelTimes?: TravelTimeData[];
+  travelTimes?: TravelTimeResult[];
 }
 
 export function ItineraryDayHeader({

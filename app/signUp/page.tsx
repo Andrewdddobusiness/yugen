@@ -93,7 +93,7 @@ export default function SignUpPage() {
         {!user ? (
           <div className="mx-auto grid w-[350px] gap-6">
             <div className="grid gap-2 text-center">
-              <h1 className="text-4xl font-bold text-[#3A86FF]">Sign Up</h1>
+              <h1 className="text-4xl font-bold text-[#3F5FA3]">Sign Up</h1>
               <p className="text-muted-foreground text-lg">You&apos;re one step closer to planning your next trip!</p>
             </div>
 
@@ -104,7 +104,7 @@ export default function SignUpPage() {
                   name="first_name"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="text-[#3A86FF]">First Name</FormLabel>
+                      <FormLabel className="text-[#3F5FA3]">First Name</FormLabel>
                       <FormControl>
                         <Input placeholder="John" type="first_name" {...field} />
                       </FormControl>
@@ -117,7 +117,7 @@ export default function SignUpPage() {
                   name="last_name"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="text-[#3A86FF]">Last Name</FormLabel>
+                      <FormLabel className="text-[#3F5FA3]">Last Name</FormLabel>
                       <FormControl>
                         <Input placeholder="Smith" type="last_name" {...field} />
                       </FormControl>
@@ -130,7 +130,7 @@ export default function SignUpPage() {
                   name="email"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="text-[#3A86FF]">Email</FormLabel>
+                      <FormLabel className="text-[#3F5FA3]">Email</FormLabel>
                       <FormControl>
                         <Input placeholder="example@gmail.com" type="email" {...field} />
                       </FormControl>
@@ -143,7 +143,7 @@ export default function SignUpPage() {
                   name="password"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="text-[#3A86FF]">Password</FormLabel>
+                      <FormLabel className="text-[#3F5FA3]">Password</FormLabel>
                       <FormControl>
                         <Input type="password" placeholder="Enter your password" {...field} />
                       </FormControl>
@@ -158,7 +158,7 @@ export default function SignUpPage() {
                   <Button
                     type="submit"
                     disabled={loading}
-                    className="rounded-xl shadow-lg hover:scale-105 transition-all duration-300 bg-[#032bc0] text-white hover:bg-[#3A86FF]"
+                    className="rounded-xl shadow-lg hover:scale-105 transition-all duration-300 bg-[#2A3B63] text-white hover:bg-[#3F5FA3]"
                   >
                     Sign Up
                   </Button>
@@ -197,7 +197,7 @@ export default function SignUpPage() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                 </svg>
               </div>
-              <h1 className="text-3xl font-bold text-[#3A86FF]">Welcome aboard!</h1>
+              <h1 className="text-3xl font-bold text-[#3F5FA3]">Welcome aboard!</h1>
               <div className="space-y-2">
                 <p className="text-lg text-muted-foreground">
                   We&apos;ve sent a verification email to:
@@ -210,7 +210,7 @@ export default function SignUpPage() {
               </div>
               <div className="pt-4 space-y-3">
                 <Link href="/login">
-                  <Button className="w-full rounded-xl shadow-lg hover:scale-105 transition-all duration-300 bg-[#032bc0] text-white hover:bg-[#3A86FF]">
+                  <Button className="w-full rounded-xl shadow-lg hover:scale-105 transition-all duration-300 bg-[#2A3B63] text-white hover:bg-[#3F5FA3]">
                     Go to Login
                   </Button>
                 </Link>
@@ -233,7 +233,7 @@ export default function SignUpPage() {
                         }
                       }
                     }}
-                    className="text-[#3A86FF] underline hover:no-underline"
+                    className="text-[#3F5FA3] underline hover:no-underline"
                   >
                     resend verification email
                   </button>

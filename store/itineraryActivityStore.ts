@@ -17,6 +17,7 @@ export interface IItineraryActivity {
   date: string | null; // Allow null for unscheduled activities
   start_time: string | null; // Allow null for unscheduled activities
   end_time: string | null; // Allow null for unscheduled activities
+  notes?: string;
   deleted_at: string | null;
   activity?: IActivity;
 }

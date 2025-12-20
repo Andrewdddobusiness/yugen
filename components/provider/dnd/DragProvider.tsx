@@ -288,8 +288,8 @@ interface DragContextValue {
   validateDropZone: (zoneId: string, item: DraggedItem) => DropValidation;
   
   // History operations
-  undo: () => boolean;
-  redo: () => boolean;
+  undo: () => Promise<boolean>;
+  redo: () => Promise<boolean>;
   canUndo: () => boolean;
   canRedo: () => boolean;
   

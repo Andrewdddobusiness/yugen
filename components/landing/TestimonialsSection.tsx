@@ -13,7 +13,7 @@ const testimonials = [
     location: "San Francisco, CA",
     avatar: "/testimonials/sarah.jpg",
     rating: 5,
-    text: "Journey completely transformed how I plan my trips. The drag-and-drop calendar is so intuitive - it's like having Google Calendar for travel planning. I saved 10+ hours on my last Europe trip.",
+    text: "Yugi completely transformed how I plan my trips. The drag-and-drop calendar is so intuitive - it's like having Google Calendar for travel planning. I saved 10+ hours on my last Europe trip.",
     trip: "3-week Europe Adventure",
     highlight: "Saved 10+ hours"
   },
@@ -24,7 +24,7 @@ const testimonials = [
     location: "Austin, TX",
     avatar: "/testimonials/michael.jpg", 
     rating: 5,
-    text: "As someone who loves detailed planning, Journey is perfect. The area search helped me discover hidden gems in Tokyo that I never would have found otherwise. The export features are incredibly useful.",
+    text: "As someone who loves detailed planning, Yugi is perfect. The area search helped me discover hidden gems in Tokyo that I never would have found otherwise. The export features are incredibly useful.",
     trip: "2-week Japan Discovery",
     highlight: "Found hidden gems"
   },
@@ -35,7 +35,7 @@ const testimonials = [
     location: "London, UK",
     avatar: "/testimonials/emma.jpg",
     rating: 5,
-    text: "Planning our family vacation used to be stressful, but Journey made it enjoyable. The wishlist feature let everyone contribute ideas, and organizing everything was so smooth.",
+    text: "Planning our family vacation used to be stressful, but Yugi made it enjoyable. The wishlist feature let everyone contribute ideas, and organizing everything was so smooth.",
     trip: "Family Trip to Thailand",
     highlight: "Made planning enjoyable"
   }
@@ -53,7 +53,7 @@ export default function TestimonialsSection() {
   const isInView = useInView(sectionRef, { once: true, margin: "-100px" });
 
   return (
-    <section className="py-24 bg-gray-50" ref={sectionRef}>
+    <section className="py-24 bg-bg-50" ref={sectionRef}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Section Header */}
         <motion.div
@@ -62,14 +62,14 @@ export default function TestimonialsSection() {
           transition={{ duration: 0.8 }}
           className="text-center mb-16"
         >
-          <h2 className="text-4xl lg:text-5xl font-bold text-gray-900 mb-6">
+          <h2 className="text-4xl lg:text-5xl font-bold text-ink-900 mb-6 font-logo">
             Loved by
             <br />
-            <span className="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+            <span className="bg-gradient-to-r from-brand-500 via-brand-400 to-teal-500 bg-clip-text text-transparent">
               Travel Enthusiasts
             </span>
           </h2>
-          <p className="text-xl text-gray-600 max-w-2xl mx-auto">
+          <p className="text-xl text-ink-600 max-w-2xl mx-auto">
             Join thousands of travelers who&apos;ve discovered the joy of stress-free trip planning
           </p>
         </motion.div>
@@ -87,11 +87,11 @@ export default function TestimonialsSection() {
                 initial={{ opacity: 0, scale: 0.5 }}
                 animate={{ opacity: isInView ? 1 : 0, scale: isInView ? 1 : 0.5 }}
                 transition={{ duration: 0.5, delay: 0.3 + index * 0.1 }}
-                className="text-3xl lg:text-4xl font-bold text-blue-600 mb-2"
+                className="text-3xl lg:text-4xl font-bold text-brand-500 mb-2"
               >
                 {stat.number}{stat.suffix}
               </motion.div>
-              <div className="text-gray-600 font-medium">{stat.label}</div>
+              <div className="text-ink-600 font-medium">{stat.label}</div>
             </div>
           ))}
         </motion.div>
@@ -104,11 +104,11 @@ export default function TestimonialsSection() {
               initial={{ opacity: 0, y: 30 }}
               animate={{ opacity: isInView ? 1 : 0, y: isInView ? 0 : 30 }}
               transition={{ duration: 0.6, delay: 0.4 + index * 0.2 }}
-              className="bg-white rounded-2xl p-8 shadow-lg border border-gray-100 relative hover:shadow-xl transition-all duration-300"
+              className="bg-white rounded-2xl p-8 shadow-card border border-stroke-200 relative hover:shadow-float transition-all duration-300"
             >
               {/* Quote Icon */}
               <div className="absolute -top-4 left-8">
-                <div className="bg-blue-600 rounded-full p-3">
+                <div className="bg-brand-500 rounded-full p-3">
                   <Quote className="h-6 w-6 text-white" />
                 </div>
               </div>
@@ -121,16 +121,16 @@ export default function TestimonialsSection() {
               </div>
 
               {/* Testimonial Text */}
-              <blockquote className="text-gray-700 leading-relaxed mb-6">
+              <blockquote className="text-ink-700 leading-relaxed mb-6">
                 &quot;{testimonial.text}&quot;
               </blockquote>
 
               {/* Trip Info */}
-              <div className="bg-blue-50 rounded-lg p-4 mb-6">
-                <div className="text-sm font-semibold text-blue-900 mb-1">
+              <div className="bg-brand-500/10 rounded-lg p-4 mb-6 border border-stroke-200/70">
+                <div className="text-sm font-semibold text-brand-700 mb-1">
                   {testimonial.trip}
                 </div>
-                <div className="text-sm text-blue-600">
+                <div className="text-sm text-brand-600">
                   ✨ {testimonial.highlight}
                 </div>
               </div>
@@ -148,14 +148,14 @@ export default function TestimonialsSection() {
                     }}
                   />
                   {/* Fallback initials */}
-                  <div className="absolute inset-0 flex items-center justify-center bg-blue-600 text-white font-semibold">
+                  <div className="absolute inset-0 flex items-center justify-center bg-brand-500 text-white font-semibold">
                     {testimonial.name.split(' ').map(n => n[0]).join('')}
                   </div>
                 </div>
                 <div>
-                  <div className="font-semibold text-gray-900">{testimonial.name}</div>
-                  <div className="text-sm text-gray-600">{testimonial.role}</div>
-                  <div className="text-sm text-gray-500">{testimonial.location}</div>
+                  <div className="font-semibold text-ink-900">{testimonial.name}</div>
+                  <div className="text-sm text-ink-700">{testimonial.role}</div>
+                  <div className="text-sm text-ink-500">{testimonial.location}</div>
                 </div>
               </div>
             </motion.div>
@@ -165,19 +165,19 @@ export default function TestimonialsSection() {
         {/* Bottom CTA */}
         <motion.div
           initial={{ opacity: 0, y: 30 }}
-          animate={{ opacity: isInView ? 1 : 0, y: isInView ? 0 : 30 }}
-          transition={{ duration: 0.6, delay: 1.0 }}
-          className="text-center mt-16"
-        >
-          <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-2xl p-8 text-white">
+      animate={{ opacity: isInView ? 1 : 0, y: isInView ? 0 : 30 }}
+      transition={{ duration: 0.6, delay: 1.0 }}
+      className="text-center mt-16"
+    >
+          <div className="bg-gradient-to-r from-brand-600 via-brand-500 to-teal-500 rounded-2xl p-8 text-white">
             <h3 className="text-2xl font-bold mb-4">
-              Ready to Join the Journey Community?
+              Ready to join the Yugi community?
             </h3>
-            <p className="text-blue-100 mb-6 max-w-2xl mx-auto">
+            <p className="text-white/80 mb-6 max-w-2xl mx-auto">
               Start planning your next adventure with the tool that&apos;s already helped 50,000+ travelers create unforgettable trips.
             </p>
-            <button className="bg-white text-blue-600 font-semibold px-8 py-3 rounded-xl hover:bg-gray-50 transition-colors duration-300">
-              Start Planning Free
+            <button className="bg-white text-brand-700 font-semibold px-8 py-3 rounded-xl hover:bg-bg-0 transition-colors duration-300 shadow-card">
+              Start planning free
             </button>
           </div>
         </motion.div>

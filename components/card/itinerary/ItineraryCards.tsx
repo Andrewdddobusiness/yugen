@@ -1,7 +1,7 @@
 "use client";
-import ItineraryCard from "./itineraryCard";
-import ItineraryCardCreate from "./itineraryCardCreate";
-import { IItineraryCard } from "@/components/cards/itineraryCard";
+import ItineraryCard from "./ItineraryCard";
+import ItineraryCardCreate from "./ItineraryCardCreate";
+import { IItineraryCard } from "./ItineraryCard";
 
 interface ItineraryCardsProps {
   itineraries: IItineraryCard[];

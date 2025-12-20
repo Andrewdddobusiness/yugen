@@ -14,7 +14,7 @@ export const ACTIVITY_STATUS: FilterOption[] = [
   { value: 'without-notes', label: 'No notes' },
 ];
 
-export const PRICE_LEVELS: FilterOption[] = [
+export const FILTER_PRICE_LEVELS: FilterOption[] = [
   { value: '1', label: '$' },
   { value: '2', label: '$$' },
   { value: '3', label: '$$$' },

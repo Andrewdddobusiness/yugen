@@ -94,7 +94,7 @@ export default function LoginPage() {
       <div className="flex items-center justify-center z-50">
         <div className="mx-auto grid w-[350px] gap-6">
           <div className="grid gap-2 text-center">
-            <h1 className="text-4xl font-bold text-[#3A86FF]">Login</h1>
+            <h1 className="text-4xl font-bold text-[#3F5FA3]">Login</h1>
             <p className="text-muted-foreground text-lg">Let&apos;s get back to planning your next trip!</p>
           </div>
 
@@ -105,7 +105,7 @@ export default function LoginPage() {
                 name="email"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-[#3A86FF]">Email</FormLabel>
+                    <FormLabel className="text-[#3F5FA3]">Email</FormLabel>
                     <FormControl>
                       <Input placeholder="example@gmail.com" type="email" {...field} />
                     </FormControl>
@@ -118,7 +118,7 @@ export default function LoginPage() {
                 name="password"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-[#3A86FF]">Password</FormLabel>
+                    <FormLabel className="text-[#3F5FA3]">Password</FormLabel>
                     <FormControl>
                       <Input type="password" placeholder="Enter your password" {...field} />
                     </FormControl>
@@ -133,7 +133,7 @@ export default function LoginPage() {
                 <Button
                   type="submit"
                   disabled={loading}
-                  className="rounded-xl shadow-lg hover:scale-105 transition-all duration-300 bg-[#032bc0] text-white hover:bg-[#3A86FF]"
+                  className="rounded-xl shadow-lg hover:scale-105 transition-all duration-300 bg-[#2A3B63] text-white hover:bg-[#3F5FA3]"
                 >
                   Login
                 </Button>
@@ -160,7 +160,7 @@ export default function LoginPage() {
           </div>
           
           <div className="text-center text-sm text-gray-500">
-            <Link href="/login/reset" className="underline text-[#3A86FF]">
+            <Link href="/login/reset" className="underline text-[#3F5FA3]">
               Forgot your password?
             </Link>
           </div>

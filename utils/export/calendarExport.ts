@@ -74,7 +74,7 @@ export class CalendarExporter {
     // Calendar header
     lines.push('BEGIN:VCALENDAR');
     lines.push('VERSION:2.0');
-    lines.push('PRODID:-//Journey App//Travel Itinerary//EN');
+    lines.push('PRODID:-//Yugi//Travel Itinerary//EN');
     lines.push('CALSCALE:GREGORIAN');
     lines.push('METHOD:PUBLISH');
     
@@ -121,7 +121,7 @@ export class CalendarExporter {
     lines.push(`LAST-MODIFIED:${timestamp}`);
 
     // Activity dates and times
-    const activityDate = new Date(activity.date);
+    const activityDate = new Date(activity.date as string);
     const startDateTime = this.combineDateTime(activityDate, activity.start_time!);
     const endDateTime = activity.end_time 
       ? this.combineDateTime(activityDate, activity.end_time)
@@ -268,7 +268,7 @@ export class CalendarExporter {
 
     // Date and time
     if (activity.start_time && activity.date) {
-      const activityDate = new Date(activity.date);
+      const activityDate = new Date(activity.date as string);
       const startDateTime = this.combineDateTime(activityDate, activity.start_time);
       const endDateTime = activity.end_time 
         ? this.combineDateTime(activityDate, activity.end_time)
@@ -323,7 +323,7 @@ export class CalendarExporter {
     const rows = details.activities
       .filter(activity => activity.start_time && activity.date)
       .map(activity => {
-        const activityDate = new Date(activity.date);
+        const activityDate = new Date(activity.date as string);
         const startDateTime = this.combineDateTime(activityDate, activity.start_time!);
         const endDateTime = activity.end_time 
           ? this.combineDateTime(activityDate, activity.end_time)

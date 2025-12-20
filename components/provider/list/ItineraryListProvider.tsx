@@ -4,33 +4,14 @@ import React, { createContext, useContext, useState, useEffect, useCallback, use
 import { format } from 'date-fns';
 import { useParams } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
-import { useItineraryActivityStore } from '@/store/itineraryActivityStore';
+import { useItineraryActivityStore, IItineraryActivity } from '@/store/itineraryActivityStore';
 import { useItineraryLayoutStore } from '@/store/itineraryLayoutStore';
 import { useTravelTimes } from '@/components/hooks/use-travel-times';
 import type { TravelMode } from '@/actions/google/travelTime';
-import type { FilterableActivity } from '../SearchAndFilter';
+import type { FilterableActivity } from '../../list/SearchAndFilter';
 
-interface ItineraryActivity {
-  itinerary_activity_id: string;
-  date: string | null;
-  start_time: string | null;
-  end_time: string | null;
-  notes?: string;
-  activity?: {
-    activity_id?: string;
-    name: string;
-    address?: string;
-    coordinates?: [number, number];
-    types?: string[];
-    rating?: number;
-    price_level?: string;
-    phone_number?: string;
-    website_url?: string;
-    photo_names?: string[];
-    place_id?: string;
-  };
-  deleted_at?: string | null;
-}
+// Use the interface from the store
+type ItineraryActivity = IItineraryActivity;
 
 interface ItineraryListContextType {
   // Activities state

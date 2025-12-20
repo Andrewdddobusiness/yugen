@@ -26,10 +26,10 @@ export default function CTASection() {
   const isInView = useInView(sectionRef, { once: true, margin: "-100px" });
 
   return (
-    <section className="py-24 bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-800 relative overflow-hidden" ref={sectionRef}>
+    <section className="py-24 bg-gradient-to-br from-brand-700 via-brand-600 to-ink-900 relative overflow-hidden" ref={sectionRef}>
       {/* Background Pattern */}
-      <div className="absolute inset-0 opacity-10">
-        <div className="absolute inset-0 bg-[url('/grid-pattern.svg')]"></div>
+      <div className="absolute inset-0 opacity-20">
+        <div className="absolute inset-0 route-pattern"></div>
       </div>
 
       {/* Floating Elements */}
@@ -77,16 +77,15 @@ export default function CTASection() {
           transition={{ duration: 0.8 }}
         >
           <h2 className="text-4xl lg:text-6xl font-bold text-white mb-6 leading-tight">
-            Start Your Next
+            Step into clearer planning
             <br />
-            <span className="bg-gradient-to-r from-yellow-400 to-orange-400 bg-clip-text text-transparent">
-              Adventure Today
+            <span className="bg-gradient-to-r from-brand-300 via-brand-500 to-teal-500 bg-clip-text text-transparent">
+              with Yugi by your side
             </span>
           </h2>
           
-          <p className="text-xl text-blue-100 mb-8 max-w-2xl mx-auto leading-relaxed">
-            Join over 50,000 travelers who&apos;ve discovered the joy of stress-free trip planning. 
-            Your perfect itinerary is just a few clicks away.
+          <p className="text-xl text-white/80 mb-8 max-w-2xl mx-auto leading-relaxed">
+            Join thousands of travelers who prefer calm, glassy controls over chaos. Build, adjust, and share itineraries without losing clarity.
           </p>
 
           {/* Feature Pills */}
@@ -101,7 +100,7 @@ export default function CTASection() {
                 key={index}
                 className="flex items-center space-x-2 bg-white/10 backdrop-blur-sm rounded-full px-4 py-2 border border-white/20"
               >
-                <div className="text-yellow-400">{feature.icon}</div>
+                <div className="text-teal-300">{feature.icon}</div>
                 <span className="text-white text-sm font-medium">{feature.text}</span>
               </div>
             ))}
@@ -116,16 +115,16 @@ export default function CTASection() {
           >
             <Button
               size="lg"
-              className="text-lg bg-white text-blue-600 hover:bg-gray-50 rounded-xl px-8 py-4 shadow-lg transition-all duration-300 hover:scale-105 hover:shadow-xl font-semibold"
+              className="text-lg px-8 py-4 bg-white text-brand-700 hover:bg-bg-0 shadow-float transition-all duration-300 hover:shadow-card font-semibold"
             >
-              Start Planning Free
+              Start planning with Yugi
               <ArrowRight className="h-5 w-5 ml-2" />
             </Button>
             
             <Button
-              variant="outline"
+              variant="secondary"
               size="lg"
-              className="text-lg border-2 border-white/30 text-white hover:bg-white/10 rounded-xl px-8 py-4 backdrop-blur-sm transition-all duration-300"
+              className="text-lg border border-white/30 text-white hover:bg-white/10 rounded-xl px-8 py-4 backdrop-blur-sm transition-all duration-300"
             >
               Watch Demo
             </Button>
@@ -163,27 +162,27 @@ export default function CTASection() {
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-8">
             <div className="text-center">
               <div className="text-3xl font-bold text-white mb-2">50K+</div>
-              <div className="text-blue-200 text-sm">Happy Travelers</div>
+              <div className="text-brand-300 text-sm">Happy Travelers</div>
             </div>
             <div className="text-center">
               <div className="text-3xl font-bold text-white mb-2">2M+</div>
-              <div className="text-blue-200 text-sm">Places Discovered</div>
+              <div className="text-brand-300 text-sm">Places Discovered</div>
             </div>
             <div className="text-center">
               <div className="text-3xl font-bold text-white mb-2">4.9★</div>
-              <div className="text-blue-200 text-sm">Average Rating</div>
+              <div className="text-brand-300 text-sm">Average Rating</div>
             </div>
             <div className="text-center">
               <div className="text-3xl font-bold text-white mb-2">195</div>
-              <div className="text-blue-200 text-sm">Countries Covered</div>
+              <div className="text-brand-300 text-sm">Countries Covered</div>
             </div>
           </div>
         </motion.div>
       </div>
 
       {/* Background Glow Effects */}
-      <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-blue-400/20 rounded-full blur-3xl"></div>
-      <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-indigo-400/20 rounded-full blur-3xl"></div>
+      <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-brand-400/25 rounded-full blur-3xl"></div>
+      <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-teal-500/20 rounded-full blur-3xl"></div>
     </section>
   );
 }

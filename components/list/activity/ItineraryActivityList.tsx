@@ -7,7 +7,7 @@ import { cn } from '@/lib/utils';
 import { SortableActivityItem } from './SortableActivityItem';
 import { DayTimeSlots } from '../time-management/DayTimeSlots';
 import { shouldShowTravelTime, getTravelTimeColor, formatTravelTime } from '@/utils/travel/travelTimeUtils';
-import type { TravelTimeData } from '@/components/hooks/use-travel-times';
+import type { TravelTimeResult } from '@/utils/travel/travelTimeUtils';
 import type { ItineraryActivity, EditingField } from './types';
 
 interface ItineraryActivityListProps {
@@ -152,7 +152,7 @@ export function ItineraryActivityList({
               />
               
               {/* Travel Time Indicator */}
-              {nextActivity && currentTravelData && shouldShowTravelTime(currentTravelData) && (
+              {nextActivity && currentTravelData && shouldShowTravelTime(currentTravelData as TravelTimeResult) && (
                 <div className="flex items-center justify-center py-2">
                   <div className="flex items-center gap-2 text-sm text-gray-600 bg-gray-50 rounded-full px-4 py-2 border">
                     <div className="h-4 w-4 text-gray-400">

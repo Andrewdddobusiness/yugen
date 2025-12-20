@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { Grid, List, Map, Filter, SortAsc } from 'lucide-react';
-import PlaceCard from './PlaceCard';
+import PlaceCard from '@/components/card/place/PlaceCard';
 import type { ActivityWithDetails } from '@/types/database';
 
 interface SearchResultsProps {
@@ -190,7 +190,7 @@ export default function SearchResults({
                 <option value="">All Types</option>
                 {availableTypes.map(type => (
                   <option key={type} value={type}>
-                    {type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                    {type.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase())}
                   </option>
                 ))}
               </select>

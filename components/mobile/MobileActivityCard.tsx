@@ -19,6 +19,7 @@ interface MobileActivityCardProps {
   onEdit?: () => void;
   onDelete?: () => void;
   dragHandleProps?: any;
+  onClick?: () => void;
   className?: string;
 }
 
@@ -32,6 +33,7 @@ export function MobileActivityCard({
   onEdit,
   onDelete,
   dragHandleProps,
+  onClick,
   className,
 }: MobileActivityCardProps) {
   const [isExpanded, setIsExpanded] = useState(false);
@@ -65,6 +67,7 @@ export function MobileActivityCard({
         isSelected && "ring-2 ring-blue-500 bg-blue-50/30 dark:bg-blue-900/20",
         className
       )}
+      onClick={onClick}
     >
       <Collapsible open={isExpanded} onOpenChange={setIsExpanded}>
         <CollapsibleTrigger asChild>

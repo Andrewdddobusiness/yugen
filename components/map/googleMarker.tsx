@@ -1,6 +1,6 @@
 import { AdvancedMarker, useMap } from "@vis.gl/react-google-maps";
 import { IActivity, useActivitiesStore } from "@/store/activityStore";
-import CustomMarker from "./customMarker";
+import CustomMarker from "./CustomMarker";
 import { TColor } from "@/lib/colors/colors";
 
 interface IWaypointProps {

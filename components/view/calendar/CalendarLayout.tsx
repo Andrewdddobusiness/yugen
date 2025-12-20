@@ -43,7 +43,7 @@ interface CalendarLayoutProps {
   conflicts?: TimeConflict[];
   showConflictResolver?: boolean;
   onCloseConflictResolver?: () => void;
-  onResolveConflicts?: (resolutions: any[]) => void;
+  onResolveConflicts?: (resolutions: any[]) => Promise<void>;
 }
 
 /**

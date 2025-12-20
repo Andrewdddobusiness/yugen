@@ -30,7 +30,7 @@ const PopUpCreateItinerary = dynamic(() => import("@/components/dialog/itinerary
   loading: () => (
     <Button
       disabled
-      className="w-full bg-[#3A86FF] text-white rounded-xl shadow-md hover:bg-[#3A86FF]/80 transition-all duration-300 active:scale-95"
+      className="w-full bg-[#3F5FA3] text-white rounded-xl shadow-md hover:bg-[#3F5FA3]/80 transition-all duration-300 active:scale-95"
     >
       <LoadingSpinner />
     </Button>
@@ -51,8 +51,8 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                   <div className="w-[35px] h-[35px]">
                     <Image
                       className="w-full h-full"
-                      src="/journey1.svg"
-                      alt="Journey Logo"
+                      src="/yugi-mark.svg"
+                      alt="Yugi Logo"
                       width={100}
                       height={100}
                       priority
@@ -61,7 +61,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                   </div>
                 </div>
                 <div className="grid flex-1 text-left text-sm leading-tight">
-                  <span className="truncate text-sm font-bold text-[#3A86FF]">Journey</span>
+                  <span className="truncate text-sm font-bold text-brand-600">Yugi</span>
                   <span className="truncate text-xs text-gray-500">
                     {subscription?.status === "active" ? "Pro Traveler" : "Free"}
                   </span>
@@ -74,7 +74,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       <SidebarContent className="bg-white">
         <div className="flex w-full px-4 mt-2">
           <PopUpCreateItinerary className="w-full">
-            <Button className="w-full bg-[#3A86FF] text-white rounded-xl shadow-md hover:bg-[#3A86FF]/80 transition-all duration-300 active:scale-95">
+            <Button className="w-full bg-brand-500 text-white rounded-[14px] shadow-pressable hover:bg-brand-600 active:shadow-pressable-pressed">
               <Plus className="size-3.5 mr-1" />
               <span>Create New Itinerary</span>
             </Button>

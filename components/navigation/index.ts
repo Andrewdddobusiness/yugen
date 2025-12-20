@@ -1,2 +1,2 @@
 // Navigation component exports
-export { default as MobileNavigation } from './MobileNavigation';
+export { MobileNavigation, MobileTopBar, MobileFAB, MobileTabBar, MobileViewSwitcher } from './MobileNavigation';

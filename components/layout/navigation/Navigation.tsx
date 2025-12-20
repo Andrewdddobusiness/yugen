@@ -131,7 +131,7 @@ export default function Navigation() {
   //***** GET SUBSCRIPTION DETAILS *****//
   const { data: subscription, isLoading: isSubscriptionLoading } = useQuery({
     queryKey: ["subscription", user?.id],
-    queryFn: () => getSubscriptionDetails(user?.id as string),
+    queryFn: () => getSubscriptionDetails(),
     enabled: !!user?.id,
     staleTime: Infinity,
     refetchOnMount: false,
@@ -154,12 +154,8 @@ export default function Navigation() {
                 href="/pricing"
                 className={cn(
                   navigationMenuTriggerStyle(),
-                  "text-[#FFBE0B]",
-                  "hover:text-[#FFBE0B]/80",
-                  "focus:text-[#FFBE0B]",
-                  "active:text-[#FFBE0B]",
-                  "focus:border-[#FFBE0B]",
-                  scrolled && "text-[#fff] hover:text-[#fff]/80"
+                  "text-brand-600 hover:text-brand-700 focus:text-brand-700 active:text-brand-700 focus:border-brand-400",
+                  scrolled && "text-ink-900 hover:text-brand-700"
                 )}
               >
                 Pricing
@@ -182,17 +178,17 @@ export default function Navigation() {
           <NavigationMenu className="mr-4">
             <NavigationMenuList className="flex space-x-4">
               <NavigationMenuItem>
-                <NavigationMenuLink
-                  href="/pricing"
-                  className={cn(
-                    navigationMenuTriggerStyle(),
-                    "text-gray-700 font-medium",
-                    "hover:text-blue-600",
-                    "focus:text-blue-600",
-                    "transition-colors duration-200",
-                    scrolled && "text-white hover:text-blue-200"
-                  )}
-                >
+              <NavigationMenuLink
+                href="/pricing"
+                className={cn(
+                  navigationMenuTriggerStyle(),
+                  "text-ink-700 font-medium",
+                  "hover:text-brand-600",
+                  "focus:text-brand-600",
+                  "transition-colors duration-200",
+                  scrolled && "text-ink-900 hover:text-brand-500"
+                )}
+              >
                   Pricing
                 </NavigationMenuLink>
               </NavigationMenuItem>
@@ -202,9 +198,8 @@ export default function Navigation() {
             <PopUpCreateItinerary>
               <Button
                 className={cn(
-                  "w-full rounded-xl",
-
-                  "text-[#fff] bg-[#3A86FF] hover:bg-[#3A86FF]/80 hover:scale-105 shadow-lg transition-all duration-300 h-9"
+                  "w-full h-10 shadow-pressable",
+                  "bg-brand-500 text-white hover:bg-brand-600 active:shadow-pressable-pressed"
                 )}
               >
                 <Plus className="size-3.5 mr-1" />
@@ -249,55 +244,43 @@ export default function Navigation() {
 
     return (
       <NavigationMenu>
-        <NavigationMenuList className="flex space-x-4">
-          <NavigationMenuItem>
-            <NavigationMenuLink
-              href="/pricing"
-              className={cn(
-                navigationMenuTriggerStyle(),
-                "text-[#FFBE0B]",
-                "hover:text-[#FFBE0B]/80",
-                scrolled && "text-[#fff] hover:text-[#fff]/80"
-              )}
-            >
-              Pricing
-            </NavigationMenuLink>
-          </NavigationMenuItem>
-          <NavigationMenuItem>
-            <NavigationMenuLink
-              href="/login"
-              className={cn(
-                navigationMenuTriggerStyle(),
-                "text-[#FF006E]",
-                "hover:text-[#FF006E]/80",
-                "focus:text-[#FF006E]",
-                "active:text-[#FF006E]",
-                "focus:border-[#FF006E]",
-                scrolled && "text-[#fff] hover:text-[#fff]/80"
-              )}
-            >
-              Login
-            </NavigationMenuLink>
-          </NavigationMenuItem>
-          <NavigationMenuItem>
-            <NavigationMenuLink
-              href="/signUp"
-              className={cn(
-                navigationMenuTriggerStyle2(),
-                "bg-[#3A86FF]",
-                "text-white",
-                "hover:text-white/80",
-                "focus:text-white",
-                "active:text-white",
-                "focus:bg-[#3A86FF]",
-                "active:bg-[#3A86FF]",
-                "h-9",
-                "shadow-lg"
-              )}
-            >
-              Sign Up
-            </NavigationMenuLink>
-          </NavigationMenuItem>
+          <NavigationMenuList className="flex space-x-4">
+            <NavigationMenuItem>
+              <NavigationMenuLink
+                href="/pricing"
+                className={cn(
+                  navigationMenuTriggerStyle(),
+                  "text-brand-600 hover:text-brand-700",
+                  scrolled && "text-ink-900 hover:text-brand-600"
+                )}
+              >
+                Pricing
+              </NavigationMenuLink>
+            </NavigationMenuItem>
+            <NavigationMenuItem>
+              <NavigationMenuLink
+                href="/login"
+                className={cn(
+                  navigationMenuTriggerStyle(),
+                  "text-brand-600 hover:text-brand-700 focus:text-brand-700 active:text-brand-700",
+                  scrolled && "text-ink-900 hover:text-brand-600"
+                )}
+              >
+                Login
+              </NavigationMenuLink>
+            </NavigationMenuItem>
+            <NavigationMenuItem>
+              <NavigationMenuLink
+                href="/signUp"
+                className={cn(
+                  navigationMenuTriggerStyle2(),
+                  "bg-brand-500 text-white shadow-pressable hover:bg-brand-600 active:shadow-pressable-pressed",
+                  "h-9"
+                )}
+              >
+                Sign Up
+              </NavigationMenuLink>
+            </NavigationMenuItem>
         </NavigationMenuList>
       </NavigationMenu>
     );
@@ -306,33 +289,17 @@ export default function Navigation() {
   return (
     <div
       className={cn(
-        "fixed top-0 left-0 right-0 flex flex-row items-center justify-between h-16 px-4 sm:px-32 pb-8 sm:pb-0 z-50 pt-8 transition-all duration-300",
-        scrolled && "bg-[#032bc0]"
+        "fixed top-0 left-0 right-0 flex flex-row items-center justify-between h-16 px-4 sm:px-12 lg:px-16 z-50 transition-all duration-300",
+        scrolled ? "bg-white/80 backdrop-blur-2xl border-b border-stroke-200/60 shadow-card" : "bg-transparent"
       )}
     >
-      {/* Glass wave effect */}
-      <div
-        className={cn(
-          "absolute bottom-0 left-0 w-full h-[40px] transition-all duration-300 opacity-0 translate-y-full hidden sm:block",
-          scrolled && "opacity-100"
-        )}
-      >
-        <Image
-          src="/home/blueWave.svg"
-          alt="Wave Border"
-          width={1920}
-          height={120}
-          className="absolute inset-0 w-full h-full rotate-180"
-        />
-      </div>
-
       {/* Mobile Menu Button - Left Side */}
       <div className="sm:hidden relative z-10">
         <Drawer open={open} onOpenChange={setOpen}>
           <DrawerTrigger asChild>
-            <Menu className={cn("h-6 w-6 text-[#3A86FF]", scrolled && "text-white")} />
+            <Menu className={cn("h-6 w-6 text-brand-600", scrolled && "text-brand-700")} />
           </DrawerTrigger>
-          <DrawerContent className="h-[98%] bg-primary text-white bg-[#032bc0] bg-opacity-70">
+          <DrawerContent className="h-[98%] bg-gradient-to-b from-brand-700 to-ink-900 text-white border-t-0">
             <div className="flex flex-col h-full px-6 py-10">
               {/* Navigation Links */}
               <div className="space-y-6 text-4xl font-semibold">
@@ -398,19 +365,22 @@ export default function Navigation() {
       {/* Logo - Centered on mobile, left-aligned on desktop */}
       <Link
         href="/"
-        className="flex items-center justify-center z-10 absolute left-1/2 -translate-x-1/2 sm:relative sm:left-0 sm:translate-x-0"
+        className="flex items-center justify-center gap-2 z-10 absolute left-1/2 -translate-x-1/2 sm:relative sm:left-0 sm:translate-x-0"
       >
-        <div className="w-[35px] h-[35px] group cursor-pointer select-none">
+        <div className="w-[36px] h-[36px] group cursor-pointer select-none">
           <Image
             className="w-full h-full transition-transform duration-500 ease-in-out transform group-hover:rotate-45"
-            src="/journey1.svg"
-            alt="Journey Logo"
+            src="/assets/yugi-mascot-1.png"
+            alt="Yugi Logo"
             width={100}
             height={100}
             priority
             draggable={false}
           />
         </div>
+        <span className="hidden sm:inline-block text-lg font-semibold tracking-tight text-ink-900 font-logo">
+          Yugi
+        </span>
       </Link>
 
       {/* Desktop Navigation - Right Side */}

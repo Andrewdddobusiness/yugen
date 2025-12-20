@@ -4,30 +4,11 @@ import { useState, useCallback } from 'react';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
-import { useItineraryActivityStore } from '@/store/itineraryActivityStore';
+import { useItineraryActivityStore, IItineraryActivity } from '@/store/itineraryActivityStore';
 import { batchUpdateItineraryActivities, setItineraryActivityNotes, setItineraryActivityTimes } from '@/actions/supabase/actions';
 
-interface ItineraryActivity {
-  itinerary_activity_id: string;
-  date: string | null;
-  start_time: string | null;
-  end_time: string | null;
-  notes?: string;
-  activity?: {
-    activity_id?: string;
-    name: string;
-    address?: string;
-    coordinates?: [number, number];
-    types?: string[];
-    rating?: number;
-    price_level?: string;
-    phone_number?: string;
-    website_url?: string;
-    photo_names?: string[];
-    place_id?: string;
-  };
-  deleted_at?: string | null;
-}
+// Use the interface from the store
+type ItineraryActivity = IItineraryActivity;
 
 interface UseBulkSelectionProps {
   activities: ItineraryActivity[];
@@ -181,7 +162,7 @@ export function useBulkSelection({ activities, onRemoveActivity }: UseBulkSelect
     try {
       // Move activities by updating their dates
       const updates = selectedItems.map(activity => ({
-        itinerary_activity_id: activity.itinerary_activity_id,
+        id: activity.itinerary_activity_id,
         date: targetDate === 'unscheduled' ? null : targetDate,
         start_time: null, // Clear times when moving to new day
         end_time: null,
@@ -192,8 +173,8 @@ export function useBulkSelection({ activities, onRemoveActivity }: UseBulkSelect
       if (result.success) {
         // Update local state
         const updatedActivities = itineraryActivities.map(activity => {
-          const update = updates.find(u => u.itinerary_activity_id === activity.itinerary_activity_id);
-          return update ? { ...activity, ...update } : activity;
+          const update = updates.find(u => u.id === activity.itinerary_activity_id);
+          return update ? { ...activity, ...update, itinerary_activity_id: update.id } : activity;
         });
         
         setItineraryActivities(updatedActivities);

@@ -3,7 +3,7 @@
 import React from "react";
 import { Star, DollarSign } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import Rating from "@/components/rating/rating";
+import Rating from "@/components/rating/Rating";
 import { type ActivityMetadataProps } from "../types";
 import { formatPriceLevel, getActivityTypeColor } from "../utils";
 import { formatCategoryType } from "@/utils/formatting/types";

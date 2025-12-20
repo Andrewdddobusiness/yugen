@@ -61,7 +61,7 @@ export class GoogleMapsExporter {
    */
   static exportAsSearchList(details: ItineraryDetails): void {
     const searchList = details.activities
-      .filter(a => a.activity?.name)
+      .filter(a => a.activity?.name && a.date)
       .map(activity => ({
         name: activity.activity!.name,
         address: activity.activity?.address || '',
@@ -146,11 +146,11 @@ export class GoogleMapsExporter {
 
   // Private helper methods
   private static generateKMLForMyMaps(details: ItineraryDetails): string {
-    const activities = details.activities.filter(a => a.activity?.coordinates);
+    const activities = details.activities.filter(a => a.activity?.coordinates && a.date);
     
     const placemarks = activities.map((activity, index) => {
       const [lng, lat] = activity.activity!.coordinates!;
-      const dayIndex = this.getDayIndex(activity.date, details.fromDate);
+      const dayIndex = this.getDayIndex(activity.date as string, details.fromDate);
       
       return `
     <Placemark>
@@ -501,6 +501,7 @@ export class GoogleMapsExporter {
   private static groupActivitiesByDate(activities: IItineraryActivity[]) {
     return activities.reduce((groups: { [key: string]: IItineraryActivity[] }, activity) => {
       const date = activity.date;
+      if (!date) return groups;
       if (!groups[date]) {
         groups[date] = [];
       }

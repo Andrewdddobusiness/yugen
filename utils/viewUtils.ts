@@ -1,4 +1,4 @@
-import type { ViewMode } from '@/components/view-toggle';
+import type { ViewMode } from '@/components/view/toggle';
 import { format, isValid, parseISO } from 'date-fns';
 
 /**

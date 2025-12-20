@@ -62,7 +62,7 @@ export const ActivityTimeInfo: React.FC<ActivityTimeInfoProps> = ({
       )}>
         <Clock className={sizeConfig.icon} />
         <span>
-          {formatTimeRange(startTime, endTime, duration)}
+          {formatTimeRange(startTime || '', endTime, duration)}
         </span>
       </div>
     );

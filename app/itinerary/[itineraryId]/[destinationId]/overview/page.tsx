@@ -5,7 +5,7 @@ import { useSearchParams } from "next/navigation";
 
 import { Separator } from "@/components/ui/separator";
 
-import BuilderLayout from "@/components/layouts/BuilderLayout";
+import BuilderLayout from "@/components/layout/BuilderLayout";
 import PopUpGetStarted from "@/components/dialog/onboarding/GetStartedDialog";
 
 import { createClient } from "@/utils/supabase/client";
@@ -14,7 +14,9 @@ import { capitalizeFirstLetter } from "@/utils/formatting/capitalise";
 import { fetchCityDetails } from "@/actions/supabase/actions";
 import { Skeleton } from "@/components/ui/skeleton";
 
-export default function Overview() {
+import { Suspense } from "react";
+
+function OverviewContent() {
   const supabase = createClient();
   const searchParams = useSearchParams();
 
@@ -157,5 +159,13 @@ export default function Overview() {
       </div>
       <PopUpGetStarted />
     </>
+  );
+}
+
+export default function Overview() {
+  return (
+    <Suspense fallback={<Skeleton className="w-full h-screen" />}>
+      <OverviewContent />
+    </Suspense>
   );
 }

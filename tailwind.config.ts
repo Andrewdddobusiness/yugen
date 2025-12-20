@@ -24,7 +24,7 @@ const config = {
   		'7xl': '3.815rem'
   	},
   	container: {
-  		center: 'true',
+  		center: true,
   		padding: '2rem',
   		screens: {
   			'2xl': '1400px'
@@ -48,6 +48,44 @@ const config = {
   			ring: 'hsl(var(--ring))',
   			background: 'hsl(var(--background))',
   			foreground: 'hsl(var(--foreground))',
+  			brand: {
+  				700: '#2A3B63',
+  				600: '#334A7A',
+  				500: '#3F5FA3',
+  				400: '#5C7BCB',
+  				300: '#8FA8E6',
+  				DEFAULT: '#3F5FA3',
+  				foreground: '#FFFFFF'
+  			},
+  			bg: {
+  				0: '#FFFFFF',
+  				50: '#F7F8FB',
+  				100: '#EEF1F7'
+  			},
+  			ink: {
+  				900: '#0D1321',
+  				700: '#2A3245',
+  				500: '#55607A'
+  			},
+  			stroke: {
+  				200: '#DDE3F0'
+  			},
+  			tan: {
+  				500: '#8A5A3C',
+  				200: '#E6C9B7'
+  			},
+  			teal: {
+  				500: '#22B8B2'
+  			},
+  			coral: {
+  				500: '#FF5A6B'
+  			},
+  			lime: {
+  				500: '#40D57C'
+  			},
+  			amber: {
+  				500: '#FFB020'
+  			},
   			primary: {
   				DEFAULT: 'hsl(var(--primary))',
   				foreground: 'hsl(var(--primary-foreground))'
@@ -88,9 +126,17 @@ const config = {
   			}
   		},
   		borderRadius: {
-  			lg: 'var(--radius)',
-  			md: 'calc(var(--radius) - 2px)',
-  			sm: 'calc(var(--radius) - 4px)'
+  			lg: '14px',
+  			md: '12px',
+  			sm: '8px',
+  			xl: '16px',
+  			pill: '999px'
+  		},
+  		boxShadow: {
+  			card: '0 8px 24px rgba(13,19,33,0.10)',
+  			float: '0 16px 40px rgba(13,19,33,0.16)',
+  			pressable: '0 6px 0 rgba(42,59,99,0.25), 0 10px 24px rgba(13,19,33,0.10)',
+  			'pressable-pressed': '0 2px 0 rgba(42,59,99,0.20), 0 6px 16px rgba(13,19,33,0.08)'
   		},
   		keyframes: {
   			'accordion-down': {

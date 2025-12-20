@@ -30,7 +30,7 @@ function ItineraryMapController({
     if (!map) return;
 
     if (mapBounds) {
-      map.fitBounds(mapBounds, { padding: 50 });
+      map.fitBounds(mapBounds, 50);
     } else if (itineraryCoordinates && validActivities.length === 0) {
       // Set appropriate zoom level for destination when no activities
       map.setCenter({ lat: itineraryCoordinates[0], lng: itineraryCoordinates[1] });
@@ -129,6 +129,7 @@ export function ItineraryMap({
 }: ItineraryMapProps) {
   const { centerCoordinates, itineraryCoordinates, initialZoom, setCenterCoordinates } = useMapStore();
   const [showClusters, setShowClusters] = useState(true);
+  const [localShowRoutes, setLocalShowRoutes] = useState(showRoutes);
   const [hiddenDays, setHiddenDays] = useState<Set<string>>(new Set());
 
   // Debug logging
@@ -513,9 +514,9 @@ export function ItineraryMap({
       <div className="absolute top-4 left-4 z-10 space-y-2">
         {/* Route Toggle */}
         <Button
-          variant={showRoutes ? "default" : "outline"}
+          variant={localShowRoutes ? "default" : "outline"}
           size="sm"
-          onClick={() => setShowRoutes(!showRoutes)}
+          onClick={() => setLocalShowRoutes(!localShowRoutes)}
           className="bg-white/90 hover:bg-white shadow-lg"
         >
           <RouteIcon className="h-4 w-4 mr-2" />

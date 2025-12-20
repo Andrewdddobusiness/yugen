@@ -103,7 +103,7 @@ export function DatePickerWithRangePopover2({
               size="sm"
               onClick={handleConfirm}
               disabled={!date?.from || !date?.to}
-              className="min-h-[36px] bg-[#3A86FF] rounded-xl shadow-lg text-white hover:bg-[#3A86FF]/90 active:scale-95 transition-all duration-300"
+              className="min-h-[36px] bg-[#3F5FA3] rounded-xl shadow-lg text-white hover:bg-[#3F5FA3]/90 active:scale-95 transition-all duration-300"
             >
               Confirm
             </Button>

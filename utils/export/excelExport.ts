@@ -17,7 +17,7 @@ export const exportToExcel = (itineraryDetails: ItineraryDetails) => {
   const rows = itineraryDetails.activities
     .filter((activity) => !activity.deleted_at)
     .map((activity) => ({
-      Date: format(new Date(activity.date), "yyyy-MM-dd"),
+      Date: activity.date ? format(new Date(activity.date), "yyyy-MM-dd") : "",
       "Start Time": activity.start_time || "",
       "End Time": activity.end_time || "",
       Name: activity.activity?.name || "",

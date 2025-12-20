@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { useDragContext, DragOperation } from "./DragProvider";
+import { useDragContext, DragOperation } from "@/components/provider/dnd/DragProvider";
 
 // Error types for drag-and-drop operations
 export type DragErrorType =

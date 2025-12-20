@@ -45,6 +45,37 @@ interface RouteVisualizationProps {
   className?: string;
 }
 
+// Get travel mode icon
+const getTravelModeIcon = (mode: RouteSegment['travelMode']) => {
+  switch (mode) {
+    case 'walking':
+      return <PersonStanding className="h-3 w-3" />;
+    case 'driving':
+      return <Car className="h-3 w-3" />;
+    case 'transit':
+      return <Train className="h-3 w-3" />;
+    case 'bicycling':
+      return <Bike className="h-3 w-3" />;
+    default:
+      return <Navigation className="h-3 w-3" />;
+  }
+};
+
+const getTravelModeColor = (mode: RouteSegment['travelMode']) => {
+  switch (mode) {
+    case 'walking':
+      return '#10B981'; // Green
+    case 'driving':
+      return '#3B82F6'; // Blue
+    case 'transit':
+      return '#8B5CF6'; // Purple
+    case 'bicycling':
+      return '#F59E0B'; // Amber
+    default:
+      return '#6B7280'; // Gray
+  }
+};
+
 export function RouteVisualization({
   routes,
   visibleDays = [],
@@ -63,37 +94,6 @@ export function RouteVisualization({
     if (visibleDays.length === 0) return routes;
     return routes.filter(route => visibleDays.includes(route.date));
   }, [routes, visibleDays]);
-
-  // Get travel mode icon
-  const getTravelModeIcon = (mode: RouteSegment['travelMode']) => {
-    switch (mode) {
-      case 'walking':
-        return <PersonStanding className="h-3 w-3" />;
-      case 'driving':
-        return <Car className="h-3 w-3" />;
-      case 'transit':
-        return <Train className="h-3 w-3" />;
-      case 'bicycling':
-        return <Bike className="h-3 w-3" />;
-      default:
-        return <Navigation className="h-3 w-3" />;
-    }
-  };
-
-  const getTravelModeColor = (mode: RouteSegment['travelMode']) => {
-    switch (mode) {
-      case 'walking':
-        return '#10B981'; // Green
-      case 'driving':
-        return '#3B82F6'; // Blue
-      case 'transit':
-        return '#8B5CF6'; // Purple
-      case 'bicycling':
-        return '#F59E0B'; // Amber
-      default:
-        return '#6B7280'; // Gray
-    }
-  };
 
   return (
     <div className={className}>

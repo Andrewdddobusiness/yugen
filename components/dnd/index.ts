@@ -2,22 +2,22 @@
 // This module provides a comprehensive drag-and-drop system for the calendar application
 
 import { formatDuration as sharedFormatDuration, formatTime as sharedFormatTime } from '@/utils/formatting/time';
+import { useDragContext } from '@/components/provider/dnd/DragProvider';
+import { useDragErrorHandler } from './ErrorHandling';
+import { useDragPerformanceMonitor } from './PerformanceOptimizations';
 
 // Core Provider and Context
-export { 
-  DragProvider, 
-  useDragContext, 
-  useDragState, 
-  useDragOperations, 
-  useDragValidation 
-} from './DragProvider';
+// Core Provider and Context
+// DragProvider and hooks are exported from components/provider/dnd/DragProvider
+// and re-exported via components/provider/index.ts
+// To avoid duplication, we don't export them here.
 
 export type { 
   DraggedItem, 
   DropValidation, 
   DragOperation, 
   DragPreferences 
-} from './DragProvider';
+} from '@/components/provider/dnd/DragProvider';
 
 // Visual Components
 export { DragPreview, SnapPreview, DragGhost } from './DragPreview';

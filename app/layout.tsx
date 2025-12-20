@@ -3,32 +3,42 @@ import "./globals.css";
 import LayoutWrapper from "./layoutWrapper";
 
 export const metadata: Metadata = {
-  title: "Journey - Plan Your Perfect Trip Like a Pro",
-  description: "The ultimate travel itinerary builder that brings together destination discovery, wishlist building, and drag-and-drop scheduling in one beautiful app. Start planning your next adventure for free.",
-  keywords: ["travel planner", "itinerary builder", "trip planning", "travel organizer", "vacation planner", "journey", "wanderlog alternative"],
-  authors: [{ name: "Journey Team" }],
-  creator: "Journey",
-  publisher: "Journey",
+  title: "Yugi — Soft Navigator for Confident Travel Planning",
+  description:
+    "Yugi is your calm, glassy travel copilot with wolf-level focus. Discover, organize, and schedule trips with tactile buttons, smart maps, and premium clarity.",
+  keywords: [
+    "Yugi",
+    "travel planner",
+    "itinerary builder",
+    "trip planning",
+    "travel organizer",
+    "vacation planner",
+    "wanderlog alternative",
+  ],
+  authors: [{ name: "Yugi Team" }],
+  creator: "Yugi",
+  publisher: "Yugi",
   formatDetection: {
     email: false,
     address: false,
     telephone: false,
   },
-  metadataBase: new URL("https://journey.app"),
+  metadataBase: new URL("https://yugi.app"),
   alternates: {
     canonical: "/",
   },
   openGraph: {
-    title: "Journey - Plan Your Perfect Trip Like a Pro",
-    description: "The ultimate travel itinerary builder that brings together destination discovery, wishlist building, and drag-and-drop scheduling in one beautiful app.",
-    url: "https://journey.app",
-    siteName: "Journey",
+    title: "Yugi — Soft Navigator for Confident Travel Planning",
+    description:
+      "Yugi blends calm guidance, glassmorphic polish, and tactile controls to make travel planning feel premium and precise.",
+    url: "https://yugi.app",
+    siteName: "Yugi",
     images: [
       {
-        url: "/og-image.png",
+        url: "/yugi-og.svg",
         width: 1200,
         height: 630,
-        alt: "Journey - Travel Itinerary Planner",
+        alt: "Yugi - Travel Itinerary Planner",
       },
     ],
     locale: "en_US",
@@ -36,10 +46,11 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "Journey - Plan Your Perfect Trip Like a Pro",
-    description: "The ultimate travel itinerary builder that brings together destination discovery, wishlist building, and drag-and-drop scheduling in one beautiful app.",
-    images: ["/og-image.png"],
-    creator: "@journeyapp",
+    title: "Yugi — Soft Navigator for Confident Travel Planning",
+    description:
+      "A glassy, modern travel planner with wolf-inspired focus, tactile buttons, and map-first clarity.",
+    images: ["/yugi-og.svg"],
+    creator: "@yugiapp",
   },
   robots: {
     index: true,

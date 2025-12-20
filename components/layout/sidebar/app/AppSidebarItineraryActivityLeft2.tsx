@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { useParams, usePathname, useRouter } from "next/navigation";
+import { useParams, usePathname } from "next/navigation";
 import { Binoculars, NotebookPen, SquareChevronLeft, TextSearch } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -36,7 +36,6 @@ import { useDateRangeStore } from '@/store/dateRangeStore';
 export function AppSidebarItineraryActivityLeft() {
   const { itineraryId, destinationId } = useParams();
   const pathname = usePathname();
-  const router = useRouter();
 
   const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
 
@@ -89,18 +88,7 @@ export function AppSidebarItineraryActivityLeft() {
     },
   ];
 
-  // Debug logging
-  console.log('Sidebar Navigation Debug:', {
-    itineraryId,
-    destinationId,
-    pathname,
-    navItems: navItems.map(item => ({ title: item.title, href: item.href }))
-  });
 
-  // Navigation debug logging
-  const logNavigation = (href: string, title: string) => {
-    console.log(`Navigating to ${title}:`, href);
-  };
 
   const handleDateRangeConfirm = async (dateRange: DateRange | undefined) => {
     try {
@@ -141,8 +129,8 @@ export function AppSidebarItineraryActivityLeft() {
                 <Link href="/">
                   <Image
                     className="w-full h-full"
-                    src="/journey1.svg"
-                    alt="Journey Logo"
+                    src="/yugi-mark.svg"
+                    alt="Yugi Logo"
                     width={100}
                     height={100}
                     priority
@@ -161,21 +149,16 @@ export function AppSidebarItineraryActivityLeft() {
                 {navItems.map((item) => (
                   <SidebarMenuItem key={item.title}>
                     <SidebarMenuButton
-                      asChild
                       className={cn(
                         pathname === item.href && "bg-sidebar-accent text-sidebar-accent-foreground",
                         "transition-colors"
                       )}
+                      onClick={() => {
+                        window.location.href = item.href;
+                      }}
                     >
-                      <Link 
-                        href={item.href}
-                        onClick={() => {
-                          console.log('Navigation clicked:', item.title, 'href:', item.href);
-                        }}
-                      >
-                        <item.icon className="h-4 w-4" />
-                        <span>{item.title}</span>
-                      </Link>
+                      <item.icon className="h-4 w-4" />
+                      <span>{item.title}</span>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
                 ))}

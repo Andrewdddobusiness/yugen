@@ -70,7 +70,7 @@ export function useSwipeGesture(config: SwipeConfig = {}) {
     }
   }, []);
 
-  const handleTouchStart = useCallback((event: TouchEvent) => {
+  const handleTouchStart = useCallback((event: React.TouchEvent) => {
     const touch = event.touches[0];
     startPoint.current = { x: touch.clientX, y: touch.clientY };
     startTime.current = Date.now();
@@ -78,7 +78,7 @@ export function useSwipeGesture(config: SwipeConfig = {}) {
     setState(initialSwipeState);
   }, []);
 
-  const handleTouchMove = useCallback((event: TouchEvent) => {
+  const handleTouchMove = useCallback((event: React.TouchEvent) => {
     if (!startPoint.current) return;
     
     const touch = event.touches[0];
@@ -118,7 +118,7 @@ export function useSwipeGesture(config: SwipeConfig = {}) {
     });
   }, [threshold, getSwipeDirection, preventScroll, onSwipeStart, triggerHaptic]);
 
-  const handleTouchEnd = useCallback((event: TouchEvent) => {
+  const handleTouchEnd = useCallback((event: React.TouchEvent) => {
     if (!startPoint.current || !state.direction) {
       setState(initialSwipeState);
       return;

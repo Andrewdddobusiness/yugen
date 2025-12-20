@@ -89,7 +89,7 @@ Specializes in user experience design, interface design, user flows, accessibili
 // Design tokens (from tailwind.config.ts)
 const designTokens = {
   colors: {
-    primary: '#3A86FF',
+    primary: '#3F5FA3',
     secondary: '#06D6A0', 
     accent: '#FFD23F',
     neutral: '#6C757D'

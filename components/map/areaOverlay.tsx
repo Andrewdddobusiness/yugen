@@ -2,12 +2,12 @@ import { useEffect, useState } from "react";
 import { useMap } from "@vis.gl/react-google-maps";
 import LoadingSpinner from "@/components/loading/LoadingSpinner";
 
-interface DeckGLOverlayProps {
+interface AreaOverlayProps {
   data: GeoJSON.FeatureCollection;
   onAreaClick: (properties: any) => void;
 }
 
-export function DeckGLOverlay({ data, onAreaClick }: DeckGLOverlayProps) {
+export function AreaOverlay({ data, onAreaClick }: AreaOverlayProps) {
   const map = useMap("map-instance");
   const [hoveredArea, setHoveredArea] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -23,7 +23,7 @@ export function DeckGLOverlay({ data, onAreaClick }: DeckGLOverlayProps) {
       default: {
         fillColor: "#9ECAE1",
         fillOpacity: 0.2,
-        strokeColor: "#3A86FF",
+        strokeColor: "#3F5FA3",
         strokeWeight: 2,
         strokeOpacity: 0.8,
         transition: "all 0.3s ease-in-out",
@@ -31,7 +31,7 @@ export function DeckGLOverlay({ data, onAreaClick }: DeckGLOverlayProps) {
       hovered: {
         fillColor: "#9ECAE1",
         fillOpacity: 0.4,
-        strokeColor: "#3A86FF",
+        strokeColor: "#3F5FA3",
         strokeWeight: 3,
         strokeOpacity: 1,
         transition: "all 0.3s ease-in-out",
@@ -47,7 +47,7 @@ export function DeckGLOverlay({ data, onAreaClick }: DeckGLOverlayProps) {
         ...style,
         // Add animation styling
         animation: isHovered ? "fadeIn 0.3s ease-in-out" : undefined,
-      };
+      } as any;
     });
 
     // Add event listeners

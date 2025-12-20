@@ -65,12 +65,12 @@ export function useTouchDrag(config: TouchDragConfig = {}) {
     }
   }, []);
 
-  const getEventPosition = useCallback((event: TouchEvent | MouseEvent) => {
+  const getEventPosition = useCallback((event: React.TouchEvent | React.MouseEvent | TouchEvent | MouseEvent) => {
     if ('touches' in event) {
-      const touch = event.touches[0] || event.changedTouches[0];
+      const touch = (event as any).touches[0] || (event as any).changedTouches[0];
       return { x: touch.clientX, y: touch.clientY };
     }
-    return { x: event.clientX, y: event.clientY };
+    return { x: (event as any).clientX, y: (event as any).clientY };
   }, []);
 
   const startDrag = useCallback((id: string, position: { x: number; y: number }) => {
@@ -119,7 +119,7 @@ export function useTouchDrag(config: TouchDragConfig = {}) {
     }
   }, [state, clearLongPressTimer, triggerHaptic, onDragEnd]);
 
-  const handleTouchStart = useCallback((event: TouchEvent, id: string) => {
+  const handleTouchStart = useCallback((event: React.TouchEvent, id: string) => {
     event.preventDefault();
     
     const position = getEventPosition(event);
@@ -138,7 +138,7 @@ export function useTouchDrag(config: TouchDragConfig = {}) {
     }));
   }, [getEventPosition, longPressDelay, startDrag, onLongPress, state.isDragging]);
 
-  const handleTouchMove = useCallback((event: TouchEvent) => {
+  const handleTouchMove = useCallback((event: React.TouchEvent) => {
     event.preventDefault();
     
     const position = getEventPosition(event);
@@ -158,7 +158,7 @@ export function useTouchDrag(config: TouchDragConfig = {}) {
     }
   }, [state.isDragging, state.startPosition, moveDrag, dragThreshold, clearLongPressTimer, getEventPosition]);
 
-  const handleTouchEnd = useCallback((event: TouchEvent, id?: string) => {
+  const handleTouchEnd = useCallback((event: React.TouchEvent, id?: string) => {
     event.preventDefault();
     
     clearLongPressTimer();
@@ -189,9 +189,9 @@ export function useTouchDrag(config: TouchDragConfig = {}) {
   }, [clearLongPressTimer]);
 
   const getDragHandleProps = useCallback((id: string) => ({
-    onTouchStart: (event: TouchEvent) => handleTouchStart(event, id),
+    onTouchStart: (event: React.TouchEvent) => handleTouchStart(event, id),
     onTouchMove: handleTouchMove,
-    onTouchEnd: (event: TouchEvent) => handleTouchEnd(event, id),
+    onTouchEnd: (event: React.TouchEvent) => handleTouchEnd(event, id),
     style: {
       touchAction: 'none',
       userSelect: 'none' as const,

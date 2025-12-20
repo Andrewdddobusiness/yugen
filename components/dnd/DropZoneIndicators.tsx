@@ -14,7 +14,7 @@ import {
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { formatDuration } from '@/utils/formatting/time';
-import { useDragContext } from './DragProvider';
+import { useDragContext } from '@/components/provider/dnd/DragProvider';
 
 interface DropZoneIndicatorProps {
   isValidDrop: boolean;

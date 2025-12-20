@@ -46,6 +46,7 @@ export function PrintView({ itineraryDetails, onClose }: PrintViewProps) {
   const groupActivitiesByDate = (activities: IItineraryActivity[]) => {
     return activities.reduce((groups: { [key: string]: IItineraryActivity[] }, activity) => {
       const date = activity.date;
+      if (!date) return groups;
       if (!groups[date]) {
         groups[date] = [];
       }
@@ -432,7 +433,7 @@ export function PrintView({ itineraryDetails, onClose }: PrintViewProps) {
           fontSize: '9pt', 
           color: '#666' 
         }}>
-          Generated on {format(new Date(), 'PPP')} • Journey Travel Planner
+          Generated on {format(new Date(), 'PPP')} • Yugi Travel Planner
         </div>
       </div>
     </div>

@@ -15,7 +15,7 @@ import {
 } from 'lucide-react';
 import { getPlacePhotos } from '@/actions/google/maps';
 import type { ActivityWithDetails } from '@/types/database';
-import SavePlaceButton from '@/components/wishlist/SavePlaceButton';
+import SavePlaceButton from '@/components/button/wishlist/SavePlaceButton';
 
 interface PlaceCardProps {
   place: any; // Can be from Google API or database

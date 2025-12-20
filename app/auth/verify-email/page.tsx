@@ -10,7 +10,9 @@ import { toast } from "sonner";
 import { Mail, RefreshCw } from "lucide-react";
 import Link from "next/link";
 
-export default function VerifyEmailPage() {
+import { Suspense } from "react";
+
+function VerifyEmailContent() {
   const { user } = useAuth();
   const searchParams = useSearchParams();
   const [isResending, setIsResending] = useState(false);
@@ -103,5 +105,13 @@ export default function VerifyEmailPage() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+export default function VerifyEmailPage() {
+  return (
+    <Suspense fallback={<div className="container max-w-md mx-auto py-8 text-center">Loading...</div>}>
+      <VerifyEmailContent />
+    </Suspense>
   );
 }

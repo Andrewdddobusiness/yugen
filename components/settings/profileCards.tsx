@@ -305,7 +305,7 @@ export default function ProfileCards() {
           {!isEditingProfilePhoto ? (
             <Button
               onClick={() => toggleEditingProfilePhoto()}
-              className="bg-[#3A86FF] rounded-xl shadow-lg text-white hover:bg-[#3A86FF]/90 active:scale-95 transition-all duration-300"
+              className="bg-[#3F5FA3] rounded-xl shadow-lg text-white hover:bg-[#3F5FA3]/90 active:scale-95 transition-all duration-300"
             >
               Edit
             </Button>
@@ -317,7 +317,7 @@ export default function ProfileCards() {
                 <>
                   <Button
                     onClick={handleProfileSave}
-                    className="bg-[#3A86FF] rounded-xl shadow-lg text-white hover:bg-[#3A86FF]/90 active:scale-95 transition-all duration-300"
+                    className="bg-[#3F5FA3] rounded-xl shadow-lg text-white hover:bg-[#3F5FA3]/90 active:scale-95 transition-all duration-300"
                   >
                     Save
                   </Button>
@@ -378,7 +378,7 @@ export default function ProfileCards() {
           {!isEditingName ? (
             <Button
               onClick={() => toggleEditingName()}
-              className="bg-[#3A86FF] rounded-xl shadow-lg text-white hover:bg-[#3A86FF]/90 active:scale-95 transition-all duration-300"
+              className="bg-[#3F5FA3] rounded-xl shadow-lg text-white hover:bg-[#3F5FA3]/90 active:scale-95 transition-all duration-300"
             >
               Edit
             </Button>
@@ -390,7 +390,7 @@ export default function ProfileCards() {
                 <>
                   <Button
                     onClick={handleNameSave}
-                    className="bg-[#3A86FF] rounded-xl shadow-lg text-white hover:bg-[#3A86FF]/90 active:scale-95 transition-all duration-300"
+                    className="bg-[#3F5FA3] rounded-xl shadow-lg text-white hover:bg-[#3F5FA3]/90 active:scale-95 transition-all duration-300"
                   >
                     Save
                   </Button>
@@ -426,7 +426,7 @@ export default function ProfileCards() {
           {!isEditingEmail ? (
             <Button
               onClick={() => toggleEditingEmail()}
-              className="bg-[#3A86FF] rounded-xl shadow-lg text-white hover:bg-[#3A86FF]/90 active:scale-95 transition-all duration-300"
+              className="bg-[#3F5FA3] rounded-xl shadow-lg text-white hover:bg-[#3F5FA3]/90 active:scale-95 transition-all duration-300"
             >
               Edit
             </Button>
@@ -438,7 +438,7 @@ export default function ProfileCards() {
                 <>
                   <Button
                     onClick={handleEmailSave}
-                    className="bg-[#3A86FF] rounded-xl shadow-lg text-white hover:bg-[#3A86FF]/90 active:scale-95 transition-all duration-300"
+                    className="bg-[#3F5FA3] rounded-xl shadow-lg text-white hover:bg-[#3F5FA3]/90 active:scale-95 transition-all duration-300"
                   >
                     Save
                   </Button>
@@ -468,7 +468,7 @@ export default function ProfileCards() {
 
         <CardFooter className="border-t py-4">
           <Link href="/login/reset">
-            <Button className="bg-[#3A86FF] rounded-xl shadow-lg text-white hover:bg-[#3A86FF]/90 active:scale-95 transition-all duration-300">
+            <Button className="bg-[#3F5FA3] rounded-xl shadow-lg text-white hover:bg-[#3F5FA3]/90 active:scale-95 transition-all duration-300">
               Reset Password
             </Button>
           </Link>

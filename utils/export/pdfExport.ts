@@ -76,10 +76,12 @@ export const exportToPDF = async (itineraryDetails: ItineraryDetails) => {
 
   // Group activities by date
   const groupedActivities = groupActivitiesByDate(
-    itineraryDetails.activities.map((activity) => ({
-      id: activity.itinerary_activity_id,
-      title: activity.activity?.name || "",
-      date: new Date(activity.date),
+    itineraryDetails.activities
+      .filter(activity => activity.date)
+      .map((activity) => ({
+        id: activity.itinerary_activity_id,
+        title: activity.activity?.name || "",
+        date: new Date(activity.date as string),
       time: activity.start_time ? formatTime(activity.start_time) : "",
       endTime: activity.end_time ? formatTime(activity.end_time) : "",
       duration:

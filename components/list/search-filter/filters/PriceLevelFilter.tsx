@@ -4,7 +4,7 @@ import React from 'react';
 import { DollarSign } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
-import { PRICE_LEVELS } from '../constants';
+import { FILTER_PRICE_LEVELS } from '../constants';
 
 interface PriceLevelFilterProps {
   selectedLevels: string[];
@@ -22,7 +22,7 @@ export function PriceLevelFilter({
         Price Level
       </Label>
       <div className="grid grid-cols-2 gap-2">
-        {PRICE_LEVELS.map(price => (
+        {FILTER_PRICE_LEVELS.map(price => (
           <div key={price.value} className="flex items-center space-x-2">
             <Checkbox
               id={`price-${price.value}`}

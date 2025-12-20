@@ -21,7 +21,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 
 import { DateRange } from "react-day-picker";
 import { useEffect, useState } from "react";
-import { DatePickerWithRangePopover3 } from "@/components/date/dateRangePickerPopover3";
+import { DatePickerWithRangePopover3 } from "@/components/form/date/DateRangePickerPopover3";
 
 export function NavMainItineraryActivity() {
   const { itineraryId, destinationId } = useParams();

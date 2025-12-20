@@ -1,7 +1,8 @@
 "use client";
 
 import React, { useMemo, useState } from 'react';
-import { Polyline, InfoWindow } from '@vis.gl/react-google-maps';
+import { InfoWindow } from '@vis.gl/react-google-maps';
+import { Polyline } from './Polyline';
 import { 
   Route, 
   Clock, 
@@ -358,23 +359,19 @@ function RouteVisualization({ originalActivities, optimizedRoute }: RouteVisuali
       {/* Original Route */}
       <Polyline
         path={originalPath}
-        options={{
-          strokeColor: '#EF4444',
-          strokeOpacity: 0.5,
-          strokeWeight: 3,
-          geodesic: true,
-        }}
+        strokeColor="#EF4444"
+        strokeOpacity={0.5}
+        strokeWeight={3}
+        geodesic={true}
       />
       
       {/* Optimized Route */}
       <Polyline
         path={optimizedPath}
-        options={{
-          strokeColor: '#10B981',
-          strokeOpacity: 0.8,
-          strokeWeight: 4,
-          geodesic: true,
-        }}
+        strokeColor="#10B981"
+        strokeOpacity={0.8}
+        strokeWeight={4}
+        geodesic={true}
       />
     </div>
   );

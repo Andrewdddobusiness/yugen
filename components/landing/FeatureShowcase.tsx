@@ -24,7 +24,7 @@ const features = [
     subtitle: "Find Your Perfect Places",
     description: "Discover amazing places with our intelligent search that covers every corner of your destination.",
     icon: <Search className="h-8 w-8" />,
-    color: "blue",
+    color: "teal",
     items: [
       {
         title: "Map-Based Search",
@@ -52,7 +52,7 @@ const features = [
     subtitle: "Build Your Perfect Itinerary",
     description: "Organize your trip with the same ease as using Google Calendar. Drag, drop, and perfect your schedule.",
     icon: <Calendar className="h-8 w-8" />,
-    color: "green",
+    color: "brand",
     items: [
       {
         title: "Drag & Drop Planning",
@@ -80,7 +80,7 @@ const features = [
     subtitle: "Take Your Plans Anywhere",
     description: "Export your itinerary in multiple formats or share with travel companions effortlessly.",
     icon: <Share2 className="h-8 w-8" />,
-    color: "purple",
+    color: "coral",
     items: [
       {
         title: "PDF Export",
@@ -105,27 +105,27 @@ const features = [
 ];
 
 const colorClasses = {
-  blue: {
-    bg: "bg-blue-50",
-    border: "border-blue-200",
-    text: "text-blue-600",
-    accent: "bg-blue-600",
-    gradient: "from-blue-600 to-cyan-600"
+  brand: {
+    bg: "bg-brand-300/10",
+    border: "border-brand-400/40",
+    text: "text-brand-700",
+    accent: "bg-brand-500",
+    gradient: "from-brand-500 to-brand-300",
   },
-  green: {
-    bg: "bg-green-50",
-    border: "border-green-200", 
-    text: "text-green-600",
-    accent: "bg-green-600",
-    gradient: "from-green-600 to-emerald-600"
+  teal: {
+    bg: "bg-teal-500/10",
+    border: "border-teal-500/30",
+    text: "text-teal-600",
+    accent: "bg-teal-500",
+    gradient: "from-teal-500 to-brand-400",
   },
-  purple: {
-    bg: "bg-purple-50",
-    border: "border-purple-200",
-    text: "text-purple-600", 
-    accent: "bg-purple-600",
-    gradient: "from-purple-600 to-pink-600"
-  }
+  coral: {
+    bg: "bg-coral-500/10",
+    border: "border-coral-500/30",
+    text: "text-coral-500",
+    accent: "bg-coral-500",
+    gradient: "from-coral-500 to-brand-400",
+  },
 };
 
 export default function FeatureShowcase() {
@@ -139,25 +139,20 @@ export default function FeatureShowcase() {
   const colors = colorClasses[currentFeature?.color as keyof typeof colorClasses];
 
   return (
-    <section className="py-24 bg-gray-50" ref={sectionRef}>
+    <section className="py-24 bg-bg-50" ref={sectionRef}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Section Header */}
         <motion.div
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: isInView ? 1 : 0, y: isInView ? 0 : 30 }}
-          transition={{ duration: 0.8 }}
-          className="text-center mb-16"
-        >
-          <h2 className="text-4xl lg:text-5xl font-bold text-gray-900 mb-6">
-            Everything You Need to
-            <br />
-            <span className="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-              Plan Like a Pro
-            </span>
+        transition={{ duration: 0.8 }}
+        className="text-center mb-16"
+      >
+          <h2 className="text-4xl lg:text-5xl font-bold text-ink-900 mb-4 font-logo">
+            Calendar-first, meticulous by design
           </h2>
-          <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-            Journey combines powerful discovery tools, intuitive organization, and seamless sharing 
-            to make trip planning actually enjoyable.
+          <p className="text-xl text-ink-600 max-w-3xl mx-auto">
+            Drop activities into time slots, keep alternates, check hours before you commit, collaborate in real time, and export or navigate on the go.
           </p>
         </motion.div>
 
@@ -188,17 +183,17 @@ export default function FeatureShowcase() {
                 <div className={`inline-flex p-3 rounded-xl mb-4 ${
                   isActive ? featureColors.accent : 'bg-gray-100'
                 }`}>
-                  <div className={isActive ? 'text-white' : 'text-gray-600'}>
+                  <div className={isActive ? 'text-white' : 'text-ink-500'}>
                     {feature.icon}
                   </div>
                 </div>
                 <h3 className={`text-xl font-semibold mb-2 ${
-                  isActive ? featureColors.text : 'text-gray-900'
+                  isActive ? featureColors.text : 'text-ink-900'
                 }`}>
                   {feature.title}
                 </h3>
                 <p className={`text-sm ${
-                  isActive ? 'text-gray-700' : 'text-gray-600'
+                  isActive ? 'text-ink-600' : 'text-ink-500'
                 }`}>
                   {feature.subtitle}
                 </p>
@@ -222,7 +217,7 @@ export default function FeatureShowcase() {
                 <h3 className={`text-3xl font-bold mb-4 bg-gradient-to-r ${colors.gradient} bg-clip-text text-transparent`}>
                   {currentFeature.title}
                 </h3>
-                <p className="text-lg text-gray-600 leading-relaxed">
+                <p className="text-lg text-ink-600 leading-relaxed">
                   {currentFeature.description}
                 </p>
               </div>
@@ -246,17 +241,17 @@ export default function FeatureShowcase() {
                       <div className={`p-2 rounded-lg ${
                         activeImage === item.image ? colors.accent : 'bg-gray-100'
                       }`}>
-                        <div className={activeImage === item.image ? 'text-white' : 'text-gray-600'}>
+                        <div className={activeImage === item.image ? 'text-white' : 'text-ink-500'}>
                           {item.icon}
                         </div>
                       </div>
                       <div>
                         <h4 className={`font-semibold mb-1 ${
-                          activeImage === item.image ? colors.text : 'text-gray-900'
+                          activeImage === item.image ? colors.text : 'text-ink-900'
                         }`}>
                           {item.title}
                         </h4>
-                        <p className="text-sm text-gray-600">
+                        <p className="text-sm text-ink-600">
                           {item.description}
                         </p>
                       </div>
@@ -274,26 +269,26 @@ export default function FeatureShowcase() {
               transition={{ duration: 0.5 }}
               className="relative"
             >
-              <div className="relative rounded-2xl overflow-hidden shadow-2xl border border-gray-200">
-                {/* Browser Chrome */}
-                <div className="bg-gray-100 px-4 py-3 flex items-center space-x-2 border-b border-gray-200">
-                  <div className="flex space-x-2">
-                    <div className="w-3 h-3 rounded-full bg-red-500"></div>
-                    <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
-                    <div className="w-3 h-3 rounded-full bg-green-500"></div>
-                  </div>
-                  <div className="flex-1 bg-white rounded-md px-3 py-1 mx-4">
-                    <span className="text-sm text-gray-500">journey.app</span>
-                  </div>
+            <div className="relative rounded-2xl overflow-hidden shadow-float border border-stroke-200/70 bg-white">
+              {/* Browser Chrome */}
+              <div className="bg-bg-100 px-4 py-3 flex items-center space-x-2 border-b border-stroke-200/70">
+                <div className="flex space-x-2">
+                  <div className="w-3 h-3 rounded-full bg-coral-500"></div>
+                  <div className="w-3 h-3 rounded-full bg-amber-500"></div>
+                  <div className="w-3 h-3 rounded-full bg-lime-500"></div>
                 </div>
-                
-                {/* Feature Image */}
-                <div className="relative aspect-video bg-gradient-to-br from-gray-100 to-gray-200">
-                  <Image
-                    src={`/features/${activeImage}.png`}
-                    alt={`${currentFeature.title} Feature`}
-                    fill
-                    className="object-cover transition-all duration-500"
+                <div className="flex-1 bg-white rounded-md px-3 py-1 mx-4 shadow-inner">
+                  <span className="text-sm text-ink-500">yugi.app</span>
+                </div>
+              </div>
+              
+              {/* Feature Image */}
+              <div className="relative aspect-video bg-gradient-to-br from-bg-100 to-bg-0">
+                <Image
+                  src={`/features/${activeImage}.png`}
+                  alt={`${currentFeature.title} Feature`}
+                  fill
+                  className="object-cover transition-all duration-500"
                     onError={() => {
                       // Fallback to placeholder if image doesn't exist
                     }}
@@ -316,7 +311,7 @@ export default function FeatureShowcase() {
                   {activeFeature === 'organization' && '⚡️'}
                   {activeFeature === 'sharing' && '📱'}
                 </div>
-                <div className="text-sm text-gray-600">
+                <div className="text-sm text-ink-600">
                   {activeFeature === 'discovery' && 'Places'}
                   {activeFeature === 'organization' && 'Fast'}
                   {activeFeature === 'sharing' && 'Formats'}

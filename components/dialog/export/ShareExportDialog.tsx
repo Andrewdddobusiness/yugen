@@ -31,7 +31,7 @@ interface ExportDialogProps {
   itineraryId?: string;
 }
 
-export function ExportDialog({ open, onOpenChange, itineraryId }: ExportDialogProps) {
+export function ShareExportDialog({ open, onOpenChange, itineraryId }: ExportDialogProps) {
   const { itineraryActivities } = useItineraryActivityStore();
   const [showInstructions, setShowInstructions] = useState(false);
   const [showDownloadState, setShowDownloadState] = useState<"pdf" | "excel" | null>(null);

@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "../ui/button";
-import Rating from "../rating/rating";
+import Rating from "../rating/Rating";
 import Link from "next/link";
 import { formatDateTime } from "@/utils/formatting/datetime";
 import { IReview } from "@/store/activityStore";

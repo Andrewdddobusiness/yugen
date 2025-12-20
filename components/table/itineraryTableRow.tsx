@@ -84,7 +84,7 @@ export default function ItineraryTableRow({
               <TooltipTrigger>
                 <Badge
                   variant={getTypeBadgeVariant(activity.activity.types[0])}
-                  className="bg-[#3A86FF] hover:bg-[#3A86FF]/80 px-2 flex items-center justify-start w-fit"
+                  className="bg-[#3F5FA3] hover:bg-[#3F5FA3]/80 px-2 flex items-center justify-start w-fit"
                 >
                   <span className="line-clamp-1 text-left">{formatCategoryType(activity.activity.types[0])}</span>
                 </Badge>

@@ -19,10 +19,10 @@ import { Button } from "@/components/ui/button";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
-import CommentsCarousel from "@/components/carousel/reviewsCarousel";
-import ImagesCarousel from "@/components/carousel/imagesCarousel";
+import CommentsCarousel from "@/components/carousel/ReviewsCarousel";
+import ImagesCarousel from "@/components/carousel/ImagesCarousel";
 
-import Rating from "@/components/rating/rating";
+import Rating from "@/components/rating/Rating";
 import { Skeleton } from "@/components/ui/skeleton";
 
 import { Globe, Clock, Loader2, X, Phone, ImageOff } from "lucide-react";

@@ -12,7 +12,7 @@ const plans = [
     period: "forever",
     description: "Perfect for casual travelers planning simple trips",
     icon: <Sparkles className="h-6 w-6" />,
-    color: "blue",
+    color: "brand",
     popular: false,
     features: [
       "Up to 3 itineraries",
@@ -30,7 +30,7 @@ const plans = [
     period: "month",
     description: "For serious travelers who want advanced planning tools",
     icon: <Crown className="h-6 w-6" />,
-    color: "purple",
+    color: "teal",
     popular: true,
     features: [
       "Unlimited itineraries",
@@ -50,7 +50,7 @@ const plans = [
     period: "month",
     description: "Built for travel agencies and group organizers",
     icon: <Users className="h-6 w-6" />,
-    color: "green",
+    color: "coral",
     popular: false,
     features: [
       "Everything in Pro",
@@ -67,27 +67,27 @@ const plans = [
 ];
 
 const colorClasses = {
-  blue: {
-    bg: "bg-blue-50",
-    border: "border-blue-200",
-    text: "text-blue-600",
-    accent: "bg-blue-600",
-    button: "bg-blue-600 hover:bg-blue-700"
+  brand: {
+    bg: "bg-brand-300/10",
+    border: "border-brand-400/40",
+    text: "text-brand-700",
+    accent: "bg-brand-500",
+    button: "bg-brand-500 hover:bg-brand-600",
   },
-  purple: {
-    bg: "bg-purple-50", 
-    border: "border-purple-200",
-    text: "text-purple-600",
-    accent: "bg-purple-600",
-    button: "bg-purple-600 hover:bg-purple-700"
+  teal: {
+    bg: "bg-teal-500/10",
+    border: "border-teal-500/30",
+    text: "text-teal-600",
+    accent: "bg-teal-500",
+    button: "bg-teal-500 hover:bg-teal-600",
   },
-  green: {
-    bg: "bg-green-50",
-    border: "border-green-200", 
-    text: "text-green-600",
-    accent: "bg-green-600",
-    button: "bg-green-600 hover:bg-green-700"
-  }
+  coral: {
+    bg: "bg-coral-500/10",
+    border: "border-coral-500/30",
+    text: "text-coral-500",
+    accent: "bg-coral-500",
+    button: "bg-coral-500 hover:bg-coral-600",
+  },
 };
 
 export default function PricingPreview() {
@@ -104,14 +104,14 @@ export default function PricingPreview() {
           transition={{ duration: 0.8 }}
           className="text-center mb-16"
         >
-          <h2 className="text-4xl lg:text-5xl font-bold text-gray-900 mb-6">
+          <h2 className="text-4xl lg:text-5xl font-bold text-ink-900 mb-6">
             Simple, Transparent
             <br />
-            <span className="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+            <span className="bg-gradient-to-r from-brand-500 via-brand-400 to-teal-500 bg-clip-text text-transparent">
               Pricing
             </span>
           </h2>
-          <p className="text-xl text-gray-600 max-w-3xl mx-auto">
+          <p className="text-xl text-ink-600 max-w-3xl mx-auto">
             Start free and upgrade only when you need more. No hidden fees, no surprises.
           </p>
         </motion.div>
@@ -127,10 +127,10 @@ export default function PricingPreview() {
                 initial={{ opacity: 0, y: 30 }}
                 animate={{ opacity: isInView ? 1 : 0, y: isInView ? 0 : 30 }}
                 transition={{ duration: 0.6, delay: 0.2 + index * 0.1 }}
-                className={`relative rounded-2xl border-2 p-8 transition-all duration-300 hover:shadow-xl ${
+                className={`relative rounded-2xl border p-8 transition-all duration-300 ${
                   plan.popular 
-                    ? `${colors.bg} ${colors.border} shadow-lg scale-105` 
-                    : 'bg-white border-gray-200 hover:border-gray-300'
+                    ? `${colors.bg} ${colors.border} shadow-float scale-105` 
+                    : 'bg-white border-stroke-200 hover:shadow-card hover:border-stroke-200/80'
                 }`}
               >
                 {/* Popular Badge */}
@@ -143,20 +143,20 @@ export default function PricingPreview() {
                 {/* Plan Header */}
                 <div className="text-center mb-8">
                   <div className={`inline-flex p-3 rounded-xl mb-4 ${
-                    plan.popular ? colors.accent : 'bg-gray-100'
+                    plan.popular ? colors.accent : 'bg-bg-100'
                   }`}>
-                    <div className={plan.popular ? 'text-white' : 'text-gray-600'}>
+                    <div className={plan.popular ? 'text-white' : 'text-ink-600'}>
                       {plan.icon}
                     </div>
                   </div>
                   
                   <h3 className={`text-xl font-bold mb-2 ${
-                    plan.popular ? colors.text : 'text-gray-900'
+                    plan.popular ? colors.text : 'text-ink-900'
                   }`}>
                     {plan.name}
                   </h3>
                   
-                  <p className="text-gray-600 text-sm mb-4">
+                  <p className="text-ink-600 text-sm mb-4">
                     {plan.description}
                   </p>
 
@@ -166,12 +166,12 @@ export default function PricingPreview() {
                       <span className="text-4xl font-bold text-gray-900">
                         ${plan.price}
                       </span>
-                      <span className="text-gray-600 ml-1">
+                      <span className="text-ink-600 ml-1">
                         /{plan.period}
                       </span>
                     </div>
                     {plan.price > 0 && (
-                      <div className="text-sm text-gray-500 mt-1">
+                      <div className="text-sm text-ink-500 mt-1">
                         Billed monthly
                       </div>
                     )}
@@ -185,7 +185,7 @@ export default function PricingPreview() {
                       <div className={`p-1 rounded-full mr-3 ${colors.accent}`}>
                         <Check className="h-4 w-4 text-white" />
                       </div>
-                      <span className="text-gray-700">{feature}</span>
+                      <span className="text-ink-700">{feature}</span>
                     </div>
                   ))}
                 </div>
@@ -195,7 +195,7 @@ export default function PricingPreview() {
                   className={`w-full py-3 rounded-xl font-semibold transition-all duration-300 ${
                     plan.popular 
                       ? `${colors.button} text-white` 
-                      : 'bg-gray-900 hover:bg-gray-800 text-white'
+                      : `${colors.button} text-white`
                   }`}
                 >
                   {plan.cta}
@@ -208,38 +208,18 @@ export default function PricingPreview() {
         {/* Bottom Note */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: isInView ? 1 : 0, y: isInView ? 0 : 20 }}
-          transition={{ duration: 0.6, delay: 0.8 }}
-          className="text-center mt-12"
-        >
-          <p className="text-gray-600">
+        animate={{ opacity: isInView ? 1 : 0, y: isInView ? 0 : 20 }}
+        transition={{ duration: 0.6, delay: 0.8 }}
+        className="text-center mt-12"
+      >
+          <p className="text-ink-600">
             All plans include a 30-day money-back guarantee. Questions?{" "}
-            <a href="#" className="text-blue-600 hover:text-blue-700 font-medium">
+            <a href="#" className="text-brand-600 hover:text-brand-700 font-medium">
               Contact our team
             </a>
           </p>
         </motion.div>
 
-        {/* Enterprise CTA */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: isInView ? 1 : 0, y: isInView ? 0 : 20 }}
-          transition={{ duration: 0.6, delay: 1.0 }}
-          className="mt-16 text-center"
-        >
-          <div className="bg-gray-50 rounded-2xl p-8">
-            <h3 className="text-2xl font-bold text-gray-900 mb-4">
-              Need Something Custom?
-            </h3>
-            <p className="text-gray-600 mb-6 max-w-2xl mx-auto">
-              We work with large travel companies and enterprises to build custom solutions. 
-              Contact us to discuss your specific needs.
-            </p>
-            <Button variant="outline" className="border-2 border-gray-300 hover:border-blue-600 hover:text-blue-600">
-              Enterprise Solutions
-            </Button>
-          </div>
-        </motion.div>
       </div>
     </section>
   );

@@ -6,7 +6,7 @@ import { Clock, MapPin, Star, Calendar } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatDuration, formatTime } from '@/utils/formatting/time';
 import { formatCategoryType } from '@/utils/formatting/types';
-import { useDragState } from './DragProvider';
+import { useDragState } from '@/components/provider/dnd/DragProvider';
 
 interface DragPreviewProps {
   className?: string;

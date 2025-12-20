@@ -36,12 +36,12 @@ export class EnhancedPDFExporter {
   private yPosition: number = 0;
   private currentPage: number = 1;
   private colors = {
-    primary: [59, 130, 246], // Blue
-    secondary: [107, 114, 128], // Gray
-    accent: [16, 185, 129], // Green
-    text: [17, 24, 39], // Dark gray
-    lightText: [156, 163, 175], // Light gray
-    background: [249, 250, 251], // Light background
+    primary: [59, 130, 246] as [number, number, number], // Blue
+    secondary: [107, 114, 128] as [number, number, number], // Gray
+    accent: [16, 185, 129] as [number, number, number], // Green
+    text: [17, 24, 39] as [number, number, number], // Dark gray
+    lightText: [156, 163, 175] as [number, number, number], // Light gray
+    background: [249, 250, 251] as [number, number, number], // Light background
   };
 
   constructor(private options: PDFExportOptions) {
@@ -330,6 +330,14 @@ export class EnhancedPDFExporter {
     this.pdf.text(activity.activity?.name || 'Unnamed Activity', contentX, this.yPosition);
     this.yPosition += 8;
 
+    // Date
+    if (activity.date) {
+      this.pdf.setFontSize(12);
+      this.pdf.setTextColor(...this.colors.secondary);
+      this.pdf.text(format(new Date(activity.date), 'EEEE, MMMM d'), contentX, this.yPosition);
+      this.yPosition += 6;
+    }
+
     // Location
     if (activity.activity?.address) {
       this.pdf.setFontSize(12);
@@ -365,13 +373,13 @@ export class EnhancedPDFExporter {
     if (activity.notes) {
       this.pdf.setFontSize(11);
       this.pdf.setTextColor(...this.colors.text);
-      this.pdf.setFont(undefined, 'italic');
+      this.pdf.setFont('helvetica', 'italic');
       const noteLines = this.pdf.splitTextToSize(activity.notes, contentWidth);
       noteLines.forEach((line: string) => {
         this.pdf.text(line, contentX, this.yPosition);
         this.yPosition += 5;
       });
-      this.pdf.setFont(undefined, 'normal');
+      this.pdf.setFont('helvetica', 'normal');
     }
 
     // QR Code
@@ -451,6 +459,7 @@ export class EnhancedPDFExporter {
         phone: a.activity?.phone_number || '',
         website: a.activity?.website_url || '',
         address: a.activity?.address || '',
+        date: a.date,
       }));
 
     if (contacts.length === 0) {
@@ -488,6 +497,13 @@ export class EnhancedPDFExporter {
           this.pdf.text(line, this.margins.left + 10, this.yPosition);
           this.yPosition += 4;
         });
+      }
+
+      if (contact.date) {
+        this.pdf.setFontSize(10);
+        this.pdf.setTextColor(...this.colors.lightText);
+        this.pdf.text(`Scheduled for: ${format(new Date(contact.date), 'PPP')}`, this.margins.left + 10, this.yPosition);
+        this.yPosition += 5;
       }
 
       this.yPosition += 8;
@@ -554,11 +570,11 @@ export class EnhancedPDFExporter {
         this.colors.primary[1],
         this.colors.primary[2]
       );
-      this.pdf.setGState(new this.pdf.GState({ opacity }));
+      (this.pdf as any).setGState(new (this.pdf as any).GState({ opacity }));
       this.pdf.rect(0, i * stepHeight, this.pageWidth, stepHeight, 'F');
     }
     
-    this.pdf.setGState(new this.pdf.GState({ opacity: 1 }));
+    (this.pdf as any).setGState(new (this.pdf as any).GState({ opacity: 1 }));
   }
 
   private formatTime(time: string): string {
@@ -586,6 +602,7 @@ export class EnhancedPDFExporter {
   private groupActivitiesByDate(activities: IItineraryActivity[]) {
     return activities.reduce((groups: { [key: string]: IItineraryActivity[] }, activity) => {
       const date = activity.date;
+      if (!date) return groups;
       if (!groups[date]) {
         groups[date] = [];
       }

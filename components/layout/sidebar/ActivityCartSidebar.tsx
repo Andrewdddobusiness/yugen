@@ -5,7 +5,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { useSidebar } from "@/components/ui/sidebar";
 
-import ActivityCardsHorizontal from "@/components/cards/ActivityCardsHorizontal";
+import ActivityCardsHorizontal from "@/components/card/activity/ActivityCardsHorizontal";
 
 import { cn } from "@/lib/utils";
 

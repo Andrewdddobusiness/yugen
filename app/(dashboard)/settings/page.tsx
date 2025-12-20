@@ -6,7 +6,7 @@ import { getSubscriptionDetails } from "@/actions/stripe/actions";
 
 import { Card, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import ManageSubscriptionButton from "@/components/button/subscription/ManageSubscriptionButton";
-import ProfileCards from "@/components/settings/profileCards";
+import ProfileCards from "@/components/settings/ProfileCards";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 
@@ -66,7 +66,7 @@ export default function Settings() {
               ) : (
                 <Link href="/pricing" className="w-full">
                   <Button
-                    className="w-full bg-[#3A86FF] rounded-xl shadow-lg text-white hover:bg-[#3A86FF]/90 active:scale-95 transition-all duration-300"
+                    className="w-full bg-[#3F5FA3] rounded-xl shadow-lg text-white hover:bg-[#3F5FA3]/90 active:scale-95 transition-all duration-300"
                     disabled={isSubscriptionLoading}
                   >
                     Upgrade to Pro

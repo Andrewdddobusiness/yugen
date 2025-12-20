@@ -39,7 +39,7 @@ export default function CheckoutButton({ priceId, children }: CheckoutButtonProp
 
   return (
     <Button
-      className="w-full bg-[#032bc0] text-white rounded-xl shadow-lg hover:scale-105 transition-all duration-300 hover:bg-[#3A86FF]"
+      className="w-full bg-[#2A3B63] text-white rounded-xl shadow-lg hover:scale-105 transition-all duration-300 hover:bg-[#3F5FA3]"
       onClick={handleCheckout}
       disabled={loading}
     >

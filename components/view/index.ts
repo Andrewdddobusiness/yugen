@@ -1,31 +1,31 @@
 // View component exports
 
 // Calendar views
-export { default as Calendar } from './calendar/Calendar';
-export { default as CalendarTest } from './calendar/CalendarTest';
-export { default as GoogleCalendarView } from './calendar/GoogleCalendarView';
-export { default as CalendarLayout } from './calendar/CalendarLayout';
-export { default as CalendarControls } from './calendar/CalendarControls';
-export { default as CalendarGrid } from './calendar/CalendarGrid';
-export { default as CalendarGridEnhanced } from './calendar/CalendarGridEnhanced';
-export { default as ActivityBlock } from './calendar/ActivityBlock';
-export { default as ActivityBlockContent } from './calendar/ActivityBlockContent';
-export { default as ActivityBlockPopover } from './calendar/ActivityBlockPopover';
-export { default as BusinessHoursOverlay } from './calendar/BusinessHoursOverlay';
-export { default as ConflictResolver } from './calendar/ConflictResolver';
-export { default as DayColumn } from './calendar/DayColumn';
-export { default as DropZone } from './calendar/DropZone';
-export { default as GridCell } from './calendar/GridCell';
-export { default as GridHeader } from './calendar/GridHeader';
-export { default as GridNavigation } from './calendar/GridNavigation';
-export { default as TimeGrid } from './calendar/TimeGrid';
-export { default as TimePicker } from './calendar/TimePicker';
-export { default as TimeSlots } from './calendar/TimeSlots';
-export { default as TravelTimeIndicator } from './calendar/TravelTimeIndicator';
+export { default as ItineraryCalendar } from './calendar/Calendar';
+export { CalendarTest } from './calendar/CalendarTest';
+export { GoogleCalendarView } from './calendar/GoogleCalendarView';
+export { CalendarLayout } from './calendar/CalendarLayout';
+export { CalendarControls } from './calendar/CalendarControls';
+export { CalendarGrid } from './calendar/CalendarGrid';
+export { CalendarGridEnhanced } from './calendar/CalendarGridEnhanced';
+export { ActivityBlock } from './calendar/ActivityBlock';
+export { ActivityBlockContent } from './calendar/ActivityBlockContent';
+export { ActivityBlockPopover } from './calendar/ActivityBlockPopover';
+export { BusinessHoursOverlay } from './calendar/BusinessHoursOverlay';
+export { ConflictResolver } from './calendar/ConflictResolver';
+export { DayColumn } from './calendar/DayColumn';
+export { DropZone } from './calendar/DropZone';
+export { GridCell } from './calendar/GridCell';
+export { GridHeader } from './calendar/GridHeader';
+export { GridNavigation } from './calendar/GridNavigation';
+export { TimeGrid } from './calendar/TimeGrid';
+export { TimePicker } from './calendar/TimePicker';
+export { TimeSlots } from './calendar/TimeSlots';
+export { TravelTimeIndicator as CalendarTravelTimeIndicator } from './calendar/TravelTimeIndicator';
 
 // Calendar hooks
 export { useCalendarDays } from './calendar/hooks/useCalendarDays';
-export { useDragAndDrop } from './calendar/hooks/useDragAndDrop';
+export { useDragAndDrop as useCalendarDragAndDrop } from './calendar/hooks/useDragAndDrop';
 export { useScheduledActivities } from './calendar/hooks/useScheduledActivities';
 export { useTimeSlots } from './calendar/hooks/useTimeSlots';
 
@@ -36,10 +36,10 @@ export * from './calendar/services/activityScheduler';
 export * from './calendar/data';
 
 // Print views
-export { default as PrintView } from './print/PrintView';
+export { PrintView } from './print/PrintView';
 
 // Toggle views
-export { default as ViewToggle } from './toggle/ViewToggle';
-export { default as MobileViewSelector } from './toggle/MobileViewSelector';
-export { default as ViewRecommendationCard } from './toggle/ViewRecommendationCard';
-export { default as ViewTransition } from './toggle/ViewTransition';
+export { ViewToggle } from './toggle/ViewToggle';
+export { MobileViewSelector } from './toggle/MobileViewSelector';
+export { ViewRecommendationCard } from './toggle/ViewRecommendationCard';
+export { ViewTransition } from './toggle/ViewTransition';

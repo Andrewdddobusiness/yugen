@@ -107,6 +107,7 @@ export interface ActivityActionsProps {
   variant?: 'default' | 'inline' | 'dropdown';
   size?: ActivityCardSize;
   className?: string;
+  showHoverOnly?: boolean;
 }
 
 // Helper type to extract activity data from different activity types

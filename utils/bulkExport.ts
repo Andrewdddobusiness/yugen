@@ -364,7 +364,7 @@ Instructions:
 
 ${itinerary.activities.map((activity, index) => `
 ${index + 1}. **${activity.activity?.name || 'Unnamed Activity'}**
-   - Date: ${activity.date}
+   - Date: ${activity.date || 'Not specified'}
    - Time: ${activity.start_time || 'Not specified'}
    - Location: ${activity.activity?.address || 'Not specified'}
    ${activity.notes ? `- Notes: ${activity.notes}` : ''}
@@ -377,14 +377,14 @@ Generated on ${new Date().toLocaleString()}
   private static generateICalContent(itinerary: ItineraryDetails): string {
     return `BEGIN:VCALENDAR
 VERSION:2.0
-PRODID:-//Journey App//Bulk Export//EN
+PRODID:-//Yugi//Bulk Export//EN
 CALSCALE:GREGORIAN
 X-WR-CALNAME:${itinerary.itineraryName || itinerary.city} Itinerary
 
-${itinerary.activities.filter(a => a.start_time).map((activity, index) => `
+${itinerary.activities.filter(a => a.start_time && a.date).map((activity, index) => `
 BEGIN:VEVENT
-UID:bulk-export-${index}@journey-app.com
-DTSTART:${this.formatCalendarDateTime(activity.date, activity.start_time!)}
+UID:bulk-export-${index}@yugi.app
+DTSTART:${this.formatCalendarDateTime(activity.date as string, activity.start_time!)}
 SUMMARY:${activity.activity?.name || 'Travel Activity'}
 LOCATION:${activity.activity?.address || ''}
 DESCRIPTION:${activity.notes || ''}

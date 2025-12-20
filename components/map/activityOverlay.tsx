@@ -8,9 +8,9 @@ import { Button } from "@/components/ui/button";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
-import CommentsCarousel from "@/components/carousel/reviewsCarousel";
-import ImagesCarousel from "@/components/carousel/imagesCarousel";
-import Rating from "@/components/rating/rating";
+import CommentsCarousel from "@/components/carousel/ReviewsCarousel";
+import ImagesCarousel from "@/components/carousel/ImagesCarousel";
+import Rating from "@/components/rating/Rating";
 import { Skeleton } from "@/components/ui/skeleton";
 
 import { Globe, Clock, Loader2, X, Phone, ImageOff, MapPin } from "lucide-react";
@@ -250,7 +250,7 @@ export function ActivityOverlay({ onClose }: ActivityOverlayProps) {
         {/* Footer with action button */}
         <div className="absolute bottom-0 left-0 right-0 p-4 border-t bg-white rounded-b-3xl">
           {loading ? (
-            <Button disabled className="w-full rounded-xl bg-[#3A86FF] text-white shadow-lg hover:bg-[#3A86FF]/80">
+            <Button disabled className="w-full rounded-xl bg-[#3F5FA3] text-white shadow-lg hover:bg-[#3F5FA3]/80">
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               Please wait
             </Button>
@@ -261,7 +261,7 @@ export function ActivityOverlay({ onClose }: ActivityOverlayProps) {
           ) : (
             <Button
               variant="default"
-              className="w-full rounded-xl bg-[#3A86FF] text-white shadow-lg hover:bg-[#3A86FF]/80"
+              className="w-full rounded-xl bg-[#3F5FA3] text-white shadow-lg hover:bg-[#3F5FA3]/80"
               onClick={handleAddToItinerary}
             >
               Add to Itinerary

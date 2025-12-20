@@ -1,6 +1,7 @@
 // Travel time system type definitions
 
-export type { TravelMode, TravelTimeResult, TravelTimeRequest, TravelTimeResponse } from '@/actions/google/travelTime';
+import type { TravelMode, TravelTimeResult, TravelTimeRequest, TravelTimeResponse } from '@/actions/google/travelTime';
+export type { TravelMode, TravelTimeResult, TravelTimeRequest, TravelTimeResponse };
 
 export type {
   ActivityWithCoordinates,

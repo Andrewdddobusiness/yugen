@@ -188,7 +188,7 @@ export async function removeFromWishlist(searchHistoryId: number): Promise<Datab
       .eq("search_history_id", searchHistoryId)
       .single();
 
-    if (checkError || wishlistItem?.itinerary?.user_id !== user.id) {
+    if (checkError || (wishlistItem?.itinerary as any)?.user_id !== user.id) {
       return {
         success: false,
         error: { message: "Wishlist item not found or access denied" }
@@ -469,7 +469,7 @@ export async function updateWishlistItem(
       .eq("search_history_id", searchHistoryId)
       .single();
 
-    if (checkError || wishlistItem?.itinerary?.user_id !== user.id) {
+    if (checkError || (wishlistItem?.itinerary as any)?.user_id !== user.id) {
       return {
         success: false,
         error: { message: "Wishlist item not found or access denied" }

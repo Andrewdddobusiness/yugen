@@ -3,7 +3,7 @@ import { IActivity, useActivitiesStore } from "@/store/activityStore";
 import { useActivityTabStore } from "@/store/activityTabStore";
 
 import { colors, TColor } from "@/lib/colors/colors";
-import GoogleMarker from "./googleMarker";
+import GoogleMarker from "./GoogleMarker";
 
 export default function GoogleMarkers({ color }: { color?: TColor }) {
   const { selectedTab } = useActivityTabStore();

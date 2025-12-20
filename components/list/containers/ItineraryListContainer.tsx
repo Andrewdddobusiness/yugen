@@ -82,7 +82,23 @@ function ItineraryListContent({ containerRef, className }: ItineraryListContaine
   } = useItineraryListContext();
 
   // Activity editor hook
-  const editorProps = useItineraryActivityEditor({ activities: activeActivities });
+  const {
+    startEditing: onStartEditing,
+    cancelEditing: onCancelEditing,
+    saveField: onSaveField,
+    handleEditKeyDown: onEditKeyDown,
+    handleEditingValueChange: onEditingValueChange,
+    ...restEditorProps
+  } = useItineraryActivityEditor({ activities: activeActivities });
+  
+  const editorProps = {
+    onStartEditing,
+    onCancelEditing,
+    onSaveField,
+    onEditKeyDown,
+    onEditingValueChange,
+    ...restEditorProps,
+  };
 
   // Bulk selection hook
   const bulkSelectionProps = useBulkSelection({ 
@@ -150,7 +166,7 @@ function ItineraryListContent({ containerRef, className }: ItineraryListContaine
           totalCount={activeActivities.length}
           dayCount={groupedActivities.length}
           useTimeSlotView={useTimeSlotView}
-          onToggleTimeSlotView={setUseTimeSlotView}
+          onToggleTimeSlotView={() => setUseTimeSlotView(!useTimeSlotView)}
           onExpandAllDays={expandAllDays}
           onCollapseAllDays={collapseAllDays}
           bulkSelectionActions={bulkSelectionProps}

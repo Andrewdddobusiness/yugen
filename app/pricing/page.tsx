@@ -44,7 +44,7 @@ export default function PricingPage() {
 
       <div className="relative z-10">
         <div className="text-center mb-8">
-          <h1 className="text-6xl font-bold text-[#3A86FF]">Pricing</h1>
+          <h1 className="text-6xl font-bold text-[#3F5FA3]">Pricing</h1>
           <p className="text-xl text-gray-500">Choose the plan that works for you.</p>
         </div>
 

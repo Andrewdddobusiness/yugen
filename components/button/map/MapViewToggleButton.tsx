@@ -15,7 +15,7 @@ export function ViewToggleButton({ isMapView, onToggle }: ViewToggleButtonProps)
       onClick={onToggle}
       className={cn(
         "fixed bottom-4 right-4 z-50 rounded-full shadow-lg sm:hidden border-2 border-white active:scale-95 transition-all duration-300 ease-in-out",
-        "bg-[#3A86FF] hover:bg-[#3A86FF]/90 text-white overflow-hidden"
+        "bg-[#3F5FA3] hover:bg-[#3F5FA3]/90 text-white overflow-hidden"
       )}
       size="icon"
     >

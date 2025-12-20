@@ -1,12 +1,12 @@
 import { APIProvider, Map, AdvancedMarker } from "@vis.gl/react-google-maps";
 import { useEffect, useMemo, useRef } from "react";
 import { IItineraryActivity } from "@/store/itineraryActivityStore";
-import CustomMarker from "./customMarker";
+import CustomMarker from "./CustomMarker";
 import { colors } from "@/lib/colors/colors";
-import { ActivityOverlay } from "./activityOverlay";
+import { ActivityOverlay } from "./ActivityOverlay";
 import { motion, AnimatePresence } from "framer-motion";
 import { useActivitiesStore } from "@/store/activityStore";
-import TableMapController from "./tableMapController";
+import TableMapController from "./TableMapController";
 
 interface GoogleMapComponentProps {
   activities: IItineraryActivity[];

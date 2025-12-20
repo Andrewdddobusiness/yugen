@@ -16,28 +16,21 @@ import { Map, X } from "lucide-react";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable';
 import { ViewToggle } from "@/components/view/toggle/ViewToggle";
 import { ViewTransition, ViewLoadingState } from "@/components/view/toggle/ViewTransition";
-import { ViewRecommendationCard } from "@/components/view/toggle/ViewRecommendationCard";
 import { useViewRouter } from "@/hooks/useViewRouter";
 import { useViewStatePreservation } from "@/hooks/useViewStatePreservation";
 import { getDestination } from "@/actions/supabase/destinations";
 import { geocodeAddress } from "@/actions/google/maps";
 
 export default function Builder() {
-  try {
-    console.log('Builder component rendering...');
-    
-    const { itineraryId, destinationId } = useParams();
-    const itinId = itineraryId?.toString();
-    const destId = destinationId?.toString();
-    
-    console.log('Builder params:', { itineraryId, destinationId, itinId, destId });
+  console.log('Builder component rendering...');
+  
+  const { itineraryId, destinationId } = useParams();
+  const itinId = itineraryId?.toString();
+  const destId = destinationId?.toString();
+  
+  console.log('Builder params:', { itineraryId, destinationId, itinId, destId });
 
-    if (!itineraryId || !destinationId) {
-      console.error('Missing required route params');
-      return <div>Error: Missing itinerary or destination ID</div>;
-    }
-
-    const { itineraryActivities, fetchItineraryActivities, setItineraryActivities } = useItineraryActivityStore();
+  const { itineraryActivities, fetchItineraryActivities, setItineraryActivities } = useItineraryActivityStore();
   const { 
     currentView, 
     showMap, 
@@ -142,7 +135,7 @@ export default function Builder() {
   useEffect(() => {
     if (data?.length) {
       const scheduledActivities = data.filter(a => a.start_time && a.end_time);
-      const validDates = data.map(a => a.date).filter(date => date && !isNaN(new Date(date).getTime()));
+      const validDates = data.map(a => a.date).filter((date): date is string => !!date && !isNaN(new Date(date).getTime()));
       const timeSpan = validDates.length > 0 ? 
         Math.ceil((Math.max(...validDates.map(date => new Date(date).getTime())) 
         - Math.min(...validDates.map(date => new Date(date).getTime()))) / (1000 * 60 * 60 * 24)) + 1 : 1;
@@ -210,13 +203,19 @@ export default function Builder() {
     }))
   });
 
+  if (!itineraryId || !destinationId) {
+    console.error('Missing required route params');
+    return <div>Error: Missing itinerary or destination ID</div>;
+  }
+
   if (isLoading) return <Loading />;
   if (error) {
     console.error('Builder page error:', error);
     return <div>Error: {error.message || 'Unknown error'}</div>;
   }
 
-  return (
+  try {
+    return (
     <div className="h-full flex flex-col">
       {/* Enhanced Toolbar with ViewToggle */}
       <div className="flex items-center justify-between p-4 border-b bg-white dark:bg-gray-950 shadow-sm">
@@ -405,8 +404,6 @@ export default function Builder() {
             )}
       </div>
       
-      {/* View Recommendations */}
-      <ViewRecommendationCard autoShow={true} showDelay={5000} />
     </div>
   );
   } catch (error) {
