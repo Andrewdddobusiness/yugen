@@ -4,7 +4,7 @@ import { DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/di
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, CheckCircle2, XCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useEffect, useState, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 interface ExportDownloadStateProps {
   type: "pdf" | "excel";
@@ -17,6 +17,23 @@ export function ExportDownloadState({ type, onBack, onClose, onExport }: ExportD
   const [progress, setProgress] = useState(0);
   const [status, setStatus] = useState<"downloading" | "success" | "error">("downloading");
   const hasExported = useRef(false);
+
+  const handleExport = useCallback(async () => {
+    if (hasExported.current) return;
+    hasExported.current = true;
+
+    try {
+      await onExport();
+      setStatus("success");
+      setTimeout(() => {
+        onClose();
+      }, 1500);
+    } catch (error) {
+      console.error("Export failed:", error);
+      setStatus("error");
+      hasExported.current = false;
+    }
+  }, [onClose, onExport]);
 
   useEffect(() => {
     hasExported.current = false;
@@ -48,24 +65,7 @@ export function ExportDownloadState({ type, onBack, onClose, onExport }: ExportD
       mounted = false;
       clearInterval(timer);
     };
-  }, [status]);
-
-  const handleExport = async () => {
-    if (hasExported.current) return;
-    hasExported.current = true;
-
-    try {
-      await onExport();
-      setStatus("success");
-      setTimeout(() => {
-        onClose();
-      }, 1500);
-    } catch (error) {
-      console.error("Export failed:", error);
-      setStatus("error");
-      hasExported.current = false;
-    }
-  };
+  }, [handleExport, status]);
 
   return (
     <div className="space-y-6 py-4">
@@ -82,7 +82,7 @@ export function ExportDownloadState({ type, onBack, onClose, onExport }: ExportD
             {status === "error" && "Export Failed"}
           </DialogTitle>
         </div>
-        <DialogDescription>
+        <DialogDescription className="text-ink-500">
           {status === "downloading" && "Please wait while we prepare your document..."}
           {status === "success" && "Your document has been downloaded successfully."}
           {status === "error" && "There was an error exporting your document. Please try again."}
@@ -92,12 +92,12 @@ export function ExportDownloadState({ type, onBack, onClose, onExport }: ExportD
       <div className={cn("space-y-4", status === "success" && "animate-in fade-in-0")}>
         {status === "downloading" && <Progress value={progress} className="w-full animate-in fade-in-0 " />}
         {status === "success" && (
-          <div className="flex items-center justify-center text-primary">
-            <CheckCircle2 className="h-12 w-12 animate-in zoom-in-0 text-brand-500" />
+          <div className="flex items-center justify-center text-brand-500">
+            <CheckCircle2 className="h-12 w-12 animate-in zoom-in-0" />
           </div>
         )}
         {status === "error" && (
-          <div className="flex items-center justify-center text-destructive">
+          <div className="flex items-center justify-center text-coral-500">
             <XCircle className="h-12 w-12 animate-in zoom-in-0" />
           </div>
         )}

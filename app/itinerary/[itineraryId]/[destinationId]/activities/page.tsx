@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useState, lazy, Suspense, useMemo } from "react";
+import React, { useEffect, useState, lazy, Suspense, useMemo, useRef } from "react";
 import dynamic from "next/dynamic";
 import { useParams } from "next/navigation";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
@@ -73,11 +73,17 @@ export default function Activities() {
 
   // **** STATES ****
 
+  const [shouldLoadMap, setShouldLoadMap] = useState(false);
   const [popupInfo, setPopupInfo] = useState<{
     longitude: number;
     latitude: number;
     name: string;
   } | null>(null);
+
+  useEffect(() => {
+    const id = window.setTimeout(() => setShouldLoadMap(true), 150);
+    return () => window.clearTimeout(id);
+  }, []);
 
   const { data: destinationData, isLoading: isDestinationLoading } = useQuery({
     queryKey: ["itineraryDestination", itineraryId],
@@ -154,7 +160,8 @@ export default function Activities() {
   });
 
   // Track which place IDs we've already processed to prevent duplicate requests
-  const [processedPlaceIds, setProcessedPlaceIds] = useState<Set<string>>(new Set());
+  const processedPlaceIdsRef = useRef<Set<string>>(new Set());
+  const inFlightPlaceIdsRef = useRef<Set<string>>(new Set());
   const [isProcessingMissingActivities, setIsProcessingMissingActivities] = useState(false);
 
   useEffect(() => {
@@ -190,7 +197,10 @@ export default function Activities() {
         const missingPlaceIds = searchHistoryActivitiesData.missingPlaceIds || [];
 
         // Filter out already processed place IDs
-        const newMissingPlaceIds = missingPlaceIds.filter((placeId: string) => !processedPlaceIds.has(placeId));
+        const newMissingPlaceIds = missingPlaceIds.filter(
+          (placeId: string) =>
+            !processedPlaceIdsRef.current.has(placeId) && !inFlightPlaceIdsRef.current.has(placeId)
+        );
 
         if (newMissingPlaceIds.length === 0) {
           return;
@@ -206,21 +216,29 @@ export default function Activities() {
             batches.push(newMissingPlaceIds.slice(i, i + batchSize));
           }
 
-          for (const batch of batches) {
+          for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
+            const batch = batches[batchIndex];
             // Process batch in parallel but limit concurrency
             const batchPromises = batch.map(async (placeId: string) => {
-              try {
-                // Mark as processed immediately to prevent duplicate requests
-                setProcessedPlaceIds((prev) => new Set([...prev, placeId]));
-
-                const placeDetails = await placeDetailsQuery(placeId);
-                if (placeDetails) {
-                  return await insertActivityMutation.mutateAsync(placeDetails);
-                }
+              if (processedPlaceIdsRef.current.has(placeId) || inFlightPlaceIdsRef.current.has(placeId)) {
                 return null;
+              }
+
+              inFlightPlaceIdsRef.current.add(placeId);
+              try {
+                const placeDetails = await placeDetailsQuery(placeId);
+                if (!placeDetails) {
+                  return null;
+                }
+
+                const inserted = await insertActivityMutation.mutateAsync(placeDetails);
+                processedPlaceIdsRef.current.add(placeId);
+                return inserted;
               } catch (error) {
                 console.error(`Error processing place ID ${placeId}:`, error);
                 return null;
+              } finally {
+                inFlightPlaceIdsRef.current.delete(placeId);
               }
             });
 
@@ -243,7 +261,7 @@ export default function Activities() {
             }
 
             // Add small delay between batches to prevent API rate limiting
-            if (batches.indexOf(batch) < batches.length - 1) {
+            if (batchIndex < batches.length - 1) {
               await new Promise((resolve) => setTimeout(resolve, 100));
             }
           }
@@ -265,7 +283,6 @@ export default function Activities() {
     // Remove the problematic dependencies that cause infinite loops:
     // - isProcessingMissingActivities (causes loop with setIsProcessingMissingActivities)
     // - insertActivityMutation (not stable)
-    // - processedPlaceIds (updated inside effect)
     // - setSearchHistoryActivities (Zustand setter not stable)
   ]);
 
@@ -331,7 +348,7 @@ export default function Activities() {
   };
 
   // Compute filtered and sorted activities for area search
-  const filteredAreaSearchActivities = React.useMemo(() => {
+  const filteredAreaSearchActivities = useMemo(() => {
     if (!areaSearchActivities || !Array.isArray(areaSearchActivities)) return [];
     
     let filtered = areaSearchActivities as IActivityWithLocation[];
@@ -353,7 +370,7 @@ export default function Activities() {
   }, [areaSearchActivities, selectedFilters, selectedCostFilters, sortOrder]);
 
   // Compute filtered and sorted activities for search history
-  const filteredSearchHistoryActivities = React.useMemo(() => {
+  const filteredSearchHistoryActivities = useMemo(() => {
     if (!searchHistoryActivities || !Array.isArray(searchHistoryActivities)) return [];
     
     let filtered = searchHistoryActivities as IActivityWithLocation[];
@@ -445,10 +462,10 @@ export default function Activities() {
                 <ScrollArea className="h-full px-4">
                   {/* Processing indicator */}
                   {isProcessingMissingActivities && (
-                    <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                    <div className="mb-4 p-3 bg-bg-50 border border-stroke-200 rounded-xl">
                       <div className="flex items-center space-x-2">
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500"></div>
-                        <span className="text-sm text-blue-700">Loading additional activities...</span>
+                        <div className="animate-spin rounded-full h-4 w-4 border-2 border-stroke-200 border-t-brand-500"></div>
+                        <span className="text-sm text-ink-500">Loading additional activities…</span>
                       </div>
                     </div>
                   )}
@@ -480,26 +497,35 @@ export default function Activities() {
         )}
       >
         {isCoordinatesLoading ? (
-          <div className="w-full h-full bg-zinc-50 rounded-lg flex items-center justify-center">
+          <div className="w-full h-full bg-bg-50 rounded-lg flex items-center justify-center">
             <div className="space-y-3 w-full h-full">
-              <Skeleton className="flex items-center justify-center w-full h-full rounded-lg bg-zinc-200">
-                <EarthIcon className="w-[20%] h-[20%] text-zinc-300" />
+              <Skeleton className="flex items-center justify-center w-full h-full rounded-lg bg-stroke-200">
+                <EarthIcon className="w-[20%] h-[20%] text-ink-500/20" />
               </Skeleton>
             </div>
           </div>
         ) : cityCoordinates ? (
-          <Suspense
-            fallback={
-              <div className="w-full h-full flex items-center justify-center bg-muted">
-                <div className="flex flex-col items-center gap-2">
-                  <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-                  <span className="text-sm text-muted-foreground">Loading map...</span>
+          shouldLoadMap ? (
+            <Suspense
+              fallback={
+                <div className="w-full h-full flex items-center justify-center bg-bg-50">
+                  <div className="flex flex-col items-center gap-2">
+                    <div className="w-8 h-8 border-2 border-stroke-200 border-t-brand-500 rounded-full animate-spin" />
+                    <span className="text-sm text-ink-500">Loading map…</span>
+                  </div>
                 </div>
+              }
+            >
+              <GoogleMapComponent />
+            </Suspense>
+          ) : (
+            <div className="w-full h-full flex items-center justify-center bg-bg-50">
+              <div className="flex flex-col items-center gap-2">
+                <div className="w-8 h-8 border-2 border-stroke-200 border-t-brand-500 rounded-full animate-spin" />
+                <span className="text-sm text-ink-500">Loading map…</span>
               </div>
-            }
-          >
-            <GoogleMapComponent />
-          </Suspense>
+            </div>
+          )
         ) : null}
         {popupInfo && (
           <Suspense fallback={null}>

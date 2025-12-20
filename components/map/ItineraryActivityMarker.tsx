@@ -2,7 +2,7 @@
 
 import React, { useMemo, useState } from "react";
 import { AdvancedMarker, InfoWindow } from "@vis.gl/react-google-maps";
-import { Clock, MapPin, Star, DollarSign, Calendar, Route, User } from "lucide-react";
+import { Clock, MapPin, Star, DollarSign, Calendar, Route } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -55,17 +55,17 @@ export function ItineraryActivityMarker({
   // Marker color based on day and type - moved before early return
   const markerColor = useMemo(() => {
     const dayColors = [
-      "#3B82F6", // Blue
-      "#EF4444", // Red
-      "#10B981", // Green
-      "#F59E0B", // Amber
-      "#8B5CF6", // Purple
-      "#F97316", // Orange
-      "#06B6D4", // Cyan
+      "#3F5FA3", // brand.500
+      "#22B8B2", // teal.500
+      "#FF5A6B", // coral.500
+      "#FFB020", // amber.500
+      "#5C7BCB", // brand.400
+      "#334A7A", // brand.600
+      "#8FA8E6", // brand.300
     ];
 
-    if (isSelected) return "#1D4ED8"; // Dark blue for selected
-    if (isHighlighted) return "#DC2626"; // Dark red for highlighted
+    if (isSelected) return "#2A3B63"; // brand.700 for selected
+    if (isHighlighted) return "#FF5A6B"; // coral.500 for highlighted
 
     return dayColors[dayIndex % dayColors.length];
   }, [dayIndex, isSelected, isHighlighted]);
@@ -76,19 +76,12 @@ export function ItineraryActivityMarker({
     !Array.isArray(activity.activity.coordinates) ||
     activity.activity.coordinates.length !== 2
   ) {
-    console.log(
-      "ItineraryActivityMarker: No valid coordinates for",
-      activity.activity?.name,
-      activity.activity?.coordinates
-    );
     return null;
   }
 
   // Coordinates are stored as [lng, lat] in our data
   const [lng, lat] = activity.activity.coordinates;
   const position = { lat: lat, lng: lng };
-
-  console.log("ItineraryActivityMarker: Rendering marker at", position, "for", activity.activity?.name);
 
   // Get activity type for marker styling
   const primaryType = activity.activity?.types?.[0] || "tourist_attraction";
@@ -190,7 +183,7 @@ export function ItineraryActivityMarker({
             className={cn(
               "flex items-center justify-center w-10 h-10 rounded-full shadow-lg border-2 border-white",
               "transition-all duration-200 transform",
-              isSelected && "scale-125 ring-4 ring-blue-200",
+              isSelected && "scale-125 ring-4 ring-brand-400/30",
               isHighlighted && "animate-pulse scale-110"
             )}
             style={{ backgroundColor: markerColor }}
@@ -207,7 +200,7 @@ export function ItineraryActivityMarker({
 
           {/* Day Number */}
           {dayIndex >= 0 && (
-            <div className="absolute -bottom-1 -left-1 bg-gray-800 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs font-bold">
+            <div className="absolute -bottom-1 -left-1 bg-ink-900 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs font-bold">
               {dayIndex + 1}
             </div>
           )}
@@ -220,12 +213,12 @@ export function ItineraryActivityMarker({
           <div className="p-2 space-y-3 max-w-sm">
             {/* Header */}
             <div className="space-y-2">
-              <h3 className="font-semibold text-base leading-tight text-gray-900">
+              <h3 className="font-semibold text-base leading-tight text-ink-900">
                 {activity.activity?.name || "Unnamed Activity"}
               </h3>
 
               {activity.activity?.address && (
-                <div className="flex items-start gap-2 text-sm text-gray-600">
+                <div className="flex items-start gap-2 text-sm text-ink-500">
                   <MapPin className="h-3 w-3 mt-0.5 flex-shrink-0" />
                   <span className="line-clamp-2">{activity.activity.address}</span>
                 </div>
@@ -235,14 +228,14 @@ export function ItineraryActivityMarker({
             {/* Time and Date */}
             <div className="flex items-center gap-4 text-sm">
               {activity.date && (
-                <div className="flex items-center gap-1 text-gray-700">
+                <div className="flex items-center gap-1 text-ink-700">
                   <Calendar className="h-3 w-3" />
                   <span>{formatDate(activity.date)}</span>
                 </div>
               )}
 
               {activity.start_time && (
-                <div className="flex items-center gap-1 text-gray-700">
+                <div className="flex items-center gap-1 text-ink-700">
                   <Clock className="h-3 w-3" />
                   <span>
                     {formatTime(activity.start_time)}
@@ -264,7 +257,7 @@ export function ItineraryActivityMarker({
               {/* Rating */}
               {activity.activity?.rating && (
                 <div className="flex items-center gap-1">
-                  <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
+                  <Star className="h-3 w-3 fill-amber-500 text-amber-500" />
                   <span className="text-sm font-medium">{activity.activity.rating}</span>
                 </div>
               )}
@@ -273,7 +266,7 @@ export function ItineraryActivityMarker({
               {activity.activity?.price_level && (
                 <div className="flex items-center gap-1">
                   <DollarSign className="h-3 w-3" />
-                  <span className="text-sm font-medium text-green-600">
+                  <span className="text-sm font-medium text-ink-700">
                     {getPriceDisplay(activity.activity.price_level)}
                   </span>
                 </div>
@@ -281,7 +274,7 @@ export function ItineraryActivityMarker({
             </div>
 
             {/* Notes */}
-            {activity.notes && <div className="text-sm text-gray-700 p-2 bg-gray-50 rounded">{activity.notes}</div>}
+            {activity.notes && <div className="text-sm text-ink-700 p-2 bg-bg-50 rounded">{activity.notes}</div>}
 
             {/* Actions */}
             <div className="flex gap-2 pt-2 border-t">
@@ -331,7 +324,7 @@ export function ClusterMarker({ activities, position, onClick, dayIndex = 0 }: C
   const [showInfoWindow, setShowInfoWindow] = useState(false);
 
   const count = activities.length;
-  const dayColors = ["#3B82F6", "#EF4444", "#10B981", "#F59E0B", "#8B5CF6", "#F97316", "#06B6D4"];
+  const dayColors = ["#3F5FA3", "#22B8B2", "#FF5A6B", "#FFB020", "#5C7BCB", "#334A7A", "#8FA8E6"];
 
   const clusterColor = dayColors[dayIndex % dayColors.length];
 
@@ -346,7 +339,7 @@ export function ClusterMarker({ activities, position, onClick, dayIndex = 0 }: C
         className="cursor-pointer transform transition-transform hover:scale-110"
       >
         <div
-          className="flex items-center justify-center w-12 h-12 rounded-full shadow-lg border-3 border-white text-white font-bold text-sm"
+          className="flex items-center justify-center w-12 h-12 rounded-full shadow-lg border-[3px] border-white text-white font-bold text-sm"
           style={{ backgroundColor: clusterColor }}
         >
           {count}
@@ -356,15 +349,15 @@ export function ClusterMarker({ activities, position, onClick, dayIndex = 0 }: C
       {showInfoWindow && (
         <InfoWindow position={position} onCloseClick={() => setShowInfoWindow(false)} maxWidth={250}>
           <div className="p-2">
-            <h4 className="font-semibold mb-2">{count} Activities in this area</h4>
+            <h4 className="font-semibold mb-2 text-ink-900">{count} Activities in this area</h4>
             <div className="space-y-1 max-h-32 overflow-y-auto">
               {activities.slice(0, 5).map((activity) => (
-                <div key={activity.itinerary_activity_id} className="text-sm text-gray-700">
+                <div key={activity.itinerary_activity_id} className="text-sm text-ink-700">
                   {activity.activity?.name || "Unnamed Activity"}
                 </div>
               ))}
               {activities.length > 5 && (
-                <div className="text-xs text-gray-500">And {activities.length - 5} more...</div>
+                <div className="text-xs text-ink-500">And {activities.length - 5} more...</div>
               )}
             </div>
           </div>

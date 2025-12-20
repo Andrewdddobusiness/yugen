@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { formatCategoryType } from '@/utils/formatting/types';
-import { formatDuration, formatTimeRange } from '@/utils/formatting/time';
+import { formatTimeRange } from '@/utils/formatting/time';
 import { type ActivityTimeBlock } from '@/utils/timeSlots';
 
 interface ActivityTimeBlockProps {
@@ -56,7 +56,7 @@ export function ActivityTimeBlock({
     >
       {/* Travel time indicator */}
       {showTravelTime && travelTime && (
-        <div className="mb-1 text-xs text-gray-500 flex items-center gap-1">
+        <div className="mb-1 text-xs text-ink-500 flex items-center gap-1">
           <Clock className="h-3 w-3" />
           {travelTime} travel
         </div>
@@ -64,15 +64,15 @@ export function ActivityTimeBlock({
       
       <Card 
         className={cn(
-          "h-full cursor-pointer transition-all duration-200",
-          "hover:shadow-md border-l-4",
-          isSelected && "ring-2 ring-blue-500 bg-blue-50/30 dark:bg-blue-900/20",
-          isEditing && "ring-2 ring-yellow-500",
+          "group h-full cursor-pointer transition-all duration-200",
+          "bg-bg-0 border border-stroke-200 hover:shadow-card border-l-4",
+          isSelected && "ring-2 ring-brand-500 bg-brand-500/10",
+          isEditing && "ring-2 ring-amber-500",
           // Color coding based on activity type
-          activity.activity?.types?.includes('restaurant') && "border-l-orange-500",
-          activity.activity?.types?.includes('tourist_attraction') && "border-l-purple-500",
-          activity.activity?.types?.includes('lodging') && "border-l-blue-500",
-          !activity.activity?.types && "border-l-gray-400"
+          activity.activity?.types?.includes('restaurant') && "border-l-amber-500",
+          activity.activity?.types?.includes('tourist_attraction') && "border-l-teal-500",
+          activity.activity?.types?.includes('lodging') && "border-l-brand-500",
+          !activity.activity?.types && "border-l-stroke-200"
         )}
         onClick={onSelect}
       >
@@ -85,7 +85,7 @@ export function ActivityTimeBlock({
               </h4>
               
               {/* Time display */}
-              <div className="flex items-center gap-2 mt-1 text-xs text-gray-600 dark:text-gray-400">
+              <div className="flex items-center gap-2 mt-1 text-xs text-ink-500 dark:text-white/60">
                 <Clock className="h-3 w-3" />
                 <span>
                   {formatTimeRange(startTime, endTime, duration)}
@@ -103,7 +103,7 @@ export function ActivityTimeBlock({
                     e.stopPropagation();
                     onEdit();
                   }}
-                  className="h-6 w-6 p-0"
+                  className="h-7 w-7 p-0 text-ink-500 hover:text-ink-700"
                 >
                   <Edit3 className="h-3 w-3" />
                 </Button>
@@ -116,7 +116,7 @@ export function ActivityTimeBlock({
                     e.stopPropagation();
                     onDelete();
                   }}
-                  className="h-6 w-6 p-0 text-red-500 hover:text-red-700"
+                  className="h-7 w-7 p-0 text-coral-500 hover:text-coral-500/80"
                 >
                   <Trash2 className="h-3 w-3" />
                 </Button>
@@ -128,7 +128,7 @@ export function ActivityTimeBlock({
           <div className="flex-1 space-y-1">
             {/* Address */}
             {activity.activity?.address && (
-              <div className="flex items-center gap-1 text-xs text-gray-600 dark:text-gray-400">
+              <div className="flex items-center gap-1 text-xs text-ink-500 dark:text-white/60">
                 <MapPin className="h-3 w-3 flex-shrink-0" />
                 <span className="truncate">{activity.activity.address}</span>
               </div>
@@ -146,7 +146,7 @@ export function ActivityTimeBlock({
               {/* Rating */}
               {activity.activity?.rating && (
                 <div className="flex items-center gap-0.5 text-xs">
-                  <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
+                  <Star className="h-3 w-3 fill-amber-500 text-amber-500" />
                   <span>{activity.activity.rating}</span>
                 </div>
               )}
@@ -162,7 +162,7 @@ export function ActivityTimeBlock({
             
             {/* Notes */}
             {activity.notes && (
-              <div className="text-xs text-gray-700 dark:text-gray-300 mt-1 line-clamp-2">
+              <div className="text-xs text-ink-700 dark:text-white/80 mt-1 line-clamp-2">
                 {activity.notes}
               </div>
             )}

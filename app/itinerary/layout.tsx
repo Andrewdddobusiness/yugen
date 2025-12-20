@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { usePathname } from "next/navigation";
+import { useParams, usePathname } from "next/navigation";
 import dynamic from "next/dynamic";
 
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
@@ -28,9 +28,6 @@ import { useUserStore } from "@/store/userStore";
 import { useStripeSubscriptionStore, ISubscriptionDetails } from "@/store/stripeSubscriptionStore";
 import { createClient } from "@/utils/supabase/client";
 
-
-import { IItineraryActivity, useItineraryActivityStore } from "@/store/itineraryActivityStore";
-import { useParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Download, Share, Users } from "lucide-react";
 import Loading from "@/components/loading/Loading";
@@ -47,7 +44,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   // Removed isBuilderPage check - now showing sidebar on all pages including builder
 
   //**** STORES ****//
-  const { fetchItineraryActivities, setItineraryActivities } = useItineraryActivityStore();
   const { setUser, setUserLoading, setProfileUrl, setIsProfileUrlLoading } = useUserStore();
   const { setSubscription, setIsSubscriptionLoading } = useStripeSubscriptionStore();
   
@@ -65,6 +61,10 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       if (error || !user) throw error;
       return user;
     },
+    staleTime: Infinity,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
   });
 
   useEffect(() => {
@@ -101,6 +101,10 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       return null;
     },
     enabled: !!user,
+    staleTime: Infinity,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
   });
 
   useEffect(() => {
@@ -113,27 +117,16 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     queryKey: ["subscription", user?.id],
     queryFn: getSubscriptionDetails,
     enabled: !!user,
+    staleTime: Infinity,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
   });
 
   useEffect(() => {
     setSubscription(subscription as ISubscriptionDetails);
     setIsSubscriptionLoading(false);
   }, [subscription, setSubscription, setIsSubscriptionLoading]);
-
-  //**** GET ITINERARY ACTIVITIES ****//
-  const { data: itineraryActivities } = useQuery({
-    queryKey: ["itineraryActivities", itineraryId, destinationId],
-    queryFn: () => fetchItineraryActivities(itineraryId as string, destinationId as string),
-    enabled: !!itineraryId && !!destinationId,
-    staleTime: 10 * 60 * 1000, // Cache for 10 minutes to reduce refetching
-    gcTime: 20 * 60 * 1000, // Keep in cache for 20 minutes
-  });
-
-  useEffect(() => {
-    if (itineraryActivities) {
-      setItineraryActivities(itineraryActivities as IItineraryActivity[]);
-    }
-  }, [itineraryActivities, setItineraryActivities]);
 
   const getBreadcrumbText = () => {
     if (pathname.includes("/builder")) {
@@ -159,7 +152,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   if (isBuilderPage) {
     return (
       <div className="flex flex-col h-screen">
-        <header className="sticky top-0 flex shrink-0 items-center gap-2 border-b bg-background p-2">
+        <header className="sticky top-0 flex shrink-0 items-center gap-2 border-b border-stroke-200 bg-bg-0/80 backdrop-blur-xl p-2">
           <div className="flex items-center gap-2 flex-1">
             <Breadcrumb>
               <BreadcrumbList>
@@ -179,7 +172,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               <Button
                 variant="outline"
                 size="default"
-                className="gap-2 transition-colors active:scale-95 active:bg-accent hover:bg-accent/80"
+                className="gap-2 transition-colors"
               >
                 <Share className="size-4" />
                 <span>Share</span>
@@ -262,7 +255,12 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         <div className="flex-1 overflow-auto">{children}</div>
       </main>
     </SidebarProvider>
-    <ShareExportDialog open={exportDialogOpen} onOpenChange={setExportDialogOpen} itineraryId={itineraryId as string} />
+    <ShareExportDialog
+      open={exportDialogOpen}
+      onOpenChange={setExportDialogOpen}
+      itineraryId={itineraryId as string}
+      destinationId={destinationId as string}
+    />
     </div>
   );
 }

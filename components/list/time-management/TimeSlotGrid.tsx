@@ -59,10 +59,10 @@ export function TimeSlotGrid({
       {/* Current time line */}
       {showNowLine && (
         <div 
-          className="absolute left-0 right-0 z-20 border-t-2 border-red-500"
+          className="absolute left-0 right-0 z-20 border-t-2 border-coral-500"
           style={{ top: currentTimePosition }}
         >
-          <div className="absolute -left-2 -top-2 bg-red-500 text-white text-xs px-1 py-0.5 rounded">
+          <div className="absolute -left-2 -top-2 bg-coral-500 text-white text-xs px-1 py-0.5 rounded">
             Now
           </div>
         </div>
@@ -92,7 +92,7 @@ function TimeSlotRow({ slot, isLast }: TimeSlotRowProps) {
     >
       {/* Time label */}
       <div className="w-16 flex-shrink-0 pr-2 text-right">
-        <span className="text-sm text-gray-500 dark:text-gray-400 font-medium">
+        <span className="text-sm text-ink-500 dark:text-white/60 font-medium">
           {slot.displayTime}
         </span>
       </div>
@@ -100,14 +100,14 @@ function TimeSlotRow({ slot, isLast }: TimeSlotRowProps) {
       {/* Grid line and content area */}
       <div className="flex-1 relative">
         {/* Top border line */}
-        <div className="absolute top-0 left-0 right-0 border-t border-gray-200 dark:border-gray-700" />
+        <div className="absolute top-0 left-0 right-0 border-t border-stroke-200/70 dark:border-white/10" />
         
         {/* Content area with subtle background */}
-        <div className="h-full bg-gray-50/30 dark:bg-gray-800/30 hover:bg-gray-50/50 dark:hover:bg-gray-800/50 transition-colors" />
+        <div className="h-full bg-bg-50/40 dark:bg-white/5 hover:bg-bg-50/70 dark:hover:bg-white/10 transition-colors" />
         
         {/* Bottom border for last slot */}
         {isLast && (
-          <div className="absolute bottom-0 left-0 right-0 border-t border-gray-200 dark:border-gray-700" />
+          <div className="absolute bottom-0 left-0 right-0 border-t border-stroke-200/70 dark:border-white/10" />
         )}
       </div>
     </div>

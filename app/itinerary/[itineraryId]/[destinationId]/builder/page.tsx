@@ -195,9 +195,9 @@ export default function Builder() {
 
   try {
     return (
-    <div className="h-full flex flex-col">
+    <div className="h-full flex flex-col bg-bg-50 dark:bg-ink-900">
       {/* Enhanced Toolbar with ViewToggle */}
-      <div className="flex items-center justify-between p-4 border-b bg-white dark:bg-gray-950 shadow-sm">
+      <div className="flex items-center justify-between p-4 border-b bg-bg-0 dark:bg-ink-900 shadow-sm">
         <ViewToggle 
           className="flex-1"
           showMapToggle={!isMobile}
@@ -228,7 +228,7 @@ export default function Builder() {
               <ResizablePanelGroup direction="horizontal" className="h-full">
                 {/* Main Content */}
                 <ResizablePanel defaultSize={60} className="min-w-0">
-                  <div className="h-full bg-gray-50 dark:bg-gray-900">
+                  <div className="h-full bg-bg-50 dark:bg-ink-900">
                     <ViewTransition 
                       viewKey={currentView}
                       loadingComponent={<ViewLoadingState />}
@@ -278,9 +278,9 @@ export default function Builder() {
                       
                       return (
                         <Suspense fallback={
-                          <div className="h-full flex items-center justify-center bg-gray-50 dark:bg-gray-900">
+                          <div className="h-full flex items-center justify-center bg-bg-50 dark:bg-ink-900">
                             <div className="flex flex-col items-center space-y-2">
-                              <Map className="w-8 h-8 animate-spin text-blue-500" />
+                              <Map className="w-8 h-8 animate-spin text-brand-500" />
                               <p className="text-sm text-muted-foreground">Loading map...</p>
                             </div>
                           </div>
@@ -300,7 +300,7 @@ export default function Builder() {
                 </ResizablePanel>
               </ResizablePanelGroup>
             ) : (
-              <div className="h-full w-full bg-gray-50 dark:bg-gray-900">
+              <div className="h-full w-full bg-bg-50 dark:bg-ink-900">
                 <ViewTransition 
                   viewKey={currentView}
                   loadingComponent={<ViewLoadingState />}

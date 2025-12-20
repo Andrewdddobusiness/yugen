@@ -1,14 +1,13 @@
 "use client";
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import Image from "next/image";
-import { motion, AnimatePresence } from "framer-motion";
 import LoadingSpinner from "@/components/loading/LoadingSpinner";
 
 export default function Loading() {
   const textOptions = [
-    "Create itineraries with ease.",
-    "You can always update your itineraries later.",
-    "Share your itineraries with your buddies.",
+    "Loading your itinerary…",
+    "Syncing activities and time slots…",
+    "Preparing exports and navigation…",
   ];
 
   const [currentTextIndex, setCurrentTextIndex] = useState(0);
@@ -21,35 +20,22 @@ export default function Loading() {
   }, [textOptions.length]);
 
   return (
-    <div className="flex flex-col justify-center items-center w-full h-screen gap-4">
-      <motion.div
-        animate={{ scale: [1, 1.2, 1] }}
-        transition={{ duration: 1.5, repeat: Infinity, repeatType: "loop" }}
-        className="flex flex-col justify-center items-center w-10 h-10"
-      >
+    <div className="flex flex-col justify-center items-center w-full h-screen bg-bg-50">
+      <div className="glass rounded-2xl px-7 py-6 flex flex-col items-center gap-4 max-w-sm w-[92%] text-center">
+        <div className="relative w-20 h-20">
         <Image
-          src="/smile.svg"
-          alt="smile"
-          width={50}
-          height={50}
-          className="w-12 h-12"
+          src="/assets/yugi-mascot-1.png"
+          alt="Loading"
+          fill
+          priority
+          sizes="80px"
+          className="object-contain animate-pulse"
         />
-      </motion.div>
-      <div className="text-sm text-zinc-500 h-6 flex items-center justify-center">
-        <AnimatePresence>
-          <motion.div
-            key={currentTextIndex}
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 10 }}
-            transition={{ duration: 0.5 }}
-            className="absolute"
-          >
-            {textOptions[currentTextIndex]}
-          </motion.div>
-        </AnimatePresence>
+        </div>
+        <div className="text-xl font-semibold text-ink-900 font-logo">Yugi</div>
+        <div className="text-sm text-ink-500 h-5">{textOptions[currentTextIndex]}</div>
+        <LoadingSpinner />
       </div>
-      <LoadingSpinner />
     </div>
   );
 }

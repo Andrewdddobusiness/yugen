@@ -1,8 +1,7 @@
 "use client";
 
 import React from 'react';
-import { Star, MapPin, Clock, Phone, Globe, DollarSign, Calendar, User } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { Star, MapPin, Phone, Globe, DollarSign, Calendar, User } from 'lucide-react';
 
 interface ActivityData {
   name: string;
@@ -107,7 +106,7 @@ export function ActivityBlockPopover({
 
   return (
     <div
-      className="absolute z-50 w-80 bg-white rounded-lg shadow-xl border border-gray-200 p-4 pointer-events-none"
+      className="absolute z-50 w-80 glass rounded-xl p-4 pointer-events-none"
       style={{
         left: position.x,
         top: position.y,
@@ -116,20 +115,20 @@ export function ActivityBlockPopover({
     >
       {/* Header */}
       <div className="mb-3">
-        <div className="font-semibold text-gray-900 text-base leading-tight mb-1">
+        <div className="font-semibold text-ink-900 dark:text-white/90 text-base leading-tight mb-1">
           {activity.activity?.name || 'Untitled Activity'}
         </div>
-        <div className="text-sm text-gray-600">
+        <div className="text-sm text-ink-500 dark:text-white/60">
           {category}
         </div>
       </div>
 
       {/* Date and Time */}
-      <div className="flex items-center text-sm text-gray-700 mb-3">
-        <Calendar className="h-4 w-4 mr-2 text-gray-500" />
+      <div className="flex items-center text-sm text-ink-700 dark:text-white/80 mb-3">
+        <Calendar className="h-4 w-4 mr-2 text-ink-500 dark:text-white/60" />
         <div>
           <div className="font-medium">{formatDate(activity.date)}</div>
-          <div className="text-gray-600">
+          <div className="text-ink-500 dark:text-white/60">
             {formatTime(activity.startTime)} - {formatTime(activity.endTime)}
             <span className="ml-1">({getDurationText(activity.duration)})</span>
           </div>
@@ -140,18 +139,18 @@ export function ActivityBlockPopover({
       <div className="flex items-center justify-between mb-3">
         {activity.activity?.rating && (
           <div className="flex items-center">
-            <Star className="h-4 w-4 text-yellow-500 mr-1" />
-            <span className="text-sm font-medium text-gray-900">
+            <Star className="h-4 w-4 text-amber-500 mr-1" />
+            <span className="text-sm font-medium text-ink-900 dark:text-white/90">
               {activity.activity.rating.toFixed(1)}
             </span>
-            <span className="text-sm text-gray-500 ml-1">rating</span>
+            <span className="text-sm text-ink-500 dark:text-white/60 ml-1">rating</span>
           </div>
         )}
         
         {priceInfo && (
           <div className="flex items-center">
-            <DollarSign className="h-4 w-4 text-gray-500 mr-1" />
-            <span className="text-sm text-gray-700">
+            <DollarSign className="h-4 w-4 text-ink-500 dark:text-white/60 mr-1" />
+            <span className="text-sm text-ink-700 dark:text-white/80">
               {priceInfo.level} - {priceInfo.text}
             </span>
           </div>
@@ -161,8 +160,8 @@ export function ActivityBlockPopover({
       {/* Address */}
       {activity.activity?.address && (
         <div className="flex items-start mb-3">
-          <MapPin className="h-4 w-4 text-gray-500 mr-2 mt-0.5 flex-shrink-0" />
-          <div className="text-sm text-gray-700">
+          <MapPin className="h-4 w-4 text-ink-500 dark:text-white/60 mr-2 mt-0.5 flex-shrink-0" />
+          <div className="text-sm text-ink-700 dark:text-white/80">
             {activity.activity.address}
           </div>
         </div>
@@ -171,7 +170,7 @@ export function ActivityBlockPopover({
       {/* Description */}
       {activity.activity?.description && (
         <div className="mb-3">
-          <p className="text-sm text-gray-600 line-clamp-3">
+          <p className="text-sm text-ink-500 dark:text-white/60 line-clamp-3">
             {activity.activity.description}
           </p>
         </div>
@@ -181,8 +180,8 @@ export function ActivityBlockPopover({
       <div className="space-y-2 mb-3">
         {activity.activity?.phone_number && (
           <div className="flex items-center">
-            <Phone className="h-4 w-4 text-gray-500 mr-2" />
-            <span className="text-sm text-gray-700">
+            <Phone className="h-4 w-4 text-ink-500 dark:text-white/60 mr-2" />
+            <span className="text-sm text-ink-700 dark:text-white/80">
               {activity.activity.phone_number}
             </span>
           </div>
@@ -190,12 +189,12 @@ export function ActivityBlockPopover({
         
         {activity.activity?.website_url && (
           <div className="flex items-center">
-            <Globe className="h-4 w-4 text-gray-500 mr-2" />
+            <Globe className="h-4 w-4 text-ink-500 dark:text-white/60 mr-2" />
             <a
               href={activity.activity.website_url}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-sm text-blue-600 hover:text-blue-800 pointer-events-auto"
+              className="text-sm text-brand-600 hover:text-brand-700 dark:text-brand-400 dark:hover:text-brand-300 pointer-events-auto"
             >
               Visit Website
             </a>
@@ -206,20 +205,20 @@ export function ActivityBlockPopover({
       {/* Status Indicators */}
       <div className="flex items-center gap-3 mb-3">
         {activity.is_booked && (
-          <div className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+          <div className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-lime-500/15 text-ink-700 dark:text-white/80">
             <Calendar className="h-3 w-3 mr-1" />
             Confirmed
           </div>
         )}
         
         {activity.priority && activity.priority >= 4 && (
-          <div className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
+          <div className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-coral-500/15 text-ink-700 dark:text-white/80">
             High Priority
           </div>
         )}
         
         {activity.cost && (
-          <div className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+          <div className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-brand-500/10 text-ink-700 dark:text-white/80">
             Budget: ${activity.cost}
           </div>
         )}
@@ -227,12 +226,12 @@ export function ActivityBlockPopover({
 
       {/* User Notes */}
       {activity.notes && (
-        <div className="border-t border-gray-100 pt-3">
+        <div className="border-t border-stroke-200/60 dark:border-white/10 pt-3">
           <div className="flex items-start">
-            <User className="h-4 w-4 text-gray-500 mr-2 mt-0.5 flex-shrink-0" />
+            <User className="h-4 w-4 text-ink-500 dark:text-white/60 mr-2 mt-0.5 flex-shrink-0" />
             <div>
-              <div className="text-xs font-medium text-gray-500 mb-1">Your Notes</div>
-              <p className="text-sm text-gray-700 italic">
+              <div className="text-xs font-medium text-ink-500 dark:text-white/60 mb-1">Your Notes</div>
+              <p className="text-sm text-ink-700 dark:text-white/80 italic">
                 &quot;{activity.notes}&quot;
               </p>
             </div>
@@ -242,8 +241,8 @@ export function ActivityBlockPopover({
 
       {/* Arrow pointer */}
       <div className="absolute top-full left-1/2 transform -translate-x-1/2">
-        <div className="w-0 h-0 border-l-8 border-r-8 border-t-8 border-l-transparent border-r-transparent border-t-gray-200"></div>
-        <div className="w-0 h-0 border-l-8 border-r-8 border-t-8 border-l-transparent border-r-transparent border-t-white absolute top-0 left-1/2 transform -translate-x-1/2 -translate-y-px"></div>
+        <div className="w-0 h-0 border-l-8 border-r-8 border-t-8 border-l-transparent border-r-transparent border-t-stroke-200/60 dark:border-t-white/10" />
+        <div className="w-0 h-0 border-l-8 border-r-8 border-t-8 border-l-transparent border-r-transparent border-t-white/75 dark:border-t-ink-900/55 absolute top-0 left-1/2 transform -translate-x-1/2 -translate-y-px" />
       </div>
     </div>
   );

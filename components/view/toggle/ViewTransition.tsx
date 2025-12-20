@@ -98,7 +98,7 @@ export function ViewTransition({
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               transition={{ duration: 0.15 }}
-              className="absolute inset-0 flex items-center justify-center bg-gray-50/80 dark:bg-gray-900/80"
+              className="absolute inset-0 flex items-center justify-center bg-bg-50/80 dark:bg-ink-900/80"
             >
               {loadingComponent}
             </motion.div>
@@ -159,13 +159,11 @@ export function ViewLoadingState() {
     <div className="flex items-center justify-center h-32">
       <div className="flex flex-col items-center space-y-4">
         <div className="relative">
-          <div className="w-8 h-8 border-2 border-gray-300 rounded-full animate-spin">
-            <div className="absolute top-0 left-0 w-8 h-8 border-2 border-blue-500 rounded-full border-t-transparent animate-spin"></div>
+          <div className="w-8 h-8 border-2 border-stroke-200 rounded-full animate-spin">
+            <div className="absolute top-0 left-0 w-8 h-8 border-2 border-brand-500 rounded-full border-t-transparent animate-spin"></div>
           </div>
         </div>
-        <p className="text-sm text-gray-600 dark:text-gray-400 font-medium">
-          Switching view...
-        </p>
+        <p className="text-sm text-ink-500 dark:text-white/70 font-medium">Switching view…</p>
       </div>
     </div>
   );

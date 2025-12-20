@@ -5,8 +5,17 @@ import { useDraggable } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
 import { GripVertical } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { ActivityBlockContent } from './ActivityBlockContent';
+import { ActivityBlockContent, type ActivityAccent } from './ActivityBlockContent';
 import { ActivityBlockPopover } from './ActivityBlockPopover';
+
+const accentStyles: Record<ActivityAccent, { border: string; tint: string }> = {
+  brand: { border: "border-l-brand-500", tint: "bg-brand-500/10" },
+  teal: { border: "border-l-teal-500", tint: "bg-teal-500/10" },
+  amber: { border: "border-l-amber-500", tint: "bg-amber-500/10" },
+  coral: { border: "border-l-coral-500", tint: "bg-coral-500/10" },
+  lime: { border: "border-l-lime-500", tint: "bg-lime-500/10" },
+  tan: { border: "border-l-tan-500", tint: "bg-tan-500/10" },
+};
 
 interface ActivityData {
   name: string;
@@ -226,50 +235,46 @@ export function ActivityBlock({
   };
 
   // Generate color based on activity category following the color coding system
-  const getActivityColor = (types?: string[], activityId?: string) => {
+  const getActivityAccent = (types?: string[], activityId?: string): ActivityAccent => {
     if (types && types.length > 0) {
       const primaryType = types[0].toLowerCase();
       
-      // Category-based colors as per CALENDAR-002 specification
+      // Category-based accents (calendar blocks use tinted fills + accent borders)
       if (primaryType.includes('restaurant') || primaryType.includes('food') || primaryType.includes('meal')) {
-        return 'bg-red-500';  // 🍴 Food & Dining: Red/Orange tones
+        return 'amber';
       }
       if (primaryType.includes('tourist_attraction') || primaryType.includes('museum') || primaryType.includes('landmark')) {
-        return 'bg-blue-500';  // 🏛️ Attractions: Blue tones
+        return 'brand';
       }
       if (primaryType.includes('shopping') || primaryType.includes('store') || primaryType.includes('mall')) {
-        return 'bg-purple-500';  // 🛍️ Shopping: Purple tones
+        return 'teal';
       }
       if (primaryType.includes('park') || primaryType.includes('natural') || primaryType.includes('outdoor')) {
-        return 'bg-green-500';  // 🌳 Outdoors: Green tones
+        return 'lime';
       }
       if (primaryType.includes('entertainment') || primaryType.includes('amusement') || primaryType.includes('night_club')) {
-        return 'bg-pink-500';  // 🎭 Entertainment: Pink/Magenta tones
+        return 'coral';
       }
       if (primaryType.includes('lodging') || primaryType.includes('hotel') || primaryType.includes('accommodation')) {
-        return 'bg-gray-500';  // 🏨 Accommodation: Gray tones
+        return 'tan';
       }
       if (primaryType.includes('transit') || primaryType.includes('transport') || primaryType.includes('airport')) {
-        return 'bg-yellow-500';  // 🚗 Transportation: Yellow/Amber tones
+        return 'amber';
       }
     }
 
-    // Fallback to hash-based color for consistency
-    const colors = [
-      'bg-blue-500', 'bg-green-500', 'bg-purple-500', 'bg-orange-500',
-      'bg-red-500', 'bg-teal-500', 'bg-pink-500', 'bg-indigo-500'
-    ];
-    
+    // Fallback to hash-based accent for consistency
+    const accents: ActivityAccent[] = ["brand", "teal", "amber", "tan", "lime", "coral"];
     const hash = (activityId || '').split('').reduce((a, b) => {
       a = ((a << 5) - a) + b.charCodeAt(0);
       return a & a;
     }, 0);
     
-    return colors[Math.abs(hash) % colors.length];
+    return accents[Math.abs(hash) % accents.length];
   };
 
   const blockSize = getBlockSize(activity.duration);
-  const activityColor = getActivityColor(activity.activity?.types, activity.activityId || activity.id);
+  const activityAccent = getActivityAccent(activity.activity?.types, activity.activityId || activity.id);
 
   // Calculate dynamic height during resize
   const calculateBlockHeight = () => {
@@ -297,17 +302,18 @@ export function ActivityBlock({
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
         className={cn(
-        "relative rounded-lg shadow-sm border-l-4 overflow-hidden group",
-        "cursor-default", // Default cursor, not cursor-move
-        isResizing && "cursor-ns-resize select-none",
-        "hover:shadow-md active:shadow-lg",
-        isDragging && "opacity-50 rotate-1 shadow-xl",
-        isResizing && "shadow-lg ring-2 ring-blue-300 z-30 ring-opacity-70",
-        isOverlay && "shadow-2xl border-2 border-white",
-        activityColor.replace('bg-', 'border-l-'),
-        "bg-white",
-        className
-      )}
+          "relative rounded-lg overflow-hidden group border border-stroke-200 border-l-4",
+          "cursor-default",
+          isResizing && "cursor-ns-resize select-none",
+          "shadow-sm hover:shadow-card active:shadow-float",
+          isDragging && "opacity-50 rotate-1 shadow-float",
+          isResizing && "shadow-float ring-2 ring-brand-400/50 z-30",
+          isOverlay && "shadow-2xl border-2 border-white",
+          accentStyles[activityAccent].border,
+          "bg-bg-0",
+          accentStyles[activityAccent].tint,
+          className
+        )}
       role="button"
       tabIndex={0}
       aria-label={`Move ${activity.activity?.name || 'activity'}`}
@@ -315,12 +321,12 @@ export function ActivityBlock({
       {/* Drag Handle - only show on hover and for standard+ blocks */}
       {blockSize !== 'compact' && !isResizing && (
         <div 
-          className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity z-20 cursor-move p-1 hover:bg-gray-100 rounded"
+          className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity z-20 cursor-move p-1 hover:bg-bg-50 rounded"
           {...listeners}
           {...attributes}
           title="Drag to move activity"
         >
-          <GripVertical className="h-3 w-3 text-gray-400 hover:text-gray-600" />
+          <GripVertical className="h-3 w-3 text-ink-500 hover:text-brand-600" />
         </div>
       )}
 
@@ -328,7 +334,7 @@ export function ActivityBlock({
       <ActivityBlockContent
         activity={activity}
         blockSize={blockSize}
-        activityColor={activityColor}
+        activityAccent={activityAccent}
         isResizing={isResizing}
         isDragging={isDragging}
       />
@@ -340,8 +346,8 @@ export function ActivityBlock({
             className={cn(
               "absolute top-0 left-0 right-0 h-2 cursor-n-resize transition-all z-20",
               isResizing && resizeDirection === 'top' 
-                ? "bg-blue-400 opacity-100" 
-                : "hover:bg-blue-300 opacity-0 group-hover:opacity-100"
+                ? "bg-brand-500/30 opacity-100" 
+                : "hover:bg-brand-500/20 opacity-0 group-hover:opacity-100"
             )}
             onMouseDown={handleResizeTopMouseDown}
             title="Adjust start time (drag up to start earlier, down to start later)"
@@ -350,8 +356,8 @@ export function ActivityBlock({
             className={cn(
               "absolute bottom-0 left-0 right-0 h-2 cursor-s-resize transition-all z-20",
               isResizing && resizeDirection === 'bottom' 
-                ? "bg-blue-400 opacity-100" 
-                : "hover:bg-blue-300 opacity-0 group-hover:opacity-100"
+                ? "bg-brand-500/30 opacity-100" 
+                : "hover:bg-brand-500/20 opacity-0 group-hover:opacity-100"
             )}
             onMouseDown={handleResizeBottomMouseDown}
             title="Adjust end time (drag down to end later, up to end earlier)"
@@ -361,18 +367,18 @@ export function ActivityBlock({
 
       {/* Status indicators */}
       {isDragging && (
-        <div className="absolute inset-0 bg-blue-500 bg-opacity-20 flex items-center justify-center">
-          <div className="text-blue-700 text-xs font-medium">Moving...</div>
+        <div className="absolute inset-0 bg-brand-500/10 flex items-center justify-center">
+          <div className="text-brand-700 text-xs font-medium">Moving…</div>
         </div>
       )}
       
       {isResizing && (
-        <div className="absolute inset-0 bg-blue-500 bg-opacity-20 flex items-center justify-center">
+        <div className="absolute inset-0 bg-brand-500/10 flex items-center justify-center">
           <div className="text-center">
-            <div className="text-blue-700 text-xs font-medium">
+            <div className="text-brand-700 text-xs font-medium">
               {resizeDirection === 'top' ? 'Adjusting start time' : 'Adjusting end time'}
             </div>
-            <div className="text-blue-600 text-xs mt-1 font-semibold">
+            <div className="text-brand-600 text-xs mt-1 font-semibold">
               {Math.floor(previewDuration / 60)}h {previewDuration % 60}m
             </div>
           </div>

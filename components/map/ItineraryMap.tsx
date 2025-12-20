@@ -2,8 +2,7 @@
 
 import React, { useMemo, useState, useEffect } from 'react';
 import { APIProvider, Map, MapCameraChangedEvent, useMap } from '@vis.gl/react-google-maps';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Eye, EyeOff, Route as RouteIcon, MapPin, Calendar } from 'lucide-react';
+import { Route as RouteIcon, MapPin, Calendar } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
@@ -132,17 +131,6 @@ export function ItineraryMap({
   const [localShowRoutes, setLocalShowRoutes] = useState(showRoutes);
   const [hiddenDays, setHiddenDays] = useState<Set<string>>(new Set());
 
-  // Debug logging
-  console.log('ItineraryMap render:', {
-    activitiesCount: activities.length,
-    activities: activities.map(a => ({
-      id: a.itinerary_activity_id,
-      name: a.activity?.name,
-      coordinates: a.activity?.coordinates,
-      date: a.date
-    }))
-  });
-
   // Filter activities with coordinates
   const validActivities = useMemo(() => {
     const valid = activities.filter(activity => {
@@ -151,24 +139,8 @@ export function ItineraryMap({
                        activity.activity.coordinates.length === 2;
       const hasDate = activity.date;
       const isVisible = visibleDays.length === 0 || visibleDays.includes(activity.date || '');
-      
-      console.log('Activity filter:', {
-        name: activity.activity?.name,
-        hasCoords,
-        coordinates: activity.activity?.coordinates,
-        hasDate,
-        date: activity.date,
-        isVisible
-      });
-      
       return hasCoords && hasDate && isVisible;
     });
-    
-    console.log('Valid activities:', valid.length, valid.map(a => ({
-      name: a.activity?.name,
-      coordinates: a.activity?.coordinates
-    })));
-    
     return valid;
   }, [activities, visibleDays]);
 
@@ -324,46 +296,29 @@ export function ItineraryMap({
 
   // Calculate center from activities, then destination, then mapStore, then default
   const center = useMemo(() => {
-    console.log('🗺️ Calculating map center...');
-    console.log('📊 Available data:', {
-      validActivitiesCount: validActivities.length,
-      itineraryCoordinates,
-      centerCoordinates,
-      destinationName,
-    });
-    
     if (validActivities.length > 0) {
       const coords = validActivities[0].activity?.coordinates;
-      console.log('📍 First activity coordinates:', coords);
       if (coords && coords.length === 2) {
         // Coordinates are stored as [lng, lat] in our data
         const [lng, lat] = coords;
-        const calculatedCenter = { lat, lng };
-        console.log('✅ Using calculated center from activities:', calculatedCenter);
-        return calculatedCenter;
+        return { lat, lng };
       }
     }
     
     // Fallback to destination coordinates (itineraryCoordinates) if available
     if (itineraryCoordinates && Array.isArray(itineraryCoordinates) && itineraryCoordinates.length === 2) {
-      console.log('🏙️ Using destination center:', itineraryCoordinates);
       // itineraryCoordinates are stored as [lat, lng] from geocoding
-      const destinationCenter = { lat: itineraryCoordinates[0], lng: itineraryCoordinates[1] };
-      console.log('✅ Destination center formatted:', destinationCenter);
-      return destinationCenter;
+      return { lat: itineraryCoordinates[0], lng: itineraryCoordinates[1] };
     }
     
     // Fallback to mapStore center coordinates if available
     if (centerCoordinates && Array.isArray(centerCoordinates) && centerCoordinates.length === 2) {
-      console.log('💾 Using mapStore center:', centerCoordinates);
       return { lat: centerCoordinates[0], lng: centerCoordinates[1] };
     }
     
     // Default to London as last resort
-    console.log('⚠️ No coordinates available, using default center (London)');
-    console.log('💡 Tip: Make sure destination geocoding is working or add activities with coordinates');
     return { lat: 51.5074, lng: -0.1278 };
-  }, [validActivities, itineraryCoordinates, centerCoordinates, destinationName]);
+  }, [validActivities, itineraryCoordinates, centerCoordinates]);
 
   const handleCenterChanged = (e: MapCameraChangedEvent) => {
     if (e.detail?.center) {
@@ -391,23 +346,14 @@ export function ItineraryMap({
     cluster.activities.some(activity => activity.date && !hiddenDays.has(activity.date))
   );
 
-  console.log('Final render state:', {
-    center,
-    validActivitiesCount: validActivities.length,
-    visibleIndividualActivitiesCount: visibleIndividualActivities.length,
-    visibleClustersCount: visibleClusters.length,
-    showClusters,
-    mapBounds: mapBounds?.toJSON(),
-  });
-
   // Check for required Google Maps configuration
   if (!process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY) {
     return (
-      <div className={cn("relative w-full h-full flex items-center justify-center bg-gray-100", className)}>
+      <div className={cn("relative w-full h-full flex items-center justify-center bg-bg-50", className)}>
         <div className="text-center p-6">
-          <MapPin className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-          <p className="text-gray-600 font-medium">Google Maps API key not configured</p>
-          <p className="text-sm text-gray-500 mt-2">
+          <MapPin className="h-12 w-12 mx-auto mb-4 text-ink-500" />
+          <p className="text-ink-700 font-medium">Google Maps API key not configured</p>
+          <p className="text-sm text-ink-500 mt-2">
             Please add NEXT_PUBLIC_GOOGLE_MAPS_API_KEY to your environment variables
           </p>
         </div>
@@ -431,9 +377,6 @@ export function ItineraryMap({
           gestureHandling="greedy"
           disableDefaultUI={true}
           onCenterChanged={handleCenterChanged}
-          onTilesLoaded={() => {
-            console.log('Map tiles loaded');
-          }}
           minZoom={8}
           maxZoom={18}
         >
@@ -447,7 +390,6 @@ export function ItineraryMap({
           {/* Individual Activity Markers */}
           {validActivities.map((activity) => {
             const dayIndex = Object.keys(dailyActivities).indexOf(activity.date!);
-            console.log('Rendering marker for:', activity.activity?.name, activity.activity?.coordinates);
             return (
               <ItineraryActivityMarker
                 key={activity.itinerary_activity_id}
@@ -471,7 +413,6 @@ export function ItineraryMap({
                 dayIndex={dayIndex}
                 onClick={() => {
                   // Focus map on cluster - will be handled by map click events
-                  console.log('Cluster clicked:', cluster.activities.length, 'activities');
                 }}
               />
             );
@@ -514,10 +455,9 @@ export function ItineraryMap({
       <div className="absolute top-4 left-4 z-10 space-y-2">
         {/* Route Toggle */}
         <Button
-          variant={localShowRoutes ? "default" : "outline"}
+          variant={localShowRoutes ? "default" : "secondary"}
           size="sm"
           onClick={() => setLocalShowRoutes(!localShowRoutes)}
-          className="bg-white/90 hover:bg-white shadow-lg"
         >
           <RouteIcon className="h-4 w-4 mr-2" />
           Routes
@@ -525,10 +465,9 @@ export function ItineraryMap({
 
         {/* Cluster Toggle */}
         <Button
-          variant={showClusters ? "default" : "outline"}
+          variant={showClusters ? "default" : "secondary"}
           size="sm"
           onClick={() => setShowClusters(!showClusters)}
-          className="bg-white/90 hover:bg-white shadow-lg"
         >
           <MapPin className="h-4 w-4 mr-2" />
           Cluster
@@ -536,7 +475,7 @@ export function ItineraryMap({
       </div>
 
       {/* Day Control Panel */}
-      <div className="absolute top-4 right-4 z-10 bg-white/95 rounded-lg shadow-lg p-3 max-w-xs">
+      <div className="absolute top-4 right-4 z-10 glass rounded-xl p-3 max-w-xs">
         <div className="flex items-center gap-2 mb-3">
           <Calendar className="h-4 w-4" />
           <span className="font-semibold text-sm">Days</span>
@@ -547,11 +486,11 @@ export function ItineraryMap({
         
         <div className="space-y-2 max-h-64 overflow-y-auto">
           {dailyRoutes.map((route) => (
-            <div key={route.date} className="text-xs p-2 border rounded">
+            <div key={route.date} className="text-xs p-2 border border-stroke-200/60 rounded-lg bg-bg-0/70">
               Day {route.dayIndex + 1} - {route.date}
               <button 
                 onClick={() => toggleDayVisibility(route.date)}
-                className="ml-2 text-blue-600"
+                className="ml-2 text-brand-600 hover:text-brand-700"
               >
                 {!hiddenDays.has(route.date) ? 'Hide' : 'Show'}
               </button>
@@ -561,20 +500,20 @@ export function ItineraryMap({
       </div>
 
       {/* Activity Stats */}
-      <div className="absolute bottom-4 left-4 z-10 bg-white/95 rounded-lg shadow-lg p-3">
+      <div className="absolute bottom-4 left-4 z-10 glass rounded-xl p-3">
         <div className="flex items-center gap-4 text-sm">
           <div className="flex items-center gap-1">
-            <div className="w-2 h-2 bg-blue-500 rounded-full" />
+            <div className="w-2 h-2 bg-brand-500 rounded-full" />
             <span>{validActivities.length} activities</span>
           </div>
           {showClusters && visibleClusters.length > 0 && (
             <div className="flex items-center gap-1">
-              <div className="w-2 h-2 bg-green-500 rounded-full" />
+              <div className="w-2 h-2 bg-teal-500 rounded-full" />
               <span>{visibleClusters.length} clusters</span>
             </div>
           )}
           <div className="flex items-center gap-1">
-            <div className="w-2 h-2 bg-purple-500 rounded-full" />
+            <div className="w-2 h-2 bg-coral-500 rounded-full" />
             <span>{visibleRoutes.reduce((sum, route) => sum + route.segments.length, 0)} routes</span>
           </div>
         </div>

@@ -138,7 +138,7 @@ export function ViewToggle({
     <TooltipProvider>
       <div className={cn("flex items-center gap-2", className)}>
         {/* Main View Toggle Buttons */}
-        <div className="flex items-center bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
+        <div className="flex items-center bg-bg-100 dark:bg-ink-900 rounded-xl p-1 border border-stroke-200/70 dark:border-white/10">
           {viewConfigs.map((config) => {
             const Icon = config.icon;
             const isActive = currentView === config.id;
@@ -152,8 +152,10 @@ export function ViewToggle({
                     disabled={isTransitioning || isTransitioningView}
                     onClick={() => handleViewChange(config.id)}
                     className={cn(
-                      "relative transition-all duration-200 hover:bg-white dark:hover:bg-gray-700",
-                      isActive && "bg-white dark:bg-gray-700 shadow-sm"
+                      "relative transition-all duration-200",
+                      isActive
+                        ? "bg-bg-0 dark:bg-white/5 shadow-sm"
+                        : "hover:bg-bg-0/70 dark:hover:bg-white/5"
                     )}
                   >
                     
@@ -164,18 +166,18 @@ export function ViewToggle({
                         animate={{ opacity: 1, scale: 1 }}
                         className="absolute inset-0 flex items-center justify-center"
                       >
-                        <div className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
+                        <div className="w-4 h-4 border-2 border-stroke-200 border-t-brand-500 rounded-full animate-spin" />
                       </motion.div>
                     )}
                     
                     <Icon className={cn(
                       "h-4 w-4 mr-2 transition-colors duration-200",
-                      isActive ? "text-gray-900 dark:text-gray-100" : "text-gray-600 dark:text-gray-400",
+                      isActive ? "text-brand-500" : "text-ink-500 dark:text-white/60",
                       isTransitioning && isActive && "opacity-0"
                     )} />
                     <span className={cn(
                       "transition-colors duration-200 font-medium",
-                      isActive ? "text-gray-900 dark:text-gray-100" : "text-gray-600 dark:text-gray-400",
+                      isActive ? "text-ink-900 dark:text-white/90" : "text-ink-500 dark:text-white/60",
                       isTransitioning && isActive && "opacity-0"
                     )}>
                       {config.label}

@@ -16,6 +16,7 @@ import { useActivitiesStore } from "@/store/activityStore";
 
 import { SearchType } from "@/lib/googleMaps/includedTypes";
 import { Button } from "../ui/button";
+import { cn } from "@/lib/utils";
 
 export default function SearchField() {
   const queryClient = useQueryClient();
@@ -31,7 +32,7 @@ export default function SearchField() {
   const [autocompleteResults, setAutocompleteResults] = useState<Array<ISearchHistoryItem>>([]);
   const [isVisible, setIsVisible] = useState<boolean>(false);
   const [mapHasChanged, setMapHasChanged] = useState(false);
-  const [searchAreaTimeout, setSearchAreaTimeout] = useState<NodeJS.Timeout | null>(null);
+  const searchAreaTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [selectedType, setSelectedType] = useState<SearchType>("all");
   const [isExactSearch, setIsExactSearch] = useState(false);
   const [searchTypeArea, setSearchTypeArea] = useState(false);
@@ -179,7 +180,6 @@ export default function SearchField() {
             centerCoordinates[1], // longitude
             mapRadius
           );
-          console.log("Text search successful:", activities.length, "results");
         } catch (textSearchError: any) {
           console.warn("Text Search API failed, falling back to nearby search with filtering:", textSearchError);
           
@@ -392,22 +392,22 @@ export default function SearchField() {
     ]
   );
 
-  // Optimized map change effect with proper cleanup
+  // Optimized map change effect with proper cleanup (no state writes for timers)
   useEffect(() => {
-    if (searchAreaTimeout) {
-      clearTimeout(searchAreaTimeout);
+    if (searchAreaTimeoutRef.current) {
+      clearTimeout(searchAreaTimeoutRef.current);
     }
 
     const timeout = setTimeout(() => {
       setMapHasChanged(true);
     }, 500); // 500ms delay after map movement
 
-    setSearchAreaTimeout(timeout);
+    searchAreaTimeoutRef.current = timeout;
 
     return () => {
       clearTimeout(timeout);
     };
-  }, [centerCoordinates, mapRadius, searchAreaTimeout]);
+  }, [centerCoordinates, mapRadius]);
 
   const handleClearSearch = useCallback(() => {
     setSelectedSearchQuery("");
@@ -437,7 +437,7 @@ export default function SearchField() {
       <div className="relative">
         {/* Search input with icon */}
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-ink-500" />
           <Input
             ref={inputRef}
             type="text"
@@ -446,20 +446,21 @@ export default function SearchField() {
             onChange={handleSearchChange}
             onFocus={handleInputFocus}
             onBlur={handleInputBlur}
-            className={`w-full pl-10 pr-12 h-12 text-base rounded-xl border-2 border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all duration-200 shadow-sm hover:shadow-md ${
-              searchError ? "border-red-300 focus:border-red-500 focus:ring-red-100" : ""
-            }`}
+            className={cn(
+              "w-full pl-10 pr-12 h-12 text-base rounded-xl bg-bg-0/95 backdrop-blur-sm shadow-card",
+              searchError && "border-coral-500/50 focus-visible:border-coral-500 focus-visible:ring-coral-500/20"
+            )}
           />
           {/* Right side controls */}
           <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-2">
-            {isAutocompleteLoading && <Loader2 className="h-4 w-4 animate-spin text-blue-500" />}
+            {isAutocompleteLoading && <Loader2 className="h-4 w-4 animate-spin text-brand-500" />}
             {selectedSearchQuery && (
               <button
                 onClick={handleClearSearch}
-                className="p-1.5 hover:bg-gray-100 rounded-full transition-colors"
+                className="p-1.5 hover:bg-bg-50 rounded-full transition-colors"
                 aria-label="Clear search"
               >
-                <X className="h-4 w-4 text-gray-400 hover:text-gray-600" />
+                <X className="h-4 w-4 text-ink-500 hover:text-ink-700" />
               </button>
             )}
           </div>
@@ -467,9 +468,9 @@ export default function SearchField() {
 
         {/* Error message */}
         {searchError && (
-          <div className="absolute top-full left-0 right-0 mt-2 p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-600 z-20 shadow-sm">
+          <div className="absolute top-full left-0 right-0 mt-2 p-3 bg-coral-500/10 border border-coral-500/20 rounded-xl text-sm text-ink-700 z-20 shadow-card">
             <div className="flex items-center gap-2">
-              <div className="w-1.5 h-1.5 bg-red-500 rounded-full flex-shrink-0" />
+              <div className="w-1.5 h-1.5 bg-coral-500 rounded-full flex-shrink-0" />
               {searchError}
             </div>
           </div>
@@ -477,11 +478,11 @@ export default function SearchField() {
 
         {/* Autocomplete results */}
         {isVisible && (autocompleteResults.length > 0 || debouncedQuery.length >= 2 || isAutocompleteLoading) && (
-          <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-gray-200 rounded-xl shadow-xl z-30 max-h-64 overflow-y-auto">
+          <div className="absolute top-full left-0 right-0 mt-2 glass rounded-xl z-30 max-h-64 overflow-y-auto">
             {isAutocompleteLoading && autocompleteResults.length === 0 ? (
               <div className="flex items-center justify-center py-6">
-                <Loader2 className="h-5 w-5 animate-spin text-blue-500 mr-3" />
-                <span className="text-sm text-gray-600 font-medium">Searching places...</span>
+                <Loader2 className="h-5 w-5 animate-spin text-brand-500 mr-3" />
+                <span className="text-sm text-ink-700 font-medium">Searching places…</span>
               </div>
             ) : (
               <div className="py-2">
@@ -489,16 +490,16 @@ export default function SearchField() {
                 {debouncedQuery.length >= 2 && (
                   <button
                     onClick={() => handleTextSearch(debouncedQuery)}
-                    className="w-full text-left px-4 py-3 hover:bg-green-50 transition-colors group border-b border-gray-100"
+                    className="w-full text-left px-4 py-3 hover:bg-brand-500/10 transition-colors group border-b border-stroke-200/60"
                   >
                     <div className="flex items-center gap-3">
-                      <Search className="h-4 w-4 text-green-500 group-hover:text-green-600 flex-shrink-0" />
+                      <Search className="h-4 w-4 text-teal-500 group-hover:text-brand-500 flex-shrink-0" />
                       <div className="flex-1 min-w-0">
-                        <div className="font-medium text-sm text-gray-900 truncate">
-                          Search for &quot;{debouncedQuery}&quot;
+                        <div className="font-medium text-sm text-ink-900 truncate">
+                          Search “{debouncedQuery}” nearby
                         </div>
-                        <div className="text-xs text-gray-500 mt-0.5 truncate">
-                          Find places matching this keyword nearby
+                        <div className="text-xs text-ink-500 mt-0.5 truncate">
+                          Uses a keyword search within your current map area.
                         </div>
                       </div>
                     </div>
@@ -510,13 +511,13 @@ export default function SearchField() {
                   <button
                     key={`${result.placeId}-${index}`}
                     onClick={() => handleAutocompleteSelect(result)}
-                    className="w-full text-left px-4 py-3 hover:bg-blue-50 transition-colors group"
+                    className="w-full text-left px-4 py-3 hover:bg-bg-50 transition-colors group"
                   >
                     <div className="flex items-center gap-3">
-                      <MapPin className="h-4 w-4 text-gray-400 group-hover:text-blue-500 flex-shrink-0" />
+                      <MapPin className="h-4 w-4 text-ink-500 group-hover:text-brand-500 flex-shrink-0" />
                       <div className="flex-1 min-w-0">
-                        <div className="font-medium text-sm text-gray-900 truncate">{result.mainText}</div>
-                        <div className="text-xs text-gray-500 mt-0.5 truncate">{result.secondaryText}</div>
+                        <div className="font-medium text-sm text-ink-900 truncate">{result.mainText}</div>
+                        <div className="text-xs text-ink-500 mt-0.5 truncate">{result.secondaryText}</div>
                       </div>
                     </div>
                   </button>
@@ -524,7 +525,7 @@ export default function SearchField() {
 
                 {/* No results message */}
                 {!isAutocompleteLoading && autocompleteResults.length === 0 && debouncedQuery.length >= 2 && (
-                  <div className="px-4 py-3 text-sm text-gray-500 text-center">
+                  <div className="px-4 py-3 text-sm text-ink-500 text-center">
                     No specific places found. Try the keyword search above.
                   </div>
                 )}
@@ -545,13 +546,12 @@ export default function SearchField() {
               size="sm"
               onClick={() => handleSearchTypeSelect(type.id as SearchType)}
               disabled={isActivitiesLoading}
-              className={`flex items-center gap-2 text-xs font-medium px-3 py-2.5 rounded-full whitespace-nowrap transition-all duration-200 transform hover:scale-105 active:scale-95 ${
-                isSelected
-                  ? "bg-blue-500 hover:bg-blue-600 text-white shadow-lg border-blue-500"
-                  : "bg-white hover:bg-blue-50 text-gray-700 border-gray-200 hover:border-blue-300 hover:text-blue-600 shadow-sm hover:shadow-md"
-              } ${isActivitiesLoading ? "opacity-50 cursor-not-allowed" : ""}`}
+              className={cn(
+                "flex items-center gap-2 rounded-full whitespace-nowrap",
+                !isSelected && "bg-bg-0/90 backdrop-blur-sm"
+              )}
             >
-              <div className={`transition-colors ${isSelected ? "text-white" : "text-gray-500"}`}>
+              <div className={cn("transition-colors", isSelected ? "text-white" : "text-ink-500")}>
                 {type.icon}
               </div>
               <span className="hidden sm:inline font-medium">{type.label}</span>
@@ -567,12 +567,12 @@ export default function SearchField() {
           size="sm"
           onClick={() => handleSearchTypeSelect("all")}
           disabled={isActivitiesLoading}
-          className="w-full mt-3 h-11 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white font-medium rounded-xl shadow-md hover:shadow-lg transition-all transform hover:scale-[1.02] active:scale-[0.98]"
+          className="w-full mt-3 h-11 rounded-xl"
         >
           {isActivitiesLoading ? (
             <>
               <Loader2 className="h-4 w-4 animate-spin mr-2" />
-              <span>Searching area...</span>
+              <span>Searching area…</span>
             </>
           ) : (
             <>

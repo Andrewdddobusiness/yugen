@@ -69,22 +69,23 @@ export function MobileViewSelector({
         disabled={isTransitioningView}
         className={cn(
           "w-full justify-between h-12 px-4 text-left",
-          "bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700",
-          "hover:bg-gray-50 dark:hover:bg-gray-700",
+          "bg-bg-0/90 backdrop-blur-sm border-stroke-200 shadow-sm",
+          "hover:bg-bg-50",
+          "dark:bg-ink-900/40 dark:border-white/10 dark:hover:bg-white/5",
           "transition-all duration-200"
         )}
       >
         <div className="flex items-center space-x-3">
           {isTransitioningView ? (
-            <div className="w-5 h-5 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
+            <div className="w-5 h-5 border-2 border-stroke-200 border-t-brand-500 rounded-full animate-spin" />
           ) : (
-            <CurrentIcon className="h-5 w-5 text-gray-600 dark:text-gray-300" />
+            <CurrentIcon className="h-5 w-5 text-brand-500" />
           )}
           <div className="flex flex-col items-start">
-            <span className="font-medium text-gray-900 dark:text-gray-100">
+            <span className="font-medium text-ink-900 dark:text-white/90">
               {currentConfig?.label}
             </span>
-            <span className="text-xs text-gray-500 dark:text-gray-400">
+            <span className="text-xs text-ink-500 dark:text-white/60">
               {currentConfig?.description}
             </span>
           </div>
@@ -92,7 +93,7 @@ export function MobileViewSelector({
         
         <ChevronDown 
           className={cn(
-            "h-4 w-4 text-gray-400 transition-transform duration-200",
+            "h-4 w-4 text-ink-500 transition-transform duration-200 dark:text-white/60",
             isOpen && "rotate-180"
           )} 
         />
@@ -124,8 +125,7 @@ export function MobileViewSelector({
               }}
               className={cn(
                 "absolute top-full left-0 right-0 mt-2 z-50",
-                "bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700",
-                "shadow-xl shadow-black/10 dark:shadow-black/30"
+                "glass rounded-xl"
               )}
             >
               <div className="p-2 space-y-1">
@@ -141,8 +141,8 @@ export function MobileViewSelector({
                       className={cn(
                         "w-full flex items-center space-x-3 p-3 rounded-lg",
                         "text-left transition-all duration-200",
-                        "hover:bg-gray-50 dark:hover:bg-gray-700",
-                        isActive && "bg-gray-50 dark:bg-gray-700",
+                        "hover:bg-bg-50 dark:hover:bg-white/5",
+                        isActive && "bg-brand-500/10",
                         "disabled:opacity-50 disabled:cursor-not-allowed"
                       )}
                       whileTap={{ scale: 0.98 }}
@@ -153,8 +153,8 @@ export function MobileViewSelector({
                           className={cn(
                             "h-5 w-5 transition-colors duration-200",
                             isActive 
-                              ? "text-gray-900 dark:text-gray-100" 
-                              : "text-gray-600 dark:text-gray-300"
+                              ? "text-brand-500" 
+                              : "text-ink-500 dark:text-white/70"
                           )} 
                         />
                       </div>
@@ -165,8 +165,8 @@ export function MobileViewSelector({
                           <span className={cn(
                             "font-medium transition-colors duration-200",
                             isActive 
-                              ? "text-gray-900 dark:text-gray-100" 
-                              : "text-gray-700 dark:text-gray-200"
+                              ? "text-ink-900 dark:text-white/90" 
+                              : "text-ink-700 dark:text-white/80"
                           )}>
                             {config.label}
                           </span>
@@ -176,11 +176,11 @@ export function MobileViewSelector({
                               animate={{ opacity: 1, scale: 1 }}
                               className="ml-2"
                             >
-                              <Check className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                              <Check className="h-4 w-4 text-brand-500" />
                             </motion.div>
                           )}
                         </div>
-                        <p className="text-sm text-gray-500 dark:text-gray-400 truncate">
+                        <p className="text-sm text-ink-500 dark:text-white/60 truncate">
                           {config.description}
                         </p>
                       </div>
@@ -190,8 +190,8 @@ export function MobileViewSelector({
               </div>
               
               {/* Close hint */}
-              <div className="px-4 py-2 border-t border-gray-100 dark:border-gray-700">
-                <p className="text-xs text-gray-400 dark:text-gray-500 text-center">
+              <div className="px-4 py-2 border-t border-stroke-200/60 dark:border-white/10">
+                <p className="text-xs text-ink-500 dark:text-white/50 text-center">
                   Tap outside to close
                 </p>
               </div>

@@ -12,6 +12,7 @@ import { useItineraryActivityStore } from "@/store/itineraryActivityStore";
 import { Button } from "@/components/ui/button";
 import { ExportDownloadState } from "@/components/dialog/export/ExportDownloadState";
 import { useState } from "react";
+import { cn } from "@/lib/utils";
 
 interface ExportOption {
   id: string;
@@ -19,19 +20,55 @@ interface ExportOption {
   description: string;
   icon: React.ElementType;
   onClick: () => void;
+  disabled?: boolean;
 }
 
 interface ExportDialogProps {
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
   itineraryId?: string;
+  destinationId?: string;
 }
 
-export function ShareExportDialog({ open, onOpenChange, itineraryId }: ExportDialogProps) {
-  const { itineraryActivities } = useItineraryActivityStore();
+export function ShareExportDialog({ open, onOpenChange, itineraryId, destinationId }: ExportDialogProps) {
+  const { itineraryActivities, fetchItineraryActivities, setItineraryActivities } = useItineraryActivityStore();
   const [showInstructions, setShowInstructions] = useState(false);
   const [showDownloadState, setShowDownloadState] = useState<"pdf" | "excel" | null>(null);
   const [kmlData, setKmlData] = React.useState<{ content: string; fileName: string } | null>(null);
+
+  const dialogOpen = Boolean(open);
+
+  const { data: itineraryActivitiesData, isLoading: isItineraryActivitiesLoading } = useQuery({
+    queryKey: ["itineraryActivities", itineraryId, destinationId],
+    queryFn: () => fetchItineraryActivities(itineraryId as string, destinationId as string),
+    enabled: dialogOpen && !!itineraryId && !!destinationId,
+    staleTime: 10 * 60 * 1000,
+    gcTime: 20 * 60 * 1000,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+  });
+
+  React.useEffect(() => {
+    if (Array.isArray(itineraryActivitiesData)) {
+      setItineraryActivities(itineraryActivitiesData);
+    }
+  }, [itineraryActivitiesData, setItineraryActivities]);
+
+  const { data: destinationData, isLoading: isDestinationLoading } = useQuery({
+    queryKey: ["itineraryDestination", itineraryId],
+    queryFn: () => fetchItineraryDestination(itineraryId as string),
+    enabled: dialogOpen && !!itineraryId,
+    staleTime: Infinity,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+  });
+
+  const destination = destinationData?.data;
+  const activitiesForExport = itineraryActivitiesData ?? itineraryActivities;
+  const isExportDataLoading = isItineraryActivitiesLoading || isDestinationLoading;
+  const canExport = !isExportDataLoading && !!destination;
 
   const exportOptions: ExportOption[] = [
     {
@@ -40,6 +77,7 @@ export function ShareExportDialog({ open, onOpenChange, itineraryId }: ExportDia
       description: "Export your itinerary as a detailed PDF document",
       icon: FileText,
       onClick: () => setShowDownloadState("pdf"),
+      disabled: !canExport,
     },
     {
       id: "maps",
@@ -50,6 +88,7 @@ export function ShareExportDialog({ open, onOpenChange, itineraryId }: ExportDia
         setShowInstructions(true);
         void prepareKMLData();
       },
+      disabled: !canExport,
     },
     {
       id: "excel",
@@ -57,18 +96,13 @@ export function ShareExportDialog({ open, onOpenChange, itineraryId }: ExportDia
       description: "Export your itinerary as an Excel spreadsheet",
       icon: FileSpreadsheet,
       onClick: () => setShowDownloadState("excel"),
+      disabled: !canExport,
     },
   ];
 
-  const { data: destinationData } = useQuery({
-    queryKey: ["itineraryDestination", itineraryId],
-    queryFn: () => fetchItineraryDestination(itineraryId as string),
-    enabled: !!itineraryId,
-  });
-
   const prepareKMLData = async () => {
-    if (itineraryActivities && destinationData?.data) {
-      const locations = itineraryActivities
+    if (activitiesForExport && destination) {
+      const locations = activitiesForExport
         .filter(
           (activity): activity is typeof activity & { activity: { coordinates: [number, number] } } =>
             !!activity.activity?.place_id &&
@@ -85,10 +119,10 @@ export function ShareExportDialog({ open, onOpenChange, itineraryId }: ExportDia
 
       if (locations.length > 0) {
         const { generateKML } = await import("@/utils/export/kmlExport");
-        const kmlContent = generateKML(locations, `${destinationData.data.city} Itinerary`);
+        const kmlContent = generateKML(locations, `${destination.city} Itinerary`);
         setKmlData({
           content: kmlContent,
-          fileName: `${destinationData.data.city}_itinerary.kml`,
+          fileName: `${destination.city}_itinerary.kml`,
         });
       }
     }
@@ -102,15 +136,17 @@ export function ShareExportDialog({ open, onOpenChange, itineraryId }: ExportDia
   };
 
   const executeExport = async () => {
-    if (!showDownloadState || !destinationData?.data || !itineraryActivities) return;
+    if (!showDownloadState || !destination || !activitiesForExport) {
+      throw new Error("Export data is not ready yet.");
+    }
 
     try {
       const itineraryDetails = {
-        city: destinationData.data.city,
-        country: destinationData.data.country,
-        fromDate: new Date(destinationData.data.from_date),
-        toDate: new Date(destinationData.data.to_date),
-        activities: itineraryActivities,
+        city: destination.city,
+        country: destination.country,
+        fromDate: new Date(destination.from_date),
+        toDate: new Date(destination.to_date),
+        activities: activitiesForExport,
       };
 
       if (showDownloadState === "pdf") {
@@ -128,7 +164,7 @@ export function ShareExportDialog({ open, onOpenChange, itineraryId }: ExportDia
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="sm:max-w-[460px] !bg-white/75 backdrop-blur-2xl !border-stroke-200/60 !shadow-float dark:!bg-ink-900/55 dark:!border-white/10">
         {showDownloadState ? (
           <ExportDownloadState
             type={showDownloadState}
@@ -156,12 +192,17 @@ export function ShareExportDialog({ open, onOpenChange, itineraryId }: ExportDia
                 </Button>
                 <DialogTitle>Import to Google My Maps</DialogTitle>
               </div>
-              <DialogDescription className="p-4">
+              <DialogDescription className="p-4 text-ink-500">
                 <ol className="list-decimal pl-4 space-y-4">
                   <li>
                     Download your itinerary file
-                    <Button onClick={handleDownloadKML} className="ml-2" variant="secondary">
-                      Download KML File
+                    <Button
+                      onClick={handleDownloadKML}
+                      className="ml-2"
+                      variant="default"
+                      disabled={!kmlData}
+                    >
+                      {kmlData ? "Download KML File" : "Preparing…"}
                     </Button>
                   </li>
                   <li>
@@ -170,7 +211,7 @@ export function ShareExportDialog({ open, onOpenChange, itineraryId }: ExportDia
                       href="https://www.google.com/maps/d/"
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-primary hover:underline"
+                      className="text-brand-600 hover:underline"
                     >
                       Google My Maps
                     </Link>
@@ -186,23 +227,41 @@ export function ShareExportDialog({ open, onOpenChange, itineraryId }: ExportDia
           <>
             <DialogHeader>
               <DialogTitle>Export Itinerary</DialogTitle>
-              <DialogDescription>Choose a format to export your itinerary</DialogDescription>
+              <DialogDescription className="text-ink-500">
+                Choose a format to export your itinerary.
+              </DialogDescription>
             </DialogHeader>
             <ScrollArea className="max-h-[60vh]">
               <div className="flex flex-col gap-4 p-4">
+                {isExportDataLoading ? (
+                  <div className="flex items-center gap-2 text-sm text-ink-500">
+                    <div className="h-4 w-4 rounded-full border-2 border-stroke-200 border-t-brand-500 animate-spin" />
+                    Preparing export options…
+                  </div>
+                ) : !destination ? (
+                  <div className="text-sm text-ink-500">
+                    Couldn’t load trip details. Try closing and reopening this dialog.
+                  </div>
+                ) : null}
                 {exportOptions.map((option, index) => (
                   <React.Fragment key={option.id}>
                     {index > 0 && <Separator />}
                     <button
+                      disabled={option.disabled}
                       onClick={option.onClick}
-                      className="flex items-start gap-4 hover:bg-accent p-2 rounded-lg transition-colors"
+                      className={cn(
+                        "flex items-start gap-4 p-3 rounded-xl text-left transition-all",
+                        "border border-stroke-200 bg-bg-0/70 hover:bg-bg-50",
+                        "active:translate-y-[2px] active:shadow-pressable-pressed shadow-sm",
+                        option.disabled && "opacity-60 cursor-not-allowed active:translate-y-0"
+                      )}
                     >
-                      <div className="rounded-md bg-primary/10 p-2">
-                        <option.icon className="h-6 w-6 text-primary" />
+                      <div className="rounded-lg bg-brand-500/10 p-2 text-brand-500">
+                        <option.icon className="h-6 w-6" />
                       </div>
                       <div className="flex flex-col items-start">
-                        <div className="text-sm font-semibold">{option.title}</div>
-                        <div className="text-sm text-muted-foreground">{option.description}</div>
+                        <div className="text-sm font-semibold text-ink-900">{option.title}</div>
+                        <div className="text-sm text-ink-500">{option.description}</div>
                       </div>
                     </button>
                   </React.Fragment>
