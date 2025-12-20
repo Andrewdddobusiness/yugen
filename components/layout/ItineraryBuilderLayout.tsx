@@ -115,6 +115,7 @@ export function ItineraryBuilderLayout({ children, className }: ItineraryBuilder
       {/* Toolbar */}
       {layoutPreferences.showToolbar && (
         <ItineraryToolbar
+          itineraryId={itineraryId?.toString()}
           currentView={currentView}
           onViewChange={setCurrentView}
           showMap={showMap}

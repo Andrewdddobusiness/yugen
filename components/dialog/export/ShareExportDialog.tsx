@@ -6,14 +6,10 @@ import { FileSpreadsheet, MapPin, FileText, ArrowLeft } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
-import { exportToPDF } from "@/utils/export/pdfExport";
 import { useQuery } from "@tanstack/react-query";
 import { fetchItineraryDestination } from "@/actions/supabase/actions";
 import { useItineraryActivityStore } from "@/store/itineraryActivityStore";
-import { exportToMyMaps } from "@/utils/export/mapsExport";
-import { generateKML } from "@/utils/export/kmlExport";
 import { Button } from "@/components/ui/button";
-import { exportToExcel } from "@/utils/export/excelExport";
 import { ExportDownloadState } from "@/components/dialog/export/ExportDownloadState";
 import { useState } from "react";
 
@@ -52,7 +48,7 @@ export function ShareExportDialog({ open, onOpenChange, itineraryId }: ExportDia
       icon: MapPin,
       onClick: () => {
         setShowInstructions(true);
-        prepareKMLData();
+        void prepareKMLData();
       },
     },
     {
@@ -70,7 +66,7 @@ export function ShareExportDialog({ open, onOpenChange, itineraryId }: ExportDia
     enabled: !!itineraryId,
   });
 
-  const prepareKMLData = () => {
+  const prepareKMLData = async () => {
     if (itineraryActivities && destinationData?.data) {
       const locations = itineraryActivities
         .filter(
@@ -88,6 +84,7 @@ export function ShareExportDialog({ open, onOpenChange, itineraryId }: ExportDia
         }));
 
       if (locations.length > 0) {
+        const { generateKML } = await import("@/utils/export/kmlExport");
         const kmlContent = generateKML(locations, `${destinationData.data.city} Itinerary`);
         setKmlData({
           content: kmlContent,
@@ -97,8 +94,9 @@ export function ShareExportDialog({ open, onOpenChange, itineraryId }: ExportDia
     }
   };
 
-  const handleDownloadKML = () => {
+  const handleDownloadKML = async () => {
     if (kmlData) {
+      const { exportToMyMaps } = await import("@/utils/export/mapsExport");
       exportToMyMaps(kmlData.content, kmlData.fileName.replace(".kml", ""));
     }
   };
@@ -116,8 +114,10 @@ export function ShareExportDialog({ open, onOpenChange, itineraryId }: ExportDia
       };
 
       if (showDownloadState === "pdf") {
+        const { exportToPDF } = await import("@/utils/export/pdfExport");
         await exportToPDF(itineraryDetails);
       } else if (showDownloadState === "excel") {
+        const { exportToExcel } = await import("@/utils/export/excelExport");
         await exportToExcel(itineraryDetails);
       }
     } catch (error) {

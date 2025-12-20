@@ -2,10 +2,11 @@
 
 import React from "react";
 import { Button } from "@/components/ui/button";
-import { ShareExportDialog } from "@/components/dialog/export/ShareExportDialog";
+import dynamic from "next/dynamic";
 import { Download, Share, Users } from "lucide-react";
 
 interface ItineraryToolbarProps {
+  itineraryId?: string;
   currentView: "table" | "calendar" | "list";
   onViewChange: (view: "table" | "calendar" | "list") => void;
   showMap: boolean;
@@ -19,7 +20,13 @@ interface ItineraryToolbarProps {
   onAddActivity: () => void;
 }
 
+const ShareExportDialog = dynamic(
+  () => import("@/components/dialog/export/ShareExportDialog").then((mod) => mod.ShareExportDialog),
+  { ssr: false }
+);
+
 export default function ItineraryToolbar({
+  itineraryId,
   currentView,
   onViewChange,
   showMap,
@@ -51,7 +58,7 @@ export default function ItineraryToolbar({
         <Button variant="ghost" size="icon" onClick={() => setShowExportDialog(true)}>
           <Share className="h-4 w-4" />
         </Button>
-        <ShareExportDialog open={showExportDialog} onOpenChange={setShowExportDialog} />
+        <ShareExportDialog open={showExportDialog} onOpenChange={setShowExportDialog} itineraryId={itineraryId} />
       </div>
     </div>
   );

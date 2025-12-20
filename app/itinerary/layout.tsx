@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { usePathname } from "next/navigation";
+import dynamic from "next/dynamic";
 
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebarItineraryActivityLeft } from "@/components/layout/sidebar/app/AppSidebarItineraryActivityLeft2";
@@ -32,8 +33,12 @@ import { IItineraryActivity, useItineraryActivityStore } from "@/store/itinerary
 import { useParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Download, Share, Users } from "lucide-react";
-import { ShareExportDialog } from "@/components/dialog/export/ShareExportDialog";
 import Loading from "@/components/loading/Loading";
+
+const ShareExportDialog = dynamic(
+  () => import("@/components/dialog/export/ShareExportDialog").then((mod) => mod.ShareExportDialog),
+  { ssr: false }
+);
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   const { itineraryId, destinationId } = useParams();

@@ -1,16 +1,22 @@
 "use client";
 import React, { useEffect, useState, useRef, lazy, Suspense } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { GoogleCalendarView } from "@/components/view/calendar/GoogleCalendarView";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useItineraryActivityStore } from "@/store/itineraryActivityStore";
 import { useItineraryLayoutStore } from "@/store/itineraryLayoutStore";
 import { useMapStore } from "@/store/mapStore";
 import Loading from "@/components/loading/Loading";
-import { ItineraryTableView } from "@/components/table/ItineraryTable";
-import { ItineraryListView } from "@/components/list/containers/ItineraryListView";
 import { useParams } from "next/navigation";
 const ItineraryMap = lazy(() => import("@/components/map/ItineraryMap").then(module => ({ default: module.ItineraryMap })));
+const GoogleCalendarView = lazy(() =>
+  import("@/components/view/calendar/GoogleCalendarView").then((module) => ({ default: module.GoogleCalendarView }))
+);
+const ItineraryTableView = lazy(() =>
+  import("@/components/table/ItineraryTable").then((module) => ({ default: module.ItineraryTableView }))
+);
+const ItineraryListView = lazy(() =>
+  import("@/components/list/containers/ItineraryListView").then((module) => ({ default: module.ItineraryListView }))
+);
 import { Button } from "@/components/ui/button";
 import { Map, X } from "lucide-react";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable';
@@ -22,13 +28,9 @@ import { getDestination } from "@/actions/supabase/destinations";
 import { geocodeAddress } from "@/actions/google/maps";
 
 export default function Builder() {
-  console.log('Builder component rendering...');
-  
   const { itineraryId, destinationId } = useParams();
   const itinId = itineraryId?.toString();
   const destId = destinationId?.toString();
-  
-  console.log('Builder params:', { itineraryId, destinationId, itinId, destId });
 
   const { itineraryActivities, fetchItineraryActivities, setItineraryActivities } = useItineraryActivityStore();
   const { 
@@ -68,7 +70,6 @@ export default function Builder() {
   // View state preservation
   const { saveScrollPosition, restoreScrollPosition } = useViewStatePreservation({
     onViewEnter: (view) => {
-      console.log(`Entering view: ${view}`);
       // Restore scroll position for the entering view
       setTimeout(() => {
         const element = view === 'list' ? listRef.current?.containerRef?.current :
@@ -81,7 +82,6 @@ export default function Builder() {
       }, 300); // Wait for view transition to complete
     },
     onViewExit: (view) => {
-      console.log(`Exiting view: ${view}`);
       // Save scroll position for the exiting view
       const element = view === 'list' ? listRef.current?.containerRef?.current :
                     view === 'calendar' ? calendarRef.current :
@@ -98,6 +98,10 @@ export default function Builder() {
     queryKey: ["itineraryActivities", itineraryId, destinationId],
     queryFn: () => fetchItineraryActivities(itinId, destId),
     enabled: !!itineraryId && !!destinationId,
+    staleTime: 10 * 60 * 1000,
+    gcTime: 20 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
   });
 
   // Fetch destination data for map centering
@@ -159,49 +163,24 @@ export default function Builder() {
     const geocodeDestination = async () => {
       if (destinationData?.city && destinationData?.country) {
         const address = `${destinationData.city}, ${destinationData.country}`;
-        console.log('🌍 Geocoding destination for map centering:', address);
-        console.log('📍 Destination data:', destinationData);
         
         try {
           const result = await geocodeAddress(address);
-          console.log('🔍 Geocoding result:', result);
           
           if (result.success && result.data?.coordinates) {
             const { lat, lng } = result.data.coordinates;
-            console.log('✅ Geocoded coordinates:', { lat, lng });
-            console.log('💾 Setting itinerary coordinates for map...');
             setItineraryCoordinates([lat, lng]);
           } else {
-            console.warn('❌ Failed to geocode destination:', result.error?.message || 'Unknown error');
+            console.warn("Failed to geocode destination:", result.error?.message || "Unknown error");
           }
         } catch (error) {
-          console.error('💥 Error geocoding destination:', error);
+          console.error("Error geocoding destination:", error);
         }
-      } else {
-        console.log('⚠️ Missing destination data for geocoding:', { 
-          hasDestinationData: !!destinationData,
-          city: destinationData?.city,
-          country: destinationData?.country 
-        });
       }
     };
 
     geocodeDestination();
   }, [destinationData, setItineraryCoordinates]);
-
-  // Debug logging for activities
-  console.log('Builder page render:', {
-    isLoading,
-    error,
-    dataLength: data?.length,
-    itineraryActivitiesLength: itineraryActivities?.length,
-    sampleData: data?.slice(0, 2)?.map(a => ({
-      id: a.itinerary_activity_id,
-      name: a.activity?.name,
-      coordinates: a.activity?.coordinates,
-      date: a.date
-    }))
-  });
 
   if (!itineraryId || !destinationId) {
     console.error('Missing required route params');
@@ -255,32 +234,28 @@ export default function Builder() {
                       loadingComponent={<ViewLoadingState />}
                       className="h-full"
                     >
-                      {currentView === 'calendar' ? (
-                        <div ref={calendarRef} className="h-full overflow-auto">
-                          <GoogleCalendarView 
-                            isLoading={false} 
-                            className="h-full"
-                          />
-                        </div>
-                      ) : currentView === 'table' ? (
-                        <div ref={tableRef} className="flex-1 h-full overflow-auto">
-                          <div className="p-4">
-                            <ItineraryTableView 
-                              showMap={showMap} 
-                              onToggleMap={toggleMap}
-                            />
+                      <Suspense fallback={<ViewLoadingState />}>
+                        {currentView === 'calendar' ? (
+                          <div ref={calendarRef} className="h-full overflow-auto">
+                            <GoogleCalendarView isLoading={false} className="h-full" />
                           </div>
-                        </div>
-                      ) : (
-                        <ScrollArea className="flex-1 h-full">
-                          <ItineraryListView 
-                            ref={listRef}
-                            showMap={showMap} 
-                            onToggleMap={toggleMap}
-                            targetDate={targetDate}
-                          />
-                        </ScrollArea>
-                      )}
+                        ) : currentView === 'table' ? (
+                          <div ref={tableRef} className="flex-1 h-full overflow-auto">
+                            <div className="p-4">
+                              <ItineraryTableView showMap={showMap} onToggleMap={toggleMap} />
+                            </div>
+                          </div>
+                        ) : (
+                          <ScrollArea className="flex-1 h-full">
+                            <ItineraryListView
+                              ref={listRef}
+                              showMap={showMap}
+                              onToggleMap={toggleMap}
+                              targetDate={targetDate}
+                            />
+                          </ScrollArea>
+                        )}
+                      </Suspense>
                     </ViewTransition>
                   </div>
                 </ResizablePanel>
@@ -301,17 +276,6 @@ export default function Builder() {
                           a.activity?.coordinates && Array.isArray(a.activity.coordinates) && a.activity.coordinates.length === 2
                       );
                       
-                      console.log('Passing to ItineraryMap:', {
-                        totalActivities: itineraryActivities.length,
-                        filteredActivities: filteredActivities.length,
-                        filteredSample: filteredActivities.slice(0, 2).map(a => ({
-                          id: a.itinerary_activity_id,
-                          name: a.activity?.name,
-                          coordinates: a.activity?.coordinates,
-                          date: a.date
-                        }))
-                      });
-                      
                       return (
                         <Suspense fallback={
                           <div className="h-full flex items-center justify-center bg-gray-50 dark:bg-gray-900">
@@ -325,40 +289,9 @@ export default function Builder() {
                             activities={filteredActivities}
                             showRoutes={true}
                             destinationName={destinationData ? `${destinationData.city}, ${destinationData.country}` : undefined}
-                            onActivitySelect={(activityId) => {
-                              // Handle activity selection - could sync with other views
-                              console.log('Selected activity:', activityId);
-                            }}
-                            onActivityEdit={(activityId) => {
-                              // Handle activity editing
-                              console.log('Edit activity:', activityId);
-                            }}
-                            onAddSuggestion={(suggestion, date) => {
-                              // Convert suggestion to proper format and add to itinerary
-                              console.log('📍 Adding suggestion to itinerary:', suggestion.name, 'for date:', date);
-                              
-                              // Convert Google Places format to our activity format
-                              const convertedActivity = {
-                                activity: {
-                                  name: suggestion.name,
-                                  address: suggestion.vicinity,
-                                  coordinates: [suggestion.geometry.location.lng, suggestion.geometry.location.lat] as [number, number], // Convert to [lng, lat]
-                                  types: suggestion.types,
-                                  rating: suggestion.rating,
-                                  price_level: suggestion.price_level?.toString(),
-                                  place_id: suggestion.place_id
-                                },
-                                date: date || new Date().toISOString().split('T')[0],
-                                start_time: null,
-                                end_time: null,
-                                notes: 'Added from location suggestions'
-                              };
-                              
-                              console.log('🔄 Converted suggestion coordinates:', suggestion.geometry.location, '->', convertedActivity.activity.coordinates);
-                              
-                              // TODO: Add proper integration with itinerary store/API
-                              // For now, just log the conversion
-                            }}
+                            onActivitySelect={() => {}}
+                            onActivityEdit={() => {}}
+                            onAddSuggestion={() => {}}
                           />
                         </Suspense>
                       );
@@ -373,32 +306,28 @@ export default function Builder() {
                   loadingComponent={<ViewLoadingState />}
                   className="h-full"
                 >
-                  {currentView === 'calendar' ? (
-                    <div ref={calendarRef} className="h-full overflow-auto">
-                      <GoogleCalendarView 
-                        isLoading={false} 
-                        className="h-full"
-                      />
-                    </div>
-                  ) : currentView === 'table' ? (
-                    <div ref={tableRef} className="flex-1 h-full overflow-auto">
-                      <div className="p-4">
-                        <ItineraryTableView 
-                          showMap={false} 
-                          onToggleMap={toggleMap}
-                        />
+                  <Suspense fallback={<ViewLoadingState />}>
+                    {currentView === 'calendar' ? (
+                      <div ref={calendarRef} className="h-full overflow-auto">
+                        <GoogleCalendarView isLoading={false} className="h-full" />
                       </div>
-                    </div>
-                  ) : (
-                    <ScrollArea className="flex-1 h-full">
-                      <ItineraryListView 
-                        ref={listRef}
-                        showMap={false} 
-                        onToggleMap={toggleMap}
-                        targetDate={targetDate}
-                      />
-                    </ScrollArea>
-                  )}
+                    ) : currentView === 'table' ? (
+                      <div ref={tableRef} className="flex-1 h-full overflow-auto">
+                        <div className="p-4">
+                          <ItineraryTableView showMap={false} onToggleMap={toggleMap} />
+                        </div>
+                      </div>
+                    ) : (
+                      <ScrollArea className="flex-1 h-full">
+                        <ItineraryListView
+                          ref={listRef}
+                          showMap={false}
+                          onToggleMap={toggleMap}
+                          targetDate={targetDate}
+                        />
+                      </ScrollArea>
+                    )}
+                  </Suspense>
                 </ViewTransition>
               </div>
             )}

@@ -1,11 +1,6 @@
 // Custom hook for export functionality
 import { useState } from 'react';
 import { useToast } from '@/components/ui/use-toast';
-import { EnhancedPDFExporter } from '@/utils/export/enhancedPdfExport';
-import { EnhancedExcelExporter } from '@/utils/export/enhancedExcelExport';
-import { GoogleMapsExporter } from '@/utils/export/googleMapsExport';
-import { TextMarkdownExporter } from '@/utils/export/textMarkdownExport';
-import { CalendarExporter } from '@/utils/export/calendarExport';
 import { ExportOptions, ItineraryDetails } from './types';
 
 interface UseExportHandlersProps {
@@ -29,7 +24,8 @@ export const useExportHandlers = ({
 
     try {
       switch (format) {
-        case 'pdf':
+        case 'pdf': {
+          const { EnhancedPDFExporter } = await import('@/utils/export/enhancedPdfExport');
           const pdfExporter = new EnhancedPDFExporter({
             includeMap: exportOptions.pdfIncludeMap,
             includeQRCodes: exportOptions.pdfIncludeQRCodes,
@@ -44,7 +40,10 @@ export const useExportHandlers = ({
           await pdfExporter.export(itineraryDetails);
           break;
 
-        case 'excel':
+        }
+
+        case 'excel': {
+          const { EnhancedExcelExporter } = await import('@/utils/export/enhancedExcelExport');
           const excelExporter = new EnhancedExcelExporter({
             includeExpenses: exportOptions.excelIncludeExpenses,
             includeTravelTimes: exportOptions.excelIncludeTravelTimes,
@@ -56,7 +55,10 @@ export const useExportHandlers = ({
           excelExporter.export(itineraryDetails);
           break;
 
-        case 'markdown':
+        }
+
+        case 'markdown': {
+          const { TextMarkdownExporter } = await import('@/utils/export/textMarkdownExport');
           const markdownExporter = new TextMarkdownExporter({
             format: exportOptions.textFormat,
             includeMetadata: exportOptions.textIncludeMetadata,
@@ -68,23 +70,38 @@ export const useExportHandlers = ({
           markdownExporter.export(itineraryDetails);
           break;
 
-        case 'google-maps':
+        }
+
+        case 'google-maps': {
+          const { GoogleMapsExporter } = await import('@/utils/export/googleMapsExport');
           GoogleMapsExporter.exportToGoogleMaps(itineraryDetails);
           break;
 
-        case 'google-my-maps':
+        }
+
+        case 'google-my-maps': {
+          const { GoogleMapsExporter } = await import('@/utils/export/googleMapsExport');
           GoogleMapsExporter.exportToMyMaps(itineraryDetails);
           break;
 
-        case 'google-earth':
+        }
+
+        case 'google-earth': {
+          const { GoogleMapsExporter } = await import('@/utils/export/googleMapsExport');
           GoogleMapsExporter.exportToGoogleEarth(itineraryDetails);
           break;
 
-        case 'search-list':
+        }
+
+        case 'search-list': {
+          const { GoogleMapsExporter } = await import('@/utils/export/googleMapsExport');
           GoogleMapsExporter.exportAsSearchList(itineraryDetails);
           break;
 
-        case 'ical':
+        }
+
+        case 'ical': {
+          const { CalendarExporter } = await import('@/utils/export/calendarExport');
           const calendarExporter = new CalendarExporter({
             timeZone: exportOptions.calendarTimeZone,
             includeAlarms: exportOptions.calendarIncludeAlarms,
@@ -96,7 +113,10 @@ export const useExportHandlers = ({
           calendarExporter.exportToICAL(itineraryDetails);
           break;
 
-        case 'google-calendar':
+        }
+
+        case 'google-calendar': {
+          const { CalendarExporter } = await import('@/utils/export/calendarExport');
           const googleCalExporter = new CalendarExporter({
             timeZone: exportOptions.calendarTimeZone,
             includeAlarms: exportOptions.calendarIncludeAlarms,
@@ -108,7 +128,10 @@ export const useExportHandlers = ({
           googleCalExporter.exportToGoogleCalendar(itineraryDetails);
           break;
 
-        case 'outlook':
+        }
+
+        case 'outlook': {
+          const { CalendarExporter } = await import('@/utils/export/calendarExport');
           const outlookExporter = new CalendarExporter({
             timeZone: 'UTC',
             includeAlarms: exportOptions.calendarIncludeAlarms,
@@ -119,6 +142,8 @@ export const useExportHandlers = ({
           });
           outlookExporter.exportToOutlook(itineraryDetails);
           break;
+
+        }
 
         default:
           throw new Error(`Unsupported export format: ${format}`);
