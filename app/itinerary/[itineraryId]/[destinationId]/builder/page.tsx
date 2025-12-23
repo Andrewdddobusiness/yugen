@@ -195,7 +195,7 @@ export default function Builder() {
 
   try {
     return (
-    <div className="h-full flex flex-col bg-bg-50 dark:bg-ink-900">
+    <div className="h-full w-full flex flex-col bg-bg-50 dark:bg-ink-900">
       {/* Enhanced Toolbar with ViewToggle */}
       <div className="flex items-center justify-between p-4 border-b bg-bg-0 dark:bg-ink-900 shadow-sm">
         <ViewToggle 
@@ -223,9 +223,9 @@ export default function Builder() {
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 flex overflow-hidden">
+      <div className="flex-1 flex overflow-hidden w-full">
             {showMap ? (
-              <ResizablePanelGroup direction="horizontal" className="h-full">
+              <ResizablePanelGroup direction="horizontal" className="h-full w-full">
                 {/* Main Content */}
                 <ResizablePanel defaultSize={60} className="min-w-0">
                   <div className="h-full bg-bg-50 dark:bg-ink-900">
@@ -308,13 +308,13 @@ export default function Builder() {
                 >
                   <Suspense fallback={<ViewLoadingState />}>
                     {currentView === 'calendar' ? (
-                      <div ref={calendarRef} className="h-full overflow-auto">
-                        <GoogleCalendarView isLoading={false} className="h-full" />
-                      </div>
-                    ) : currentView === 'table' ? (
-                      <div ref={tableRef} className="flex-1 h-full overflow-auto">
-                        <div className="p-4">
-                          <ItineraryTableView showMap={false} onToggleMap={toggleMap} />
+                          <div ref={calendarRef} className="h-full overflow-auto">
+                            <GoogleCalendarView isLoading={false} className="h-full w-full" />
+                          </div>
+                        ) : currentView === 'table' ? (
+                          <div ref={tableRef} className="flex-1 h-full overflow-auto">
+                            <div className="p-4">
+                              <ItineraryTableView showMap={false} onToggleMap={toggleMap} />
                         </div>
                       </div>
                     ) : (

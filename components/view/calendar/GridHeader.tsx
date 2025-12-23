@@ -4,6 +4,7 @@ import React from 'react';
 import { format, isToday, isWeekend, isSameDay } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { Sun, Cloud, CloudRain, CloudSnow } from 'lucide-react';
+import { CALENDAR_HEADER_HEIGHT_PX, getCalendarSlotHeightPx } from './layoutMetrics';
 
 interface GridHeaderProps {
   dates: Date[];
@@ -163,6 +164,8 @@ export function TimeColumn({
   isCompact?: boolean;
   className?: string;
 }) {
+  const slotHeight = getCalendarSlotHeightPx(interval);
+
   return (
     <div className={cn(
       "flex-shrink-0 bg-gray-50 border-r border-gray-200",
@@ -170,12 +173,11 @@ export function TimeColumn({
       className
     )}>
       {/* Header spacer */}
-      <div className="h-16 border-b border-gray-200" />
+      <div className="border-b border-gray-200" style={{ height: CALENDAR_HEADER_HEIGHT_PX }} />
       
       {/* Time slots */}
       <div className="relative">
         {timeSlots.map((slot, index) => {
-          const slotHeight = interval === 15 ? 30 : interval === 30 ? 48 : 60;
           const showLabel = slot.minute === 0 || (interval === 15 && index % 2 === 0);
           
           return (

@@ -5,6 +5,8 @@ import { useDroppable } from '@dnd-kit/core';
 import { format, isToday, isWeekend } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { ActivityBlock } from './ActivityBlock';
+import { useSchedulingContext } from '@/store/timeSchedulingStore';
+import { CALENDAR_HEADER_HEIGHT_PX, getCalendarSlotHeightPx } from './layoutMetrics';
 
 interface TimeSlot {
   time: string;
@@ -79,26 +81,29 @@ export function DayColumn({
 }: DayColumnProps) {
   const isCurrentDay = isToday(date);
   const isWeekendDay = isWeekend(date);
+  const schedulingContext = useSchedulingContext();
+  const slotHeightPx = getCalendarSlotHeightPx(schedulingContext.config.interval);
+  const minutesPerSlot = schedulingContext.config.interval;
 
   return (
     <div className={cn("flex-1 flex flex-col", className)}>
       {/* Day Header */}
       <div className={cn(
-        "h-12 border-b border-gray-200 flex flex-col items-center justify-center p-2",
-        isCurrentDay && "bg-blue-50 border-blue-200",
-        isWeekendDay && "bg-gray-50"
-      )}>
-        <div className="text-xs text-gray-600 uppercase tracking-wide">
+        "border-b border-stroke-200 flex flex-col items-center justify-center p-2 bg-bg-0/80",
+        isCurrentDay && "bg-brand-500/10 border-brand-400/60",
+        isWeekendDay && "bg-bg-50"
+      )} style={{ height: CALENDAR_HEADER_HEIGHT_PX }}>
+        <div className="text-xs text-ink-500 uppercase tracking-wide leading-none">
           {format(date, 'EEE')}
         </div>
         <div className={cn(
-          "text-lg font-semibold",
-          isCurrentDay ? "text-blue-600" : "text-gray-900"
+          "text-lg font-semibold leading-none",
+          isCurrentDay ? "text-brand-600" : "text-ink-900"
         )}>
           {format(date, 'd')}
         </div>
         {isCurrentDay && (
-          <div className="w-1 h-1 bg-blue-500 rounded-full mt-1" />
+          <div className="w-1 h-1 bg-brand-500 rounded-full mt-1" />
         )}
       </div>
 
@@ -108,9 +113,10 @@ export function DayColumn({
           <div
             key={`${dayIndex}-${slotIndex}`}
             className={cn(
-              "h-12 border-b border-gray-100 relative",
-              isWeekendDay && "bg-gray-50/50"
+              "border-b border-stroke-200/60 relative",
+              isWeekendDay && "bg-bg-50/60"
             )}
+            style={{ height: `${slotHeightPx}px` }}
           >
             {/* Drop zone for this time slot */}
             <TimeSlotDropZone
@@ -128,17 +134,17 @@ export function DayColumn({
               
               // Check if current time falls within this slot
               const slotStart = slot.hour * 60 + slot.minute;
-              const slotEnd = slotStart + 30;
+              const slotEnd = slotStart + minutesPerSlot;
               const currentTime = currentHour * 60 + currentMinute;
               
               if (currentTime >= slotStart && currentTime < slotEnd) {
-                const progress = ((currentTime - slotStart) / 30) * 100;
+                const progress = ((currentTime - slotStart) / minutesPerSlot) * 100;
                 return (
                   <div
-                    className="absolute left-0 right-0 h-0.5 bg-red-500 z-10"
+                    className="absolute left-0 right-0 h-0.5 bg-coral-500 z-10"
                     style={{ top: `${progress}%` }}
                   >
-                    <div className="absolute -left-1 -top-1 w-2 h-2 bg-red-500 rounded-full" />
+                    <div className="absolute -left-1 -top-1 w-2 h-2 bg-coral-500 rounded-full" />
                   </div>
                 );
               }
@@ -154,8 +160,8 @@ export function DayColumn({
               key={activity.id}
               className="absolute pointer-events-auto"
               style={{
-                top: `${(activity.position.startSlot * 48)}px`, // 48px = h-12
-                height: `${activity.position.span * 48}px`,
+                top: `${activity.position.startSlot * slotHeightPx}px`,
+                height: `${activity.position.span * slotHeightPx}px`,
                 left: '2px',
                 right: '2px',
                 zIndex: 1

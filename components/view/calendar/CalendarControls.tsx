@@ -82,7 +82,12 @@ export function CalendarControls({
   };
 
   return (
-    <div className={cn("flex items-center justify-between p-4 bg-white", className)}>
+    <div className={cn(
+      "flex items-center justify-between px-4 py-3",
+      "bg-bg-0/90 backdrop-blur-sm border-b border-stroke-200",
+      "dark:bg-ink-900/50 dark:border-white/10",
+      "rounded-t-xl"
+    , className)}>
       {/* Date Navigation */}
       <div className="flex items-center space-x-4">
         <div className="flex items-center space-x-1">
@@ -114,14 +119,14 @@ export function CalendarControls({
           Today
         </Button>
 
-        <div className="text-lg font-semibold text-gray-900">
+        <div className="text-lg font-semibold text-ink-900 dark:text-white/90">
           {getDateRangeText()}
         </div>
       </div>
 
       {/* View Mode Controls */}
       <div className="flex items-center space-x-2">
-        <div className="flex items-center bg-gray-100 rounded-lg p-1">
+        <div className="flex items-center bg-bg-50 dark:bg-white/10 rounded-lg p-1 border border-stroke-200/70 dark:border-white/10 shadow-sm">
           <Button
             variant={viewMode === 'day' ? "default" : "ghost"}
             size="sm"
@@ -149,8 +154,8 @@ export function CalendarControls({
         </div>
 
         {/* Time Zone Indicator */}
-        <div className="flex items-center space-x-1 text-sm text-gray-500 ml-4">
-          <Clock className="h-4 w-4" />
+        <div className="flex items-center space-x-1 text-sm text-ink-500 ml-4">
+          <Clock className="h-4 w-4 text-brand-500" />
           <span>{Intl.DateTimeFormat().resolvedOptions().timeZone}</span>
         </div>
       </div>

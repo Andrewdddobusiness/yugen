@@ -10,6 +10,7 @@ import { cn } from '@/lib/utils';
 import { useSchedulingContext } from '@/store/timeSchedulingStore';
 import { ScheduledActivity } from './hooks/useScheduledActivities';
 import { TimeSlot } from './TimeGrid';
+import { CALENDAR_HEADER_HEIGHT_PX, getCalendarSlotHeightPx } from './layoutMetrics';
 
 interface CalendarLayoutProps {
   // Calendar configuration
@@ -84,14 +85,14 @@ export function CalendarLayout({
   const schedulingContext = useSchedulingContext();
 
   return (
-    <div className={cn("flex flex-col h-full bg-white", className)}>
+    <div className={cn("flex flex-col h-full w-full min-w-0 bg-bg-0", className)}>
       {/* Calendar Controls */}
       <CalendarControls
         selectedDate={selectedDate}
         viewMode={viewMode}
         onViewModeChange={onViewModeChange}
         onDateChange={onDateChange}
-        className="border-b border-gray-200"
+        className="border-b border-stroke-200 rounded-t-xl"
       />
 
       {/* Saving Indicator */}
@@ -108,41 +109,41 @@ export function CalendarLayout({
         onDragOver={onDragOver}
         onDragEnd={onDragEnd}
       >
-        <div className="flex-1 flex overflow-hidden">
+        <div className="flex-1 flex overflow-hidden bg-bg-50 dark:bg-ink-900 route-pattern">
           {/* Time Column using enhanced TimeGrid */}
           <TimeGrid 
             config={schedulingContext.config}
-            className="border-r border-gray-200"
+            className="border-r border-stroke-200 bg-bg-0/80 backdrop-blur-sm"
           >
             {(slots) => (
-              <div className="w-20 flex-shrink-0 bg-gray-50">
-                <div className="h-12 border-b border-gray-200" />
+              <div className="w-24 flex-shrink-0 bg-bg-0/70">
+                <div className="border-b border-stroke-200/70" style={{ height: CALENDAR_HEADER_HEIGHT_PX }} />
                 <div className="relative">
                   {slots.map((slot) => {
-                    const slotHeight = schedulingContext.config.interval === 15 ? 30 : 
-                                    schedulingContext.config.interval === 30 ? 48 : 60;
+                    const slotHeight = getCalendarSlotHeightPx(schedulingContext.config.interval);
                     
                     return (
                       <div
                         key={slot.time}
                         className={cn(
                           "border-b relative",
-                          slot.isHour ? "border-gray-200" : "border-gray-100"
+                          slot.isHour ? "border-stroke-200" : "border-stroke-200/70",
+                          "bg-bg-0/60"
                         )}
                         style={{ height: `${slotHeight}px` }}
                       >
                         {(slot.isHour || schedulingContext.config.interval === 15) && (
                           <div 
                             className={cn(
-                              "absolute -top-2 right-2 text-xs px-1 bg-gray-50",
-                              slot.isHour ? "text-gray-700 font-medium" : "text-gray-500"
+                              "absolute -top-2 right-2 text-xs px-1 bg-bg-0/90",
+                              slot.isHour ? "text-ink-700 font-medium" : "text-ink-500"
                             )}
                           >
                             {schedulingContext.config.interval === 15 || slot.isHour ? slot.label : ''}
                           </div>
                         )}
                         {slot.isHour && (
-                          <div className="absolute left-0 top-0 w-2 h-px bg-gray-300" />
+                          <div className="absolute left-0 top-0 w-2 h-px bg-stroke-200" />
                         )}
                       </div>
                     );
@@ -153,7 +154,7 @@ export function CalendarLayout({
           </TimeGrid>
 
           {/* Days Grid */}
-          <div className="flex-1 flex">
+          <div className="flex-1 flex min-w-0 bg-bg-0/70">
             {days.map((day, dayIndex) => (
               <DayColumn
                 key={format(day, 'yyyy-MM-dd')}
@@ -163,7 +164,7 @@ export function CalendarLayout({
                 activities={scheduledActivities.filter(act => act.position.day === dayIndex)}
                 dragOverInfo={dragOverInfo}
                 onResize={onResize}
-                className={dayIndex < days.length - 1 ? "border-r border-gray-200" : ""}
+                className={dayIndex < days.length - 1 ? "border-r border-stroke-200/70" : ""}
               />
             ))}
           </div>

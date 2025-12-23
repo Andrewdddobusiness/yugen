@@ -2,6 +2,7 @@
 
 import React, { useMemo } from 'react';
 import { cn } from '@/lib/utils';
+import { CALENDAR_HEADER_HEIGHT_PX, getCalendarSlotHeightPx } from './layoutMetrics';
 
 export interface TimeSlot {
   time: string;
@@ -69,18 +70,18 @@ export function TimeGrid({ config, children, className }: TimeGridProps) {
   }, [config]);
 
   if (children) {
-    return <>{children(timeSlots)}</>;
+    return <div className={cn("flex-shrink-0", className)}>{children(timeSlots)}</div>;
   }
 
   return (
     <div className={cn("w-20 flex-shrink-0 bg-gray-50 border-r border-gray-200", className)}>
       {/* Header spacer */}
-      <div className="h-12 border-b border-gray-200" />
+      <div className="border-b border-gray-200" style={{ height: CALENDAR_HEADER_HEIGHT_PX }} />
       
       {/* Time slots */}
       <div className="relative">
         {timeSlots.map((slot) => {
-          const slotHeight = getSlotHeight(config.interval);
+          const slotHeight = getCalendarSlotHeightPx(config.interval);
           
           return (
             <div
@@ -113,18 +114,6 @@ export function TimeGrid({ config, children, className }: TimeGridProps) {
       </div>
     </div>
   );
-}
-
-/**
- * Calculate slot height based on interval for visual consistency
- */
-function getSlotHeight(interval: number): number {
-  switch (interval) {
-    case 15: return 30; // 15 min = 30px
-    case 30: return 48; // 30 min = 48px  
-    case 60: return 60; // 60 min = 60px
-    default: return 48;
-  }
 }
 
 /**
