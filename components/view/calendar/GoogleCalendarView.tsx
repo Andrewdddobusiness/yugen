@@ -26,7 +26,7 @@ export function GoogleCalendarView({
     return startDate ? new Date(startDate) : new Date();
   });
   
-  const [viewMode, setViewMode] = useState<'day' | '3-day' | 'week'>(() => {
+  const [viewMode, setViewMode] = useState<'day' | '3-day' | 'week' | 'month'>(() => {
     const viewState = getViewState('calendar');
     return viewState.viewMode || 'week';
   });

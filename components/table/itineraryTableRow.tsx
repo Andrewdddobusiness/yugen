@@ -99,7 +99,7 @@ export default function ItineraryTableRow({
       <TableCell className="w-[20%] min-w-[200px]">{activity.activity?.address}</TableCell>
       <TableCell className="w-[15%] min-w-[150px]">
         <DatePickerPopover
-          itineraryActivityId={Number(activity.itinerary_activity_id)}
+          itineraryActivityId={activity.itinerary_activity_id}
           showText={true}
           styled={true}
           startDate={startDate}
@@ -113,7 +113,7 @@ export default function ItineraryTableRow({
         }}
       >
         <TimePopover
-          itineraryActivityId={Number(activity.itinerary_activity_id)}
+          itineraryActivityId={activity.itinerary_activity_id}
           storeStartTime={activity.start_time}
           storeEndTime={activity.end_time}
           showText={true}

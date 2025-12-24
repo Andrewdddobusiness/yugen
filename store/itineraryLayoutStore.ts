@@ -29,7 +29,7 @@ export interface ItineraryLayoutState {
     };
     calendar: {
       selectedDate: string | null;
-      viewMode: 'day' | '3-day' | 'week';
+      viewMode: 'day' | '3-day' | 'week' | 'month';
       scrollPosition: number;
     };
     table: {

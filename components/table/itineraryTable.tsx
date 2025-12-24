@@ -183,7 +183,7 @@ export function ItineraryTableView({ showMap, onToggleMap }: ItineraryTableViewP
                           <div>
                             <div className="text-xs text-gray-500 mb-1">Date</div>
                             <DatePickerPopover
-                              itineraryActivityId={Number(activity.itinerary_activity_id)}
+                              itineraryActivityId={activity.itinerary_activity_id}
                               showText={true}
                               styled={true}
                               startDate={startDate || undefined}
@@ -194,7 +194,7 @@ export function ItineraryTableView({ showMap, onToggleMap }: ItineraryTableViewP
                           <div>
                             <div className="text-xs text-gray-500 mb-1">Time</div>
                             <TimePopover
-                              itineraryActivityId={Number(activity.itinerary_activity_id)}
+                              itineraryActivityId={activity.itinerary_activity_id}
                               storeStartTime={activity.start_time}
                               storeEndTime={activity.end_time}
                               showText={true}

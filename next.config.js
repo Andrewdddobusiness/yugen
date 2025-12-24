@@ -4,6 +4,10 @@ const withBundleAnalyzer = require('@next/bundle-analyzer')({
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Keep dev/prod outputs separate to avoid corrupted `.next` when running
+  // `next dev` and `next build` (or multiple dev servers) back-to-back.
+  distDir: process.env.NODE_ENV === 'production' ? '.next' : '.next-dev',
+
   // Performance optimizations
   experimental: {
     turbo: {
@@ -19,6 +23,13 @@ const nextConfig = {
   
   // Webpack optimizations
   webpack: (config, { dev, isServer }) => {
+    // Dev stability: avoid filesystem cache corruption causing missing chunk modules.
+    if (dev) {
+      config.cache = {
+        type: 'memory',
+      };
+    }
+
     // Production optimizations
     if (!dev) {
       config.optimization = {

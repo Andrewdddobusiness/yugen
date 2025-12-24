@@ -13,8 +13,8 @@ import {
 
 interface CalendarGridProps {
   selectedDate?: Date;
-  viewMode?: 'day' | '3-day' | 'week';
-  onViewModeChange?: (mode: 'day' | '3-day' | 'week') => void;
+  viewMode?: 'day' | '3-day' | 'week' | 'month';
+  onViewModeChange?: (mode: 'day' | '3-day' | 'week' | 'month') => void;
   onDateChange?: (date: Date) => void;
   className?: string;
 }

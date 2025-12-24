@@ -1,5 +1,11 @@
 import { useMemo } from 'react';
-import { startOfWeek, endOfWeek, eachDayOfInterval } from 'date-fns';
+import {
+  startOfWeek,
+  endOfWeek,
+  eachDayOfInterval,
+  startOfMonth,
+  addDays
+} from 'date-fns';
 
 /**
  * useCalendarDays - Generates the array of days for calendar display
@@ -15,7 +21,7 @@ import { startOfWeek, endOfWeek, eachDayOfInterval } from 'date-fns';
  */
 export function useCalendarDays(
   selectedDate: Date, 
-  viewMode: 'day' | '3-day' | 'week'
+  viewMode: 'day' | '3-day' | 'week' | 'month'
 ): Date[] {
   const days = useMemo(() => {
     switch (viewMode) {
@@ -27,6 +33,13 @@ export function useCalendarDays(
           new Date(selectedDate.getTime() + 24 * 60 * 60 * 1000),
           new Date(selectedDate.getTime() + 2 * 24 * 60 * 60 * 1000)
         ];
+      case 'month': {
+        const monthStart = startOfMonth(selectedDate);
+        const start = startOfWeek(monthStart, { weekStartsOn: 1 }); // Monday
+        // Always render 6 weeks (Google Calendar style) for stable row heights.
+        const end = addDays(start, 41);
+        return eachDayOfInterval({ start, end });
+      }
       case 'week':
       default:
         const start = startOfWeek(selectedDate, { weekStartsOn: 1 }); // Monday

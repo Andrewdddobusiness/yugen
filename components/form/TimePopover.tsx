@@ -8,6 +8,19 @@ import { formatTime } from "@/utils/formatting/datetime";
 import { cn } from "@/lib/utils";
 import { setItineraryActivityTimes } from "@/actions/supabase/actions";
 import { useQueryClient } from "@tanstack/react-query";
+import { useItineraryActivityStore } from "@/store/itineraryActivityStore";
+
+const normalizeTimeToHHmm = (time: string | null | undefined) => {
+  if (!time) return "";
+  const parts = time.split(":");
+  if (parts.length < 2) return "";
+  return `${parts[0].padStart(2, "0")}:${parts[1].padStart(2, "0")}`;
+};
+
+const toTimeWithSeconds = (timeHHmm: string) => {
+  if (!timeHHmm) return "";
+  return timeHHmm.length === 5 ? `${timeHHmm}:00` : timeHHmm;
+};
 
 const generateTimeOptions = () => {
   const times = [];
@@ -28,23 +41,24 @@ export default function TimePopover({
   showText = true,
   styled = true,
 }: {
-  itineraryActivityId: number;
+  itineraryActivityId: string;
   storeStartTime: string | null;
   storeEndTime: string | null;
   showText?: boolean;
   styled?: boolean;
 }) {
   const queryClient = useQueryClient();
+  const setItineraryActivities = useItineraryActivityStore((s) => s.setItineraryActivities);
 
-  const [startTime, setStartTime] = useState(storeStartTime || "");
-  const [endTime, setEndTime] = useState(storeEndTime || "");
+  const [startTime, setStartTime] = useState(normalizeTimeToHHmm(storeStartTime));
+  const [endTime, setEndTime] = useState(normalizeTimeToHHmm(storeEndTime));
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
 
   useEffect(() => {
-    setStartTime(storeStartTime || "");
-    setEndTime(storeEndTime || "");
+    setStartTime(normalizeTimeToHHmm(storeStartTime));
+    setEndTime(normalizeTimeToHHmm(storeEndTime));
   }, [storeStartTime, storeEndTime]);
 
   const handleTimeChange = (type: "start" | "end", value: string) => {
@@ -80,7 +94,24 @@ export default function TimePopover({
 
     setIsLoading(true);
     try {
-      await setItineraryActivityTimes(itineraryActivityId.toString(), startTime, endTime);
+      const result = await setItineraryActivityTimes(
+        itineraryActivityId,
+        toTimeWithSeconds(startTime),
+        toTimeWithSeconds(endTime)
+      );
+      if (!result?.success) {
+        setError(result?.message || "Failed to save times. Please try again.");
+        return;
+      }
+
+      const currentActivities = useItineraryActivityStore.getState().itineraryActivities;
+      setItineraryActivities(
+        currentActivities.map((a) =>
+          a.itinerary_activity_id === itineraryActivityId
+            ? { ...a, start_time: toTimeWithSeconds(startTime), end_time: toTimeWithSeconds(endTime) }
+            : a
+        )
+      );
       queryClient.invalidateQueries({ queryKey: ["itineraryActivities"] });
       setIsOpen(false);
     } catch (error) {

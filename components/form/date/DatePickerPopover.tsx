@@ -1,6 +1,5 @@
 "use client";
 
-import React from "react";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { format, isWithinInterval } from "date-fns";
 import { Calendar } from "@/components/ui/calendar";
@@ -8,11 +7,12 @@ import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { CalendarIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { fetchFilteredTableData, setTableData } from "@/actions/supabase/actions";
+import { fetchFilteredTableData } from "@/actions/supabase/actions";
 import { createClient } from "@/utils/supabase/client";
+import { useItineraryActivityStore } from "@/store/itineraryActivityStore";
 
 interface DatePickerPopoverProps {
-  itineraryActivityId: number;
+  itineraryActivityId: string;
   showText?: boolean;
   styled?: boolean;
   startDate?: Date;
@@ -27,12 +27,13 @@ export function DatePickerPopover({
   endDate,
 }: DatePickerPopoverProps) {
   const queryClient = useQueryClient();
+  const setItineraryActivities = useItineraryActivityStore((s) => s.setItineraryActivities);
 
-  const { data: dateData, isLoading } = useQuery({
+  const { data: dateData } = useQuery({
     queryKey: ["itineraryActivity", "date", itineraryActivityId],
     queryFn: async () => {
       const result = await fetchFilteredTableData("itinerary_activity", "date", "itinerary_activity_id", [
-        itineraryActivityId.toString(),
+        itineraryActivityId,
       ]);
 
       if (result.success && result.data?.[0]?.date) {
@@ -67,9 +68,6 @@ export function DatePickerPopover({
 
   const updateDateMutation = useMutation({
     mutationFn: async (newDate: Date | undefined) => {
-      console.log("Attempting to update itinerary_activity_id:", itineraryActivityId);
-      console.log("New date:", newDate ? format(newDate, "yyyy-MM-dd") : null);
-      
       const supabase = createClient();
       const { data, error } = await supabase
         .from("itinerary_activity")
@@ -84,7 +82,6 @@ export function DatePickerPopover({
         throw error;
       }
 
-      console.log("Update successful:", data);
       return newDate;
     },
     onMutate: async (newDate) => {
@@ -99,6 +96,15 @@ export function DatePickerPopover({
       // Optimistically update to the new value
       queryClient.setQueryData(["itineraryActivity", "date", itineraryActivityId], newDate);
 
+      // Optimistically update the itinerary store (table grouping uses this)
+      const isoDate = newDate ? format(newDate, "yyyy-MM-dd") : null;
+      const currentActivities = useItineraryActivityStore.getState().itineraryActivities;
+      setItineraryActivities(
+        currentActivities.map((a) =>
+          a.itinerary_activity_id === itineraryActivityId ? { ...a, date: isoDate } : a
+        )
+      );
+
       // Return a context with the previous and new date
       return { previousDate, newDate };
     },
@@ -110,6 +116,16 @@ export function DatePickerPopover({
           context.previousDate
         );
       }
+
+      const previousIsoDate =
+        context?.previousDate instanceof Date ? format(context.previousDate, "yyyy-MM-dd") : null;
+      const currentActivities = useItineraryActivityStore.getState().itineraryActivities;
+      setItineraryActivities(
+        currentActivities.map((a) =>
+          a.itinerary_activity_id === itineraryActivityId ? { ...a, date: previousIsoDate } : a
+        )
+      );
+
       console.error("Error saving date:", err);
     },
     onSettled: () => {

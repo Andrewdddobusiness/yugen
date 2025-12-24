@@ -1,16 +1,16 @@
 "use client";
 
 import React from 'react';
-import { format, addDays, subDays, addWeeks, subWeeks, isToday } from 'date-fns';
+import { format, addDays, subDays, addWeeks, subWeeks, addMonths, subMonths, isToday } from 'date-fns';
 import { ChevronLeft, ChevronRight, Calendar, Clock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
 interface CalendarControlsProps {
   selectedDate: Date;
-  viewMode: 'day' | '3-day' | 'week';
+  viewMode: 'day' | '3-day' | 'week' | 'month';
   onDateChange?: (date: Date) => void;
-  onViewModeChange?: (mode: 'day' | '3-day' | 'week') => void;
+  onViewModeChange?: (mode: 'day' | '3-day' | 'week' | 'month') => void;
   className?: string;
 }
 
@@ -35,6 +35,9 @@ export function CalendarControls({
       case 'week':
         onDateChange(subWeeks(selectedDate, 1));
         break;
+      case 'month':
+        onDateChange(subMonths(selectedDate, 1));
+        break;
     }
   };
 
@@ -50,6 +53,9 @@ export function CalendarControls({
         break;
       case 'week':
         onDateChange(addWeeks(selectedDate, 1));
+        break;
+      case 'month':
+        onDateChange(addMonths(selectedDate, 1));
         break;
     }
   };
@@ -78,6 +84,8 @@ export function CalendarControls({
         } else {
           return `${format(selectedDate, 'MMM d')} - ${format(weekEnd, 'MMM d, yyyy')}`;
         }
+      case 'month':
+        return format(selectedDate, 'MMMM yyyy');
     }
   };
 
@@ -150,6 +158,14 @@ export function CalendarControls({
             className="h-7 text-xs"
           >
             Week
+          </Button>
+          <Button
+            variant={viewMode === 'month' ? "default" : "ghost"}
+            size="sm"
+            onClick={() => onViewModeChange?.('month')}
+            className="h-7 text-xs"
+          >
+            Month
           </Button>
         </div>
 
