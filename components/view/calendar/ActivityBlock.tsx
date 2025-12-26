@@ -67,7 +67,6 @@ export function ActivityBlock({
   const [resizeDirection, setResizeDirection] = useState<'top' | 'bottom' | null>(null);
   const [showPopover, setShowPopover] = useState(false);
   const [popoverPosition, setPopoverPosition] = useState({ x: 0, y: 0 });
-  const [previewDuration, setPreviewDuration] = useState<number>(activity.duration);
   const [previewHeight, setPreviewHeight] = useState<number>(0);
   const blockRef = useRef<HTMLDivElement | null>(null);
   const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -99,7 +98,6 @@ export function ActivityBlock({
   const handleResizeStart = useCallback((direction: 'top' | 'bottom', e: MouseEvent) => {
     setIsResizing(true);
     setResizeDirection(direction);
-    setPreviewDuration(activity.duration);
     
     // Get initial mouse position and calendar grid context
     const initialMouseY = e.clientY;
@@ -152,7 +150,6 @@ export function ActivityBlock({
       // Update preview if duration changed
       if (newDuration !== lastCalculatedDuration) {
         lastCalculatedDuration = newDuration;
-        setPreviewDuration(newDuration);
         
         // For top handle resize, we need to adjust the visual position
         if (direction === 'top') {
@@ -179,7 +176,6 @@ export function ActivityBlock({
     const handleMouseUp = (e: MouseEvent) => {
       setIsResizing(false);
       setResizeDirection(null);
-      setPreviewDuration(activity.duration);
       setPreviewHeight(0);
       
       // Reset any transform applied during resize
@@ -394,19 +390,6 @@ export function ActivityBlock({
       {isDragging && (
         <div className="absolute inset-0 bg-brand-500/10 flex items-center justify-center">
           <div className="text-brand-700 text-xs font-medium">Moving…</div>
-        </div>
-      )}
-      
-      {isResizing && (
-        <div className="absolute inset-0 bg-brand-500/10 flex items-center justify-center">
-          <div className="text-center">
-            <div className="text-brand-700 text-xs font-medium">
-              {resizeDirection === 'top' ? 'Adjusting start time' : 'Adjusting end time'}
-            </div>
-            <div className="text-brand-600 text-xs mt-1 font-semibold">
-              {Math.floor(previewDuration / 60)}h {previewDuration % 60}m
-            </div>
-          </div>
         </div>
       )}
       </div>

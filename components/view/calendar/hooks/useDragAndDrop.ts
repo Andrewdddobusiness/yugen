@@ -8,7 +8,7 @@ import { useSchedulingContext } from '@/store/timeSchedulingStore';
 import { ActivityScheduler, SchedulerWishlistItem } from '../services/activityScheduler';
 import { ScheduledActivity } from './useScheduledActivities';
 import { TimeSlot } from '../TimeGrid';
-import { findNearestValidSlot } from '@/utils/calendar/collisionDetection';
+import { findNearestValidSlot, timeToMinutes } from '@/utils/calendar/collisionDetection';
 
 /**
  * useDragAndDrop - Comprehensive drag and drop logic for calendar grid
@@ -313,7 +313,7 @@ export function useDragAndDrop(
     }
     
     setIsSaving(false);
-  }, [scheduler, itineraryActivities, setItineraryActivities, toast]);
+  }, [scheduler, setItineraryActivities, toast]);
 
   const handleDragEnd = useCallback(async (event: DragEndEvent) => {
     setActiveId(null);
@@ -392,49 +392,91 @@ export function useDragAndDrop(
     newDuration: number,
     resizeDirection: 'top' | 'bottom'
   ) => {
-    // Find the activity being resized
-    const activityToResize = itineraryActivities.find(act => act.itinerary_activity_id === activityId);
-    if (!activityToResize || !activityToResize.start_time || !activityToResize.end_time) return;
+    const minutesToTimeString = (minutes: number) =>
+      `${Math.floor(minutes / 60).toString().padStart(2, '0')}:${(minutes % 60)
+        .toString()
+        .padStart(2, '0')}:00`;
+
+    const currentActivities = useItineraryActivityStore.getState().itineraryActivities;
+    const previousActivity = currentActivities.find(
+      (act) => act.itinerary_activity_id === activityId
+    );
+    if (!previousActivity || !previousActivity.start_time || !previousActivity.end_time) return;
+
+    const previousTimes = {
+      start_time: previousActivity.start_time,
+      end_time: previousActivity.end_time,
+    };
+
+    const startMinutes = timeToMinutes(previousActivity.start_time as string);
+    const endMinutes = timeToMinutes(previousActivity.end_time as string);
+
+    let optimisticStartTime = previousActivity.start_time as string;
+    let optimisticEndTime = previousActivity.end_time as string;
+
+    if (resizeDirection === 'bottom') {
+      optimisticEndTime = minutesToTimeString(startMinutes + newDuration);
+    } else {
+      optimisticStartTime = minutesToTimeString(endMinutes - newDuration);
+    }
+
+    // Optimistic UI: update local store immediately so the block doesn't snap back.
+    const activitiesAfterOptimistic = useItineraryActivityStore
+      .getState()
+      .itineraryActivities.map((act) =>
+        act.itinerary_activity_id === activityId
+          ? { ...act, start_time: optimisticStartTime, end_time: optimisticEndTime }
+          : act
+      );
+    setItineraryActivities(activitiesAfterOptimistic);
 
     setIsSaving(true);
-    
+
     const result = await scheduler.resizeActivity(
       activityId,
       newDuration,
       resizeDirection,
-      activityToResize.start_time as string,
-      activityToResize.end_time as string,
-      activityToResize.date as string
+      previousTimes.start_time as string,
+      previousTimes.end_time as string,
+      previousActivity.date as string
     );
 
     if (result.success && result.data) {
-      // Update activity optimistically
-      const updatedActivity = {
-        ...activityToResize,
-        start_time: result.data.startTime,
-        end_time: result.data.endTime
-      };
-
-      const updatedActivities = itineraryActivities.map(act =>
-        act.itinerary_activity_id === activityId ? updatedActivity : act
-      );
-      
-      setItineraryActivities(updatedActivities);
+      const activitiesAfterCommit = useItineraryActivityStore
+        .getState()
+        .itineraryActivities.map((act) =>
+          act.itinerary_activity_id === activityId
+            ? {
+                ...act,
+                start_time: result.data.startTime,
+                end_time: result.data.endTime,
+              }
+            : act
+        );
+      setItineraryActivities(activitiesAfterCommit);
 
       toast({
         title: "Activity resized",
         description: result.message,
       });
     } else {
+      // Revert on error
+      const activitiesAfterRevert = useItineraryActivityStore
+        .getState()
+        .itineraryActivities.map((act) =>
+          act.itinerary_activity_id === activityId ? { ...act, ...previousTimes } : act
+        );
+      setItineraryActivities(activitiesAfterRevert);
+
       toast({
         title: "Failed to resize",
         description: result.error,
         variant: "destructive"
       });
     }
-    
+
     setIsSaving(false);
-  }, [scheduler, itineraryActivities, setItineraryActivities, toast]);
+  }, [scheduler, setItineraryActivities, toast]);
 
   // Get the currently active activity for drag overlay
   const activeActivity = scheduledActivities.find(act => act.id === activeId);
