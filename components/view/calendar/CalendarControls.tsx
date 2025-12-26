@@ -78,7 +78,7 @@ export function CalendarControls({
           return `${format(selectedDate, 'MMM d')} - ${format(threeDayEnd, 'MMM d, yyyy')}`;
         }
       case 'week':
-        const weekStart = startOfWeek(selectedDate, { weekStartsOn: 1 });
+        const weekStart = startOfWeek(selectedDate, { weekStartsOn: 0 });
         const weekEnd = addDays(weekStart, 6);
         if (weekStart.getMonth() === weekEnd.getMonth()) {
           return `${format(weekStart, 'MMM d')} - ${format(weekEnd, 'd, yyyy')}`;

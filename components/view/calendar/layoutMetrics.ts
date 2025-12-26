@@ -1,6 +1,6 @@
 import type { TimeGridConfig } from './TimeGrid';
 
-export const CALENDAR_HEADER_HEIGHT_PX = 56;
+export const CALENDAR_HEADER_HEIGHT_PX = 48;
 
 export function getCalendarSlotHeightPx(
   interval: TimeGridConfig['interval'] | number

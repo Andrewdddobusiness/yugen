@@ -12,7 +12,7 @@ import {
  * 
  * Features:
  * - Supports day, 3-day, and week views
- * - Week view starts on Monday
+ * - Week view starts on Sunday
  * - Memoized for performance
  * 
  * @param selectedDate - The currently selected date
@@ -32,12 +32,12 @@ export function useCalendarDays(
       case '3-day':
         return eachDayOfInterval({ start: baseDate, end: addDays(baseDate, 2) });
       case 'week': {
-        const weekStart = startOfWeek(baseDate, { weekStartsOn: 1 });
+        const weekStart = startOfWeek(baseDate, { weekStartsOn: 0 });
         return eachDayOfInterval({ start: weekStart, end: addDays(weekStart, 6) });
       }
       case 'month': {
         const monthStart = startOfMonth(selectedDate);
-        const start = startOfWeek(monthStart, { weekStartsOn: 1 }); // Monday
+        const start = startOfWeek(monthStart, { weekStartsOn: 0 }); // Sunday
         // Always render 6 weeks (Google Calendar style) for stable row heights.
         const end = addDays(start, 41);
         return eachDayOfInterval({ start, end });

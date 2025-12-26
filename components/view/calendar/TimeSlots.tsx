@@ -1,8 +1,8 @@
 "use client";
 
-import React from 'react';
-import { cn } from '@/lib/utils';
-import { CALENDAR_HEADER_HEIGHT_PX } from './layoutMetrics';
+import React from "react";
+import { cn } from "@/lib/utils";
+import { CALENDAR_HEADER_HEIGHT_PX } from "./layoutMetrics";
 
 interface TimeSlot {
   time: string;
@@ -20,8 +20,11 @@ export function TimeSlots({ timeSlots, className }: TimeSlotsProps) {
   return (
     <div className={cn("w-16 flex-shrink-0 bg-gray-50", className)}>
       {/* Header spacer */}
-      <div className="border-b border-gray-200" style={{ height: CALENDAR_HEADER_HEIGHT_PX }} />
-      
+      <div
+        className="border-b border-gray-200"
+        style={{ height: CALENDAR_HEADER_HEIGHT_PX }}
+      />
+
       {/* Time slots */}
       <div className="relative">
         {timeSlots.map((slot, index) => (

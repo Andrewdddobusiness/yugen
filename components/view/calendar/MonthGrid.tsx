@@ -14,7 +14,7 @@ interface MonthGridProps {
   className?: string;
 }
 
-const weekdayLabels = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
+const weekdayLabels = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
 
 export function MonthGrid({
   monthDate,

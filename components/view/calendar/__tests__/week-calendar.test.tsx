@@ -8,18 +8,18 @@ import { CalendarControls } from '../CalendarControls';
 import { DayColumn } from '../DayColumn';
 
 describe('Week calendar', () => {
-  it('generates Monday-starting week days', () => {
-    const selectedDate = new Date(2026, 1, 1); // Feb 1, 2026 (local)
+  it('generates Sunday-starting week days', () => {
+    const selectedDate = new Date(2026, 0, 26); // Jan 26, 2026 (local)
     const { result } = renderHook(() => useCalendarDays(selectedDate, 'week'));
 
     expect(result.current).toHaveLength(7);
-    expect(format(result.current[0], 'yyyy-MM-dd')).toBe('2026-01-26');
-    expect(format(result.current[6], 'yyyy-MM-dd')).toBe('2026-02-01');
+    expect(format(result.current[0], 'yyyy-MM-dd')).toBe('2026-01-25');
+    expect(format(result.current[6], 'yyyy-MM-dd')).toBe('2026-01-31');
   });
 
-  it('renders a week range that matches Monday-starting columns', () => {
-    render(<CalendarControls selectedDate={new Date(2026, 1, 1)} viewMode="week" />);
-    expect(screen.getByText('Jan 26 - Feb 1, 2026')).toBeInTheDocument();
+  it('renders a week range that matches Sunday-starting columns', () => {
+    render(<CalendarControls selectedDate={new Date(2026, 0, 26)} viewMode="week" />);
+    expect(screen.getByText('Jan 25 - 31, 2026')).toBeInTheDocument();
   });
 
   it('shows date-only activities in the all-day row', () => {
@@ -41,8 +41,6 @@ describe('Week calendar', () => {
       </DndContext>
     );
 
-    expect(screen.getByText('Unscheduled Museum')).toBeInTheDocument();
-    expect(screen.getByText('+1 more')).toBeInTheDocument();
+    expect(screen.getByText('+3')).toBeInTheDocument();
   });
 });
-

@@ -190,6 +190,29 @@ export const useTimeSchedulingStore = create<TimeSchedulingState>()(
     }),
     {
       name: 'time-scheduling-store',
+      version: 2,
+      migrate: (persistedState: any, version) => {
+        // v1 -> v2: expand default grid to full 24 hours (00:00-23:00)
+        if (version < 2 && persistedState?.timeGridConfig) {
+          const cfg = persistedState.timeGridConfig;
+          const isOldDefault =
+            cfg.startHour === 6 && cfg.endHour === 23 && cfg.interval === 30 && cfg.showExtendedHours === false;
+
+          if (isOldDefault) {
+            return {
+              ...persistedState,
+              timeGridConfig: {
+                ...cfg,
+                startHour: 0,
+                endHour: 23,
+                showExtendedHours: true,
+              },
+            };
+          }
+        }
+
+        return persistedState;
+      },
       // Only persist configuration, not temporary state
       partialize: (state) => ({
         timeGridConfig: state.timeGridConfig,

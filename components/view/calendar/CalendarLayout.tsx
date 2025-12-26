@@ -1,38 +1,45 @@
-import React, { useMemo } from 'react';
-import { DndContext, DragOverlay, closestCorners } from '@dnd-kit/core';
-import { format } from 'date-fns';
-import { DayColumn } from './DayColumn';
-import { ActivityBlock } from './ActivityBlock';
-import { TimeGrid } from './TimeGrid';
-import { CalendarControls } from './CalendarControls';
-import { ConflictResolver, TimeConflict } from './ConflictResolver';
-import { cn } from '@/lib/utils';
-import { useSchedulingContext } from '@/store/timeSchedulingStore';
-import { ScheduledActivity } from './hooks/useScheduledActivities';
-import { TimeSlot } from './TimeGrid';
-import { CALENDAR_HEADER_HEIGHT_PX, getCalendarSlotHeightPx } from './layoutMetrics';
-import { MonthGrid } from './MonthGrid';
-import { useItineraryActivityStore } from '@/store/itineraryActivityStore';
+import React, { useMemo } from "react";
+import { DndContext, DragOverlay, closestCorners } from "@dnd-kit/core";
+import { format } from "date-fns";
+import { DayColumn } from "./DayColumn";
+import { ActivityBlock } from "./ActivityBlock";
+import { TimeGrid } from "./TimeGrid";
+import { CalendarControls } from "./CalendarControls";
+import { ConflictResolver, TimeConflict } from "./ConflictResolver";
+import { cn } from "@/lib/utils";
+import { useSchedulingContext } from "@/store/timeSchedulingStore";
+import { ScheduledActivity } from "./hooks/useScheduledActivities";
+import { TimeSlot } from "./TimeGrid";
+import {
+  CALENDAR_HEADER_HEIGHT_PX,
+  getCalendarSlotHeightPx,
+} from "./layoutMetrics";
+import { MonthGrid } from "./MonthGrid";
+import { useItineraryActivityStore } from "@/store/itineraryActivityStore";
 
 interface CalendarLayoutProps {
   // Calendar configuration
   selectedDate: Date;
-  viewMode: 'day' | '3-day' | 'week' | 'month';
-  onViewModeChange?: (mode: 'day' | '3-day' | 'week' | 'month') => void;
+  viewMode: "day" | "3-day" | "week" | "month";
+  onViewModeChange?: (mode: "day" | "3-day" | "week" | "month") => void;
   onDateChange?: (date: Date) => void;
   className?: string;
-  
+
   // Data
   days: Date[];
   timeSlots: TimeSlot[];
   scheduledActivities: ScheduledActivity[];
-  
+
   // Drag & drop handlers
   onDragStart: (event: any) => void;
   onDragOver: (event: any) => void;
   onDragEnd: (event: any) => void;
-  onResize: (activityId: string, newDuration: number, resizeDirection: 'top' | 'bottom') => void;
-  
+  onResize: (
+    activityId: string,
+    newDuration: number,
+    resizeDirection: "top" | "bottom"
+  ) => void;
+
   // State
   activeActivity?: ScheduledActivity | null;
   dragOverInfo?: {
@@ -41,7 +48,7 @@ interface CalendarLayoutProps {
     hasConflict: boolean;
   } | null;
   isSaving: boolean;
-  
+
   // Conflict resolution (optional for now)
   conflicts?: TimeConflict[];
   showConflictResolver?: boolean;
@@ -51,7 +58,7 @@ interface CalendarLayoutProps {
 
 /**
  * CalendarLayout - Main layout component for calendar grid
- * 
+ *
  * Features:
  * - Responsive calendar grid layout
  * - Time column with configurable intervals
@@ -59,7 +66,7 @@ interface CalendarLayoutProps {
  * - Drag & drop context
  * - Loading indicators
  * - Conflict resolution UI
- * 
+ *
  * This component focuses on layout and UI structure while delegating
  * business logic to hooks and services.
  */
@@ -82,14 +89,16 @@ export function CalendarLayout({
   conflicts = [],
   showConflictResolver = false,
   onCloseConflictResolver,
-  onResolveConflicts
+  onResolveConflicts,
 }: CalendarLayoutProps) {
   const schedulingContext = useSchedulingContext();
-  const slotHeightPx = getCalendarSlotHeightPx(schedulingContext.config.interval);
+  const slotHeightPx = getCalendarSlotHeightPx(
+    schedulingContext.config.interval
+  );
   const { itineraryActivities } = useItineraryActivityStore();
 
   const allDayActivitiesByDay = useMemo(() => {
-    const inView = new Set(days.map((d) => format(d, 'yyyy-MM-dd')));
+    const inView = new Set(days.map((d) => format(d, "yyyy-MM-dd")));
     const map = new Map<string, Array<{ id: string; name: string }>>();
 
     for (const activity of itineraryActivities) {
@@ -103,7 +112,7 @@ export function CalendarLayout({
       const list = map.get(dayKey);
       const item = {
         id: activity.itinerary_activity_id,
-        name: activity.activity?.name ?? 'Activity',
+        name: activity.activity?.name ?? "Activity",
       };
       if (list) list.push(item);
       else map.set(dayKey, [item]);
@@ -117,7 +126,9 @@ export function CalendarLayout({
   }, [itineraryActivities, days]);
 
   return (
-    <div className={cn("flex flex-col h-full w-full min-w-0 bg-bg-0", className)}>
+    <div
+      className={cn("flex flex-col h-full w-full min-w-0 bg-bg-0", className)}
+    >
       {/* Calendar Controls */}
       <CalendarControls
         selectedDate={selectedDate}
@@ -141,7 +152,7 @@ export function CalendarLayout({
         onDragOver={onDragOver}
         onDragEnd={onDragEnd}
       >
-        {viewMode === 'month' ? (
+        {viewMode === "month" ? (
           <div className="flex-1 overflow-hidden bg-bg-0/70">
             <MonthGrid
               monthDate={selectedDate}
@@ -151,21 +162,18 @@ export function CalendarLayout({
             />
           </div>
         ) : (
-          <div className="flex-1 min-h-0 flex overflow-y-auto overflow-x-hidden bg-bg-50 dark:bg-ink-900 route-pattern">
+          <div className="flex-1 min-h-0 flex items-start overflow-y-auto overflow-x-hidden bg-bg-0 dark:bg-ink-900">
             {/* Time Column using enhanced TimeGrid */}
-            <TimeGrid 
+            <TimeGrid
               config={schedulingContext.config}
               className="border-r border-stroke-200 bg-bg-0/80 backdrop-blur-sm"
             >
               {(slots) => (
                 <div className="w-24 flex-shrink-0 bg-bg-0/70">
-                  <div className="border-b border-stroke-200/70" style={{ height: CALENDAR_HEADER_HEIGHT_PX }} />
                   <div
-                    className="border-b border-stroke-200/70 bg-bg-0/70 flex items-center justify-center"
-                    style={{ height: `${slotHeightPx}px` }}
-                  >
-                    {/* Intentionally blank: aligns the all-day row with time slots */}
-                  </div>
+                    className="sticky top-0 z-40 border-b border-stroke-200/70 bg-bg-0/90 backdrop-blur-sm shrink-0"
+                    style={{ height: CALENDAR_HEADER_HEIGHT_PX }}
+                  />
                   <div className="relative">
                     {slots.map((slot) => {
                       return (
@@ -173,19 +181,27 @@ export function CalendarLayout({
                           key={slot.time}
                           className={cn(
                             "border-b relative",
-                            slot.isHour ? "border-stroke-200" : "border-stroke-200/70",
+                            slot.isHour
+                              ? "border-stroke-200"
+                              : "border-stroke-200/70",
                             "bg-bg-0/60"
                           )}
                           style={{ height: `${slotHeightPx}px` }}
                         >
-                          {(slot.isHour || schedulingContext.config.interval === 15) && (
-                            <div 
+                          {(slot.isHour ||
+                            schedulingContext.config.interval === 15) && (
+                            <div
                               className={cn(
-                                "absolute -top-2 right-2 text-xs px-1 bg-bg-0/90",
-                                slot.isHour ? "text-ink-700 font-medium" : "text-ink-500"
+                                "absolute top-1 right-2 text-xs px-1 bg-bg-0/90",
+                                slot.isHour
+                                  ? "text-ink-700 font-medium"
+                                  : "text-ink-500"
                               )}
                             >
-                              {schedulingContext.config.interval === 15 || slot.isHour ? slot.label : ''}
+                              {schedulingContext.config.interval === 15 ||
+                              slot.isHour
+                                ? slot.label
+                                : ""}
                             </div>
                           )}
                           {slot.isHour && (
@@ -200,18 +216,26 @@ export function CalendarLayout({
             </TimeGrid>
 
             {/* Days Grid */}
-            <div className="flex-1 flex min-w-0 bg-bg-0/70">
+            <div className="flex-1 flex items-start min-w-0 bg-bg-0">
               {days.map((day, dayIndex) => (
                 <DayColumn
-                  key={format(day, 'yyyy-MM-dd')}
+                  key={format(day, "yyyy-MM-dd")}
                   date={day}
                   dayIndex={dayIndex}
                   timeSlots={timeSlots}
-                  activities={scheduledActivities.filter(act => act.position.day === dayIndex)}
-                  allDayActivities={allDayActivitiesByDay.get(format(day, 'yyyy-MM-dd')) ?? []}
+                  activities={scheduledActivities.filter(
+                    (act) => act.position.day === dayIndex
+                  )}
+                  allDayActivities={
+                    allDayActivitiesByDay.get(format(day, "yyyy-MM-dd")) ?? []
+                  }
                   dragOverInfo={dragOverInfo}
                   onResize={onResize}
-                  className={dayIndex < days.length - 1 ? "border-r border-stroke-200/70" : ""}
+                  className={
+                    dayIndex < days.length - 1
+                      ? "border-r border-stroke-200/70"
+                      : ""
+                  }
                 />
               ))}
             </div>

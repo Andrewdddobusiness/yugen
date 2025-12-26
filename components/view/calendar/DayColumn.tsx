@@ -1,12 +1,15 @@
 "use client";
 
-import React from 'react';
-import { useDroppable } from '@dnd-kit/core';
-import { format, isToday, isWeekend } from 'date-fns';
-import { cn } from '@/lib/utils';
-import { ActivityBlock } from './ActivityBlock';
-import { useSchedulingContext } from '@/store/timeSchedulingStore';
-import { CALENDAR_HEADER_HEIGHT_PX, getCalendarSlotHeightPx } from './layoutMetrics';
+import React from "react";
+import { useDroppable } from "@dnd-kit/core";
+import { format, isToday, isWeekend } from "date-fns";
+import { cn } from "@/lib/utils";
+import { ActivityBlock } from "./ActivityBlock";
+import { useSchedulingContext } from "@/store/timeSchedulingStore";
+import {
+  CALENDAR_HEADER_HEIGHT_PX,
+  getCalendarSlotHeightPx,
+} from "./layoutMetrics";
 
 interface TimeSlot {
   time: string;
@@ -43,7 +46,11 @@ interface DayColumnProps {
     hasConflict: boolean;
   } | null;
   className?: string;
-  onResize?: (activityId: string, newDuration: number, resizeDirection: 'top' | 'bottom') => void;
+  onResize?: (
+    activityId: string,
+    newDuration: number,
+    resizeDirection: "top" | "bottom"
+  ) => void;
 }
 
 interface TimeSlotDropZoneProps {
@@ -53,9 +60,15 @@ interface TimeSlotDropZoneProps {
   className?: string;
 }
 
-function TimeSlotDropZone({ dayIndex, slotIndex, isOver, hasConflict, className }: TimeSlotDropZoneProps & { hasConflict?: boolean }) {
+function TimeSlotDropZone({
+  dayIndex,
+  slotIndex,
+  isOver,
+  hasConflict,
+  className,
+}: TimeSlotDropZoneProps & { hasConflict?: boolean }) {
   const { setNodeRef } = useDroppable({
-    id: `slot-${dayIndex}-${slotIndex}`
+    id: `slot-${dayIndex}-${slotIndex}`,
   });
 
   return (
@@ -63,8 +76,12 @@ function TimeSlotDropZone({ dayIndex, slotIndex, isOver, hasConflict, className 
       ref={setNodeRef}
       className={cn(
         "absolute inset-0 transition-colors",
-        isOver && !hasConflict && "bg-blue-100 border-2 border-blue-300 border-dashed",
-        isOver && hasConflict && "bg-red-100 border-2 border-red-300 border-dashed",
+        isOver &&
+          !hasConflict &&
+          "bg-blue-100 border-2 border-blue-300 border-dashed",
+        isOver &&
+          hasConflict &&
+          "bg-red-100 border-2 border-red-300 border-dashed",
         className
       )}
     />
@@ -79,63 +96,57 @@ export function DayColumn({
   allDayActivities = [],
   dragOverInfo,
   className,
-  onResize
+  onResize,
 }: DayColumnProps) {
   const isCurrentDay = isToday(date);
   const isWeekendDay = isWeekend(date);
   const schedulingContext = useSchedulingContext();
-  const slotHeightPx = getCalendarSlotHeightPx(schedulingContext.config.interval);
+  const slotHeightPx = getCalendarSlotHeightPx(
+    schedulingContext.config.interval
+  );
   const minutesPerSlot = schedulingContext.config.interval;
 
   return (
     <div className={cn("flex-1 flex flex-col", className)}>
       {/* Day Header */}
-      <div className={cn(
-        "border-b border-stroke-200 flex flex-col items-center justify-center p-2 bg-bg-0/80",
-        isCurrentDay && "bg-brand-500/10 border-brand-400/60",
-        isWeekendDay && "bg-bg-50"
-      )} style={{ height: CALENDAR_HEADER_HEIGHT_PX }}>
+      <div
+        className={cn(
+          "sticky top-0 z-30 border-b border-stroke-200 flex flex-col items-center justify-center px-2 py-1 bg-bg-0/90 backdrop-blur-sm shrink-0",
+          isCurrentDay && "bg-brand-500/10 border-brand-400/60",
+          isWeekendDay && "bg-bg-50"
+        )}
+        style={{ height: CALENDAR_HEADER_HEIGHT_PX }}
+      >
         <div className="text-xs text-ink-500 uppercase tracking-wide leading-none">
-          {format(date, 'EEE')}
+          {format(date, "EEE")}
         </div>
-        <div className={cn(
-          "text-lg font-semibold leading-none",
-          isCurrentDay ? "text-brand-600" : "text-ink-900"
-        )}>
-          {format(date, 'd')}
+        <div
+          className={cn(
+            "text-lg font-semibold leading-none",
+            isCurrentDay ? "text-brand-600" : "text-ink-900"
+          )}
+        >
+          {format(date, "d")}
         </div>
         {isCurrentDay && (
           <div className="w-1 h-1 bg-brand-500 rounded-full mt-1" />
         )}
-      </div>
-
-      {/* All-day / Unscheduled */}
-      <div
-        className={cn(
-          "border-b border-stroke-200/70 bg-bg-0/70",
-          isWeekendDay && "bg-bg-50/40"
-        )}
-        style={{ height: `${slotHeightPx}px` }}
-      >
-        <div className="px-2 py-1 space-y-1 overflow-hidden">
-          {allDayActivities.slice(0, 2).map((activity) => (
+        {allDayActivities.length > 0 && (
+          <div className="absolute top-1 right-1">
             <div
-              key={activity.id}
               className={cn(
-                "truncate rounded px-2 py-0.5 text-[11px] leading-4",
-                "bg-brand-500/10 text-brand-700"
+                "min-w-5 h-5 px-1 rounded-full flex items-center justify-center",
+                "text-[10px] font-semibold",
+                "bg-brand-500/10 text-brand-700 border border-brand-500/20"
               )}
-              title={activity.name}
+              title={`${allDayActivities.length} date-only activit${
+                allDayActivities.length === 1 ? "y" : "ies"
+              }`}
             >
-              {activity.name}
+              +{allDayActivities.length}
             </div>
-          ))}
-          {allDayActivities.length > 2 && (
-            <div className="text-[11px] leading-4 text-ink-500">
-              +{allDayActivities.length - 2} more
-            </div>
-          )}
-        </div>
+          </div>
+        )}
       </div>
 
       {/* Time Slots */}
@@ -145,7 +156,7 @@ export function DayColumn({
             key={`${dayIndex}-${slotIndex}`}
             className={cn(
               "border-b border-stroke-200/60 relative",
-              isWeekendDay && "bg-bg-50/60"
+              isWeekendDay ? "bg-bg-50/60" : "bg-bg-0"
             )}
             style={{ height: `${slotHeightPx}px` }}
           >
@@ -153,34 +164,44 @@ export function DayColumn({
             <TimeSlotDropZone
               dayIndex={dayIndex}
               slotIndex={slotIndex}
-              isOver={dragOverInfo?.dayIndex === dayIndex && dragOverInfo?.slotIndex === slotIndex}
-              hasConflict={dragOverInfo?.dayIndex === dayIndex && dragOverInfo?.slotIndex === slotIndex ? dragOverInfo.hasConflict : false}
+              isOver={
+                dragOverInfo?.dayIndex === dayIndex &&
+                dragOverInfo?.slotIndex === slotIndex
+              }
+              hasConflict={
+                dragOverInfo?.dayIndex === dayIndex &&
+                dragOverInfo?.slotIndex === slotIndex
+                  ? dragOverInfo.hasConflict
+                  : false
+              }
             />
 
             {/* Current time indicator */}
-            {isCurrentDay && (() => {
-              const now = new Date();
-              const currentHour = now.getHours();
-              const currentMinute = now.getMinutes();
-              
-              // Check if current time falls within this slot
-              const slotStart = slot.hour * 60 + slot.minute;
-              const slotEnd = slotStart + minutesPerSlot;
-              const currentTime = currentHour * 60 + currentMinute;
-              
-              if (currentTime >= slotStart && currentTime < slotEnd) {
-                const progress = ((currentTime - slotStart) / minutesPerSlot) * 100;
-                return (
-                  <div
-                    className="absolute left-0 right-0 h-0.5 bg-coral-500 z-10"
-                    style={{ top: `${progress}%` }}
-                  >
-                    <div className="absolute -left-1 -top-1 w-2 h-2 bg-coral-500 rounded-full" />
-                  </div>
-                );
-              }
-              return null;
-            })()}
+            {isCurrentDay &&
+              (() => {
+                const now = new Date();
+                const currentHour = now.getHours();
+                const currentMinute = now.getMinutes();
+
+                // Check if current time falls within this slot
+                const slotStart = slot.hour * 60 + slot.minute;
+                const slotEnd = slotStart + minutesPerSlot;
+                const currentTime = currentHour * 60 + currentMinute;
+
+                if (currentTime >= slotStart && currentTime < slotEnd) {
+                  const progress =
+                    ((currentTime - slotStart) / minutesPerSlot) * 100;
+                  return (
+                    <div
+                      className="absolute left-0 right-0 h-0.5 bg-coral-500 z-10"
+                      style={{ top: `${progress}%` }}
+                    >
+                      <div className="absolute -left-1 -top-1 w-2 h-2 bg-coral-500 rounded-full" />
+                    </div>
+                  );
+                }
+                return null;
+              })()}
           </div>
         ))}
 
@@ -193,9 +214,9 @@ export function DayColumn({
               style={{
                 top: `${activity.position.startSlot * slotHeightPx}px`,
                 height: `${activity.position.span * slotHeightPx}px`,
-                left: '2px',
-                right: '2px',
-                zIndex: 1
+                left: "2px",
+                right: "2px",
+                zIndex: 1,
               }}
             >
               <ActivityBlock

@@ -311,13 +311,20 @@ export function ActivityBlock({
           isOverlay && "shadow-2xl border-2 border-white",
           accentStyles[activityAccent].border,
           "bg-bg-0",
-          accentStyles[activityAccent].tint,
           className
         )}
       role="button"
       tabIndex={0}
       aria-label={`Move ${activity.activity?.name || 'activity'}`}
     >
+      <div
+        aria-hidden="true"
+        className={cn(
+          "absolute inset-0 pointer-events-none",
+          accentStyles[activityAccent].tint
+        )}
+      />
+
       {/* Drag Handle - only show on hover and for standard+ blocks */}
       {blockSize !== 'compact' && !isResizing && (
         <div 
