@@ -43,6 +43,7 @@ interface DayColumnProps {
   dragOverInfo?: {
     dayIndex: number;
     slotIndex: number;
+    spanSlots: number;
     hasConflict: boolean;
   } | null;
   className?: string;
@@ -76,12 +77,8 @@ function TimeSlotDropZone({
       ref={setNodeRef}
       className={cn(
         "absolute inset-0 transition-colors",
-        isOver &&
-          !hasConflict &&
-          "bg-blue-100 border-2 border-blue-300 border-dashed",
-        isOver &&
-          hasConflict &&
-          "bg-red-100 border-2 border-red-300 border-dashed",
+        isOver && !hasConflict && "bg-blue-100/40",
+        isOver && hasConflict && "bg-red-100/40",
         className
       )}
     />
@@ -105,6 +102,17 @@ export function DayColumn({
     schedulingContext.config.interval
   );
   const minutesPerSlot = schedulingContext.config.interval;
+  const dragPreview =
+    dragOverInfo?.dayIndex === dayIndex
+      ? {
+          startSlot: dragOverInfo.slotIndex,
+          spanSlots: Math.max(
+            1,
+            Math.min(dragOverInfo.spanSlots, timeSlots.length - dragOverInfo.slotIndex)
+          ),
+          hasConflict: dragOverInfo.hasConflict,
+        }
+      : null;
 
   return (
     <div className={cn("flex-1 flex flex-col", className)}>
@@ -204,6 +212,22 @@ export function DayColumn({
               })()}
           </div>
         ))}
+
+        {/* Drag placement preview */}
+        {dragPreview && (
+          <div
+            className={cn(
+              "absolute left-[2px] right-[2px] rounded-lg border-2 border-dashed pointer-events-none z-20",
+              dragPreview.hasConflict
+                ? "bg-red-100/60 border-red-300"
+                : "bg-blue-100/60 border-blue-300"
+            )}
+            style={{
+              top: `${dragPreview.startSlot * slotHeightPx}px`,
+              height: `${dragPreview.spanSlots * slotHeightPx}px`,
+            }}
+          />
+        )}
 
         {/* Activity Blocks */}
         <div className="absolute inset-0 pointer-events-none">

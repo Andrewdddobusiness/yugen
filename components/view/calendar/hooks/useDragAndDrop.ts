@@ -40,6 +40,7 @@ export function useDragAndDrop(
   const [dragOverInfo, setDragOverInfo] = useState<{
     dayIndex: number;
     slotIndex: number;
+    spanSlots: number;
     hasConflict: boolean;
   } | null>(null);
 
@@ -89,6 +90,7 @@ export function useDragAndDrop(
     // Check if this is a wishlist item being dragged
     const dragData = active.data?.current;
     let duration = 60; // Default 1 hour
+    let spanSlots = 1;
     let excludeId = null;
     let placeData = null;
     
@@ -100,6 +102,10 @@ export function useDragAndDrop(
       } else {
         duration = dragData.item.activity?.duration || 60;
       }
+      spanSlots = Math.max(
+        1,
+        Math.ceil(duration / schedulingContext.config.interval)
+      );
     } else {
       // Find the activity being dragged (existing logic)
       const draggedActivity = scheduledActivities.find(act => act.id === active.id);
@@ -108,8 +114,11 @@ export function useDragAndDrop(
         return;
       }
       duration = draggedActivity.duration;
+      spanSlots = Math.max(1, draggedActivity.position.span);
       excludeId = active.id as string;
     }
+
+    spanSlots = Math.max(1, Math.min(spanSlots, timeSlots.length - slotIndex));
 
     // Enhanced conflict detection
     const proposedDate = format(targetDate, 'yyyy-MM-dd');
@@ -128,9 +137,10 @@ export function useDragAndDrop(
     setDragOverInfo({
       dayIndex,
       slotIndex,
+      spanSlots,
       hasConflict: hasHighSeverityConflicts
     });
-  }, [days, timeSlots, scheduledActivities, scheduler]);
+  }, [days, timeSlots, scheduledActivities, scheduler, schedulingContext.config.interval]);
 
   const handleWishlistItemDrop = useCallback(async (wishlistItem: SchedulerWishlistItem, targetDate: Date, targetSlot: TimeSlot) => {
     setIsSaving(true);

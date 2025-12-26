@@ -1,5 +1,5 @@
 import React, { useMemo } from "react";
-import { DndContext, DragOverlay, closestCorners } from "@dnd-kit/core";
+import { DndContext, DragOverlay, pointerWithin } from "@dnd-kit/core";
 import { format } from "date-fns";
 import { DayColumn } from "./DayColumn";
 import { ActivityBlock } from "./ActivityBlock";
@@ -45,6 +45,7 @@ interface CalendarLayoutProps {
   dragOverInfo?: {
     dayIndex: number;
     slotIndex: number;
+    spanSlots: number;
     hasConflict: boolean;
   } | null;
   isSaving: boolean;
@@ -147,7 +148,7 @@ export function CalendarLayout({
       )}
 
       <DndContext
-        collisionDetection={closestCorners}
+        collisionDetection={pointerWithin}
         onDragStart={onDragStart}
         onDragOver={onDragOver}
         onDragEnd={onDragEnd}

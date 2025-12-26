@@ -7,6 +7,8 @@ import { GripVertical } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ActivityBlockContent, type ActivityAccent } from './ActivityBlockContent';
 import { ActivityBlockPopover } from './ActivityBlockPopover';
+import { useSchedulingContext } from '@/store/timeSchedulingStore';
+import { getCalendarSlotHeightPx } from './layoutMetrics';
 
 const accentStyles: Record<ActivityAccent, { border: string; tint: string }> = {
   brand: { border: "border-l-brand-500", tint: "bg-brand-500/10" },
@@ -58,6 +60,9 @@ export function ActivityBlock({
   className,
   onResize
 }: ActivityBlockProps) {
+  const schedulingContext = useSchedulingContext();
+  const minutesPerSlot = schedulingContext.config.interval;
+  const slotHeightPx = getCalendarSlotHeightPx(minutesPerSlot);
   const [isResizing, setIsResizing] = useState(false);
   const [resizeDirection, setResizeDirection] = useState<'top' | 'bottom' | null>(null);
   const [showPopover, setShowPopover] = useState(false);
@@ -97,14 +102,15 @@ export function ActivityBlock({
     const initialMouseY = e.clientY;
     const blockElement = blockRef.current;
     if (!blockElement) return;
+    const baseTransform = blockElement.style.transform;
     
-    // Calendar grid constants - based on TimeGrid.tsx and DayColumn.tsx
-    const SLOT_HEIGHT = 48; // h-12 = 48px per 30-minute slot 
-    const MINUTES_PER_SLOT = 30; // Each slot is 30 minutes
-    const MIN_DURATION = 30; // Minimum 30 minutes
-    
+    const MIN_DURATION = minutesPerSlot; // Minimum 1 slot
+
     // Calculate initial height in pixels based on duration
-    const initialHeight = (activity.duration / MINUTES_PER_SLOT) * SLOT_HEIGHT;
+    const initialHeight = Math.max(
+      slotHeightPx,
+      Math.ceil(activity.duration / minutesPerSlot) * slotHeightPx
+    );
     setPreviewHeight(initialHeight);
     
     let lastCalculatedDuration = activity.duration;
@@ -119,8 +125,8 @@ export function ActivityBlock({
       const deltaY = e.clientY - initialMouseY;
       
       // Snap to grid slots - convert pixel movement to slot changes
-      const slotsChanged = Math.round(deltaY / SLOT_HEIGHT);
-      const minutesChanged = slotsChanged * MINUTES_PER_SLOT;
+      const slotsChanged = Math.round(deltaY / slotHeightPx);
+      const minutesChanged = slotsChanged * minutesPerSlot;
       
       // Calculate new duration based on resize direction
       let newDuration: number;
@@ -134,8 +140,11 @@ export function ActivityBlock({
         newDuration = Math.max(MIN_DURATION, activity.duration - minutesChanged);
       }
       
-      // Snap to 30-minute intervals (grid slots)
-      newDuration = Math.max(MIN_DURATION, Math.round(newDuration / MINUTES_PER_SLOT) * MINUTES_PER_SLOT);
+      // Snap to grid intervals
+      newDuration = Math.max(
+        MIN_DURATION,
+        Math.round(newDuration / minutesPerSlot) * minutesPerSlot
+      );
       
       // Update preview if duration changed
       if (newDuration !== lastCalculatedDuration) {
@@ -145,18 +154,20 @@ export function ActivityBlock({
         // For top handle resize, we need to adjust the visual position
         if (direction === 'top') {
           // When extending start time (making duration longer), block should appear to grow upward
-          const heightDiff = ((newDuration - activity.duration) / MINUTES_PER_SLOT) * SLOT_HEIGHT;
-          const newHeight = (newDuration / MINUTES_PER_SLOT) * SLOT_HEIGHT;
+          const heightDiff =
+            ((newDuration - activity.duration) / minutesPerSlot) * slotHeightPx;
+          const newHeight = (newDuration / minutesPerSlot) * slotHeightPx;
           setPreviewHeight(newHeight);
           
           // Also need to adjust the block position upward
           if (blockElement) {
-            const existingTransform = style?.transform || '';
-            blockElement.style.transform = `${existingTransform} translateY(${-heightDiff}px)`;
+            blockElement.style.transform = baseTransform
+              ? `${baseTransform} translateY(${-heightDiff}px)`
+              : `translateY(${-heightDiff}px)`;
           }
         } else {
           // Bottom handle: just change height, no position change needed
-          const newHeight = (newDuration / MINUTES_PER_SLOT) * SLOT_HEIGHT;
+          const newHeight = (newDuration / minutesPerSlot) * slotHeightPx;
           setPreviewHeight(newHeight);
         }
       }
@@ -170,7 +181,7 @@ export function ActivityBlock({
       
       // Reset any transform applied during resize
       if (blockElement) {
-        blockElement.style.transform = style?.transform || '';
+        blockElement.style.transform = baseTransform;
       }
       
       document.removeEventListener('mousemove', handleMouseMove);
@@ -184,7 +195,7 @@ export function ActivityBlock({
 
     document.addEventListener('mousemove', handleMouseMove);
     document.addEventListener('mouseup', handleMouseUp);
-  }, [activity.duration, activity.id, onResize]);
+  }, [activity.duration, activity.id, minutesPerSlot, onResize, slotHeightPx]);
 
   const handleResizeTopMouseDown = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
@@ -286,16 +297,12 @@ export function ActivityBlock({
   const blockSize = getBlockSize(activity.duration);
   const activityAccent = getActivityAccent(activity.activity?.types, activity.activityId || activity.id);
 
-  // Calculate dynamic height during resize
-  const calculateBlockHeight = () => {
-    if (isResizing && previewHeight > 0) {
-      return `${previewHeight}px`;
-    }
-    
-    // Default height based on duration (30 minutes = 48px slot height)
-    const baseHeight = (activity.duration / 30) * 48;
-    return `${Math.max(48, baseHeight)}px`; // Minimum 48px (1 slot)
-  };
+  const blockHeight =
+    isResizing && previewHeight > 0
+      ? `${previewHeight}px`
+      : isOverlay
+        ? `${Math.max(1, activity.position.span) * slotHeightPx}px`
+        : undefined;
 
   return (
     <>
@@ -303,7 +310,7 @@ export function ActivityBlock({
         ref={setBlockRef}
         style={{
           ...style,
-          height: calculateBlockHeight(),
+          ...(blockHeight ? { height: blockHeight } : {}),
           transition: isResizing ? 'none' : 'height 0.2s ease'
         }}
         onMouseEnter={handleMouseEnter}

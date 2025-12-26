@@ -1,6 +1,7 @@
 "use client";
 
 import React from 'react';
+import { createPortal } from 'react-dom';
 import { Star, MapPin, Phone, Globe, DollarSign, Calendar, User } from 'lucide-react';
 
 interface ActivityData {
@@ -104,9 +105,9 @@ export function ActivityBlockPopover({
   const priceInfo = getPriceLevelDisplay(activity.activity?.price_level);
   const category = formatCategory(activity.activity?.types);
 
-  return (
+  return createPortal(
     <div
-      className="absolute z-50 w-80 glass rounded-xl p-4 pointer-events-none"
+      className="fixed z-[9999] w-80 glass rounded-xl p-4 pointer-events-none"
       style={{
         left: position.x,
         top: position.y,
@@ -244,6 +245,7 @@ export function ActivityBlockPopover({
         <div className="w-0 h-0 border-l-8 border-r-8 border-t-8 border-l-transparent border-r-transparent border-t-stroke-200/60 dark:border-t-white/10" />
         <div className="w-0 h-0 border-l-8 border-r-8 border-t-8 border-l-transparent border-r-transparent border-t-white/75 dark:border-t-ink-900/55 absolute top-0 left-1/2 transform -translate-x-1/2 -translate-y-px" />
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
