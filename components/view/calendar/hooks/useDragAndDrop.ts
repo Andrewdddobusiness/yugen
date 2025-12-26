@@ -8,6 +8,7 @@ import { useSchedulingContext } from '@/store/timeSchedulingStore';
 import { ActivityScheduler, SchedulerWishlistItem } from '../services/activityScheduler';
 import { ScheduledActivity } from './useScheduledActivities';
 import { TimeSlot } from '../TimeGrid';
+import { findNearestValidSlot } from '@/utils/calendar/collisionDetection';
 
 /**
  * useDragAndDrop - Comprehensive drag and drop logic for calendar grid
@@ -175,8 +176,64 @@ export function useDragAndDrop(
     targetSlot: TimeSlot,
     currentDuration: number
   ) => {
+    const currentActivities = useItineraryActivityStore.getState().itineraryActivities;
+    const previousActivity = currentActivities.find(
+      (act) => act.itinerary_activity_id === activityId
+    );
+    if (!previousActivity) return;
+
+    const previousTimes = {
+      date: previousActivity.date,
+      start_time: previousActivity.start_time,
+      end_time: previousActivity.end_time,
+    };
+
+    const newDate = format(targetDate, 'yyyy-MM-dd');
+    const proposedStartTime = `${targetSlot.hour.toString().padStart(2, '0')}:${targetSlot.minute.toString().padStart(2, '0')}:00`;
+
+    // Match the scheduler's "nearest valid slot" logic so the UI doesn't jump twice.
+    const existingActivities = currentActivities
+      .filter((act) => act.date && act.start_time && act.end_time)
+      .map((act) => ({
+        id: act.itinerary_activity_id,
+        date: act.date as string,
+        startTime: act.start_time as string,
+        endTime: act.end_time as string,
+      }));
+
+    const optimisticSlot = findNearestValidSlot(
+      proposedStartTime,
+      currentDuration,
+      newDate,
+      existingActivities,
+      activityId
+    );
+
+    if (!optimisticSlot) {
+      toast({
+        title: 'Could not move activity',
+        description: 'Could not find an available time slot for this activity.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    const optimisticPatch = {
+      date: newDate,
+      start_time: optimisticSlot.startTime,
+      end_time: optimisticSlot.endTime,
+    };
+
+    // Optimistic UI: update local store immediately.
+    const activitiesAfterOptimistic = useItineraryActivityStore
+      .getState()
+      .itineraryActivities.map((act) =>
+        act.itinerary_activity_id === activityId ? { ...act, ...optimisticPatch } : act
+      );
+    setItineraryActivities(activitiesAfterOptimistic);
+
     setIsSaving(true);
-    
+
     const result = await scheduler.rescheduleActivity(
       activityId,
       targetDate,
@@ -185,24 +242,20 @@ export function useDragAndDrop(
     );
 
     if (result.success) {
-      // Update the activity in the store
-      const updatedActivity = itineraryActivities.find(
-        act => act.itinerary_activity_id === activityId
-      );
-
-      if (updatedActivity && result.data) {
-        const updatedActivityData = {
-          ...updatedActivity,
-          date: result.data.date,
-          start_time: result.data.startTime,
-          end_time: result.data.endTime
-        };
-
-        const updatedActivities = itineraryActivities.map(act =>
-          act.itinerary_activity_id === activityId ? updatedActivityData : act
-        );
-        
-        setItineraryActivities(updatedActivities);
+      if (result.data) {
+        const activitiesAfterCommit = useItineraryActivityStore
+          .getState()
+          .itineraryActivities.map((act) =>
+            act.itinerary_activity_id === activityId
+              ? {
+                  ...act,
+                  date: result.data.date,
+                  start_time: result.data.startTime,
+                  end_time: result.data.endTime,
+                }
+              : act
+          );
+        setItineraryActivities(activitiesAfterCommit);
       }
 
       toast({
@@ -210,7 +263,14 @@ export function useDragAndDrop(
         description: result.message,
       });
     } else {
-      // Revert on error - activities are already in their original state
+      // Revert on error
+      const activitiesAfterRevert = useItineraryActivityStore
+        .getState()
+        .itineraryActivities.map((act) =>
+          act.itinerary_activity_id === activityId ? { ...act, ...previousTimes } : act
+        );
+      setItineraryActivities(activitiesAfterRevert);
+
       toast({
         title: "Failed to save",
         description: result.error,
