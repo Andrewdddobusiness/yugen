@@ -1,7 +1,7 @@
 "use client";
 
 import React from 'react';
-import { format, addDays, subDays, addWeeks, subWeeks, addMonths, subMonths, isToday } from 'date-fns';
+import { format, addDays, subDays, addWeeks, subWeeks, addMonths, subMonths, isToday, startOfWeek } from 'date-fns';
 import { ChevronLeft, ChevronRight, Calendar, Clock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -78,11 +78,12 @@ export function CalendarControls({
           return `${format(selectedDate, 'MMM d')} - ${format(threeDayEnd, 'MMM d, yyyy')}`;
         }
       case 'week':
-        const weekEnd = addDays(selectedDate, 6);
-        if (selectedDate.getMonth() === weekEnd.getMonth()) {
-          return `${format(selectedDate, 'MMM d')} - ${format(weekEnd, 'd, yyyy')}`;
+        const weekStart = startOfWeek(selectedDate, { weekStartsOn: 1 });
+        const weekEnd = addDays(weekStart, 6);
+        if (weekStart.getMonth() === weekEnd.getMonth()) {
+          return `${format(weekStart, 'MMM d')} - ${format(weekEnd, 'd, yyyy')}`;
         } else {
-          return `${format(selectedDate, 'MMM d')} - ${format(weekEnd, 'MMM d, yyyy')}`;
+          return `${format(weekStart, 'MMM d')} - ${format(weekEnd, 'MMM d, yyyy')}`;
         }
       case 'month':
         return format(selectedDate, 'MMMM yyyy');

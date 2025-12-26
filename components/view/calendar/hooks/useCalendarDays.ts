@@ -1,10 +1,10 @@
 import { useMemo } from 'react';
 import {
-  startOfWeek,
-  endOfWeek,
   eachDayOfInterval,
   startOfMonth,
-  addDays
+  addDays,
+  startOfDay,
+  startOfWeek
 } from 'date-fns';
 
 /**
@@ -24,15 +24,17 @@ export function useCalendarDays(
   viewMode: 'day' | '3-day' | 'week' | 'month'
 ): Date[] {
   const days = useMemo(() => {
+    const baseDate = startOfDay(selectedDate);
+
     switch (viewMode) {
       case 'day':
-        return [selectedDate];
+        return [baseDate];
       case '3-day':
-        return [
-          selectedDate,
-          new Date(selectedDate.getTime() + 24 * 60 * 60 * 1000),
-          new Date(selectedDate.getTime() + 2 * 24 * 60 * 60 * 1000)
-        ];
+        return eachDayOfInterval({ start: baseDate, end: addDays(baseDate, 2) });
+      case 'week': {
+        const weekStart = startOfWeek(baseDate, { weekStartsOn: 1 });
+        return eachDayOfInterval({ start: weekStart, end: addDays(weekStart, 6) });
+      }
       case 'month': {
         const monthStart = startOfMonth(selectedDate);
         const start = startOfWeek(monthStart, { weekStartsOn: 1 }); // Monday
@@ -40,11 +42,8 @@ export function useCalendarDays(
         const end = addDays(start, 41);
         return eachDayOfInterval({ start, end });
       }
-      case 'week':
       default:
-        const start = startOfWeek(selectedDate, { weekStartsOn: 1 }); // Monday
-        const end = endOfWeek(selectedDate, { weekStartsOn: 1 });
-        return eachDayOfInterval({ start, end });
+        return [baseDate];
     }
   }, [selectedDate, viewMode]);
 

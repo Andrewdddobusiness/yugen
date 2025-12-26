@@ -88,7 +88,7 @@ export function ViewTransition({
   }
 
   return (
-    <div className={cn("h-full w-full relative overflow-hidden", className)}>
+    <div className={cn("h-full w-full relative overflow-x-hidden", className)}>
       <AnimatePresence mode="wait" initial={false}>
         {isTransitioningView ? (
           loadingComponent && (
@@ -134,7 +134,7 @@ export function ViewSlideTransition({
   }
 
   return (
-    <div className={cn("h-full w-full relative overflow-hidden", className)}>
+    <div className={cn("h-full w-full relative overflow-x-hidden", className)}>
       <AnimatePresence mode="wait" initial={false} custom={direction}>
         {!isTransitioningView && (
           <motion.div

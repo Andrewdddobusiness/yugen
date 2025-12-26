@@ -16,4 +16,3 @@ export function getCalendarSlotHeightPx(
       return 48;
   }
 }
-

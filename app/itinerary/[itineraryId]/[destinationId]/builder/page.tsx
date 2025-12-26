@@ -1,7 +1,6 @@
 "use client";
 import React, { useEffect, useState, useRef, lazy, Suspense } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { useItineraryActivityStore } from "@/store/itineraryActivityStore";
 import { useItineraryLayoutStore } from "@/store/itineraryLayoutStore";
 import { useMapStore } from "@/store/mapStore";
@@ -195,9 +194,9 @@ export default function Builder() {
 
   try {
     return (
-    <div className="h-full w-full flex flex-col bg-bg-50 dark:bg-ink-900">
+    <div className="w-full flex flex-col bg-bg-50 dark:bg-ink-900 h-[calc(100svh-56px)] min-h-0">
       {/* Enhanced Toolbar with ViewToggle */}
-      <div className="flex items-center justify-between p-4 border-b bg-bg-0 dark:bg-ink-900 shadow-sm">
+      <div className="shrink-0 z-40 flex items-center justify-between p-4 border-b bg-bg-0/90 dark:bg-ink-900/90 backdrop-blur-xl shadow-sm">
         <ViewToggle 
           className="flex-1"
           showMapToggle={!isMobile}
@@ -223,37 +222,42 @@ export default function Builder() {
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 flex overflow-hidden w-full">
+      <div className="flex-1 min-h-0 w-full">
             {showMap ? (
               <ResizablePanelGroup direction="horizontal" className="h-full w-full">
                 {/* Main Content */}
                 <ResizablePanel defaultSize={60} className="min-w-0">
-                  <div className="h-full bg-bg-50 dark:bg-ink-900">
+                  <div className="h-full min-h-0 bg-bg-50 dark:bg-ink-900">
                     <ViewTransition 
                       viewKey={currentView}
                       loadingComponent={<ViewLoadingState />}
-                      className="h-full"
+                      className="h-full w-full"
                     >
                       <Suspense fallback={<ViewLoadingState />}>
                         {currentView === 'calendar' ? (
-                          <div ref={calendarRef} className="h-full overflow-auto">
-                            <GoogleCalendarView isLoading={false} className="h-full" />
+                          <div ref={calendarRef} className="h-full w-full overflow-hidden">
+                            <GoogleCalendarView
+                              isLoading={false}
+                              className="h-full w-full"
+                              selectedDate={currentDate ?? undefined}
+                              onSelectedDateChange={(date) => navigateToDate(date)}
+                            />
                           </div>
                         ) : currentView === 'table' ? (
-                          <div ref={tableRef} className="flex-1 h-full overflow-auto">
-                            <div className="p-4">
+                          <div ref={tableRef} className="h-full w-full overflow-auto">
+                            <div className="p-4 min-w-0">
                               <ItineraryTableView showMap={showMap} onToggleMap={toggleMap} />
                             </div>
                           </div>
                         ) : (
-                          <ScrollArea className="flex-1 h-full">
+                          <div className="h-full w-full overflow-y-auto">
                             <ItineraryListView
                               ref={listRef}
                               showMap={showMap}
                               onToggleMap={toggleMap}
                               targetDate={targetDate}
                             />
-                          </ScrollArea>
+                          </div>
                         )}
                       </Suspense>
                     </ViewTransition>
@@ -269,7 +273,7 @@ export default function Builder() {
                   maxSize={60}
                   className="hidden sm:block"
                 >
-                  <div className="h-full">
+                  <div className="h-full min-h-0">
                     {(() => {
                       const filteredActivities = itineraryActivities.filter(
                         (a) =>
@@ -304,28 +308,33 @@ export default function Builder() {
                 <ViewTransition 
                   viewKey={currentView}
                   loadingComponent={<ViewLoadingState />}
-                  className="h-full"
+                  className="h-full w-full"
                 >
                   <Suspense fallback={<ViewLoadingState />}>
                     {currentView === 'calendar' ? (
-                          <div ref={calendarRef} className="h-full overflow-auto">
-                            <GoogleCalendarView isLoading={false} className="h-full w-full" />
+                          <div ref={calendarRef} className="h-full w-full overflow-hidden">
+                            <GoogleCalendarView
+                              isLoading={false}
+                              className="h-full w-full"
+                              selectedDate={currentDate ?? undefined}
+                              onSelectedDateChange={(date) => navigateToDate(date)}
+                            />
                           </div>
                         ) : currentView === 'table' ? (
-                          <div ref={tableRef} className="flex-1 h-full overflow-auto">
-                            <div className="p-4">
+                          <div ref={tableRef} className="h-full w-full overflow-auto">
+                            <div className="p-4 min-w-0">
                               <ItineraryTableView showMap={false} onToggleMap={toggleMap} />
                         </div>
                       </div>
                     ) : (
-                      <ScrollArea className="flex-1 h-full">
+                      <div className="h-full w-full overflow-y-auto">
                         <ItineraryListView
                           ref={listRef}
                           showMap={false}
                           onToggleMap={toggleMap}
                           targetDate={targetDate}
                         />
-                      </ScrollArea>
+                      </div>
                     )}
                   </Suspense>
                 </ViewTransition>

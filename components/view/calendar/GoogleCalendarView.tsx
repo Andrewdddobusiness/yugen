@@ -8,11 +8,15 @@ import { useItineraryLayoutStore } from '@/store/itineraryLayoutStore';
 interface GoogleCalendarViewProps {
   isLoading?: boolean;
   className?: string;
+  selectedDate?: Date;
+  onSelectedDateChange?: (date: Date) => void;
 }
 
 export function GoogleCalendarView({
   isLoading = false,
-  className
+  className,
+  selectedDate: controlledSelectedDate,
+  onSelectedDateChange,
 }: GoogleCalendarViewProps) {
   const { startDate } = useDateRangeStore();
   const { saveViewState, getViewState } = useItineraryLayoutStore();
@@ -34,9 +38,9 @@ export function GoogleCalendarView({
   // Save state when selectedDate changes
   useEffect(() => {
     saveViewState('calendar', {
-      selectedDate: selectedDate.toISOString(),
+      selectedDate: (controlledSelectedDate ?? selectedDate).toISOString(),
     });
-  }, [selectedDate, saveViewState]);
+  }, [selectedDate, controlledSelectedDate, saveViewState]);
 
   // Save state when viewMode changes
   useEffect(() => {
@@ -49,12 +53,20 @@ export function GoogleCalendarView({
   useEffect(() => {
     if (startDate) {
       const newStartDate = new Date(startDate);
+      const currentDate = controlledSelectedDate ?? selectedDate;
       // Only update if it's significantly different (not just a small time difference)
-      if (Math.abs(newStartDate.getTime() - selectedDate.getTime()) > 24 * 60 * 60 * 1000) {
+      if (!controlledSelectedDate && Math.abs(newStartDate.getTime() - currentDate.getTime()) > 24 * 60 * 60 * 1000) {
         setSelectedDate(newStartDate);
-      }
+      } 
     }
-  }, [startDate, selectedDate]);
+  }, [startDate, selectedDate, controlledSelectedDate]);
+
+  // Sync internal state when controlled date changes (keeps viewState and smooth transitions consistent)
+  useEffect(() => {
+    if (controlledSelectedDate) {
+      setSelectedDate(controlledSelectedDate);
+    }
+  }, [controlledSelectedDate]);
 
   if (isLoading) {
     return (
@@ -69,10 +81,15 @@ export function GoogleCalendarView({
 
   return (
     <CalendarGrid
-      selectedDate={selectedDate}
+      selectedDate={controlledSelectedDate ?? selectedDate}
       viewMode={viewMode}
       onViewModeChange={setViewMode}
-      onDateChange={setSelectedDate}
+      onDateChange={(date) => {
+        if (!controlledSelectedDate) {
+          setSelectedDate(date);
+        }
+        onSelectedDateChange?.(date);
+      }}
       className={className}
     />
   );

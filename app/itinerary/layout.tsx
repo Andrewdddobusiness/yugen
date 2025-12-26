@@ -212,7 +212,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       >
       <AppSidebarItineraryActivityLeft />
       <main className="flex min-w-0 flex-1 flex-col w-full">
-        <header className="sticky top-0 flex shrink-0 items-center gap-2 border-b bg-background p-2">
+        <header className="sticky top-0 z-50 flex h-14 shrink-0 items-center gap-2 border-b border-stroke-200 bg-bg-0/90 backdrop-blur-xl px-2">
           <div className="flex items-center gap-2 flex-1">
             <SidebarTrigger className="-ml-1" />
             <Separator orientation="vertical" className="mr-2 h-4" />
@@ -252,7 +252,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             </DropdownMenuContent>
           </DropdownMenu>
         </header>
-        <div className="flex-1 overflow-auto w-full">{children}</div>
+        <div className="flex-1 w-full">{children}</div>
       </main>
     </SidebarProvider>
     <ShareExportDialog

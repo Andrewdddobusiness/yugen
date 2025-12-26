@@ -36,6 +36,7 @@ interface DayColumnProps {
   dayIndex: number;
   timeSlots: TimeSlot[];
   activities: ScheduledActivity[];
+  allDayActivities?: Array<{ id: string; name: string }>;
   dragOverInfo?: {
     dayIndex: number;
     slotIndex: number;
@@ -75,6 +76,7 @@ export function DayColumn({
   dayIndex,
   timeSlots,
   activities,
+  allDayActivities = [],
   dragOverInfo,
   className,
   onResize
@@ -105,6 +107,35 @@ export function DayColumn({
         {isCurrentDay && (
           <div className="w-1 h-1 bg-brand-500 rounded-full mt-1" />
         )}
+      </div>
+
+      {/* All-day / Unscheduled */}
+      <div
+        className={cn(
+          "border-b border-stroke-200/70 bg-bg-0/70",
+          isWeekendDay && "bg-bg-50/40"
+        )}
+        style={{ height: `${slotHeightPx}px` }}
+      >
+        <div className="px-2 py-1 space-y-1 overflow-hidden">
+          {allDayActivities.slice(0, 2).map((activity) => (
+            <div
+              key={activity.id}
+              className={cn(
+                "truncate rounded px-2 py-0.5 text-[11px] leading-4",
+                "bg-brand-500/10 text-brand-700"
+              )}
+              title={activity.name}
+            >
+              {activity.name}
+            </div>
+          ))}
+          {allDayActivities.length > 2 && (
+            <div className="text-[11px] leading-4 text-ink-500">
+              +{allDayActivities.length - 2} more
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Time Slots */}

@@ -62,5 +62,5 @@ export default async function ActivitiesLayout({
     redirect("/itineraries");
   }
 
-  return <div className="flex h-full w-full overflow-hidden">{children}</div>;
+  return <div className="w-full">{children}</div>;
 }

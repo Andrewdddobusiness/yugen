@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { DndContext, DragOverlay, closestCorners } from '@dnd-kit/core';
 import { format } from 'date-fns';
 import { DayColumn } from './DayColumn';
@@ -12,6 +12,7 @@ import { ScheduledActivity } from './hooks/useScheduledActivities';
 import { TimeSlot } from './TimeGrid';
 import { CALENDAR_HEADER_HEIGHT_PX, getCalendarSlotHeightPx } from './layoutMetrics';
 import { MonthGrid } from './MonthGrid';
+import { useItineraryActivityStore } from '@/store/itineraryActivityStore';
 
 interface CalendarLayoutProps {
   // Calendar configuration
@@ -84,6 +85,36 @@ export function CalendarLayout({
   onResolveConflicts
 }: CalendarLayoutProps) {
   const schedulingContext = useSchedulingContext();
+  const slotHeightPx = getCalendarSlotHeightPx(schedulingContext.config.interval);
+  const { itineraryActivities } = useItineraryActivityStore();
+
+  const allDayActivitiesByDay = useMemo(() => {
+    const inView = new Set(days.map((d) => format(d, 'yyyy-MM-dd')));
+    const map = new Map<string, Array<{ id: string; name: string }>>();
+
+    for (const activity of itineraryActivities) {
+      if (activity.deleted_at !== null) continue;
+      if (!activity.date) continue;
+      if (activity.start_time && activity.end_time) continue;
+
+      const dayKey = (activity.date as string).slice(0, 10); // YYYY-MM-DD
+      if (!inView.has(dayKey)) continue;
+
+      const list = map.get(dayKey);
+      const item = {
+        id: activity.itinerary_activity_id,
+        name: activity.activity?.name ?? 'Activity',
+      };
+      if (list) list.push(item);
+      else map.set(dayKey, [item]);
+    }
+
+    for (const list of map.values()) {
+      list.sort((a, b) => a.name.localeCompare(b.name));
+    }
+
+    return map;
+  }, [itineraryActivities, days]);
 
   return (
     <div className={cn("flex flex-col h-full w-full min-w-0 bg-bg-0", className)}>
@@ -120,7 +151,7 @@ export function CalendarLayout({
             />
           </div>
         ) : (
-          <div className="flex-1 flex overflow-hidden bg-bg-50 dark:bg-ink-900 route-pattern">
+          <div className="flex-1 min-h-0 flex overflow-y-auto overflow-x-hidden bg-bg-50 dark:bg-ink-900 route-pattern">
             {/* Time Column using enhanced TimeGrid */}
             <TimeGrid 
               config={schedulingContext.config}
@@ -129,10 +160,14 @@ export function CalendarLayout({
               {(slots) => (
                 <div className="w-24 flex-shrink-0 bg-bg-0/70">
                   <div className="border-b border-stroke-200/70" style={{ height: CALENDAR_HEADER_HEIGHT_PX }} />
+                  <div
+                    className="border-b border-stroke-200/70 bg-bg-0/70 flex items-center justify-center"
+                    style={{ height: `${slotHeightPx}px` }}
+                  >
+                    {/* Intentionally blank: aligns the all-day row with time slots */}
+                  </div>
                   <div className="relative">
                     {slots.map((slot) => {
-                      const slotHeight = getCalendarSlotHeightPx(schedulingContext.config.interval);
-                      
                       return (
                         <div
                           key={slot.time}
@@ -141,7 +176,7 @@ export function CalendarLayout({
                             slot.isHour ? "border-stroke-200" : "border-stroke-200/70",
                             "bg-bg-0/60"
                           )}
-                          style={{ height: `${slotHeight}px` }}
+                          style={{ height: `${slotHeightPx}px` }}
                         >
                           {(slot.isHour || schedulingContext.config.interval === 15) && (
                             <div 
@@ -173,6 +208,7 @@ export function CalendarLayout({
                   dayIndex={dayIndex}
                   timeSlots={timeSlots}
                   activities={scheduledActivities.filter(act => act.position.day === dayIndex)}
+                  allDayActivities={allDayActivitiesByDay.get(format(day, 'yyyy-MM-dd')) ?? []}
                   dragOverInfo={dragOverInfo}
                   onResize={onResize}
                   className={dayIndex < days.length - 1 ? "border-r border-stroke-200/70" : ""}
