@@ -33,7 +33,11 @@ import { Separator } from "@/components/ui/separator";
 import { useDateRangeStore } from '@/store/dateRangeStore';
 
 
-export function AppSidebarItineraryActivityLeft() {
+export function AppSidebarItineraryActivityLeft({
+  useExternalDndContext = false,
+}: {
+  useExternalDndContext?: boolean;
+}) {
   const { itineraryId, destinationId } = useParams();
   const pathname = usePathname();
 
@@ -200,7 +204,7 @@ export function AppSidebarItineraryActivityLeft() {
           <Separator />
         </div>
         <SidebarContent className="h-full w-full">
-          <SimplifiedItinerarySidebar />
+          <SimplifiedItinerarySidebar useExternalDndContext={useExternalDndContext} />
         </SidebarContent>
       </Sidebar>
 

@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from 'react';
+import { useDndMonitor, type DragStartEvent, type DragOverEvent, type DragEndEvent } from '@dnd-kit/core';
 import { useToast } from '@/components/ui/use-toast';
 import { CalendarLayout } from './CalendarLayout';
 import { ConflictResolver, TimeConflict } from './ConflictResolver';
@@ -17,6 +18,7 @@ interface CalendarGridProps {
   onViewModeChange?: (mode: 'day' | '3-day' | 'week' | 'month') => void;
   onDateChange?: (date: Date) => void;
   className?: string;
+  useExternalDndContext?: boolean;
 }
 
 /**
@@ -40,7 +42,8 @@ export function CalendarGrid({
   viewMode = 'week',
   onViewModeChange,
   onDateChange,
-  className
+  className,
+  useExternalDndContext = false,
 }: CalendarGridProps) {
   // Conflict resolution state (could be moved to a hook if it grows)
   const [conflicts, setConflicts] = useState<TimeConflict[]>([]);
@@ -87,26 +90,50 @@ export function CalendarGrid({
   };
 
   return (
-    <CalendarLayout
-      selectedDate={selectedDate}
-      viewMode={viewMode}
-      onViewModeChange={onViewModeChange}
-      onDateChange={onDateChange}
-      className={className}
-      days={days}
-      timeSlots={timeSlots}
-      scheduledActivities={scheduledActivities}
-      onDragStart={handleDragStart}
-      onDragOver={handleDragOver}
-      onDragEnd={handleDragEnd}
-      onResize={handleResize}
-      activeActivity={activeActivity}
-      dragOverInfo={dragOverInfo}
-      isSaving={isSaving}
-      conflicts={conflicts}
-      showConflictResolver={showConflictResolver}
-      onCloseConflictResolver={handleCloseConflictResolver}
-      onResolveConflicts={handleResolveConflicts}
-    />
+    <>
+      {useExternalDndContext && (
+        <CalendarDndMonitor
+          onDragStart={handleDragStart}
+          onDragOver={handleDragOver}
+          onDragEnd={handleDragEnd}
+        />
+      )}
+
+      <CalendarLayout
+        selectedDate={selectedDate}
+        viewMode={viewMode}
+        onViewModeChange={onViewModeChange}
+        onDateChange={onDateChange}
+        className={className}
+        useExternalDndContext={useExternalDndContext}
+        days={days}
+        timeSlots={timeSlots}
+        scheduledActivities={scheduledActivities}
+        onDragStart={handleDragStart}
+        onDragOver={handleDragOver}
+        onDragEnd={handleDragEnd}
+        onResize={handleResize}
+        activeActivity={activeActivity}
+        dragOverInfo={dragOverInfo}
+        isSaving={isSaving}
+        conflicts={conflicts}
+        showConflictResolver={showConflictResolver}
+        onCloseConflictResolver={handleCloseConflictResolver}
+        onResolveConflicts={handleResolveConflicts}
+      />
+    </>
   );
+}
+
+function CalendarDndMonitor({
+  onDragStart,
+  onDragOver,
+  onDragEnd,
+}: {
+  onDragStart: (event: DragStartEvent) => void;
+  onDragOver: (event: DragOverEvent) => void;
+  onDragEnd: (event: DragEndEvent) => void;
+}) {
+  useDndMonitor({ onDragStart, onDragOver, onDragEnd });
+  return null;
 }

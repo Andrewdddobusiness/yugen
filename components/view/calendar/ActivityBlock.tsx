@@ -80,6 +80,9 @@ export function ActivityBlock({
     isDragging
   } = useDraggable({
     id: activity.id,
+    data: {
+      type: 'scheduled-activity',
+    },
     disabled: isOverlay || isResizing // Disable dragging during resize
   });
 
@@ -256,7 +259,7 @@ export function ActivityBlock({
   };
 
   // Generate color based on activity category following the color coding system
-  const getActivityAccent = (types?: string[], activityId?: string): ActivityAccent => {
+  const getActivityAccent = (types?: string[], activityId?: unknown): ActivityAccent => {
     if (types && types.length > 0) {
       const primaryType = types[0].toLowerCase();
       
@@ -286,7 +289,8 @@ export function ActivityBlock({
 
     // Fallback to hash-based accent for consistency
     const accents: ActivityAccent[] = ["brand", "teal", "amber", "tan", "lime", "coral"];
-    const hash = (activityId || '').split('').reduce((a, b) => {
+    const activityIdString = activityId == null ? '' : String(activityId);
+    const hash = activityIdString.split('').reduce((a, b) => {
       a = ((a << 5) - a) + b.charCodeAt(0);
       return a & a;
     }, 0);

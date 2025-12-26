@@ -3,6 +3,17 @@ import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useParams, usePathname } from "next/navigation";
 import dynamic from "next/dynamic";
+import {
+  closestCenter,
+  DndContext,
+  KeyboardSensor,
+  PointerSensor,
+  pointerWithin,
+  useSensor,
+  useSensors,
+  type CollisionDetection,
+} from "@dnd-kit/core";
+import { sortableKeyboardCoordinates } from "@dnd-kit/sortable";
 
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebarItineraryActivityLeft } from "@/components/layout/sidebar/app/AppSidebarItineraryActivityLeft2";
@@ -27,6 +38,7 @@ import { getSubscriptionDetails } from "@/actions/stripe/actions";
 import { useUserStore } from "@/store/userStore";
 import { useStripeSubscriptionStore, ISubscriptionDetails } from "@/store/stripeSubscriptionStore";
 import { createClient } from "@/utils/supabase/client";
+import { useItineraryLayoutStore } from "@/store/itineraryLayoutStore";
 
 import { Button } from "@/components/ui/button";
 import { Download, Share, Users } from "lucide-react";
@@ -41,7 +53,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const { itineraryId, destinationId } = useParams();
   const pathname = usePathname();
   
-  // Removed isBuilderPage check - now showing sidebar on all pages including builder
+  const isBuilderPage = pathname.includes("/builder");
+  const currentView = useItineraryLayoutStore((state) => state.currentView);
+  const enableSharedDnd = isBuilderPage && currentView === "calendar";
 
   //**** STORES ****//
   const { setUser, setUserLoading, setProfileUrl, setIsProfileUrlLoading } = useUserStore();
@@ -141,6 +155,24 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
 
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: { distance: 6 },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
+  const collisionDetection: CollisionDetection = (args) => {
+    const pointerCollisions = pointerWithin(args);
+    const slotCollision = pointerCollisions.find((collision) =>
+      collision.id.toString().startsWith("slot-")
+    );
+    if (slotCollision) return [slotCollision];
+    return closestCenter(args);
+  };
+
   if (!itineraryId || !destinationId) {
     return <Loading />;
   }
@@ -197,20 +229,11 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   }
   */
 
-  // For other pages (activities, overview), show layout with sidebar
-  return (
+  const shell = (
     <>
-      <SidebarProvider
-        defaultOpen={false}
-        style={
-          {
-            "--sidebar-width": "420px",
-            "--sidebar-width-icon": "48px",
-            "--sidebar-width-mobile": "320px",
-          } as React.CSSProperties
-        }
-      >
-      <AppSidebarItineraryActivityLeft />
+      <AppSidebarItineraryActivityLeft
+        useExternalDndContext={enableSharedDnd}
+      />
       <main className="flex min-w-0 flex-1 flex-col w-full">
         <header className="sticky top-0 z-50 flex h-14 shrink-0 items-center gap-2 border-b border-stroke-200 bg-bg-0/90 backdrop-blur-xl px-2">
           <div className="flex items-center gap-2 flex-1">
@@ -245,7 +268,10 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 <Users className="size-4" />
                 <span>Invite Collaborators</span>
               </DropdownMenuItem>
-              <DropdownMenuItem className="cursor-pointer" onClick={() => setExportDialogOpen(true)}>
+              <DropdownMenuItem
+                className="cursor-pointer"
+                onClick={() => setExportDialogOpen(true)}
+              >
                 <Download className="size-4" />
                 <span>Export</span>
               </DropdownMenuItem>
@@ -254,6 +280,31 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         </header>
         <div className="flex-1 w-full">{children}</div>
       </main>
+    </>
+  );
+
+  return (
+    <>
+      <SidebarProvider
+        defaultOpen={false}
+        style={
+          {
+            "--sidebar-width": "420px",
+            "--sidebar-width-icon": "48px",
+            "--sidebar-width-mobile": "320px",
+          } as React.CSSProperties
+        }
+      >
+        {enableSharedDnd ? (
+          <DndContext
+            sensors={sensors}
+            collisionDetection={collisionDetection}
+          >
+            {shell}
+          </DndContext>
+        ) : (
+          shell
+        )}
     </SidebarProvider>
     <ShareExportDialog
       open={exportDialogOpen}

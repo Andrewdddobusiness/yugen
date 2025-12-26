@@ -54,6 +54,11 @@ export function useDragAndDrop(
   );
 
   const handleDragStart = useCallback((event: DragStartEvent) => {
+    const dragType = (event.active.data?.current as any)?.type;
+    if (dragType !== 'scheduled-activity') {
+      setActiveId(null);
+      return;
+    }
     setActiveId(event.active.id as string);
   }, []);
 
@@ -103,6 +108,35 @@ export function useDragAndDrop(
       } else {
         duration = dragData.item.activity?.duration || 60;
       }
+      spanSlots = Math.max(
+        1,
+        Math.ceil(duration / schedulingContext.config.interval)
+      );
+    } else if (dragData?.type === 'itinerary-activity') {
+      const itineraryActivity = dragData.item;
+
+      const durationFromTimes =
+        itineraryActivity?.start_time && itineraryActivity?.end_time
+          ? (() => {
+              const [sh, sm] = itineraryActivity.start_time.split(':').map(Number);
+              const [eh, em] = itineraryActivity.end_time.split(':').map(Number);
+              return (eh * 60 + em) - (sh * 60 + sm);
+            })()
+          : null;
+
+      duration =
+        durationFromTimes ??
+        itineraryActivity?.activity?.duration ??
+        (itineraryActivity?.activity
+          ? scheduler.estimateDuration(
+              itineraryActivity.activity,
+              targetSlot,
+              targetDate
+            )
+          : 60);
+
+      placeData = itineraryActivity?.activity ?? null;
+      excludeId = itineraryActivity?.itinerary_activity_id ?? (active.id as string);
       spanSlots = Math.max(
         1,
         Math.ceil(duration / schedulingContext.config.interval)
@@ -309,6 +343,37 @@ export function useDragAndDrop(
       await handleWishlistItemDrop(dragData.item, targetDate, targetSlot);
       return;
     }
+    if (dragData?.type === 'itinerary-activity') {
+      const itineraryActivity = dragData.item;
+
+      const durationFromTimes =
+        itineraryActivity?.start_time && itineraryActivity?.end_time
+          ? (() => {
+              const [sh, sm] = itineraryActivity.start_time.split(':').map(Number);
+              const [eh, em] = itineraryActivity.end_time.split(':').map(Number);
+              return (eh * 60 + em) - (sh * 60 + sm);
+            })()
+          : null;
+
+      const duration =
+        durationFromTimes ??
+        itineraryActivity?.activity?.duration ??
+        (itineraryActivity?.activity
+          ? scheduler.estimateDuration(
+              itineraryActivity.activity,
+              targetSlot,
+              targetDate
+            )
+          : 60);
+
+      await handleActivityReschedule(
+        (active.id as string) ?? itineraryActivity?.itinerary_activity_id,
+        targetDate,
+        targetSlot,
+        duration || 60
+      );
+      return;
+    }
 
     // Find the activity being dragged (existing logic for scheduled activities)
     const draggedActivity = scheduledActivities.find(act => act.id === active.id);
@@ -320,7 +385,7 @@ export function useDragAndDrop(
       targetSlot,
       draggedActivity.duration
     );
-  }, [days, timeSlots, scheduledActivities, handleWishlistItemDrop, handleActivityReschedule]);
+  }, [days, timeSlots, scheduledActivities, handleWishlistItemDrop, handleActivityReschedule, scheduler]);
 
   const handleResize = useCallback(async (
     activityId: string,

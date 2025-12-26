@@ -21,6 +21,7 @@ import {
   DragStartEvent,
   DragEndEvent,
   DragOverEvent,
+  useDndMonitor,
 } from '@dnd-kit/core';
 import {
   arrayMove,
@@ -101,7 +102,13 @@ function SortableActivityItem({
     transform,
     transition,
     isDragging,
-  } = useSortable({ id: activity.itinerary_activity_id });
+  } = useSortable({
+    id: activity.itinerary_activity_id,
+    data: {
+      type: "itinerary-activity",
+      item: activity,
+    },
+  });
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -167,7 +174,11 @@ function SortableActivityItem({
   );
 }
 
-export function SimplifiedItinerarySidebar() {
+export function SimplifiedItinerarySidebar({
+  useExternalDndContext = false,
+}: {
+  useExternalDndContext?: boolean;
+}) {
   const { itineraryActivities, reorderItineraryActivities, updateItineraryActivity } = useItineraryActivityStore();
   const [collapsedDates, setCollapsedDates] = useState<Set<string>>(new Set());
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -224,6 +235,8 @@ export function SimplifiedItinerarySidebar() {
   };
 
   const handleDragStart = (event: DragStartEvent) => {
+    const dragData = event.active.data?.current as any;
+    if (dragData?.type !== 'itinerary-activity') return;
     setActiveId(event.active.id as string);
   };
 
@@ -231,6 +244,12 @@ export function SimplifiedItinerarySidebar() {
     const { active, over } = event;
 
     if (!over || active.id === over.id) {
+      setActiveId(null);
+      return;
+    }
+
+    const dragData = active.data?.current as any;
+    if (dragData?.type !== 'itinerary-activity') {
       setActiveId(null);
       return;
     }
@@ -350,14 +369,15 @@ export function SimplifiedItinerarySidebar() {
     activity => activity.itinerary_activity_id === activeId
   ) : null;
 
-  return (
-    <DndContext
-      sensors={sensors}
-      collisionDetection={closestCenter}
-      onDragStart={handleDragStart}
-      onDragEnd={handleDragEnd}
-    >
+  const content = (
       <div className="h-full flex flex-col">
+      {useExternalDndContext && (
+        <SidebarDndMonitor
+          onDragStart={handleDragStart}
+          onDragEnd={handleDragEnd}
+          onDragCancel={() => setActiveId(null)}
+        />
+      )}
       {/* Header */}
       <div className="px-4 py-3 border-b bg-gradient-to-b from-muted/30 to-background">
         <h3 className="font-semibold text-sm flex items-center gap-2">
@@ -422,6 +442,20 @@ export function SimplifiedItinerarySidebar() {
         </div>
       </ScrollArea>
       </div>
+  );
+
+  if (useExternalDndContext) {
+    return content;
+  }
+
+  return (
+    <DndContext
+      sensors={sensors}
+      collisionDetection={closestCenter}
+      onDragStart={handleDragStart}
+      onDragEnd={handleDragEnd}
+    >
+      {content}
 
       {/* Drag Overlay */}
       <DragOverlay>
@@ -450,4 +484,17 @@ export function SimplifiedItinerarySidebar() {
       </DragOverlay>
     </DndContext>
   );
+}
+
+function SidebarDndMonitor({
+  onDragStart,
+  onDragEnd,
+  onDragCancel,
+}: {
+  onDragStart: (event: DragStartEvent) => void;
+  onDragEnd: (event: DragEndEvent) => void;
+  onDragCancel: () => void;
+}) {
+  useDndMonitor({ onDragStart, onDragEnd, onDragCancel });
+  return null;
 }

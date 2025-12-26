@@ -24,6 +24,7 @@ interface CalendarLayoutProps {
   onViewModeChange?: (mode: "day" | "3-day" | "week" | "month") => void;
   onDateChange?: (date: Date) => void;
   className?: string;
+  useExternalDndContext?: boolean;
 
   // Data
   days: Date[];
@@ -77,6 +78,7 @@ export function CalendarLayout({
   onViewModeChange,
   onDateChange,
   className,
+  useExternalDndContext = false,
   days,
   timeSlots,
   scheduledActivities,
@@ -126,6 +128,111 @@ export function CalendarLayout({
     return map;
   }, [itineraryActivities, days]);
 
+  const calendarContent = (
+    <>
+      {viewMode === "month" ? (
+        <div className="flex-1 overflow-hidden bg-bg-0/70">
+          <MonthGrid
+            monthDate={selectedDate}
+            days={days}
+            scheduledActivities={scheduledActivities}
+            onSelectDate={(date) => onDateChange?.(date)}
+          />
+        </div>
+      ) : (
+        <div className="flex-1 min-h-0 flex items-start overflow-y-auto overflow-x-hidden bg-bg-0 dark:bg-ink-900">
+          {/* Time Column using enhanced TimeGrid */}
+          <TimeGrid
+            config={schedulingContext.config}
+            className="border-r border-stroke-200 bg-bg-0/80 backdrop-blur-sm"
+          >
+            {(slots) => (
+              <div className="w-24 flex-shrink-0 bg-bg-0/70">
+                <div
+                  className="sticky top-0 z-40 border-b border-stroke-200/70 bg-bg-0/90 backdrop-blur-sm shrink-0"
+                  style={{ height: CALENDAR_HEADER_HEIGHT_PX }}
+                />
+                <div className="relative">
+                  {slots.map((slot) => {
+                    return (
+                      <div
+                        key={slot.time}
+                        className={cn(
+                          "border-b relative",
+                          slot.isHour
+                            ? "border-stroke-200"
+                            : "border-stroke-200/70",
+                          "bg-bg-0/60"
+                        )}
+                        style={{ height: `${slotHeightPx}px` }}
+                      >
+                        {(slot.isHour ||
+                          schedulingContext.config.interval === 15) && (
+                          <div
+                            className={cn(
+                              "absolute top-1 right-2 text-xs px-1 bg-bg-0/90",
+                              slot.isHour
+                                ? "text-ink-700 font-medium"
+                                : "text-ink-500"
+                            )}
+                          >
+                            {schedulingContext.config.interval === 15 ||
+                            slot.isHour
+                              ? slot.label
+                              : ""}
+                          </div>
+                        )}
+                        {slot.isHour && (
+                          <div className="absolute left-0 top-0 w-2 h-px bg-stroke-200" />
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </TimeGrid>
+
+          {/* Days Grid */}
+          <div className="flex-1 flex items-start min-w-0 bg-bg-0">
+            {days.map((day, dayIndex) => (
+              <DayColumn
+                key={format(day, "yyyy-MM-dd")}
+                date={day}
+                dayIndex={dayIndex}
+                timeSlots={timeSlots}
+                activities={scheduledActivities.filter(
+                  (act) => act.position.day === dayIndex
+                )}
+                allDayActivities={
+                  allDayActivitiesByDay.get(format(day, "yyyy-MM-dd")) ?? []
+                }
+                dragOverInfo={dragOverInfo}
+                onResize={onResize}
+                className={
+                  dayIndex < days.length - 1
+                    ? "border-r border-stroke-200/70"
+                    : ""
+                }
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Drag Overlay */}
+      <DragOverlay>
+        {activeActivity && (
+          <ActivityBlock
+            activity={activeActivity}
+            isOverlay
+            className="opacity-80 rotate-3 shadow-lg"
+          />
+        )}
+      </DragOverlay>
+    </>
+  );
+
   return (
     <div
       className={cn("flex flex-col h-full w-full min-w-0 bg-bg-0", className)}
@@ -147,113 +254,18 @@ export function CalendarLayout({
         </div>
       )}
 
-      <DndContext
-        collisionDetection={pointerWithin}
-        onDragStart={onDragStart}
-        onDragOver={onDragOver}
-        onDragEnd={onDragEnd}
-      >
-        {viewMode === "month" ? (
-          <div className="flex-1 overflow-hidden bg-bg-0/70">
-            <MonthGrid
-              monthDate={selectedDate}
-              days={days}
-              scheduledActivities={scheduledActivities}
-              onSelectDate={(date) => onDateChange?.(date)}
-            />
-          </div>
-        ) : (
-          <div className="flex-1 min-h-0 flex items-start overflow-y-auto overflow-x-hidden bg-bg-0 dark:bg-ink-900">
-            {/* Time Column using enhanced TimeGrid */}
-            <TimeGrid
-              config={schedulingContext.config}
-              className="border-r border-stroke-200 bg-bg-0/80 backdrop-blur-sm"
-            >
-              {(slots) => (
-                <div className="w-24 flex-shrink-0 bg-bg-0/70">
-                  <div
-                    className="sticky top-0 z-40 border-b border-stroke-200/70 bg-bg-0/90 backdrop-blur-sm shrink-0"
-                    style={{ height: CALENDAR_HEADER_HEIGHT_PX }}
-                  />
-                  <div className="relative">
-                    {slots.map((slot) => {
-                      return (
-                        <div
-                          key={slot.time}
-                          className={cn(
-                            "border-b relative",
-                            slot.isHour
-                              ? "border-stroke-200"
-                              : "border-stroke-200/70",
-                            "bg-bg-0/60"
-                          )}
-                          style={{ height: `${slotHeightPx}px` }}
-                        >
-                          {(slot.isHour ||
-                            schedulingContext.config.interval === 15) && (
-                            <div
-                              className={cn(
-                                "absolute top-1 right-2 text-xs px-1 bg-bg-0/90",
-                                slot.isHour
-                                  ? "text-ink-700 font-medium"
-                                  : "text-ink-500"
-                              )}
-                            >
-                              {schedulingContext.config.interval === 15 ||
-                              slot.isHour
-                                ? slot.label
-                                : ""}
-                            </div>
-                          )}
-                          {slot.isHour && (
-                            <div className="absolute left-0 top-0 w-2 h-px bg-stroke-200" />
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-            </TimeGrid>
-
-            {/* Days Grid */}
-            <div className="flex-1 flex items-start min-w-0 bg-bg-0">
-              {days.map((day, dayIndex) => (
-                <DayColumn
-                  key={format(day, "yyyy-MM-dd")}
-                  date={day}
-                  dayIndex={dayIndex}
-                  timeSlots={timeSlots}
-                  activities={scheduledActivities.filter(
-                    (act) => act.position.day === dayIndex
-                  )}
-                  allDayActivities={
-                    allDayActivitiesByDay.get(format(day, "yyyy-MM-dd")) ?? []
-                  }
-                  dragOverInfo={dragOverInfo}
-                  onResize={onResize}
-                  className={
-                    dayIndex < days.length - 1
-                      ? "border-r border-stroke-200/70"
-                      : ""
-                  }
-                />
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Drag Overlay */}
-        <DragOverlay>
-          {activeActivity && (
-            <ActivityBlock
-              activity={activeActivity}
-              isOverlay
-              className="opacity-80 rotate-3 shadow-lg"
-            />
-          )}
-        </DragOverlay>
-      </DndContext>
+      {useExternalDndContext ? (
+        calendarContent
+      ) : (
+        <DndContext
+          collisionDetection={pointerWithin}
+          onDragStart={onDragStart}
+          onDragOver={onDragOver}
+          onDragEnd={onDragEnd}
+        >
+          {calendarContent}
+        </DndContext>
+      )}
 
       {/* Conflict Resolution Dialog */}
       {onCloseConflictResolver && onResolveConflicts && (

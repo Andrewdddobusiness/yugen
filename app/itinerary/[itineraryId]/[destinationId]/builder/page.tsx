@@ -241,6 +241,7 @@ export default function Builder() {
                               className="h-full w-full"
                               selectedDate={currentDate ?? undefined}
                               onSelectedDateChange={(date) => navigateToDate(date)}
+                              useExternalDndContext
                             />
                           </div>
                         ) : currentView === 'table' ? (
@@ -318,6 +319,7 @@ export default function Builder() {
                               className="h-full w-full"
                               selectedDate={currentDate ?? undefined}
                               onSelectedDateChange={(date) => navigateToDate(date)}
+                              useExternalDndContext
                             />
                           </div>
                         ) : currentView === 'table' ? (

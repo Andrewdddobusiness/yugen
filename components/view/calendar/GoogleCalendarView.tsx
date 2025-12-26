@@ -10,6 +10,7 @@ interface GoogleCalendarViewProps {
   className?: string;
   selectedDate?: Date;
   onSelectedDateChange?: (date: Date) => void;
+  useExternalDndContext?: boolean;
 }
 
 export function GoogleCalendarView({
@@ -17,6 +18,7 @@ export function GoogleCalendarView({
   className,
   selectedDate: controlledSelectedDate,
   onSelectedDateChange,
+  useExternalDndContext = false,
 }: GoogleCalendarViewProps) {
   const { startDate } = useDateRangeStore();
   const { saveViewState, getViewState } = useItineraryLayoutStore();
@@ -106,6 +108,7 @@ export function GoogleCalendarView({
         onSelectedDateChange?.(date);
       }}
       className={className}
+      useExternalDndContext={useExternalDndContext}
     />
   );
 }
