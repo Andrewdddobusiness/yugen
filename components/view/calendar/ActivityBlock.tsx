@@ -78,6 +78,16 @@ export function ActivityBlock({
     disabled: isOverlay || isResizing // Disable dragging during resize
   });
 
+  const setNodeRefRef = useRef(setNodeRef);
+  useEffect(() => {
+    setNodeRefRef.current = setNodeRef;
+  }, [setNodeRef]);
+
+  const setBlockRef = useCallback((node: HTMLDivElement | null) => {
+    setNodeRefRef.current(node);
+    blockRef.current = node;
+  }, []);
+
   const handleResizeStart = useCallback((direction: 'top' | 'bottom', e: MouseEvent) => {
     setIsResizing(true);
     setResizeDirection(direction);
@@ -290,10 +300,7 @@ export function ActivityBlock({
   return (
     <>
       <div
-        ref={(node) => {
-          setNodeRef(node);
-          blockRef.current = node;
-        }}
+        ref={setBlockRef}
         style={{
           ...style,
           height: calculateBlockHeight(),

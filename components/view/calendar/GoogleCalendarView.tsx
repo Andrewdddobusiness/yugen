@@ -20,6 +20,9 @@ export function GoogleCalendarView({
 }: GoogleCalendarViewProps) {
   const { startDate } = useDateRangeStore();
   const { saveViewState, getViewState } = useItineraryLayoutStore();
+
+  const controlledSelectedDateTime = controlledSelectedDate?.getTime() ?? null;
+  const isControlled = controlledSelectedDateTime !== null;
   
   // Initialize state from store or defaults
   const [selectedDate, setSelectedDate] = useState<Date>(() => {
@@ -35,12 +38,19 @@ export function GoogleCalendarView({
     return viewState.viewMode || 'week';
   });
 
+  const effectiveSelectedDate = isControlled
+    ? (controlledSelectedDate as Date)
+    : selectedDate;
+  const effectiveSelectedDateTime = isControlled
+    ? (controlledSelectedDateTime as number)
+    : selectedDate.getTime();
+
   // Save state when selectedDate changes
   useEffect(() => {
     saveViewState('calendar', {
-      selectedDate: (controlledSelectedDate ?? selectedDate).toISOString(),
+      selectedDate: new Date(effectiveSelectedDateTime).toISOString(),
     });
-  }, [selectedDate, controlledSelectedDate, saveViewState]);
+  }, [effectiveSelectedDateTime, saveViewState]);
 
   // Save state when viewMode changes
   useEffect(() => {
@@ -51,22 +61,27 @@ export function GoogleCalendarView({
 
   // Update selected date when startDate changes (only if not already set by user)
   useEffect(() => {
-    if (startDate) {
-      const newStartDate = new Date(startDate);
-      const currentDate = controlledSelectedDate ?? selectedDate;
-      // Only update if it's significantly different (not just a small time difference)
-      if (!controlledSelectedDate && Math.abs(newStartDate.getTime() - currentDate.getTime()) > 24 * 60 * 60 * 1000) {
-        setSelectedDate(newStartDate);
-      } 
+    if (!startDate) return;
+    if (isControlled) return;
+
+    const newStartDate = new Date(startDate);
+    // Only update if it's significantly different (not just a small time difference)
+    if (
+      Math.abs(newStartDate.getTime() - effectiveSelectedDateTime) >
+      24 * 60 * 60 * 1000
+    ) {
+      setSelectedDate(newStartDate);
     }
-  }, [startDate, selectedDate, controlledSelectedDate]);
+  }, [startDate, isControlled, effectiveSelectedDateTime]);
 
   // Sync internal state when controlled date changes (keeps viewState and smooth transitions consistent)
   useEffect(() => {
-    if (controlledSelectedDate) {
-      setSelectedDate(controlledSelectedDate);
-    }
-  }, [controlledSelectedDate]);
+    if (controlledSelectedDateTime === null) return;
+    setSelectedDate((prev) => {
+      if (prev.getTime() === controlledSelectedDateTime) return prev;
+      return new Date(controlledSelectedDateTime);
+    });
+  }, [controlledSelectedDateTime]);
 
   if (isLoading) {
     return (
@@ -81,11 +96,11 @@ export function GoogleCalendarView({
 
   return (
     <CalendarGrid
-      selectedDate={controlledSelectedDate ?? selectedDate}
+      selectedDate={effectiveSelectedDate}
       viewMode={viewMode}
       onViewModeChange={setViewMode}
       onDateChange={(date) => {
-        if (!controlledSelectedDate) {
+        if (!isControlled) {
           setSelectedDate(date);
         }
         onSelectedDateChange?.(date);

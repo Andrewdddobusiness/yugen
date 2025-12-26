@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useCallback } from 'react';
+import { useEffect, useCallback, useMemo, useRef } from 'react';
 import { useRouter, useSearchParams, usePathname } from 'next/navigation';
 import { useItineraryLayoutStore } from '@/store/itineraryLayoutStore';
 import { format, isValid, parseISO } from 'date-fns';
@@ -42,6 +42,26 @@ export function useViewRouter(options: UseViewRouterOptions = {}) {
   const isValidView = (view: string | null): view is ViewMode => 
     view !== null && validViews.includes(view as ViewMode);
 
+  const onDateChangeRef = useRef<UseViewRouterOptions['onDateChange']>(onDateChange);
+  useEffect(() => {
+    onDateChangeRef.current = onDateChange;
+  }, [onDateChange]);
+
+  const lastNotifiedDateParamRef = useRef<string | null>(null);
+  const debugEnabledRef = useRef(false);
+  useEffect(() => {
+    if (process.env.NODE_ENV !== 'development') return;
+    if (typeof window === 'undefined') return;
+    debugEnabledRef.current =
+      window.localStorage.getItem('debug:view-router') === '1';
+  }, []);
+
+  const debugLog = useCallback((...args: unknown[]) => {
+    if (!debugEnabledRef.current) return;
+    // eslint-disable-next-line no-console
+    console.log('[useViewRouter]', ...args);
+  }, []);
+
   // Parse date from URL
   const parseUrlDate = useCallback((dateStr: string | null): Date | null => {
     if (!dateStr) return null;
@@ -54,6 +74,8 @@ export function useViewRouter(options: UseViewRouterOptions = {}) {
     }
   }, []);
 
+  const parsedUrlDate = useMemo(() => parseUrlDate(urlDate), [parseUrlDate, urlDate]);
+
   // Sync URL with store on mount
   useEffect(() => {
     if (!enableUrlSync) return;
@@ -65,11 +87,24 @@ export function useViewRouter(options: UseViewRouterOptions = {}) {
     }
 
     // Handle date parameter
-    const targetDate = parseUrlDate(urlDate);
-    if (targetDate && onDateChange) {
-      onDateChange(targetDate);
+    const nextDateParam = urlDate ?? null;
+    if (nextDateParam !== lastNotifiedDateParamRef.current) {
+      lastNotifiedDateParamRef.current = nextDateParam;
+      const targetDate = parseUrlDate(nextDateParam);
+      debugLog('sync-date', { urlDate: nextDateParam, targetDate });
+      onDateChangeRef.current?.(targetDate);
     }
-  }, [urlView, urlDate, currentView, storeDefaultView, defaultView, setCurrentView, enableUrlSync, parseUrlDate, onDateChange]);
+  }, [
+    urlView,
+    urlDate,
+    currentView,
+    storeDefaultView,
+    defaultView,
+    setCurrentView,
+    enableUrlSync,
+    parseUrlDate,
+    debugLog,
+  ]);
 
   // Update URL when view or date changes
   const updateUrl = useCallback((view?: ViewMode, date?: Date | null, replace = true) => {
@@ -90,8 +125,11 @@ export function useViewRouter(options: UseViewRouterOptions = {}) {
     if (date !== undefined) {
       if (date === null) {
         params.delete(dateParamName);
+        lastNotifiedDateParamRef.current = null;
       } else {
-        params.set(dateParamName, format(date, 'yyyy-MM-dd'));
+        const dateStr = format(date, 'yyyy-MM-dd');
+        params.set(dateParamName, dateStr);
+        lastNotifiedDateParamRef.current = dateStr;
       }
     }
 
@@ -155,6 +193,7 @@ export function useViewRouter(options: UseViewRouterOptions = {}) {
   // Navigate to specific date in current view with error handling
   const navigateToDate = useCallback((date: Date | null, pushHistory = false) => {
     try {
+      debugLog('navigate-to-date', { date, pushHistory });
       updateUrl(undefined, date, !pushHistory);
       
       if (onDateChange) {
@@ -164,7 +203,7 @@ export function useViewRouter(options: UseViewRouterOptions = {}) {
       console.error('Failed to navigate to date:', error);
       throw error;
     }
-  }, [updateUrl, onDateChange]);
+  }, [updateUrl, onDateChange, debugLog]);
 
   // Generate shareable URL for specific view and/or date
   const getShareableUrl = useCallback((view?: ViewMode, date?: Date | null) => {
@@ -240,7 +279,7 @@ export function useViewRouter(options: UseViewRouterOptions = {}) {
 
   return {
     currentView,
-    currentDate: parseUrlDate(urlDate),
+    currentDate: parsedUrlDate,
     changeView,
     changeViewInstant,
     navigateToDate,
@@ -249,6 +288,6 @@ export function useViewRouter(options: UseViewRouterOptions = {}) {
     navigateToView,
     isValidView,
     urlView: isValidView(urlView) ? urlView : null,
-    urlDate: parseUrlDate(urlDate),
+    urlDate: parsedUrlDate,
   };
 }
