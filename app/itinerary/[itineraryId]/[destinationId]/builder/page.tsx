@@ -1,7 +1,7 @@
 "use client";
 import React, { useEffect, useState, useRef, lazy, Suspense } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { useItineraryActivityStore } from "@/store/itineraryActivityStore";
+import { useItineraryActivityStore, type IItineraryActivity } from "@/store/itineraryActivityStore";
 import { useItineraryLayoutStore } from "@/store/itineraryLayoutStore";
 import { useMapStore } from "@/store/mapStore";
 import Loading from "@/components/loading/Loading";
@@ -17,7 +17,7 @@ const ItineraryListView = lazy(() =>
   import("@/components/list/containers/ItineraryListView").then((module) => ({ default: module.ItineraryListView }))
 );
 import { Button } from "@/components/ui/button";
-import { Map, X } from "lucide-react";
+import { Map as MapIcon, X } from "lucide-react";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable';
 import { ViewToggle } from "@/components/view/toggle/ViewToggle";
 import { ViewTransition, ViewLoadingState } from "@/components/view/toggle/ViewTransition";
@@ -129,10 +129,45 @@ export default function Builder() {
 
   // Separate effects to reduce unnecessary re-runs
   useEffect(() => {
-    if (data) {
+    if (!data) return;
+    if (!destId) return;
+
+    const current = useItineraryActivityStore.getState().itineraryActivities;
+
+    // Only hydrate from react-query when the store is empty OR when the store
+    // is for a different destination. This avoids view/date URL navigations
+    // re-applying stale cached query data over optimistic store updates.
+    const hasDifferentDestination = current.some(
+      (activity) =>
+        !!activity.itinerary_destination_id &&
+        String(activity.itinerary_destination_id) !== destId
+    );
+
+    if (current.length === 0 || hasDifferentDestination) {
       setItineraryActivities(data);
+      return;
     }
-  }, [data, setItineraryActivities]);
+
+    // Otherwise, merge in any missing rows from the query result, but never
+    // overwrite in-memory versions of existing activities.
+    const byId = new Map<string, IItineraryActivity>();
+    for (const activity of current) {
+      byId.set(String(activity.itinerary_activity_id), activity);
+    }
+
+    let changed = false;
+    for (const activity of data) {
+      const id = String(activity.itinerary_activity_id);
+      if (!byId.has(id)) {
+        byId.set(id, activity);
+        changed = true;
+      }
+    }
+
+    if (changed) {
+      setItineraryActivities(Array.from(byId.values()));
+    }
+  }, [data, destId, setItineraryActivities]);
 
   // Context data update in separate effect with memoized calculation
   useEffect(() => {
@@ -221,7 +256,7 @@ export default function Builder() {
             onClick={toggleMap}
             className="ml-4"
           >
-            {showMap ? <X className="h-4 w-4 mr-2" /> : <Map className="h-4 w-4 mr-2" />}
+            {showMap ? <X className="h-4 w-4 mr-2" /> : <MapIcon className="h-4 w-4 mr-2" />}
             {showMap ? 'Hide' : 'Map'}
           </Button>
         )}
@@ -290,8 +325,8 @@ export default function Builder() {
                       return (
                         <Suspense fallback={
                           <div className="h-full flex items-center justify-center bg-bg-50 dark:bg-ink-900">
-                            <div className="flex flex-col items-center space-y-2">
-                              <Map className="w-8 h-8 animate-spin text-brand-500" />
+                              <div className="flex flex-col items-center space-y-2">
+                              <MapIcon className="w-8 h-8 animate-spin text-brand-500" />
                               <p className="text-sm text-muted-foreground">Loading map...</p>
                             </div>
                           </div>

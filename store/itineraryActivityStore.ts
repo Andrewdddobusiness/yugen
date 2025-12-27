@@ -23,6 +23,10 @@ export interface IItineraryActivity {
   activity?: IActivity;
 }
 
+export type ItineraryActivityPatch = Partial<Omit<IItineraryActivity, "activity">> & {
+  activity?: Partial<IActivity>;
+};
+
 interface IItineraryStore {
   itineraryActivities: IItineraryActivity[];
   isActivityAdded: (placeId: string) => boolean;
@@ -30,7 +34,7 @@ interface IItineraryStore {
   updateItineraryActivity: (activity: Partial<IItineraryActivity>) => Promise<void>;
   optimisticUpdateItineraryActivity: (
     itineraryActivityId: string,
-    patch: Partial<IItineraryActivity>
+    patch: ItineraryActivityPatch
   ) => Promise<{ success: boolean; error?: string }>;
   setItineraryActivities: (activities: IItineraryActivity[]) => void;
   reorderItineraryActivities: (activities: IItineraryActivity[]) => void;
@@ -51,7 +55,7 @@ export const useItineraryActivityStore = create<IItineraryStore>((set, get) => (
   },
   fetchItineraryActivities: async (itineraryId: string, destinationId: string) => {
     try {
-      const result = await fetchFilteredTableData2(
+          const result = await fetchFilteredTableData2(
         "itinerary_activity",
         `
             itinerary_activity_id, 
@@ -60,6 +64,7 @@ export const useItineraryActivityStore = create<IItineraryStore>((set, get) => (
             date, 
             start_time, 
             end_time,
+            notes,
             deleted_at,
             activity:activity(*)
           `,
@@ -109,9 +114,10 @@ export const useItineraryActivityStore = create<IItineraryStore>((set, get) => (
     };
 
     const mergePatch = (activity: IItineraryActivity): IItineraryActivity => {
-      const merged: IItineraryActivity = { ...activity, ...patch };
-      if (patch.activity && activity.activity) {
-        merged.activity = { ...(activity.activity as IActivity), ...(patch.activity as IActivity) };
+      const { activity: activityPatch, ...itineraryPatch } = patch;
+      const merged: IItineraryActivity = { ...activity, ...itineraryPatch };
+      if (activityPatch && activity.activity) {
+        merged.activity = { ...(activity.activity as IActivity), ...activityPatch };
       }
       return merged;
     };
@@ -124,7 +130,7 @@ export const useItineraryActivityStore = create<IItineraryStore>((set, get) => (
     }));
 
     try {
-      const { activity: activityPatch, ...itineraryPatch } = patch as any;
+      const { activity: activityPatch, ...itineraryPatch } = patch;
       const patchKeys = Object.keys(itineraryPatch || {});
       if (patchKeys.length > 0) {
         const result = await setTableDataWithCheck(
@@ -140,8 +146,8 @@ export const useItineraryActivityStore = create<IItineraryStore>((set, get) => (
         }
       }
 
-      if (activityPatch?.name && existing.activity?.activity_id) {
-        const result = await setActivityName(existing.activity.activity_id, activityPatch.name);
+      if (activityPatch?.name && existing.activity_id) {
+        const result = await setActivityName(existing.activity_id, activityPatch.name);
         if (!result.success) {
           throw new Error(result.message || "Failed to update activity name");
         }
@@ -205,6 +211,7 @@ export const useItineraryActivityStore = create<IItineraryStore>((set, get) => (
             date, 
             start_time, 
             end_time,
+            notes,
             deleted_at,
             activity:activity(*)
           `,
