@@ -19,8 +19,6 @@ import { useMap } from "@vis.gl/react-google-maps";
 
 interface ItineraryTableRowProps {
   activity: any; // Replace with proper type
-  notes: { [key: string]: string };
-  onNotesChange: (id: string, value: string) => void;
   onRemoveActivity: (placeId: string) => void;
   startDate?: Date;
   endDate?: Date;
@@ -30,8 +28,6 @@ interface ItineraryTableRowProps {
 
 export default function ItineraryTableRow({
   activity,
-  notes,
-  onNotesChange,
   onRemoveActivity,
   startDate,
   endDate,
@@ -127,9 +123,7 @@ export default function ItineraryTableRow({
         }}
       >
         <NotesPopover
-          id={activity.itinerary_activity_id}
-          value={notes[activity.itinerary_activity_id] || ""}
-          onChange={onNotesChange}
+          itineraryActivityId={activity.itinerary_activity_id}
         />
       </TableCell>
       <TableCell className="w-[5%] min-w-[50px]">

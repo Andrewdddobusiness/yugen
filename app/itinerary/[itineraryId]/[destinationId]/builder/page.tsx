@@ -136,26 +136,32 @@ export default function Builder() {
 
   // Context data update in separate effect with memoized calculation
   useEffect(() => {
-    if (data?.length) {
-      const scheduledActivities = data.filter(a => a.start_time && a.end_time);
-      const validDates = data.map(a => a.date).filter((date): date is string => !!date && !isNaN(new Date(date).getTime()));
+    const active = itineraryActivities.filter((a) => a.deleted_at === null);
+    if (active.length) {
+      const scheduledActivities = active.filter((a) => a.start_time && a.end_time);
+      const validDates = active
+        .map((a) => a.date)
+        .filter(
+          (date): date is string =>
+            !!date && !isNaN(new Date(date).getTime())
+        );
       const timeSpan = validDates.length > 0 ? 
         Math.ceil((Math.max(...validDates.map(date => new Date(date).getTime())) 
         - Math.min(...validDates.map(date => new Date(date).getTime()))) / (1000 * 60 * 60 * 24)) + 1 : 1;
       
       updateContextData({
-        activityCount: data.length,
+        activityCount: active.length,
         hasScheduledActivities: scheduledActivities.length > 0,
         timeSpanDays: timeSpan,
         lastActivity: new Date(),
         userBehavior: {
           usesMobile: isMobile,
-          prefersDragDrop: scheduledActivities.length > data.length * 0.5,
-          prefersDetailView: data.length > 10,
+          prefersDragDrop: scheduledActivities.length > active.length * 0.5,
+          prefersDetailView: active.length > 10,
         }
       });
     }
-  }, [data?.length, isMobile, updateContextData]);
+  }, [itineraryActivities, isMobile, updateContextData]);
 
   // Geocode destination and set map coordinates
   useEffect(() => {

@@ -7,6 +7,7 @@ import {
   fetchActivityIdByPlaceId,
   setTableDataWithCheck,
   softDeleteTableData2,
+  setActivityName,
 } from "@/actions/supabase/actions";
 import { IActivity, IActivityWithLocation } from "./activityStore";
 
@@ -27,6 +28,10 @@ interface IItineraryStore {
   isActivityAdded: (placeId: string) => boolean;
   fetchItineraryActivities: (itineraryId: string, destinationId: string) => Promise<IItineraryActivity[]>;
   updateItineraryActivity: (activity: Partial<IItineraryActivity>) => Promise<void>;
+  optimisticUpdateItineraryActivity: (
+    itineraryActivityId: string,
+    patch: Partial<IItineraryActivity>
+  ) => Promise<{ success: boolean; error?: string }>;
   setItineraryActivities: (activities: IItineraryActivity[]) => void;
   reorderItineraryActivities: (activities: IItineraryActivity[]) => void;
   insertItineraryActivity: (
@@ -88,6 +93,75 @@ export const useItineraryActivityStore = create<IItineraryStore>((set, get) => (
       }
     } catch (error) {
       console.error("Error updating activity:", error);
+    }
+  },
+  optimisticUpdateItineraryActivity: async (itineraryActivityId, patch) => {
+    const id = String(itineraryActivityId);
+    const current = get().itineraryActivities;
+    const existing = current.find((a) => String(a.itinerary_activity_id) === id);
+    if (!existing) {
+      return { success: false, error: "Activity not found" };
+    }
+
+    const previousSnapshot: IItineraryActivity = {
+      ...existing,
+      activity: existing.activity ? { ...(existing.activity as IActivity) } : existing.activity,
+    };
+
+    const mergePatch = (activity: IItineraryActivity): IItineraryActivity => {
+      const merged: IItineraryActivity = { ...activity, ...patch };
+      if (patch.activity && activity.activity) {
+        merged.activity = { ...(activity.activity as IActivity), ...(patch.activity as IActivity) };
+      }
+      return merged;
+    };
+
+    // Optimistic UI: update local store immediately.
+    set((state) => ({
+      itineraryActivities: state.itineraryActivities.map((a) =>
+        String(a.itinerary_activity_id) === id ? mergePatch(a) : a
+      ),
+    }));
+
+    try {
+      const { activity: activityPatch, ...itineraryPatch } = patch as any;
+      const patchKeys = Object.keys(itineraryPatch || {});
+      if (patchKeys.length > 0) {
+        const result = await setTableDataWithCheck(
+          "itinerary_activity",
+          {
+            itinerary_activity_id: id,
+            ...itineraryPatch,
+          },
+          ["itinerary_activity_id"]
+        );
+        if (!result.success) {
+          throw new Error(result.message || "Failed to update activity");
+        }
+      }
+
+      if (activityPatch?.name && existing.activity?.activity_id) {
+        const result = await setActivityName(existing.activity.activity_id, activityPatch.name);
+        if (!result.success) {
+          throw new Error(result.message || "Failed to update activity name");
+        }
+      }
+
+      return { success: true };
+    } catch (error) {
+      console.error("Error updating activity (optimistic):", error);
+
+      // Revert on error.
+      set((state) => ({
+        itineraryActivities: state.itineraryActivities.map((a) =>
+          String(a.itinerary_activity_id) === id ? previousSnapshot : a
+        ),
+      }));
+
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : "Failed to update activity",
+      };
     }
   },
   setItineraryActivities: (activities: IItineraryActivity[]) => set({ itineraryActivities: activities }),

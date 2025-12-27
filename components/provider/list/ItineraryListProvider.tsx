@@ -3,7 +3,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { format } from 'date-fns';
 import { useParams } from 'next/navigation';
-import { useQueryClient } from '@tanstack/react-query';
 import { useItineraryActivityStore, IItineraryActivity } from '@/store/itineraryActivityStore';
 import { useItineraryLayoutStore } from '@/store/itineraryLayoutStore';
 import { useTravelTimes } from '@/components/hooks/use-travel-times';
@@ -66,7 +65,6 @@ interface ItineraryListProviderProps {
 
 export function ItineraryListProvider({ children }: ItineraryListProviderProps) {
   const { itineraryId } = useParams();
-  const queryClient = useQueryClient();
   
   // Get layout store functions
   const { saveViewState, getViewState } = useItineraryLayoutStore();
@@ -105,13 +103,10 @@ export function ItineraryListProvider({ children }: ItineraryListProviderProps) 
     try {
       if (!itineraryId) return;
       await removeItineraryActivity(placeId, Array.isArray(itineraryId) ? itineraryId[0] : itineraryId);
-      queryClient.invalidateQueries({
-        queryKey: ["itineraryActivities"],
-      });
     } catch (error) {
       console.error("Error removing activity:", error);
     }
-  }, [itineraryId, removeItineraryActivity, queryClient]);
+  }, [itineraryId, removeItineraryActivity]);
 
   // Group activities by date
   const groupActivitiesByDate = useCallback((activities: ItineraryActivity[]) => {

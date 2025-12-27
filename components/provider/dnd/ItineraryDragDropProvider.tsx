@@ -82,6 +82,7 @@ export function ItineraryDragDropProvider({
     }
 
     setIsReordering(true);
+    const previousActivities = useItineraryActivityStore.getState().itineraryActivities;
     
     try {
       // Find the activities involved in the drag
@@ -135,9 +136,10 @@ export function ItineraryDragDropProvider({
     } catch (error) {
       console.error('Error reordering activities:', error);
       toast.error('Failed to reorder activities. Please try again.');
-      
-      // Keep invalidation on error to ensure fresh data
-      queryClient.invalidateQueries({ queryKey: ["itineraryActivities"] });
+
+      // Revert local state on error.
+      setItineraryActivities(previousActivities);
+      queryClient.setQueryData(["itineraryActivities"], previousActivities);
     } finally {
       setIsReordering(false);
     }

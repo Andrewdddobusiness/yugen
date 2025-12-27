@@ -18,7 +18,6 @@ import { useDateRangeStore } from "@/store/dateRangeStore";
 import { useParams } from "next/navigation";
 import ItineraryTableRow from "@/components/table/ItineraryTableRow";
 import { ItineraryTableDateHeader } from "@/components/table/ItineraryTableDateHeader";
-import { useQueryClient } from "@tanstack/react-query";
 
 interface ItineraryTableViewProps {
   showMap?: boolean;
@@ -28,12 +27,10 @@ interface ItineraryTableViewProps {
 export function ItineraryTableView({ showMap, onToggleMap }: ItineraryTableViewProps) {
   const isMobile = useIsMobile();
   const { itineraryId } = useParams();
-  const queryClient = useQueryClient();
   const { saveViewState, getViewState } = useItineraryLayoutStore();
 
   /* STATE */
   const [loading, setLoading] = useState(false);
-  const [notes, setNotes] = useState<{ [key: string]: string }>({});
   
   // Initialize expanded cards from store
   const [expandedCards, setExpandedCards] = useState<{ [key: string]: boolean }>(() => {
@@ -66,9 +63,6 @@ export function ItineraryTableView({ showMap, onToggleMap }: ItineraryTableViewP
     });
   };
 
-  const handleNotesChange = (id: string, value: string) => {
-    setNotes((prev) => ({ ...prev, [id]: value }));
-  };
 
   const getTypeBadgeVariant = (type: string) => {
     switch (type?.toLowerCase()) {
@@ -128,11 +122,6 @@ export function ItineraryTableView({ showMap, onToggleMap }: ItineraryTableViewP
     try {
       if (!itineraryId) return;
       await removeItineraryActivity(placeId, Array.isArray(itineraryId) ? itineraryId[0] : itineraryId);
-
-      // Refresh the activities list
-      queryClient.invalidateQueries({
-        queryKey: ["itineraryActivities"],
-      });
     } catch (error) {
       console.error("Error removing activity:", error);
     }
@@ -236,9 +225,7 @@ export function ItineraryTableView({ showMap, onToggleMap }: ItineraryTableViewP
                         <div>
                           <div className="text-xs text-gray-500 mb-1">Notes</div>
                           <NotesPopover
-                            id={activity.itinerary_activity_id}
-                            value={notes[activity.itinerary_activity_id] || ""}
-                            onChange={handleNotesChange}
+                            itineraryActivityId={activity.itinerary_activity_id}
                           />
                         </div>
                       </div>
@@ -275,8 +262,6 @@ export function ItineraryTableView({ showMap, onToggleMap }: ItineraryTableViewP
                 <ItineraryTableRow
                   key={activity.itinerary_activity_id}
                   activity={activity}
-                  notes={notes}
-                  onNotesChange={handleNotesChange}
                   onRemoveActivity={handleRemoveActivity}
                   startDate={startDate || undefined}
                   endDate={endDate || undefined}

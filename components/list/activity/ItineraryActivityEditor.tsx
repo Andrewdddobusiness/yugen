@@ -3,8 +3,6 @@
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { useItineraryActivityStore } from '@/store/itineraryActivityStore';
-import { useQueryClient } from '@tanstack/react-query';
-import { setItineraryActivityTimes, setItineraryActivityNotes, setActivityName } from '@/actions/supabase/actions';
 
 interface ItineraryActivity {
   itinerary_activity_id: string;
@@ -33,12 +31,25 @@ interface UseItineraryActivityEditorProps {
 }
 
 export function useItineraryActivityEditor({ activities }: UseItineraryActivityEditorProps) {
-  const queryClient = useQueryClient();
-  const { itineraryActivities, setItineraryActivities } = useItineraryActivityStore();
+  const optimisticUpdateItineraryActivity = useItineraryActivityStore(
+    (s) => s.optimisticUpdateItineraryActivity
+  );
   
   const [editingField, setEditingField] = useState<{ activityId: string; field: 'name' | 'time' | 'notes' } | null>(null);
   const [editingValues, setEditingValues] = useState<{ [key: string]: string }>({});
   const [savingStates, setSavingStates] = useState<{ [key: string]: boolean }>({});
+
+  const normalizeTimeToHHmm = (time: string | null) => {
+    if (!time) return '';
+    const parts = time.split(':');
+    if (parts.length < 2) return '';
+    return `${parts[0].padStart(2, '0')}:${parts[1].padStart(2, '0')}`;
+  };
+
+  const toTimeWithSeconds = (timeHHmm: string) => {
+    if (!timeHHmm) return null;
+    return timeHHmm.length === 5 ? `${timeHHmm}:00` : timeHHmm;
+  };
 
   // Time formatting and validation utilities
   const formatTime = (timeString: string | null) => {
@@ -51,8 +62,8 @@ export function useItineraryActivityEditor({ activities }: UseItineraryActivityE
   };
 
   const formatTimeForEditing = (startTime: string | null, endTime: string | null) => {
-    const start = startTime || '';
-    const end = endTime || '';
+    const start = normalizeTimeToHHmm(startTime);
+    const end = normalizeTimeToHHmm(endTime);
     return `${start}|${end}`;
   };
 
@@ -103,76 +114,32 @@ export function useItineraryActivityEditor({ activities }: UseItineraryActivityE
     setSavingStates({ ...savingStates, [key]: true });
 
     try {
-      let result;
-      
-      switch (editingField.field) {
-        case 'name':
-          if (!activity.activity?.activity_id) throw new Error('Activity ID not found');
-          result = await setActivityName(activity.activity.activity_id, value);
-          break;
-        case 'time':
-          const [startTime, endTime] = value.split('|');
-          result = await setItineraryActivityTimes(activityId, startTime || '', endTime || '');
-          break;
-        case 'notes':
-          result = await setItineraryActivityNotes(activityId, value);
-          break;
-        default:
-          throw new Error('Unknown field type');
-      }
+      const patch = (() => {
+        switch (editingField.field) {
+          case 'name':
+            return { activity: { name: value } };
+          case 'time': {
+            const { startTime, endTime } = parseTimeFromEditing(value);
+            return {
+              start_time: toTimeWithSeconds(startTime),
+              end_time: toTimeWithSeconds(endTime),
+            };
+          }
+          case 'notes':
+            return { notes: value };
+          default:
+            return {};
+        }
+      })();
+
+      const result = await optimisticUpdateItineraryActivity(activityId, patch);
 
       if (result.success) {
-        // Update local state
-        const updatedActivities = itineraryActivities.map(act => {
-          if (act.itinerary_activity_id === activityId) {
-            switch (editingField.field) {
-              case 'name':
-                return {
-                  ...act,
-                  activity: act.activity ? { ...act.activity, name: value } : act.activity
-                };
-              case 'time':
-                const [startTime, endTime] = value.split('|');
-                return { ...act, start_time: startTime || null, end_time: endTime || null };
-              case 'notes':
-                return { ...act, notes: value };
-              default:
-                return act;
-            }
-          }
-          return act;
-        });
-        
-        setItineraryActivities(updatedActivities);
-        
-        // Update cache directly for successful operations
-        queryClient.setQueryData(["itineraryActivities"], (oldData: any) => 
-          oldData?.map((activity: any) => {
-            if (activity.itinerary_activity_id === activityId) {
-              switch (editingField.field) {
-                case 'name':
-                  return {
-                    ...activity,
-                    activity: activity.activity ? { ...activity.activity, name: value } : activity.activity
-                  };
-                case 'time':
-                  const [startTime, endTime] = value.split('|');
-                  return { ...activity, start_time: startTime || null, end_time: endTime || null };
-                case 'notes':
-                  return { ...activity, notes: value };
-                default:
-                  return activity;
-              }
-            }
-            return activity;
-          }) || []
-        );
-        
         toast.success('Activity updated successfully');
         setEditingField(null);
         setEditingValues({});
       } else {
-        throw new Error(result.message || 'Update failed');
+        throw new Error(result.error || 'Update failed');
       }
     } catch (error) {
       console.error('Error saving field:', error);

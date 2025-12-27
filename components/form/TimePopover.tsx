@@ -6,8 +6,6 @@ import { Button } from "@/components/ui/button";
 import { Loader2, Clock } from "lucide-react";
 import { formatTime } from "@/utils/formatting/datetime";
 import { cn } from "@/lib/utils";
-import { setItineraryActivityTimes } from "@/actions/supabase/actions";
-import { useQueryClient } from "@tanstack/react-query";
 import { useItineraryActivityStore } from "@/store/itineraryActivityStore";
 
 const normalizeTimeToHHmm = (time: string | null | undefined) => {
@@ -47,8 +45,9 @@ export default function TimePopover({
   showText?: boolean;
   styled?: boolean;
 }) {
-  const queryClient = useQueryClient();
-  const setItineraryActivities = useItineraryActivityStore((s) => s.setItineraryActivities);
+  const optimisticUpdateItineraryActivity = useItineraryActivityStore(
+    (s) => s.optimisticUpdateItineraryActivity
+  );
 
   const [startTime, setStartTime] = useState(normalizeTimeToHHmm(storeStartTime));
   const [endTime, setEndTime] = useState(normalizeTimeToHHmm(storeEndTime));
@@ -94,25 +93,14 @@ export default function TimePopover({
 
     setIsLoading(true);
     try {
-      const result = await setItineraryActivityTimes(
-        itineraryActivityId,
-        toTimeWithSeconds(startTime),
-        toTimeWithSeconds(endTime)
-      );
-      if (!result?.success) {
-        setError(result?.message || "Failed to save times. Please try again.");
+      const result = await optimisticUpdateItineraryActivity(itineraryActivityId, {
+        start_time: toTimeWithSeconds(startTime),
+        end_time: toTimeWithSeconds(endTime),
+      });
+      if (!result.success) {
+        setError(result.error || "Failed to save times. Please try again.");
         return;
       }
-
-      const currentActivities = useItineraryActivityStore.getState().itineraryActivities;
-      setItineraryActivities(
-        currentActivities.map((a) =>
-          a.itinerary_activity_id === itineraryActivityId
-            ? { ...a, start_time: toTimeWithSeconds(startTime), end_time: toTimeWithSeconds(endTime) }
-            : a
-        )
-      );
-      queryClient.invalidateQueries({ queryKey: ["itineraryActivities"] });
       setIsOpen(false);
     } catch (error) {
       console.error("Error saving times:", error);
