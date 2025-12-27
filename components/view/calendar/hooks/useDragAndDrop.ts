@@ -1,14 +1,15 @@
 import { useState, useCallback } from 'react';
-import { DragStartEvent, DragOverEvent, DragEndEvent } from '@dnd-kit/core';
+import { DragStartEvent, DragOverEvent, DragEndEvent, DragCancelEvent } from '@dnd-kit/core';
 import { format } from 'date-fns';
 import { useParams } from 'next/navigation';
 import { useToast } from '@/components/ui/use-toast';
+import { setItineraryActivityDateTimes, setTableDataWithCheck } from '@/actions/supabase/actions';
 import { useItineraryActivityStore } from '@/store/itineraryActivityStore';
 import { useSchedulingContext } from '@/store/timeSchedulingStore';
 import { ActivityScheduler, SchedulerWishlistItem } from '../services/activityScheduler';
 import { ScheduledActivity } from './useScheduledActivities';
 import { TimeSlot } from '../TimeGrid';
-import { findNearestValidSlot, timeToMinutes } from '@/utils/calendar/collisionDetection';
+import { timeToMinutes } from '@/utils/calendar/collisionDetection';
 
 /**
  * useDragAndDrop - Comprehensive drag and drop logic for calendar grid
@@ -30,18 +31,27 @@ export function useDragAndDrop(
   timeSlots: TimeSlot[],
   scheduledActivities: ScheduledActivity[]
 ) {
+  const getActivityIdFromDragId = (id: unknown) => {
+    const raw = String(id);
+    if (raw.startsWith('calendar-overlay:')) return raw.slice('calendar-overlay:'.length);
+    if (raw.startsWith('calendar:')) return raw.slice('calendar:'.length);
+    if (raw.startsWith('sidebar:')) return raw.slice('sidebar:'.length);
+    return raw;
+  };
+
   const { destinationId } = useParams();
   const { toast } = useToast();
   const { itineraryActivities, setItineraryActivities } = useItineraryActivityStore();
   const schedulingContext = useSchedulingContext();
   
-  // Drag state
-  const [activeId, setActiveId] = useState<string | null>(null);
-  const [isSaving, setIsSaving] = useState(false);
-  const [dragOverInfo, setDragOverInfo] = useState<{
-    dayIndex: number;
-    slotIndex: number;
-    spanSlots: number;
+	  // Drag state
+	  const [activeId, setActiveId] = useState<string | null>(null);
+	  const [activeType, setActiveType] = useState<'scheduled-activity' | 'itinerary-activity' | 'wishlist-item' | null>(null);
+	  const [isSaving, setIsSaving] = useState(false);
+	  const [dragOverInfo, setDragOverInfo] = useState<{
+	    dayIndex: number;
+	    slotIndex: number;
+	    spanSlots: number;
     hasConflict: boolean;
   } | null>(null);
 
@@ -53,22 +63,32 @@ export function useDragAndDrop(
     itineraryActivities
   );
 
-  const handleDragStart = useCallback((event: DragStartEvent) => {
-    const dragType = (event.active.data?.current as any)?.type;
-    if (dragType !== 'scheduled-activity') {
-      setActiveId(null);
-      return;
-    }
-    setActiveId(event.active.id as string);
-  }, []);
+		  const handleDragStart = useCallback((event: DragStartEvent) => {
+		    const dragType = (event.active.data?.current as any)?.type as
+		      | 'scheduled-activity'
+		      | 'itinerary-activity'
+		      | 'wishlist-item'
+		      | undefined;
 
-  const handleDragOver = useCallback((event: DragOverEvent) => {
-    const { active, over } = event;
-    
-    if (!over) {
-      setDragOverInfo(null);
-      return;
-    }
+		    if (dragType === 'scheduled-activity' || dragType === 'itinerary-activity') {
+		      // Drive the DragOverlay for cross-component drags (sidebar -> calendar).
+		      setActiveId(getActivityIdFromDragId(event.active.id));
+		      setActiveType(dragType);
+		      return;
+		    }
+
+		    setActiveId(null);
+		    setActiveType(null);
+		  }, []);
+
+		  const handleDragOver = useCallback((event: DragOverEvent) => {
+		    const { active, over } = event;
+		    const activeDragId = getActivityIdFromDragId(active.id);
+	    
+	    if (!over) {
+	      setDragOverInfo(null);
+	      return;
+	    }
 
     // Parse drop zone ID
     const dropZoneData = over.id.toString().split('-');
@@ -135,29 +155,32 @@ export function useDragAndDrop(
             )
           : 60);
 
-      placeData = itineraryActivity?.activity ?? null;
-      excludeId = itineraryActivity?.itinerary_activity_id ?? (active.id as string);
-      spanSlots = Math.max(
-        1,
-        Math.ceil(duration / schedulingContext.config.interval)
-      );
-    } else {
-      // Find the activity being dragged (existing logic)
-      const draggedActivity = scheduledActivities.find(act => act.id === active.id);
-      if (!draggedActivity) {
-        setDragOverInfo(null);
-        return;
-      }
-      duration = draggedActivity.duration;
-      spanSlots = Math.max(1, draggedActivity.position.span);
-      excludeId = active.id as string;
-    }
+	      placeData = itineraryActivity?.activity ?? null;
+	      excludeId = String(itineraryActivity?.itinerary_activity_id ?? activeDragId);
+	      spanSlots = Math.max(
+	        1,
+	        Math.ceil(duration / schedulingContext.config.interval)
+	      );
+	    } else {
+	      // Find the activity being dragged (existing logic)
+	      const draggedActivity = scheduledActivities.find((act) => String(act.id) === activeDragId);
+	      if (!draggedActivity) {
+	        setDragOverInfo(null);
+	        return;
+	      }
+	      duration = draggedActivity.duration;
+	      spanSlots = Math.max(1, draggedActivity.position.span);
+	      excludeId = activeDragId;
+	    }
 
-    spanSlots = Math.max(1, Math.min(spanSlots, timeSlots.length - slotIndex));
+    // Keep the dragged item's duration, but clamp the start slot so it stays within the grid.
+    spanSlots = Math.max(1, Math.min(spanSlots, timeSlots.length));
+    const boundedSlotIndex = Math.max(0, Math.min(slotIndex, timeSlots.length - spanSlots));
+    const boundedTargetSlot = timeSlots[boundedSlotIndex];
 
     // Enhanced conflict detection
     const proposedDate = format(targetDate, 'yyyy-MM-dd');
-    const proposedStartTime = `${targetSlot.hour.toString().padStart(2, '0')}:${targetSlot.minute.toString().padStart(2, '0')}:00`;
+    const proposedStartTime = `${boundedTargetSlot.hour.toString().padStart(2, '0')}:${boundedTargetSlot.minute.toString().padStart(2, '0')}:00`;
     
     const detectedConflicts = scheduler.detectConflicts(
       proposedDate,
@@ -171,7 +194,7 @@ export function useDragAndDrop(
     
     setDragOverInfo({
       dayIndex,
-      slotIndex,
+      slotIndex: boundedSlotIndex,
       spanSlots,
       hasConflict: hasHighSeverityConflicts
     });
@@ -204,124 +227,218 @@ export function useDragAndDrop(
     setIsSaving(false);
   }, [scheduler, destinationId, itineraryActivities, setItineraryActivities, toast]);
 
-  const handleActivityReschedule = useCallback(async (
-    activityId: string,
-    targetDate: Date,
-    targetSlot: TimeSlot,
-    currentDuration: number
-  ) => {
-    const currentActivities = useItineraryActivityStore.getState().itineraryActivities;
-    const previousActivity = currentActivities.find(
-      (act) => act.itinerary_activity_id === activityId
-    );
-    if (!previousActivity) return;
+	  const handleActivityReschedule = useCallback(async (
+	    activityId: string,
+	    targetDate: Date,
+	    targetSlot: TimeSlot,
+	    currentDuration: number
+	  ) => {
+	    const activityIdString = String(activityId);
+	    const currentActivities = useItineraryActivityStore.getState().itineraryActivities;
+	    const previousActivity = currentActivities.find(
+	      (act) => String(act.itinerary_activity_id) === activityIdString
+	    );
+	    if (!previousActivity) return;
 
-    const previousTimes = {
-      date: previousActivity.date,
-      start_time: previousActivity.start_time,
-      end_time: previousActivity.end_time,
-    };
+	    const minutesToTimeString = (minutes: number) =>
+	      `${Math.floor(minutes / 60).toString().padStart(2, '0')}:${(minutes % 60)
+	        .toString()
+	        .padStart(2, '0')}:00`;
 
-    const newDate = format(targetDate, 'yyyy-MM-dd');
-    const proposedStartTime = `${targetSlot.hour.toString().padStart(2, '0')}:${targetSlot.minute.toString().padStart(2, '0')}:00`;
+	    const newDate = format(targetDate, 'yyyy-MM-dd');
+	    const interval = schedulingContext.config.interval;
+	    const dayStartMinutes = schedulingContext.config.startHour * 60;
+	    const dayEndMinutes = (schedulingContext.config.endHour + 1) * 60;
 
-    // Match the scheduler's "nearest valid slot" logic so the UI doesn't jump twice.
-    const existingActivities = currentActivities
-      .filter((act) => act.date && act.start_time && act.end_time)
-      .map((act) => ({
-        id: act.itinerary_activity_id,
-        date: act.date as string,
-        startTime: act.start_time as string,
-        endTime: act.end_time as string,
-      }));
+	    const alignedDuration = Math.min(
+	      Math.max(interval, Math.ceil(currentDuration / interval) * interval),
+	      Math.max(interval, dayEndMinutes - dayStartMinutes)
+	    );
 
-    const optimisticSlot = findNearestValidSlot(
-      proposedStartTime,
-      currentDuration,
-      newDate,
-      existingActivities,
-      activityId
-    );
+	    const proposedStartMinutes = targetSlot.hour * 60 + targetSlot.minute;
+	    const boundedStartMinutes = Math.min(
+	      Math.max(proposedStartMinutes, dayStartMinutes),
+	      Math.max(dayStartMinutes, dayEndMinutes - alignedDuration)
+	    );
+	    const boundedEndMinutes = boundedStartMinutes + alignedDuration;
 
-    if (!optimisticSlot) {
-      toast({
-        title: 'Could not move activity',
-        description: 'Could not find an available time slot for this activity.',
-        variant: 'destructive',
-      });
-      return;
-    }
+	    const optimisticPatch = {
+	      date: newDate,
+	      start_time: minutesToTimeString(boundedStartMinutes),
+	      end_time: minutesToTimeString(boundedEndMinutes),
+	    } as const;
 
-    const optimisticPatch = {
-      date: newDate,
-      start_time: optimisticSlot.startTime,
-      end_time: optimisticSlot.endTime,
-    };
+	    const previousById = new Map<
+	      string,
+	      { date: string | null; start_time: string | null; end_time: string | null }
+	    >();
+	    previousById.set(activityIdString, {
+	      date: previousActivity.date,
+	      start_time: previousActivity.start_time,
+	      end_time: previousActivity.end_time,
+	    });
 
-    // Optimistic UI: update local store immediately.
-    const activitiesAfterOptimistic = useItineraryActivityStore
-      .getState()
-      .itineraryActivities.map((act) =>
-        act.itinerary_activity_id === activityId ? { ...act, ...optimisticPatch } : act
-      );
-    setItineraryActivities(activitiesAfterOptimistic);
+	    const updatesById = new Map<
+	      string,
+	      { date: string | null; start_time: string | null; end_time: string | null }
+	    >();
+	    updatesById.set(activityIdString, optimisticPatch);
 
-    setIsSaving(true);
+	    const overlaps = currentActivities.filter((act) => {
+	      if (String(act.itinerary_activity_id) === activityIdString) return false;
+	      if (act.deleted_at !== null) return false;
+	      if (!act.date || !act.start_time || !act.end_time) return false;
+	      return String(act.date) === newDate;
+	    });
 
-    const result = await scheduler.rescheduleActivity(
-      activityId,
-      targetDate,
-      targetSlot,
-      currentDuration
-    );
+	    let trimmedCount = 0;
+	    for (const act of overlaps) {
+	      const start = timeToMinutes(act.start_time as string);
+	      const end = timeToMinutes(act.end_time as string);
 
-    if (result.success) {
-      if (result.data) {
-        const activitiesAfterCommit = useItineraryActivityStore
-          .getState()
-          .itineraryActivities.map((act) =>
-            act.itinerary_activity_id === activityId
-              ? {
-                  ...act,
-                  date: result.data.date,
-                  start_time: result.data.startTime,
-                  end_time: result.data.endTime,
-                }
-              : act
-          );
-        setItineraryActivities(activitiesAfterCommit);
-      }
+	      if (end <= boundedStartMinutes || start >= boundedEndMinutes) continue;
 
-      toast({
-        title: result.data?.wasAdjusted ? "Time adjusted" : "Activity updated",
-        description: result.message,
-      });
-    } else {
-      // Revert on error
-      const activitiesAfterRevert = useItineraryActivityStore
-        .getState()
-        .itineraryActivities.map((act) =>
-          act.itinerary_activity_id === activityId ? { ...act, ...previousTimes } : act
-        );
-      setItineraryActivities(activitiesAfterRevert);
+	      let newStart = start;
+	      let newEnd = end;
+	      let shouldUnschedule = false;
 
-      toast({
-        title: "Failed to save",
-        description: result.error,
-        variant: "destructive"
-      });
-    }
-    
-    setIsSaving(false);
-  }, [scheduler, setItineraryActivities, toast]);
+	      if (start >= boundedStartMinutes && end <= boundedEndMinutes) {
+	        // Fully covered by the moved activity.
+	        shouldUnschedule = true;
+	      } else if (start < boundedStartMinutes && end > boundedEndMinutes) {
+	        // Spans across the moved activity; keep the larger remaining side.
+	        const left = boundedStartMinutes - start;
+	        const right = end - boundedEndMinutes;
+	        if (left >= right) newEnd = boundedStartMinutes;
+	        else newStart = boundedEndMinutes;
+	      } else if (start < boundedStartMinutes && end > boundedStartMinutes) {
+	        // Overlaps the start of the moved activity.
+	        newEnd = boundedStartMinutes;
+	      } else if (start < boundedEndMinutes && end > boundedEndMinutes) {
+	        // Overlaps the end of the moved activity.
+	        newStart = boundedEndMinutes;
+	      }
 
-  const handleDragEnd = useCallback(async (event: DragEndEvent) => {
-    setActiveId(null);
-    setDragOverInfo(null);
-    
-    const { active, over } = event;
-    
-    if (!over) return;
+	      if (!shouldUnschedule && newEnd <= newStart) {
+	        shouldUnschedule = true;
+	      }
+
+	      const id = String(act.itinerary_activity_id);
+	      previousById.set(id, {
+	        date: act.date,
+	        start_time: act.start_time,
+	        end_time: act.end_time,
+	      });
+
+	      if (shouldUnschedule) {
+	        updatesById.set(id, {
+	          date: null,
+	          start_time: null,
+	          end_time: null,
+	        });
+	      } else {
+	        updatesById.set(id, {
+	          date: newDate,
+	          start_time: minutesToTimeString(newStart),
+	          end_time: minutesToTimeString(newEnd),
+	        });
+	      }
+
+	      trimmedCount++;
+	    }
+
+	    // Optimistic UI: update local store immediately.
+	    const activitiesAfterOptimistic = currentActivities.map((act) => {
+	      const update = updatesById.get(String(act.itinerary_activity_id));
+	      return update ? { ...act, ...update } : act;
+	    });
+	    setItineraryActivities(activitiesAfterOptimistic);
+
+	    setIsSaving(true);
+
+	    const persistedIds: string[] = [];
+	    const persistUpdate = async (
+	      id: string,
+	      update: { date: string | null; start_time: string | null; end_time: string | null }
+	    ) => {
+	      if (update.date && update.start_time && update.end_time) {
+	        const result = await setItineraryActivityDateTimes(
+	          id,
+	          update.date,
+	          update.start_time,
+	          update.end_time
+	        );
+	        if (!result.success) {
+	          throw new Error(result.message || 'Failed to update activity');
+	        }
+	        return;
+	      }
+
+	      const result = await setTableDataWithCheck(
+	        'itinerary_activity',
+	        {
+	          itinerary_activity_id: id,
+	          date: null,
+	          start_time: null,
+	          end_time: null,
+	        },
+	        ['itinerary_activity_id']
+	      );
+	      if (!result.success) {
+	        throw new Error(result.message || 'Failed to update activity');
+	      }
+	    };
+
+	    const rollbackPersisted = async () => {
+	      for (const id of persistedIds.reverse()) {
+	        const previous = previousById.get(id);
+	        if (!previous) continue;
+	        try {
+	          await persistUpdate(id, previous);
+	        } catch (error) {
+	          console.error('Failed to rollback activity update:', error);
+	        }
+	      }
+	    };
+
+	    try {
+	      for (const [id, update] of updatesById.entries()) {
+	        await persistUpdate(id, update);
+	        persistedIds.push(id);
+	      }
+
+	      toast({
+	        title: 'Activity updated',
+	        description:
+	          trimmedCount > 0
+	            ? 'Overlapping activities were trimmed to fit.'
+	            : 'Activity moved successfully.',
+	      });
+	    } catch (error) {
+	      console.error('Error saving activity:', error);
+	      await rollbackPersisted();
+	      setItineraryActivities(currentActivities);
+
+	      toast({
+	        title: 'Failed to save',
+	        description:
+	          error instanceof Error ? error.message : 'Could not save changes. Please try again.',
+	        variant: 'destructive',
+	      });
+	    } finally {
+	      setIsSaving(false);
+	    }
+	  }, [schedulingContext.config.endHour, schedulingContext.config.interval, schedulingContext.config.startHour, setItineraryActivities, toast]);
+
+		  const handleDragEnd = useCallback(async (event: DragEndEvent) => {
+		    setActiveId(null);
+		    setActiveType(null);
+		    setDragOverInfo(null);
+	    
+	    const { active, over } = event;
+	    const activeDragId = getActivityIdFromDragId(active.id);
+	    
+	    if (!over) return;
 
     // Parse drop zone ID to get day and time slot
     const dropZoneData = over.id.toString().split('-');
@@ -343,7 +460,7 @@ export function useDragAndDrop(
       await handleWishlistItemDrop(dragData.item, targetDate, targetSlot);
       return;
     }
-    if (dragData?.type === 'itinerary-activity') {
+	    if (dragData?.type === 'itinerary-activity') {
       const itineraryActivity = dragData.item;
 
       const durationFromTimes =
@@ -366,32 +483,39 @@ export function useDragAndDrop(
             )
           : 60);
 
-      await handleActivityReschedule(
-        (active.id as string) ?? itineraryActivity?.itinerary_activity_id,
-        targetDate,
-        targetSlot,
-        duration || 60
-      );
-      return;
-    }
+	      await handleActivityReschedule(
+	        activeDragId,
+	        targetDate,
+	        targetSlot,
+	        duration || 60
+	      );
+	      return;
+	    }
 
-    // Find the activity being dragged (existing logic for scheduled activities)
-    const draggedActivity = scheduledActivities.find(act => act.id === active.id);
-    if (!draggedActivity) return;
+	    // Find the activity being dragged (existing logic for scheduled activities)
+	    const draggedActivity = scheduledActivities.find((act) => String(act.id) === activeDragId);
+	    if (!draggedActivity) return;
 
-    await handleActivityReschedule(
-      active.id as string,
-      targetDate,
-      targetSlot,
-      draggedActivity.duration
-    );
-  }, [days, timeSlots, scheduledActivities, handleWishlistItemDrop, handleActivityReschedule, scheduler]);
+	    await handleActivityReschedule(
+	      activeDragId,
+	      targetDate,
+	      targetSlot,
+	      draggedActivity.duration
+	    );
+		  }, [days, timeSlots, scheduledActivities, handleWishlistItemDrop, handleActivityReschedule, scheduler]);
+
+	  const handleDragCancel = useCallback((_event: DragCancelEvent) => {
+	    setActiveId(null);
+	    setActiveType(null);
+	    setDragOverInfo(null);
+	  }, []);
 
   const handleResize = useCallback(async (
     activityId: string,
     newDuration: number,
     resizeDirection: 'top' | 'bottom'
   ) => {
+    const activityIdString = String(activityId);
     const minutesToTimeString = (minutes: number) =>
       `${Math.floor(minutes / 60).toString().padStart(2, '0')}:${(minutes % 60)
         .toString()
@@ -399,7 +523,7 @@ export function useDragAndDrop(
 
     const currentActivities = useItineraryActivityStore.getState().itineraryActivities;
     const previousActivity = currentActivities.find(
-      (act) => act.itinerary_activity_id === activityId
+      (act) => String(act.itinerary_activity_id) === activityIdString
     );
     if (!previousActivity || !previousActivity.start_time || !previousActivity.end_time) return;
 
@@ -424,7 +548,7 @@ export function useDragAndDrop(
     const activitiesAfterOptimistic = useItineraryActivityStore
       .getState()
       .itineraryActivities.map((act) =>
-        act.itinerary_activity_id === activityId
+        String(act.itinerary_activity_id) === activityIdString
           ? { ...act, start_time: optimisticStartTime, end_time: optimisticEndTime }
           : act
       );
@@ -433,7 +557,7 @@ export function useDragAndDrop(
     setIsSaving(true);
 
     const result = await scheduler.resizeActivity(
-      activityId,
+      activityIdString,
       newDuration,
       resizeDirection,
       previousTimes.start_time as string,
@@ -445,7 +569,7 @@ export function useDragAndDrop(
       const activitiesAfterCommit = useItineraryActivityStore
         .getState()
         .itineraryActivities.map((act) =>
-          act.itinerary_activity_id === activityId
+          String(act.itinerary_activity_id) === activityIdString
             ? {
                 ...act,
                 start_time: result.data.startTime,
@@ -464,7 +588,9 @@ export function useDragAndDrop(
       const activitiesAfterRevert = useItineraryActivityStore
         .getState()
         .itineraryActivities.map((act) =>
-          act.itinerary_activity_id === activityId ? { ...act, ...previousTimes } : act
+          String(act.itinerary_activity_id) === activityIdString
+            ? { ...act, ...previousTimes }
+            : act
         );
       setItineraryActivities(activitiesAfterRevert);
 
@@ -478,21 +604,121 @@ export function useDragAndDrop(
     setIsSaving(false);
   }, [scheduler, setItineraryActivities, toast]);
 
-  // Get the currently active activity for drag overlay
-  const activeActivity = scheduledActivities.find(act => act.id === activeId);
+	  // Get the currently active activity for drag overlay.
+	  // For sidebar drags (itinerary-activity), we synthesize a ScheduledActivity so the DragOverlay
+	  // can render the same card UI while crossing components.
+			  const activeActivity = (() => {
+			    if (!activeId || !activeType) return null;
 
-  return {
-    // Drag handlers
-    handleDragStart,
-    handleDragOver,
-    handleDragEnd,
-    handleResize,
-    
-    // State
-    activeId,
-    activeActivity,
-    dragOverInfo,
-    isSaving,
+			    if (activeType === 'scheduled-activity') {
+			      return (
+			        scheduledActivities.find((act) => String(act.id) === activeId) ?? null
+			      );
+			    }
+
+		    if (activeType !== 'itinerary-activity') return null;
+
+	    const itineraryActivity = itineraryActivities.find(
+	      (act) => String(act.itinerary_activity_id) === activeId
+	    );
+	    if (!itineraryActivity) return null;
+
+	    const interval = schedulingContext.config.interval;
+	    const MIN_DURATION = interval;
+
+	    const durationFromTimes =
+	      itineraryActivity.start_time && itineraryActivity.end_time
+	        ? Math.max(
+	            0,
+	            timeToMinutes(itineraryActivity.end_time) -
+	              timeToMinutes(itineraryActivity.start_time)
+	          )
+	        : null;
+
+	    const durationFromActivity =
+	      typeof itineraryActivity.activity?.duration === 'number'
+	        ? itineraryActivity.activity.duration
+	        : null;
+
+	    const targetDate = dragOverInfo?.dayIndex != null ? days[dragOverInfo.dayIndex] : undefined;
+	    const targetSlot = dragOverInfo?.slotIndex != null ? timeSlots[dragOverInfo.slotIndex] : undefined;
+
+	    const durationFromEstimate =
+	      itineraryActivity.activity && targetDate && targetSlot
+	        ? scheduler.estimateDuration(itineraryActivity.activity, targetSlot, targetDate)
+	        : null;
+
+	    const duration =
+	      durationFromTimes ??
+	      durationFromActivity ??
+	      durationFromEstimate ??
+	      60;
+
+	    const safeDuration = Math.max(MIN_DURATION, duration);
+	    const spanSlots =
+	      dragOverInfo?.spanSlots ??
+	      Math.max(1, Math.ceil(safeDuration / interval));
+	    const visualDuration = dragOverInfo ? spanSlots * interval : safeDuration;
+
+	    const startTime = (() => {
+	      if (targetSlot) {
+	        return `${targetSlot.hour.toString().padStart(2, '0')}:${targetSlot.minute
+	          .toString()
+	          .padStart(2, '0')}:00`;
+	      }
+	      if (itineraryActivity.start_time) return itineraryActivity.start_time;
+	      const firstSlot = timeSlots[0];
+	      return `${firstSlot.hour.toString().padStart(2, '0')}:${firstSlot.minute
+	        .toString()
+	        .padStart(2, '0')}:00`;
+	    })();
+
+	    const endTime = (() => {
+	      if (!targetSlot && itineraryActivity.end_time) return itineraryActivity.end_time;
+	      const startMinutes = timeToMinutes(startTime);
+	      const endMinutes = startMinutes + visualDuration;
+	      return `${Math.floor(endMinutes / 60)
+	        .toString()
+	        .padStart(2, '0')}:${(endMinutes % 60).toString().padStart(2, '0')}:00`;
+	    })();
+
+	    const overlayDate = (() => {
+	      if (targetDate) return targetDate;
+	      if (itineraryActivity.date) return new Date(itineraryActivity.date);
+	      return days[0] ?? new Date();
+	    })();
+
+	    return {
+	      id: String(itineraryActivity.itinerary_activity_id),
+	      activityId: itineraryActivity.activity_id || '',
+	      placeId: itineraryActivity.activity?.place_id || '',
+	      date: overlayDate,
+	      startTime,
+	      endTime,
+	      duration: visualDuration,
+	      position: {
+	        day: dragOverInfo?.dayIndex ?? 0,
+	        startSlot: dragOverInfo?.slotIndex ?? 0,
+	        span: spanSlots,
+	      },
+	      activity: itineraryActivity.activity,
+	    } satisfies ScheduledActivity;
+	  })();
+
+	  return {
+	    // Drag handlers
+	    handleDragStart,
+	    handleDragOver,
+	    handleDragEnd,
+	    handleDragCancel,
+	    handleResize,
+	    
+	    // State
+	    activeId,
+	    activeType,
+	    activeActivity,
+      dragOverInfo,
+      isSaving,
     
     // Utilities
     scheduler

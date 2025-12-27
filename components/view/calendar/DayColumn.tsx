@@ -40,6 +40,7 @@ interface DayColumnProps {
   timeSlots: TimeSlot[];
   activities: ScheduledActivity[];
   allDayActivities?: Array<{ id: string; name: string }>;
+  highlightActivityId?: string | null;
   dragOverInfo?: {
     dayIndex: number;
     slotIndex: number;
@@ -91,6 +92,7 @@ export function DayColumn({
   timeSlots,
   activities,
   allDayActivities = [],
+  highlightActivityId,
   dragOverInfo,
   className,
   onResize,
@@ -245,7 +247,12 @@ export function DayColumn({
             >
               <ActivityBlock
                 activity={activity}
-                className="h-full"
+                className={cn(
+                  "h-full",
+                  highlightActivityId &&
+                    String(highlightActivityId) === String(activity.id) &&
+                    "ring-2 ring-brand-400/70"
+                )}
                 onResize={onResize}
               />
             </div>

@@ -1,4 +1,5 @@
-import React, { useMemo } from "react";
+import React, { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { DndContext, DragOverlay, pointerWithin } from "@dnd-kit/core";
 import { format } from "date-fns";
 import { DayColumn } from "./DayColumn";
@@ -16,6 +17,7 @@ import {
 } from "./layoutMetrics";
 import { MonthGrid } from "./MonthGrid";
 import { useItineraryActivityStore } from "@/store/itineraryActivityStore";
+import { SidebarActivityDragOverlay } from "./SidebarActivityDragOverlay";
 
 interface CalendarLayoutProps {
   // Calendar configuration
@@ -35,6 +37,7 @@ interface CalendarLayoutProps {
   onDragStart: (event: any) => void;
   onDragOver: (event: any) => void;
   onDragEnd: (event: any) => void;
+  onDragCancel?: (event: any) => void;
   onResize: (
     activityId: string,
     newDuration: number,
@@ -42,6 +45,12 @@ interface CalendarLayoutProps {
   ) => void;
 
   // State
+  activeId?: string | null;
+  activeType?:
+    | "scheduled-activity"
+    | "itinerary-activity"
+    | "wishlist-item"
+    | null;
   activeActivity?: ScheduledActivity | null;
   dragOverInfo?: {
     dayIndex: number;
@@ -85,7 +94,10 @@ export function CalendarLayout({
   onDragStart,
   onDragOver,
   onDragEnd,
+  onDragCancel,
   onResize,
+  activeId,
+  activeType,
   activeActivity,
   dragOverInfo,
   isSaving,
@@ -99,6 +111,24 @@ export function CalendarLayout({
     schedulingContext.config.interval
   );
   const { itineraryActivities } = useItineraryActivityStore();
+
+  const activeSidebarActivity = useMemo(() => {
+    if (activeType !== "itinerary-activity" || !activeId) return null;
+    return (
+      itineraryActivities.find(
+        (act) => String(act.itinerary_activity_id) === String(activeId)
+      ) ?? null
+    );
+  }, [activeType, activeId, itineraryActivities]);
+
+  const highlightActivityId = useMemo(() => {
+    if (activeType !== "itinerary-activity" || !activeId) return null;
+    return scheduledActivities.some(
+      (act) => String(act.id) === String(activeId)
+    )
+      ? String(activeId)
+      : null;
+  }, [activeType, activeId, scheduledActivities]);
 
   const allDayActivitiesByDay = useMemo(() => {
     const inView = new Set(days.map((d) => format(d, "yyyy-MM-dd")));
@@ -127,6 +157,11 @@ export function CalendarLayout({
 
     return map;
   }, [itineraryActivities, days]);
+
+  const [canPortal, setCanPortal] = useState(false);
+  useEffect(() => {
+    setCanPortal(true);
+  }, []);
 
   const calendarContent = (
     <>
@@ -204,6 +239,7 @@ export function CalendarLayout({
                 activities={scheduledActivities.filter(
                   (act) => act.position.day === dayIndex
                 )}
+                highlightActivityId={highlightActivityId}
                 allDayActivities={
                   allDayActivitiesByDay.get(format(day, "yyyy-MM-dd")) ?? []
                 }
@@ -220,16 +256,25 @@ export function CalendarLayout({
         </div>
       )}
 
-      {/* Drag Overlay */}
-      <DragOverlay>
-        {activeActivity && (
-          <ActivityBlock
-            activity={activeActivity}
-            isOverlay
-            className="opacity-80 rotate-3 shadow-lg"
-          />
+      {canPortal &&
+        createPortal(
+          <DragOverlay zIndex={2000}>
+            {activeType === "itinerary-activity" &&
+            activeSidebarActivity &&
+            !dragOverInfo ? (
+              <SidebarActivityDragOverlay activity={activeSidebarActivity} />
+            ) : (
+              activeActivity && (
+              <ActivityBlock
+                activity={activeActivity}
+                isOverlay
+                className="opacity-80 rotate-3 shadow-lg"
+              />
+              )
+            )}
+          </DragOverlay>,
+          document.body
         )}
-      </DragOverlay>
     </>
   );
 
@@ -262,6 +307,7 @@ export function CalendarLayout({
           onDragStart={onDragStart}
           onDragOver={onDragOver}
           onDragEnd={onDragEnd}
+          onDragCancel={onDragCancel}
         >
           {calendarContent}
         </DndContext>

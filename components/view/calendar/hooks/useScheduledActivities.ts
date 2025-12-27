@@ -52,9 +52,34 @@ export function useScheduledActivities(days: Date[], timeSlots: TimeSlot[]): Sch
         const startSlot = timeSlots.findIndex(slot => 
           slot.hour === startHour && slot.minute === startMinute
         );
-        const endSlot = timeSlots.findIndex(slot => 
+        let endSlot = timeSlots.findIndex(slot => 
           slot.hour === endHour && slot.minute === endMinute
         );
+
+        if (startSlot === -1) return null;
+
+        if (endSlot === -1 && timeSlots.length > 0) {
+          const endMinutes = endHour * 60 + endMinute;
+          const firstSlot = timeSlots[0];
+          const lastSlot = timeSlots[timeSlots.length - 1];
+          const firstMinutes = firstSlot.hour * 60 + firstSlot.minute;
+          const lastMinutes = lastSlot.hour * 60 + lastSlot.minute;
+          const inferredInterval =
+            timeSlots.length > 1
+              ? (timeSlots[1].hour * 60 + timeSlots[1].minute) - firstMinutes
+              : 60;
+          const gridEndMinutes = lastMinutes + inferredInterval;
+
+          // Allow activities ending exactly at the end of the grid (e.g. 24:00).
+          if (endMinutes === gridEndMinutes) {
+            endSlot = timeSlots.length;
+          } else {
+            endSlot = Math.min(
+              timeSlots.length,
+              Math.max(0, Math.round((endMinutes - firstMinutes) / inferredInterval))
+            );
+          }
+        }
         
         const span = Math.max(1, endSlot - startSlot);
         const duration = (endHour * 60 + endMinute) - (startHour * 60 + startMinute);

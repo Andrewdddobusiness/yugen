@@ -103,7 +103,7 @@ function SortableActivityItem({
     transition,
     isDragging,
   } = useSortable({
-    id: activity.itinerary_activity_id,
+    id: `sidebar:${activity.itinerary_activity_id}`,
     data: {
       type: "itinerary-activity",
       item: activity,
@@ -235,12 +235,20 @@ export function SimplifiedItinerarySidebar({
   };
 
   const handleDragStart = (event: DragStartEvent) => {
+    const toItineraryActivityId = (id: unknown) => {
+      const raw = String(id);
+      return raw.startsWith('sidebar:') ? raw.slice('sidebar:'.length) : raw;
+    };
     const dragData = event.active.data?.current as any;
     if (dragData?.type !== 'itinerary-activity') return;
-    setActiveId(event.active.id as string);
+    setActiveId(toItineraryActivityId(event.active.id));
   };
 
   const handleDragEnd = (event: DragEndEvent) => {
+    const toItineraryActivityId = (id: unknown) => {
+      const raw = String(id);
+      return raw.startsWith('sidebar:') ? raw.slice('sidebar:'.length) : raw;
+    };
     const { active, over } = event;
 
     if (!over || active.id === over.id) {
@@ -254,8 +262,11 @@ export function SimplifiedItinerarySidebar({
       return;
     }
 
+    const activeActivityId = toItineraryActivityId(active.id);
+    const overActivityId = toItineraryActivityId(over.id);
+
     const activeActivity = itineraryActivities.find(
-      (activity) => activity.itinerary_activity_id === active.id
+      (activity) => activity.itinerary_activity_id === activeActivityId
     );
 
     if (!activeActivity) {
@@ -279,7 +290,7 @@ export function SimplifiedItinerarySidebar({
 
       // Update the activities list
       const updatedActivities = itineraryActivities.map(activity =>
-        activity.itinerary_activity_id === active.id ? updatedActivity : activity
+        activity.itinerary_activity_id === activeActivityId ? updatedActivity : activity
       );
 
       reorderItineraryActivities(updatedActivities);
@@ -293,7 +304,7 @@ export function SimplifiedItinerarySidebar({
 
     // Handle reordering within same date or between dates
     const overActivity = itineraryActivities.find(
-      (activity) => activity.itinerary_activity_id === over.id
+      (activity) => activity.itinerary_activity_id === overActivityId
     );
 
     if (!overActivity) {
@@ -312,10 +323,10 @@ export function SimplifiedItinerarySidebar({
       // Reordering within same date
       const dateActivities = activitiesByDate[activeDate];
       const oldIndex = dateActivities.findIndex(
-        (activity) => activity.itinerary_activity_id === active.id
+        (activity) => activity.itinerary_activity_id === activeActivityId
       );
       const newIndex = dateActivities.findIndex(
-        (activity) => activity.itinerary_activity_id === over.id
+        (activity) => activity.itinerary_activity_id === overActivityId
       );
 
       if (oldIndex !== -1 && newIndex !== -1) {
@@ -345,11 +356,11 @@ export function SimplifiedItinerarySidebar({
 
       // Remove from old date and add to new date at the position of the drop target
       const otherActivities = itineraryActivities.filter(
-        activity => activity.itinerary_activity_id !== active.id
+        activity => activity.itinerary_activity_id !== activeActivityId
       );
       
       const overIndex = otherActivities.findIndex(
-        activity => activity.itinerary_activity_id === over.id
+        activity => activity.itinerary_activity_id === overActivityId
       );
       
       const newActivities = [...otherActivities];
@@ -413,7 +424,7 @@ export function SimplifiedItinerarySidebar({
                 {/* Activities for this date */}
                 {!collapsedDates.has(date) && (
                   <SortableContext
-                    items={activitiesByDate[date].map(a => a.itinerary_activity_id)}
+                    items={activitiesByDate[date].map((a) => `sidebar:${a.itinerary_activity_id}`)}
                     strategy={verticalListSortingStrategy}
                   >
                     <div className="space-y-1.5 ml-5">

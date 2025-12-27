@@ -78,7 +78,7 @@ export function ActivityBlock({
     transform,
     isDragging
   } = useDraggable({
-    id: activity.id,
+    id: isOverlay ? `calendar-overlay:${activity.id}` : `calendar:${activity.id}`,
     data: {
       type: 'scheduled-activity',
     },

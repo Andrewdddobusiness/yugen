@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from 'react';
-import { useDndMonitor, type DragStartEvent, type DragOverEvent, type DragEndEvent } from '@dnd-kit/core';
+import { useDndMonitor, type DragStartEvent, type DragOverEvent, type DragEndEvent, type DragCancelEvent } from '@dnd-kit/core';
 import { useToast } from '@/components/ui/use-toast';
 import { CalendarLayout } from './CalendarLayout';
 import { ConflictResolver, TimeConflict } from './ConflictResolver';
@@ -60,7 +60,10 @@ export function CalendarGrid({
     handleDragStart,
     handleDragOver,
     handleDragEnd,
+    handleDragCancel,
     handleResize,
+    activeId,
+    activeType,
     activeActivity,
     dragOverInfo,
     isSaving
@@ -96,6 +99,7 @@ export function CalendarGrid({
           onDragStart={handleDragStart}
           onDragOver={handleDragOver}
           onDragEnd={handleDragEnd}
+          onDragCancel={handleDragCancel}
         />
       )}
 
@@ -112,7 +116,10 @@ export function CalendarGrid({
         onDragStart={handleDragStart}
         onDragOver={handleDragOver}
         onDragEnd={handleDragEnd}
+        onDragCancel={handleDragCancel}
         onResize={handleResize}
+        activeId={activeId}
+        activeType={activeType}
         activeActivity={activeActivity}
         dragOverInfo={dragOverInfo}
         isSaving={isSaving}
@@ -129,11 +136,13 @@ function CalendarDndMonitor({
   onDragStart,
   onDragOver,
   onDragEnd,
+  onDragCancel,
 }: {
   onDragStart: (event: DragStartEvent) => void;
   onDragOver: (event: DragOverEvent) => void;
   onDragEnd: (event: DragEndEvent) => void;
+  onDragCancel: (event: DragCancelEvent) => void;
 }) {
-  useDndMonitor({ onDragStart, onDragOver, onDragEnd });
+  useDndMonitor({ onDragStart, onDragOver, onDragEnd, onDragCancel });
   return null;
 }
