@@ -3,6 +3,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
+import { useSearchParams } from "next/navigation";
 
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -23,6 +24,9 @@ export default function SignUpPage() {
   const [loading, setLoading] = useState<any>(false);
 
   const { toast } = useToast();
+  const searchParams = useSearchParams();
+  const nextParam = searchParams.get("next");
+  const safeNext = nextParam && nextParam.startsWith("/") ? nextParam : null;
 
   const form = useForm<z.infer<typeof signUpSchema>>({
     resolver: zodResolver(signUpSchema),
@@ -179,12 +183,16 @@ export default function SignUpPage() {
               <GoogleSignInButton 
                 text="Sign up with Google"
                 className="rounded-xl shadow-lg hover:scale-105 transition-all duration-300"
+                next={safeNext}
               />
             </div>
 
             <div className="mt-4 text-center text-sm text-gray-500">
               Already have an account?{" "}
-              <Link href="/login" className="underline text-[#FF006E]">
+              <Link
+                href={safeNext ? `/login?next=${encodeURIComponent(safeNext)}` : "/login"}
+                className="underline text-[#FF006E]"
+              >
                 Login
               </Link>
             </div>
@@ -209,7 +217,7 @@ export default function SignUpPage() {
                 <p>Check your inbox and click the verification link to activate your account.</p>
               </div>
               <div className="pt-4 space-y-3">
-                <Link href="/login">
+                <Link href={safeNext ? `/login?next=${encodeURIComponent(safeNext)}` : "/login"}>
                   <Button className="w-full rounded-xl shadow-lg hover:scale-105 transition-all duration-300 bg-[#2A3B63] text-white hover:bg-[#3F5FA3]">
                     Go to Login
                   </Button>

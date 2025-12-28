@@ -9,12 +9,14 @@ interface GoogleSignInButtonProps {
   text?: string;
   variant?: "default" | "destructive" | "outline" | "secondary" | "ghost" | "link";
   className?: string;
+  next?: string | null;
 }
 
 export function GoogleSignInButton({ 
   text = "Continue with Google", 
   variant = "outline",
-  className = "" 
+  className = "",
+  next = null,
 }: GoogleSignInButtonProps) {
   const [isLoading, setIsLoading] = useState(false);
 
@@ -22,7 +24,7 @@ export function GoogleSignInButton({
     setIsLoading(true);
     
     try {
-      const result = await signInWithGoogle();
+      const result = await signInWithGoogle(next ?? undefined);
       
       if (!result.success) {
         toast.error(result.message || "Failed to sign in with Google");

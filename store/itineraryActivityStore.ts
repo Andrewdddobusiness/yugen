@@ -20,6 +20,8 @@ export interface IItineraryActivity {
   end_time: string | null; // Allow null for unscheduled activities
   notes?: string;
   deleted_at: string | null;
+  created_by?: string | null;
+  updated_by?: string | null;
   activity?: IActivity;
 }
 
@@ -66,6 +68,8 @@ export const useItineraryActivityStore = create<IItineraryStore>((set, get) => (
             end_time,
             notes,
             deleted_at,
+            created_by,
+            updated_by,
             activity:activity(*)
           `,
         {
@@ -213,6 +217,8 @@ export const useItineraryActivityStore = create<IItineraryStore>((set, get) => (
             end_time,
             notes,
             deleted_at,
+            created_by,
+            updated_by,
             activity:activity(*)
           `,
           {
@@ -313,6 +319,8 @@ export const useItineraryActivityStore = create<IItineraryStore>((set, get) => (
 	              date: null, // Unscheduled
 	              start_time: null, // Unscheduled
 	              end_time: null, // Unscheduled
+	              created_by: insertedRow?.created_by ?? null,
+	              updated_by: insertedRow?.updated_by ?? null,
 	              activity: activity,
 	              deleted_at: insertedRow?.deleted_at ?? null,
 	            },

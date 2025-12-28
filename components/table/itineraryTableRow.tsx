@@ -16,6 +16,7 @@ import {
 import { formatCategoryType } from "@/utils/formatting/types";
 import { useActivitiesStore } from "@/store/activityStore";
 import { useMap } from "@vis.gl/react-google-maps";
+import { ActivityCreatedBy } from "@/components/collaboration/ActivityCreatedBy";
 
 interface ItineraryTableRowProps {
   activity: any; // Replace with proper type
@@ -72,7 +73,16 @@ export default function ItineraryTableRow({
       className="flex w-full hover:bg-gray-50 cursor-pointer"
       onClick={handleRowClick}
     >
-      <TableCell className="w-[20%] min-w-[200px]">{activity.activity?.name}</TableCell>
+      <TableCell className="w-[20%] min-w-[200px]">
+        <div className="flex flex-col">
+          <div className="truncate">{activity.activity?.name}</div>
+          <ActivityCreatedBy
+            userId={activity.created_by}
+            mode="text"
+            textClassName="text-[11px]"
+          />
+        </div>
+      </TableCell>
       <TableCell className="w-[10%] min-w-[100px]">
         {activity.activity?.types && (
           <TooltipProvider>

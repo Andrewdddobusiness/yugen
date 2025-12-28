@@ -143,13 +143,15 @@ export async function updatePassword(formData: FormData) {
   return { success: true, message: "Password updated successfully" };
 }
 
-export async function signInWithGoogle() {
+export async function signInWithGoogle(next?: string) {
   const supabase = createClient();
+
+  const safeNext = next && next.startsWith("/") ? next : "/";
 
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: "google",
     options: {
-      redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/auth/callback`,
+      redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/auth/callback?next=${encodeURIComponent(safeNext)}`,
     },
   });
 

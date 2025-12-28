@@ -19,6 +19,8 @@ function VerifyEmailContent() {
   
   // Get email from query params or user object
   const email = searchParams.get('email') || user?.email;
+  const nextParam = searchParams.get("next");
+  const safeNext = nextParam && nextParam.startsWith("/") ? nextParam : null;
 
   const handleResendConfirmation = async () => {
     if (!email) {
@@ -96,7 +98,7 @@ function VerifyEmailContent() {
           </div>
 
           <div className="pt-4 border-t">
-            <Link href="/login">
+            <Link href={safeNext ? `/login?next=${encodeURIComponent(safeNext)}` : "/login"}>
               <Button variant="ghost" className="w-full">
                 Back to Login
               </Button>

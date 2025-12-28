@@ -10,6 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { ActivityCreatedBy } from '@/components/collaboration/ActivityCreatedBy';
 import {
   DndContext,
   closestCenter,
@@ -142,9 +143,16 @@ function SortableActivityItem({
 
         {/* Activity Details */}
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium truncate">
-            {activity.activity?.name || 'Unnamed Activity'}
-          </p>
+          <div className="flex items-start justify-between gap-2">
+            <p className="text-sm font-medium truncate">
+              {activity.activity?.name || 'Unnamed Activity'}
+            </p>
+            <ActivityCreatedBy
+              userId={activity.created_by}
+              mode="avatar"
+              avatarClassName="h-5 w-5"
+            />
+          </div>
           
           {/* Time if scheduled */}
           {activity.start_time && (

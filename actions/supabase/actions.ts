@@ -718,7 +718,6 @@ export async function fetchUserItineraries(userId: string): Promise<{ data: IIti
         )
       `
       )
-      .eq("itinerary.user_id", userId)
       .is("itinerary.deleted_at", null);
 
     if (error) throw error;

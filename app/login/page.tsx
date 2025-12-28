@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -24,6 +24,9 @@ export default function LoginPage() {
 
   const { toast } = useToast();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const nextParam = searchParams.get("next");
+  const safeNext = nextParam && nextParam.startsWith("/") ? nextParam : null;
 
   const form = useForm<z.infer<typeof loginSchema>>({
     resolver: zodResolver(loginSchema),
@@ -46,13 +49,14 @@ export default function LoginPage() {
           title: "Logged in.",
           description: "Welcome back traveller!",
         });
-        router.push("/itineraries");
+        router.push(safeNext ?? "/itineraries");
       } else if (response.error?.message === "Email not confirmed") {
         toast({
           title: "Email not verified",
           description: "Please check your email and verify your account before logging in.",
         });
-        router.push(`/auth/verify-email?email=${encodeURIComponent(values.email)}`);
+        const next = safeNext ? `&next=${encodeURIComponent(safeNext)}` : "";
+        router.push(`/auth/verify-email?email=${encodeURIComponent(values.email)}${next}`);
       } else {
         toast({
           title: "Login failed",
@@ -147,11 +151,14 @@ export default function LoginPage() {
             </div>
           </div>
 
-          <GoogleSignInButton />
+          <GoogleSignInButton next={safeNext} />
 
           <div className="mt-4 text-center text-sm text-gray-500">
             Don&apos;t have an account?{" "}
-            <Link href="/signUp" className="underline text-[#FF006E]">
+            <Link
+              href={safeNext ? `/signUp?next=${encodeURIComponent(safeNext)}` : "/signUp"}
+              className="underline text-[#FF006E]"
+            >
               Sign up
             </Link>
           </div>

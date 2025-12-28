@@ -39,10 +39,16 @@ import { useUserStore } from "@/store/userStore";
 import { useStripeSubscriptionStore, ISubscriptionDetails } from "@/store/stripeSubscriptionStore";
 import { createClient } from "@/utils/supabase/client";
 import { useItineraryLayoutStore } from "@/store/itineraryLayoutStore";
+import { useItineraryActivityStore } from "@/store/itineraryActivityStore";
 
 import { Button } from "@/components/ui/button";
 import { Download, Share, Users } from "lucide-react";
 import Loading from "@/components/loading/Loading";
+import {
+  ItineraryCollaborationPanel,
+  ItineraryCollaborationTrigger,
+  openItineraryCollaborationPanel,
+} from "@/components/collaboration/ItineraryCollaboration";
 
 const ShareExportDialog = dynamic(
   () => import("@/components/dialog/export/ShareExportDialog").then((mod) => mod.ShareExportDialog),
@@ -52,6 +58,9 @@ const ShareExportDialog = dynamic(
 export default function Layout({ children }: { children: React.ReactNode }) {
   const { itineraryId, destinationId } = useParams();
   const pathname = usePathname();
+
+  const itineraryIdValue = Array.isArray(itineraryId) ? itineraryId[0] : String(itineraryId ?? "");
+  const destinationIdValue = Array.isArray(destinationId) ? destinationId[0] : String(destinationId ?? "");
   
   const isBuilderPage = pathname.includes("/builder");
   const currentView = useItineraryLayoutStore((state) => state.currentView);
@@ -90,6 +99,59 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       setUser(user);
     }
   }, [user, setUser]);
+
+  // Realtime: keep itinerary activities in sync across collaborators.
+  useEffect(() => {
+    if (!user?.id) return;
+    if (!itineraryIdValue || !destinationIdValue) return;
+
+    const supabase = createClient();
+
+    let refreshTimer: ReturnType<typeof setTimeout> | null = null;
+    const scheduleRefresh = () => {
+      if (refreshTimer) clearTimeout(refreshTimer);
+      refreshTimer = setTimeout(async () => {
+        try {
+          const store = useItineraryActivityStore.getState();
+          const latest = await store.fetchItineraryActivities(itineraryIdValue, destinationIdValue);
+          store.setItineraryActivities(latest);
+        } catch (error) {
+          console.error("Failed to refresh itinerary activities:", error);
+        }
+      }, 250);
+    };
+
+    const channel = supabase
+      .channel(`itinerary-activity:${itineraryIdValue}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "itinerary_activity",
+          filter: `itinerary_id=eq.${itineraryIdValue}`,
+        },
+        (payload) => {
+          const newRow = payload.new as any;
+          const oldRow = payload.old as any;
+          const destinationId = String(newRow?.itinerary_destination_id ?? oldRow?.itinerary_destination_id ?? "");
+          if (destinationId && destinationId !== destinationIdValue) return;
+
+          const actorId = String(
+            newRow?.updated_by ?? newRow?.created_by ?? oldRow?.updated_by ?? oldRow?.created_by ?? ""
+          );
+          if (actorId && actorId === user.id) return;
+
+          scheduleRefresh();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      if (refreshTimer) clearTimeout(refreshTimer);
+      supabase.removeChannel(channel);
+    };
+  }, [destinationIdValue, itineraryIdValue, user?.id]);
 
   //***** GET PROFILE URL *****//
   const { data: profileUrl } = useQuery({
@@ -171,7 +233,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     return closestCenter(args);
   };
 
-  if (!itineraryId || !destinationId) {
+  if (!itineraryIdValue || !destinationIdValue) {
     return <Loading />;
   }
 
@@ -232,51 +294,59 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       <AppSidebarItineraryActivityLeft
         useExternalDndContext={enableSharedDnd}
       />
-      <main className="flex min-w-0 flex-1 flex-col w-full">
-        <header className="sticky top-0 z-50 flex h-14 shrink-0 items-center gap-2 border-b border-stroke-200 bg-bg-0/90 backdrop-blur-xl px-2">
-          <div className="flex items-center gap-2 flex-1">
-            <SidebarTrigger className="-ml-1" />
-            <Separator orientation="vertical" className="mr-2 h-4" />
-            <Breadcrumb>
-              <BreadcrumbList>
-                <BreadcrumbItem>
-                  <BreadcrumbLink href="/itineraries">Itineraries</BreadcrumbLink>
-                </BreadcrumbItem>
-                <BreadcrumbSeparator />
-                <BreadcrumbItem>
-                  <BreadcrumbPage>{getBreadcrumbText()}</BreadcrumbPage>
-                </BreadcrumbItem>
-              </BreadcrumbList>
-            </Breadcrumb>
-          </div>
+      <main className="flex min-w-0 flex-1 w-full">
+        <div className="flex min-w-0 flex-1 flex-col w-full">
+          <header className="sticky top-0 z-50 flex h-14 shrink-0 items-center gap-2 border-b border-stroke-200 bg-bg-0/90 backdrop-blur-xl px-2">
+            <div className="flex items-center gap-2 flex-1">
+              <SidebarTrigger className="-ml-1" />
+              <Separator orientation="vertical" className="mr-2 h-4" />
+              <Breadcrumb>
+                <BreadcrumbList>
+                  <BreadcrumbItem>
+                    <BreadcrumbLink href="/itineraries">Itineraries</BreadcrumbLink>
+                  </BreadcrumbItem>
+                  <BreadcrumbSeparator />
+                  <BreadcrumbItem>
+                    <BreadcrumbPage>{getBreadcrumbText()}</BreadcrumbPage>
+                  </BreadcrumbItem>
+                </BreadcrumbList>
+              </Breadcrumb>
+            </div>
 
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="outline"
-                size="default"
-                className="gap-2 transition-colors active:scale-95 active:bg-accent hover:bg-accent/80"
-              >
-                <Share className="size-4" />
-                <span>Share</span>
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent>
-              <DropdownMenuItem className="cursor-pointer">
-                <Users className="size-4" />
-                <span>Invite Collaborators</span>
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                className="cursor-pointer"
-                onClick={() => setExportDialogOpen(true)}
-              >
-                <Download className="size-4" />
-                <span>Export</span>
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </header>
-        <div className="flex-1 w-full">{children}</div>
+            <ItineraryCollaborationTrigger itineraryId={itineraryIdValue} />
+
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="default"
+                  className="gap-2 transition-colors active:scale-95 active:bg-accent hover:bg-accent/80"
+                >
+                  <Share className="size-4" />
+                  <span>Share</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent>
+                <DropdownMenuItem
+                  className="cursor-pointer"
+                  onSelect={() => openItineraryCollaborationPanel("collaborators")}
+                >
+                  <Users className="size-4" />
+                  <span>Invite Collaborators</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  className="cursor-pointer"
+                  onClick={() => setExportDialogOpen(true)}
+                >
+                  <Download className="size-4" />
+                  <span>Export</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </header>
+          <div className="min-w-0 flex-1 w-full">{children}</div>
+        </div>
+        <ItineraryCollaborationPanel itineraryId={itineraryIdValue} />
       </main>
     </>
   );
@@ -307,8 +377,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     <ShareExportDialog
       open={exportDialogOpen}
       onOpenChange={setExportDialogOpen}
-      itineraryId={itineraryId as string}
-      destinationId={destinationId as string}
+      itineraryId={itineraryIdValue}
+      destinationId={destinationIdValue}
     />
     </>
   );

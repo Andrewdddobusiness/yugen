@@ -18,6 +18,7 @@ import { ActivityTimeEditor } from './ActivityTimeEditor';
 import { ActivityNameEditor } from './ActivityNameEditor';
 import { ActivityCardDisplay } from './ActivityCardDisplay';
 import { ActivityNotesSection } from './ActivityNotesSection';
+import { ActivityCreatedBy } from '@/components/collaboration/ActivityCreatedBy';
 
 export const SortableActivityItem = React.memo(function SortableActivityItem(props: SortableActivityItemProps) {
   const {
@@ -158,6 +159,12 @@ export const SortableActivityItem = React.memo(function SortableActivityItem(pro
                   </Button>
                 </div>
               </div>
+
+              <ActivityCreatedBy
+                userId={activity.created_by}
+                mode={isMobile ? "text" : "both"}
+                avatarClassName="h-5 w-5"
+              />
 
               {/* Notes Section */}
               <ActivityNotesSection

@@ -4,6 +4,8 @@ export interface ItineraryActivity {
   start_time: string | null;
   end_time: string | null;
   notes?: string;
+  created_by?: string | null;
+  updated_by?: string | null;
   activity?: {
     activity_id?: string;
     name: string;
