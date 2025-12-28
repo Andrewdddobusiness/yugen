@@ -143,6 +143,16 @@ export async function setItineraryDestinationDateRange(
   destinationId: string,
   dateRange: { from: Date; to: Date }
 ) {
+  const itineraryIdValue = String(itineraryId ?? "").trim();
+  const destinationIdValue = String(destinationId ?? "").trim();
+  if (!/^\d+$/.test(itineraryIdValue) || !/^\d+$/.test(destinationIdValue)) {
+    return {
+      success: false,
+      message: "Invalid itinerary or destination id",
+      error: { itineraryId: itineraryIdValue, destinationId: destinationIdValue },
+    };
+  }
+
   const supabase = createClient();
 
   const { data, error } = await supabase
@@ -151,8 +161,8 @@ export async function setItineraryDestinationDateRange(
       from_date: dateRange.from,
       to_date: dateRange.to,
     })
-    .eq("itinerary_id", itineraryId)
-    .eq("itinerary_destination_id", destinationId);
+    .eq("itinerary_id", itineraryIdValue)
+    .eq("itinerary_destination_id", destinationIdValue);
 
   if (error) {
     console.error("Error setting date range:", error);
@@ -168,6 +178,15 @@ export async function setItineraryActivityDateTimes(
   startTime: string,
   endTime: string
 ) {
+  const itineraryActivityIdValue = String(itineraryActivityId ?? "").trim();
+  if (!/^\d+$/.test(itineraryActivityIdValue)) {
+    return {
+      success: false,
+      message: "Invalid itinerary activity id",
+      error: { itineraryActivityId: itineraryActivityIdValue },
+    };
+  }
+
   const supabase = createClient();
 
   const { data, error } = await supabase
@@ -177,7 +196,7 @@ export async function setItineraryActivityDateTimes(
       start_time: startTime,
       end_time: endTime,
     })
-    .eq("itinerary_activity_id", itineraryActivityId);
+    .eq("itinerary_activity_id", itineraryActivityIdValue);
 
   if (error) {
     console.error("Error setting date range:", error);
@@ -188,6 +207,15 @@ export async function setItineraryActivityDateTimes(
 }
 
 export async function setItineraryActivityTimes(itineraryActivityId: string, startTime: string, endTime: string) {
+  const itineraryActivityIdValue = String(itineraryActivityId ?? "").trim();
+  if (!/^\d+$/.test(itineraryActivityIdValue)) {
+    return {
+      success: false,
+      message: "Invalid itinerary activity id",
+      error: { itineraryActivityId: itineraryActivityIdValue },
+    };
+  }
+
   const supabase = createClient();
 
   const { data, error } = await supabase
@@ -196,7 +224,7 @@ export async function setItineraryActivityTimes(itineraryActivityId: string, sta
       start_time: startTime,
       end_time: endTime,
     })
-    .eq("itinerary_activity_id", itineraryActivityId);
+    .eq("itinerary_activity_id", itineraryActivityIdValue);
 
   if (error) {
     console.error("Error setting date range:", error);

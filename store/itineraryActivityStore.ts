@@ -285,34 +285,41 @@ export const useItineraryActivityStore = create<IItineraryStore>((set, get) => (
         itinerary_id: itineraryId,
         activity_id: activityId,
       });
-      console.log("itineraryActivityExists: ", itineraryActivityExists);
-      if (!itineraryActivityExists && activityId) {
-        await insertTableData("itinerary_activity", {
-          itinerary_id: itineraryId,
-          activity_id: activityId,
-          itinerary_destination_id: destinationId,
-          date: null,  // Leave unscheduled for user to assign later
-          start_time: null, // Leave unscheduled for user to assign later
-          end_time: null, // Leave unscheduled for user to assign later
-          deleted_at: null,
-        });
-        set((state) => ({
-          itineraryActivities: [
-            ...state.itineraryActivities,
-            {
-              itinerary_activity_id: "",
-              itinerary_destination_id: destinationId,
-              activity_id: activityId,
-              date: null, // Unscheduled
-              start_time: null, // Unscheduled
-              end_time: null, // Unscheduled
-              activity: activity,
-              deleted_at: null,
-            },
-          ],
-        }));
-      } else {
-        await setTableDataWithCheck(
+	      console.log("itineraryActivityExists: ", itineraryActivityExists);
+	      if (!itineraryActivityExists && activityId) {
+	        const insertResult = await insertTableData("itinerary_activity", {
+	          itinerary_id: itineraryId,
+	          activity_id: activityId,
+	          itinerary_destination_id: destinationId,
+	          date: null,  // Leave unscheduled for user to assign later
+	          start_time: null, // Leave unscheduled for user to assign later
+	          end_time: null, // Leave unscheduled for user to assign later
+	          deleted_at: null,
+	        });
+
+	        const insertedRow = Array.isArray(insertResult.data) ? insertResult.data[0] : null;
+	        const insertedId = insertedRow?.itinerary_activity_id;
+	        if (!insertResult.success || insertedId == null) {
+	          throw new Error(insertResult.message || "Failed to insert itinerary activity");
+	        }
+
+	        set((state) => ({
+	          itineraryActivities: [
+	            ...state.itineraryActivities,
+	            {
+	              itinerary_activity_id: String(insertedId),
+	              itinerary_destination_id: String(insertedRow?.itinerary_destination_id ?? destinationId),
+	              activity_id: String(insertedRow?.activity_id ?? activityId),
+	              date: null, // Unscheduled
+	              start_time: null, // Unscheduled
+	              end_time: null, // Unscheduled
+	              activity: activity,
+	              deleted_at: insertedRow?.deleted_at ?? null,
+	            },
+	          ],
+	        }));
+	      } else {
+	        await setTableDataWithCheck(
           "itinerary_activity",
           {
             itinerary_id: itineraryId,

@@ -3,7 +3,7 @@ import { DragStartEvent, DragOverEvent, DragEndEvent, DragCancelEvent } from '@d
 import { format } from 'date-fns';
 import { useParams } from 'next/navigation';
 import { useToast } from '@/components/ui/use-toast';
-import { setItineraryActivityDateTimes, setTableDataWithCheck } from '@/actions/supabase/actions';
+import { fetchFilteredTableData2, setItineraryActivityDateTimes, setTableDataWithCheck } from '@/actions/supabase/actions';
 import { useItineraryActivityStore } from '@/store/itineraryActivityStore';
 import { useSchedulingContext } from '@/store/timeSchedulingStore';
 import { ActivityScheduler, SchedulerWishlistItem } from '../services/activityScheduler';
@@ -227,18 +227,27 @@ export function useDragAndDrop(
     setIsSaving(false);
   }, [scheduler, destinationId, itineraryActivities, setItineraryActivities, toast]);
 
-	  const handleActivityReschedule = useCallback(async (
-	    activityId: string,
-	    targetDate: Date,
-	    targetSlot: TimeSlot,
-	    currentDuration: number
-	  ) => {
-	    const activityIdString = String(activityId);
-	    const currentActivities = useItineraryActivityStore.getState().itineraryActivities;
-	    const previousActivity = currentActivities.find(
-	      (act) => String(act.itinerary_activity_id) === activityIdString
-	    );
-	    if (!previousActivity) return;
+		  const handleActivityReschedule = useCallback(async (
+		    activityId: string,
+		    targetDate: Date,
+		    targetSlot: TimeSlot,
+		    currentDuration: number
+		  ) => {
+		    const activityIdString = String(activityId);
+		    if (!/^\d+$/.test(activityIdString)) {
+		      toast({
+		        title: 'Unable to schedule',
+		        description: 'This activity is missing a valid id. Refresh the page and try again.',
+		        variant: 'destructive',
+		      });
+		      return;
+		    }
+
+		    const currentActivities = useItineraryActivityStore.getState().itineraryActivities;
+		    const previousActivity = currentActivities.find(
+		      (act) => String(act.itinerary_activity_id) === activityIdString
+		    );
+		    if (!previousActivity) return;
 
 	    const minutesToTimeString = (minutes: number) =>
 	      `${Math.floor(minutes / 60).toString().padStart(2, '0')}:${(minutes % 60)
@@ -460,13 +469,68 @@ export function useDragAndDrop(
       await handleWishlistItemDrop(dragData.item, targetDate, targetSlot);
       return;
     }
-	    if (dragData?.type === 'itinerary-activity') {
-      const itineraryActivity = dragData.item;
+		    if (dragData?.type === 'itinerary-activity') {
+	      const itineraryActivity = dragData.item;
+	      const rawIdFromItem = String(itineraryActivity?.itinerary_activity_id ?? '').trim();
+	      let resolvedItineraryActivityId = String(activeDragId ?? '').trim();
+	
+	      if (!/^\d+$/.test(resolvedItineraryActivityId) && /^\d+$/.test(rawIdFromItem)) {
+	        resolvedItineraryActivityId = rawIdFromItem;
+	      }
+	
+	      if (!/^\d+$/.test(resolvedItineraryActivityId)) {
+	        const activityIdValue = String(itineraryActivity?.activity_id ?? '').trim();
+	        const itineraryDestinationIdValue = String(
+	          itineraryActivity?.itinerary_destination_id ?? destinationId ?? ''
+	        ).trim();
+	
+	        if (/^\d+$/.test(activityIdValue) && /^\d+$/.test(itineraryDestinationIdValue)) {
+	          const lookup = await fetchFilteredTableData2(
+	            'itinerary_activity',
+	            'itinerary_activity_id',
+	            {
+	              itinerary_destination_id: itineraryDestinationIdValue,
+	              activity_id: activityIdValue,
+	            }
+	          );
+	
+	          const foundRow = Array.isArray(lookup.data) ? lookup.data[0] : null;
+	          const foundId = foundRow?.itinerary_activity_id;
+	          if (lookup.success && foundId != null) {
+	            resolvedItineraryActivityId = String(foundId);
+	
+	            const currentActivities = useItineraryActivityStore.getState().itineraryActivities;
+	            setItineraryActivities(
+	              currentActivities.map((act) => {
+	                const actId = String(act.itinerary_activity_id ?? '').trim();
+	                const matchesPlaceholder =
+	                  actId === rawIdFromItem ||
+	                  (actId === '' &&
+	                    String(act.activity_id ?? '').trim() === activityIdValue &&
+	                    String(act.itinerary_destination_id ?? '').trim() === itineraryDestinationIdValue);
+	
+	                return matchesPlaceholder
+	                  ? { ...act, itinerary_activity_id: resolvedItineraryActivityId }
+	                  : act;
+	              })
+	            );
+	          }
+	        }
+	      }
+	
+	      if (!/^\d+$/.test(resolvedItineraryActivityId)) {
+	        toast({
+	          title: 'Unable to schedule',
+	          description: 'This activity is missing a valid id. Refresh the page and try again.',
+	          variant: 'destructive',
+	        });
+	        return;
+	      }
 
-      const durationFromTimes =
-        itineraryActivity?.start_time && itineraryActivity?.end_time
-          ? (() => {
-              const [sh, sm] = itineraryActivity.start_time.split(':').map(Number);
+	      const durationFromTimes =
+	        itineraryActivity?.start_time && itineraryActivity?.end_time
+	          ? (() => {
+	              const [sh, sm] = itineraryActivity.start_time.split(':').map(Number);
               const [eh, em] = itineraryActivity.end_time.split(':').map(Number);
               return (eh * 60 + em) - (sh * 60 + sm);
             })()
@@ -483,14 +547,14 @@ export function useDragAndDrop(
             )
           : 60);
 
-	      await handleActivityReschedule(
-	        activeDragId,
-	        targetDate,
-	        targetSlot,
-	        duration || 60
-	      );
-	      return;
-	    }
+		      await handleActivityReschedule(
+		        resolvedItineraryActivityId,
+		        targetDate,
+		        targetSlot,
+		        duration || 60
+		      );
+		      return;
+		    }
 
 	    // Find the activity being dragged (existing logic for scheduled activities)
 	    const draggedActivity = scheduledActivities.find((act) => String(act.id) === activeDragId);
@@ -502,7 +566,7 @@ export function useDragAndDrop(
 	      targetSlot,
 	      draggedActivity.duration
 	    );
-		  }, [days, timeSlots, scheduledActivities, handleWishlistItemDrop, handleActivityReschedule, scheduler]);
+			  }, [days, timeSlots, scheduledActivities, handleWishlistItemDrop, handleActivityReschedule, scheduler, destinationId, setItineraryActivities, toast]);
 
 	  const handleDragCancel = useCallback((_event: DragCancelEvent) => {
 	    setActiveId(null);
