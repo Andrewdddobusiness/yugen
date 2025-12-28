@@ -80,7 +80,9 @@ export function useViewRouter(options: UseViewRouterOptions = {}) {
   useEffect(() => {
     if (!enableUrlSync) return;
 
-    const targetView = isValidView(urlView) ? urlView : (storeDefaultView || defaultView);
+    // If the URL doesn't specify a view, keep whatever the store has (persisted)
+    // instead of forcing the "default" view on every refresh.
+    const targetView = isValidView(urlView) ? urlView : currentView;
     
     if (targetView !== currentView) {
       setCurrentView(targetView);
@@ -98,8 +100,6 @@ export function useViewRouter(options: UseViewRouterOptions = {}) {
     urlView,
     urlDate,
     currentView,
-    storeDefaultView,
-    defaultView,
     setCurrentView,
     enableUrlSync,
     parseUrlDate,

@@ -360,6 +360,7 @@ export const useItineraryLayoutStore = create<ItineraryLayoutState>()(
       partialize: (state) => ({
         // Only persist user preferences, not temporary state
         currentView: state.currentView,
+        showMap: state.showMap,
         viewHistory: state.viewHistory,
         defaultView: state.defaultView,
         viewPreferences: state.viewPreferences,

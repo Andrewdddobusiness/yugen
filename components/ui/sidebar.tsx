@@ -57,6 +57,36 @@ const SidebarProvider = React.forwardRef<
   // We use openProp and setOpenProp for control from outside the component.
   const [_open, _setOpen] = React.useState(defaultOpen);
   const open = openProp ?? _open;
+
+  // Restore persisted sidebar open state on mount (desktop only).
+  React.useEffect(() => {
+    if (openProp !== undefined) return; // controlled from outside
+    if (typeof window === "undefined") return;
+
+    const cookieName = SIDEBAR_COOKIE_NAME.replace(/[-/\\^$*+?.()|[\]{}]/g, "\\$&");
+    const match = document.cookie.match(new RegExp(`(?:^|;\\s*)${cookieName}=([^;]*)`));
+    const cookieValue = match?.[1];
+
+    const parseBoolean = (value: string | null | undefined) => {
+      if (value === "true") return true;
+      if (value === "false") return false;
+      return null;
+    };
+
+    const cookieState = parseBoolean(cookieValue);
+    if (cookieState !== null) {
+      _setOpen(cookieState);
+      return;
+    }
+
+    try {
+      const stored = parseBoolean(window.localStorage.getItem(SIDEBAR_COOKIE_NAME));
+      if (stored !== null) _setOpen(stored);
+    } catch {
+      // ignore storage read failures
+    }
+  }, [openProp]);
+
   const setOpen = React.useCallback(
     (value: boolean | ((value: boolean) => boolean)) => {
       const openState = typeof value === "function" ? value(open) : value;
@@ -68,6 +98,11 @@ const SidebarProvider = React.forwardRef<
 
       // This sets the cookie to keep the sidebar state.
       document.cookie = `${SIDEBAR_COOKIE_NAME}=${openState}; path=/; max-age=${SIDEBAR_COOKIE_MAX_AGE}`;
+      try {
+        window.localStorage.setItem(SIDEBAR_COOKIE_NAME, String(openState));
+      } catch {
+        // ignore storage write failures
+      }
     },
     [setOpenProp, open]
   );
