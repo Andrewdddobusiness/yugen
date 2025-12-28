@@ -7,14 +7,23 @@ interface IWaypointProps {
   latitude: number;
   longitude: number;
   activity: IActivity;
+  mapId?: string;
   number?: number;
-  color?: TColor;
+  color?: TColor | string;
   size?: "sm" | "md" | "lg";
 }
 
-export default function GoogleMarker({ latitude, longitude, activity, number, color, size = "md" }: IWaypointProps) {
+export default function GoogleMarker({
+  latitude,
+  longitude,
+  activity,
+  mapId = "map-instance",
+  number,
+  color,
+  size = "md",
+}: IWaypointProps) {
   const { setSelectedActivity, selectedActivity } = useActivitiesStore();
-  const map = useMap("map-instance");
+  const map = useMap(mapId);
 
   // Check if this marker's activity is the selected one
   const isActiveMarker = selectedActivity?.place_id === activity.place_id;

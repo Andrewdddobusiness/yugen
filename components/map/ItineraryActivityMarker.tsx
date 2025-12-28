@@ -35,6 +35,7 @@ interface ItineraryActivityMarkerProps {
   isSelected?: boolean;
   isHighlighted?: boolean;
   showTime?: boolean;
+  enableInfoWindow?: boolean;
   onClick?: () => void;
   onEdit?: () => void;
   className?: string;
@@ -46,6 +47,7 @@ export function ItineraryActivityMarker({
   isSelected = false,
   isHighlighted = false,
   showTime = true,
+  enableInfoWindow = true,
   onClick,
   onEdit,
   className,
@@ -172,7 +174,7 @@ export function ItineraryActivityMarker({
       <AdvancedMarker
         position={position}
         onClick={() => {
-          setShowInfoWindow(true);
+          if (enableInfoWindow) setShowInfoWindow(true);
           onClick?.();
         }}
         className={cn("cursor-pointer transform transition-transform hover:scale-110", className)}
@@ -208,7 +210,7 @@ export function ItineraryActivityMarker({
       </AdvancedMarker>
 
       {/* Info Window */}
-      {showInfoWindow && (
+      {enableInfoWindow && showInfoWindow && (
         <InfoWindow position={position} onCloseClick={() => setShowInfoWindow(false)} maxWidth={300}>
           <div className="p-2 space-y-3 max-w-sm">
             {/* Header */}

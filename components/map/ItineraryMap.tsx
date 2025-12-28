@@ -1,17 +1,23 @@
 "use client";
 
 import React, { useMemo, useState, useEffect } from 'react';
-import { APIProvider, Map, MapCameraChangedEvent, useMap } from '@vis.gl/react-google-maps';
-import { Route as RouteIcon, MapPin, Calendar } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
+import type { MapMouseEvent } from '@vis.gl/react-google-maps';
+import { APIProvider, Map, MapCameraChangedEvent, useMap, AdvancedMarker } from '@vis.gl/react-google-maps';
+import { AnimatePresence, motion } from 'framer-motion';
+import { MapPin } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-import { ItineraryActivityMarker, ClusterMarker } from './ItineraryActivityMarker';
-// import { RouteVisualization, DayRouteSummary } from './RouteVisualization';
-import { LocationSuggestions } from './LocationSuggestions';
+import CustomMarker from './CustomMarker';
+import GoogleMarkers from './GoogleMarkers';
+import { ActivityOverlay } from './ActivityOverlay';
 import { MapExport } from './MapExport';
 import { useMapStore } from '@/store/mapStore';
+import { useActivitiesStore } from '@/store/activityStore';
+import { useSearchHistoryStore } from '@/store/searchHistoryStore';
+import SearchField from '@/components/search/SearchField';
+import { getRadiusForZoom } from './zoomRadiusMap';
+import { fetchPlaceDetails } from '@/actions/google/actions';
+import { colors } from '@/lib/colors/colors';
 
 // Map controller component that uses useMap hook
 function ItineraryMapController({ 
@@ -116,8 +122,8 @@ export function ItineraryMap({
   selectedActivityId,
   visibleDays = [],
   showRoutes = true,
-  showSuggestions = true,
-  showExport = true,
+  showSuggestions = false,
+  showExport = false,
   selectedDate,
   itineraryName,
   destinationName,
@@ -126,157 +132,31 @@ export function ItineraryMap({
   onAddSuggestion,
   className,
 }: ItineraryMapProps) {
-  const { centerCoordinates, itineraryCoordinates, initialZoom, setCenterCoordinates } = useMapStore();
-  const [showClusters, setShowClusters] = useState(true);
-  const [localShowRoutes, setLocalShowRoutes] = useState(showRoutes);
-  const [hiddenDays, setHiddenDays] = useState<Set<string>>(new Set());
+  const { centerCoordinates, itineraryCoordinates, initialZoom, setCenterCoordinates, setRadius } = useMapStore();
+  const { selectedActivity, setSelectedActivity } = useActivitiesStore();
+  const { selectedSearchQuery } = useSearchHistoryStore();
+  const [isPlaceDetailsLoading, setIsPlaceDetailsLoading] = useState(false);
+
+  const showExploreMarkers = selectedSearchQuery.trim().length > 0;
+
+  const itineraryPlaceIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const activity of activities) {
+      const placeId = activity.activity?.place_id;
+      if (placeId) ids.add(placeId);
+    }
+    return Array.from(ids);
+  }, [activities]);
 
   // Filter activities with coordinates
   const validActivities = useMemo(() => {
-    const valid = activities.filter(activity => {
-      const hasCoords = activity.activity?.coordinates && 
-                       Array.isArray(activity.activity.coordinates) && 
-                       activity.activity.coordinates.length === 2;
-      const hasDate = activity.date;
-      const isVisible = visibleDays.length === 0 || visibleDays.includes(activity.date || '');
-      return hasCoords && hasDate && isVisible;
+    return activities.filter((activity) => {
+      const coords = activity.activity?.coordinates;
+      const hasCoords = coords && Array.isArray(coords) && coords.length === 2;
+      const isVisible = visibleDays.length === 0 || !activity.date || visibleDays.includes(activity.date);
+      return hasCoords && isVisible;
     });
-    return valid;
   }, [activities, visibleDays]);
-
-  // Group activities by day
-  const dailyActivities = useMemo(() => {
-    const grouped = validActivities.reduce((acc, activity) => {
-      const date = activity.date!;
-      if (!acc[date]) acc[date] = [];
-      acc[date].push(activity);
-      return acc;
-    }, {} as Record<string, ItineraryActivity[]>);
-
-    // Sort activities by start time within each day
-    Object.keys(grouped).forEach(date => {
-      grouped[date].sort((a, b) => {
-        if (!a.start_time || !b.start_time) return 0;
-        return a.start_time.localeCompare(b.start_time);
-      });
-    });
-
-    return grouped;
-  }, [validActivities]);
-
-  // Generate daily routes
-  const dailyRoutes = useMemo((): DailyRoute[] => {
-    const dayColors = [
-      '#3B82F6', '#EF4444', '#10B981', '#F59E0B',
-      '#8B5CF6', '#F97316', '#06B6D4'
-    ];
-
-    return Object.entries(dailyActivities).map(([date, dayActivities], dayIndex) => {
-      if (dayActivities.length < 2) {
-        return {
-          date,
-          dayIndex,
-          segments: [],
-          color: dayColors[dayIndex % dayColors.length],
-        };
-      }
-
-      const segments: RouteSegment[] = [];
-      
-      for (let i = 0; i < dayActivities.length - 1; i++) {
-        const fromActivity = dayActivities[i];
-        const toActivity = dayActivities[i + 1];
-        
-        if (fromActivity.activity?.coordinates && toActivity.activity?.coordinates) {
-          segments.push({
-            from: {
-              activityId: fromActivity.itinerary_activity_id,
-              name: fromActivity.activity.name,
-              coordinates: fromActivity.activity.coordinates,
-              time: fromActivity.start_time || undefined,
-            },
-            to: {
-              activityId: toActivity.itinerary_activity_id,
-              name: toActivity.activity.name,
-              coordinates: toActivity.activity.coordinates,
-              time: toActivity.start_time || undefined,
-            },
-            travelMode: 'walking', // Default to walking, could be enhanced with travel mode detection
-            duration: '15 min', // Placeholder - would calculate with Google Maps API
-            distance: '1.2 km', // Placeholder - would calculate with Google Maps API
-          });
-        }
-      }
-
-      return {
-        date,
-        dayIndex,
-        segments,
-        color: dayColors[dayIndex % dayColors.length],
-      };
-    });
-  }, [dailyActivities]);
-
-  // Activity clustering logic
-  const clusteredActivities = useMemo(() => {
-    if (!showClusters || !window.google?.maps) return { clusters: [], individual: validActivities };
-    
-    const clusters: ClusterGroup[] = [];
-    const individual: ItineraryActivity[] = [];
-    const processed = new Set<string>();
-    
-    const CLUSTER_DISTANCE_THRESHOLD = 100; // meters
-    
-    validActivities.forEach(activity => {
-      if (processed.has(activity.itinerary_activity_id) || !activity.activity?.coordinates) {
-        return;
-      }
-      
-      const [lng, lat] = activity.activity.coordinates;
-      const activityLatLng = new google.maps.LatLng(lat, lng);
-      const nearbyActivities = [activity];
-      processed.add(activity.itinerary_activity_id);
-      
-      validActivities.forEach(otherActivity => {
-        if (
-          processed.has(otherActivity.itinerary_activity_id) ||
-          !otherActivity.activity?.coordinates ||
-          otherActivity.itinerary_activity_id === activity.itinerary_activity_id
-        ) {
-          return;
-        }
-        
-        const [otherLng, otherLat] = otherActivity.activity.coordinates;
-        const otherLatLng = new google.maps.LatLng(otherLat, otherLng);
-        const distance = google.maps.geometry.spherical.computeDistanceBetween(activityLatLng, otherLatLng);
-        
-        if (distance <= CLUSTER_DISTANCE_THRESHOLD) {
-          nearbyActivities.push(otherActivity);
-          processed.add(otherActivity.itinerary_activity_id);
-        }
-      });
-      
-      if (nearbyActivities.length > 1) {
-        const bounds = new google.maps.LatLngBounds();
-        nearbyActivities.forEach(act => {
-          if (act.activity?.coordinates) {
-            const [lng, lat] = act.activity.coordinates;
-            bounds.extend({ lat, lng });
-          }
-        });
-        
-        clusters.push({
-          activities: nearbyActivities,
-          center: bounds.getCenter().toJSON(),
-          bounds,
-        });
-      } else {
-        individual.push(activity);
-      }
-    });
-    
-    return { clusters, individual };
-  }, [validActivities, showClusters]);
 
   // Calculate map bounds
   const mapBounds = useMemo(() => {
@@ -292,6 +172,15 @@ export function ItineraryMap({
     
     return bounds;
   }, [validActivities]);
+
+  const selectedIdFromStore = useMemo(() => {
+    const placeId = selectedActivity?.place_id;
+    if (!placeId) return undefined;
+    return validActivities.find((activity) => activity.activity?.place_id === placeId)
+      ?.itinerary_activity_id;
+  }, [selectedActivity?.place_id, validActivities]);
+
+  const effectiveSelectedActivityId = selectedActivityId ?? selectedIdFromStore;
 
 
   // Calculate center from activities, then destination, then mapStore, then default
@@ -326,25 +215,37 @@ export function ItineraryMap({
     }
   };
 
-  const toggleDayVisibility = (date: string) => {
-    setHiddenDays(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(date)) {
-        newSet.delete(date);
-      } else {
-        newSet.add(date);
-      }
-      return newSet;
+  const handleZoomChanged = (e: MapCameraChangedEvent) => {
+    if (!e.detail) return;
+    const radius = getRadiusForZoom(e.detail.zoom);
+    requestAnimationFrame(() => {
+      setRadius(radius);
     });
   };
 
-  const visibleRoutes = dailyRoutes.filter(route => !hiddenDays.has(route.date));
-  const visibleIndividualActivities = clusteredActivities.individual.filter(
-    activity => activity.date && !hiddenDays.has(activity.date)
-  );
-  const visibleClusters = clusteredActivities.clusters.filter(cluster =>
-    cluster.activities.some(activity => activity.date && !hiddenDays.has(activity.date))
-  );
+  const handleMapClick = async (event: MapMouseEvent) => {
+    const rawPlaceId = event.detail?.placeId;
+    if (!rawPlaceId) return;
+
+    // Prevent the default Google Maps place-info window.
+    if (event.stoppable) {
+      event.stop();
+    }
+
+    const placeId = rawPlaceId.startsWith('places/')
+      ? rawPlaceId.slice('places/'.length)
+      : rawPlaceId;
+
+    setIsPlaceDetailsLoading(true);
+    try {
+      const details = await fetchPlaceDetails(placeId);
+      setSelectedActivity(details);
+    } catch (error) {
+      console.error('Failed to fetch place details:', error);
+    } finally {
+      setIsPlaceDetailsLoading(false);
+    }
+  };
 
   // Check for required Google Maps configuration
   if (!process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY) {
@@ -377,6 +278,9 @@ export function ItineraryMap({
           gestureHandling="greedy"
           disableDefaultUI={true}
           onCenterChanged={handleCenterChanged}
+          onZoomChanged={handleZoomChanged}
+          onClick={handleMapClick}
+          clickableIcons={true}
           minZoom={8}
           maxZoom={18}
         >
@@ -387,36 +291,38 @@ export function ItineraryMap({
             mapBounds={mapBounds}
           />
           
-          {/* Individual Activity Markers */}
-          {validActivities.map((activity) => {
-            const dayIndex = Object.keys(dailyActivities).indexOf(activity.date!);
+          {/* Itinerary Waypoints (blue) */}
+          {validActivities.map((activity, index) => {
+            const coords = activity.activity?.coordinates;
+            if (!coords || !Array.isArray(coords) || coords.length !== 2) return null;
+
+            const [lng, lat] = coords;
+            const isSelected = activity.itinerary_activity_id === effectiveSelectedActivityId;
+
             return (
-              <ItineraryActivityMarker
+              <AdvancedMarker
                 key={activity.itinerary_activity_id}
-                activity={activity}
-                dayIndex={dayIndex}
-                isSelected={activity.itinerary_activity_id === selectedActivityId}
-                onClick={() => onActivitySelect?.(activity.itinerary_activity_id)}
-                onEdit={() => onActivityEdit?.(activity.itinerary_activity_id)}
-              />
+                position={{ lat, lng }}
+                onClick={() => {
+                  if (activity.activity?.place_id) {
+                    setSelectedActivity(activity.activity as any);
+                  }
+                  onActivitySelect?.(activity.itinerary_activity_id);
+                }}
+                className="cursor-pointer"
+              >
+                <CustomMarker
+                  number={index + 1}
+                  color={colors.Blue}
+                  size={isSelected ? "lg" : "md"}
+                  isSelected={isSelected}
+                />
+              </AdvancedMarker>
             );
           })}
 
-          {/* Cluster Markers */}
-          {showClusters && visibleClusters.map((cluster, index) => {
-            const dayIndex = cluster.activities[0]?.date ? Object.keys(dailyActivities).indexOf(cluster.activities[0].date) : 0;
-            return (
-              <ClusterMarker
-                key={`cluster-${index}`}
-                activities={cluster.activities}
-                position={cluster.center}
-                dayIndex={dayIndex}
-                onClick={() => {
-                  // Focus map on cluster - will be handled by map click events
-                }}
-              />
-            );
-          })}
+          {/* Explore/Search Result Markers */}
+          {showExploreMarkers && <GoogleMarkers mapId="itinerary-map" excludePlaceIds={itineraryPlaceIds} />}
 
           {/* Daily Routes - Temporarily disabled due to Polyline unavailability */}
           {/* {showRoutes && (
@@ -430,17 +336,32 @@ export function ItineraryMap({
             />
           )} */}
 
-          {/* Location Suggestions */}
-          {showSuggestions && (
-            <LocationSuggestions
-              existingActivities={validActivities}
-              mapCenter={center}
-              selectedDate={selectedDate}
-              onAddSuggestion={onAddSuggestion}
-            />
-          )}
         </Map>
       </APIProvider>
+
+      {/* Search Controls */}
+      <div className="absolute top-4 left-1/2 -translate-x-1/2 z-20 w-[420px] max-w-[calc(100%-2rem)]">
+        <SearchField />
+        {isPlaceDetailsLoading && (
+          <div className="mt-2 text-xs text-ink-500 bg-bg-0/90 backdrop-blur-sm rounded-xl px-3 py-2 shadow-card">
+            Loading place details…
+          </div>
+        )}
+      </div>
+
+      {/* Activity Bottom Sheet */}
+      <AnimatePresence>
+        {selectedActivity && (
+          <motion.div
+            initial={{ y: 100, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: 100, opacity: 0 }}
+            transition={{ type: "spring", damping: 25, stiffness: 200 }}
+          >
+            <ActivityOverlay onClose={() => setSelectedActivity(null)} />
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Map Export */}
       {showExport && (
@@ -451,70 +372,12 @@ export function ItineraryMap({
         />
       )}
 
-      {/* Map Controls */}
-      <div className="absolute top-4 left-4 z-10 space-y-2">
-        {/* Route Toggle */}
-        <Button
-          variant={localShowRoutes ? "default" : "secondary"}
-          size="sm"
-          onClick={() => setLocalShowRoutes(!localShowRoutes)}
-        >
-          <RouteIcon className="h-4 w-4 mr-2" />
-          Routes
-        </Button>
-
-        {/* Cluster Toggle */}
-        <Button
-          variant={showClusters ? "default" : "secondary"}
-          size="sm"
-          onClick={() => setShowClusters(!showClusters)}
-        >
-          <MapPin className="h-4 w-4 mr-2" />
-          Cluster
-        </Button>
-      </div>
-
-      {/* Day Control Panel */}
-      <div className="absolute top-4 right-4 z-10 glass rounded-xl p-3 max-w-xs">
-        <div className="flex items-center gap-2 mb-3">
-          <Calendar className="h-4 w-4" />
-          <span className="font-semibold text-sm">Days</span>
-          <Badge variant="secondary" className="text-xs">
-            {Object.keys(dailyActivities).length - hiddenDays.size}/{Object.keys(dailyActivities).length}
-          </Badge>
-        </div>
-        
-        <div className="space-y-2 max-h-64 overflow-y-auto">
-          {dailyRoutes.map((route) => (
-            <div key={route.date} className="text-xs p-2 border border-stroke-200/60 rounded-lg bg-bg-0/70">
-              Day {route.dayIndex + 1} - {route.date}
-              <button 
-                onClick={() => toggleDayVisibility(route.date)}
-                className="ml-2 text-brand-600 hover:text-brand-700"
-              >
-                {!hiddenDays.has(route.date) ? 'Hide' : 'Show'}
-              </button>
-            </div>
-          ))}
-        </div>
-      </div>
-
       {/* Activity Stats */}
       <div className="absolute bottom-4 left-4 z-10 glass rounded-xl p-3">
         <div className="flex items-center gap-4 text-sm">
           <div className="flex items-center gap-1">
             <div className="w-2 h-2 bg-brand-500 rounded-full" />
             <span>{validActivities.length} activities</span>
-          </div>
-          {showClusters && visibleClusters.length > 0 && (
-            <div className="flex items-center gap-1">
-              <div className="w-2 h-2 bg-teal-500 rounded-full" />
-              <span>{visibleClusters.length} clusters</span>
-            </div>
-          )}
-          <div className="flex items-center gap-1">
-            <div className="w-2 h-2 bg-coral-500 rounded-full" />
-            <span>{visibleRoutes.reduce((sum, route) => sum + route.segments.length, 0)} routes</span>
           </div>
         </div>
       </div>

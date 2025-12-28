@@ -3,7 +3,7 @@ import { colors, TColor } from "@/lib/colors/colors";
 
 interface ICustomMarker {
   number?: number;
-  color?: TColor;
+  color?: TColor | string;
   size?: "sm" | "md" | "lg";
   isSelected?: boolean;
 }
@@ -16,6 +16,7 @@ export default function CustomMarker({ number, color = "Blue", size = "md", isSe
   } as const;
 
   const { width, height, fontSize, dotSize } = sizeMap[size];
+  const resolvedColor = typeof color === "string" && color in colors ? colors[color as TColor] : color;
 
   return (
     <div className="relative inline-flex items-center justify-center">
@@ -26,7 +27,7 @@ export default function CustomMarker({ number, color = "Blue", size = "md", isSe
             width: width + 8,
             height: height + 8,
             opacity: 0.3,
-            backgroundColor: color,
+            backgroundColor: resolvedColor,
             borderRadius: "50%",
             transform: "translateY(-4px)",
           }}
@@ -53,7 +54,7 @@ export default function CustomMarker({ number, color = "Blue", size = "md", isSe
         />
         <path
           d="M12 1.5C6.201 1.5 1.5 6.201 1.5 12c0 6.708 8.308 16.24 10.428 18.466.366.38.975.38 1.341 0C15.39 28.24 22.5 18.708 22.5 12c0-5.799-4.701-10.5-10.5-10.5z"
-          fill={color}
+          fill={resolvedColor}
         />
       </svg>
 

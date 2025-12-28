@@ -107,7 +107,7 @@ export function ActivityOverlay({ onClose }: ActivityOverlayProps) {
   };
 
   return (
-    <div className="absolute bottom-2 left-0 right-0 mx-4 h-96 bg-white rounded-3xl shadow-lg">
+    <div className="absolute bottom-2 left-0 right-0 mx-4 h-96 bg-white rounded-3xl shadow-lg z-30">
       <div className="relative flex flex-col h-full">
         <Button
           variant="ghost"
