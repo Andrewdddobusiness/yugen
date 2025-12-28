@@ -10,8 +10,8 @@ export default function WishlistManagementPage() {
   const router = useRouter();
   const { itineraryId, destinationId } = useParams();
 
-  const handleBackToActivities = () => {
-    router.push(`/itinerary/${itineraryId}/${destinationId}/activities`);
+  const handleBackToBuilder = () => {
+    router.push(`/itinerary/${itineraryId}/${destinationId}/builder`);
   };
 
   return (
@@ -23,11 +23,11 @@ export default function WishlistManagementPage() {
             <Button
               variant="ghost"
               size="sm"
-              onClick={handleBackToActivities}
+              onClick={handleBackToBuilder}
               className="flex items-center space-x-2"
             >
               <ArrowLeft className="h-4 w-4" />
-              <span>Back to Activities</span>
+              <span>Back to Builder</span>
             </Button>
             
             <div>

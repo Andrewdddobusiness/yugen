@@ -5,7 +5,7 @@ import Link from "next/link";
 
 import { createClient } from "@/utils/supabase/client";
 
-import { Settings, CircleChevronLeft, TextSearch, Hammer, Footprints } from "lucide-react";
+	import { Settings, CircleChevronLeft, TextSearch, Hammer } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
@@ -134,25 +134,8 @@ export default function BuilderLayout({
               </TooltipContent>
             </Tooltip>
 
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Link href={`/itinerary/activities?i=${itineraryId}&d=${destinationId}`}>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className={`rounded-lg ${activePage === "explore" ? "bg-muted" : ""}`}
-                    aria-label="Explore"
-                  >
-                    <Footprints className="size-5" />
-                  </Button>
-                </Link>
-              </TooltipTrigger>
-              <TooltipContent side="right" sideOffset={5}>
-                Explore Activities
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-        </nav>
+	          </TooltipProvider>
+	        </nav>
 
         {/* Footer Navigation */}
         <nav className="mt-auto grid gap-1 p-2 bg-white">

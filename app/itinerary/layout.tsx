@@ -142,16 +142,14 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     setIsSubscriptionLoading(false);
   }, [subscription, setSubscription, setIsSubscriptionLoading]);
 
-  const getBreadcrumbText = () => {
-    if (pathname.includes("/builder")) {
-      return "Builder";
-    } else if (pathname.includes("/activities")) {
-      return "Explore Activities";
-    } else if (pathname.includes("/overview")) {
-      return "Overview";
-    }
-    return "Builder"; // default fallback
-  };
+	  const getBreadcrumbText = () => {
+	    if (pathname.includes("/builder")) {
+	      return "Builder";
+	    } else if (pathname.includes("/overview")) {
+	      return "Overview";
+	    }
+	    return "Builder"; // default fallback
+	  };
 
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
 

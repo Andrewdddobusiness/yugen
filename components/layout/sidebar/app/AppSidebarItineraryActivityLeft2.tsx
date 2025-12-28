@@ -4,7 +4,7 @@ import * as React from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useParams, usePathname } from "next/navigation";
-import { Binoculars, NotebookPen, SquareChevronLeft, TextSearch } from "lucide-react";
+import { NotebookPen, SquareChevronLeft, TextSearch } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -69,28 +69,23 @@ export function AppSidebarItineraryActivityLeft({
     }
   }, [itinerary, setStoreDateRange]);
 
-  const navItems = [
-    {
-      title: "Back",
-      icon: SquareChevronLeft,
-      href: "/itineraries",
-    },
-    {
-      title: "Overview",
-      icon: TextSearch,
-      href: `/itinerary/${itineraryId}/${destinationId}/overview`,
-    },
-    {
-      title: "Explore",
-      icon: Binoculars,
-      href: `/itinerary/${itineraryId}/${destinationId}/activities`,
-    },
-    {
-      title: "Build",
-      icon: NotebookPen,
-      href: `/itinerary/${itineraryId}/${destinationId}/builder`,
-    },
-  ];
+	  const navItems = [
+	    {
+	      title: "Back",
+	      icon: SquareChevronLeft,
+	      href: "/itineraries",
+	    },
+	    {
+	      title: "Overview",
+	      icon: TextSearch,
+	      href: `/itinerary/${itineraryId}/${destinationId}/overview`,
+	    },
+	    {
+	      title: "Build",
+	      icon: NotebookPen,
+	      href: `/itinerary/${itineraryId}/${destinationId}/builder`,
+	    },
+	  ];
 
 
 

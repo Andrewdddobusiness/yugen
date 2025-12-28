@@ -98,7 +98,7 @@ export default function ItineraryCard({ itinerary, onDelete }: ItineraryCardProp
 
   return (
     <Link
-      href={`/itinerary/${itinerary.itinerary_id}/${itinerary.itinerary_destination_id}/activities`}
+      href={`/itinerary/${itinerary.itinerary_id}/${itinerary.itinerary_destination_id}/builder`}
       legacyBehavior
       passHref
     >

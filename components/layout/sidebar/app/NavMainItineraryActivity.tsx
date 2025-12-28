@@ -12,7 +12,7 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
 
-import { Binoculars, NotebookPen, SquareChevronLeft, TextSearch } from "lucide-react";
+import { NotebookPen, SquareChevronLeft, TextSearch } from "lucide-react";
 
 import { fetchItineraryDestination, setItineraryDestinationDateRange } from "@/actions/supabase/actions";
 
@@ -103,28 +103,19 @@ export function NavMainItineraryActivity() {
             </SidebarMenuButton>
           </SidebarMenuItem>
 
-          <SidebarMenuItem>
-            <SidebarMenuButton asChild>
-              <Link href={`/itinerary/${itineraryId}/${destinationId}/overview`}>
-                <TextSearch />
-                <span className="text-md font-semibold">Overview</span>
-              </Link>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
+	          <SidebarMenuItem>
+	            <SidebarMenuButton asChild>
+	              <Link href={`/itinerary/${itineraryId}/${destinationId}/overview`}>
+	                <TextSearch />
+	                <span className="text-md font-semibold">Overview</span>
+	              </Link>
+	            </SidebarMenuButton>
+	          </SidebarMenuItem>
 
-          <SidebarMenuItem>
-            <SidebarMenuButton asChild>
-              <Link href={`/itinerary/${itineraryId}/${destinationId}/activities`}>
-                <Binoculars />
-                <span className="text-md font-semibold">Explore</span>
-              </Link>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-
-          <SidebarMenuItem>
-            <SidebarMenuButton asChild>
-              <Link href={`/itinerary/${itineraryId}/${destinationId}/builder`}>
-                <NotebookPen />
+	          <SidebarMenuItem>
+	            <SidebarMenuButton asChild>
+	              <Link href={`/itinerary/${itineraryId}/${destinationId}/builder`}>
+	                <NotebookPen />
                 <span className="text-md font-semibold">Build & Organise</span>
               </Link>
             </SidebarMenuButton>

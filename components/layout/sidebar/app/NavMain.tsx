@@ -74,11 +74,11 @@ export function NavMain() {
                   <SidebarMenuSub className="flex-col">
                     {itineraryData?.map((itinerary) => (
                       <SidebarMenuSubItem key={itinerary.city}>
-                        <SidebarMenuSubButton asChild>
-                          <Link
-                            href={`/itinerary/${itinerary.itinerary_id}/${itinerary.itinerary_destination_id}/activities`}
-                            className="w-full py-5"
-                          >
+	                        <SidebarMenuSubButton asChild>
+	                          <Link
+	                            href={`/itinerary/${itinerary.itinerary_id}/${itinerary.itinerary_destination_id}/builder`}
+	                            className="w-full py-5"
+	                          >
                             <div className="flex items-center gap-2 w-full">
                               <Minus size="12" className="shrink-0" />
                               <div className="flex flex-col min-w-0">

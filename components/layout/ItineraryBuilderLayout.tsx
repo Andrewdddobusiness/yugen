@@ -26,21 +26,22 @@ export function ItineraryBuilderLayout({ children, className }: ItineraryBuilder
   
   const { itineraryActivities } = useItineraryActivityStore();
   
-  const {
-    currentView,
-    timeRange,
-    showMap,
-    sidebarCollapsed,
-    searchQuery,
-    activeFilters,
-    layoutPreferences,
-    setCurrentView,
-    setTimeRange,
-    toggleMap,
-    toggleSidebar,
-    setSearchQuery,
-    setActiveFilters,
-  } = useItineraryLayoutStore();
+	  const {
+	    currentView,
+	    timeRange,
+	    showMap,
+	    sidebarCollapsed,
+	    searchQuery,
+	    activeFilters,
+	    layoutPreferences,
+	    setCurrentView,
+	    setTimeRange,
+	    setShowMap,
+	    toggleMap,
+	    toggleSidebar,
+	    setSearchQuery,
+	    setActiveFilters,
+	  } = useItineraryLayoutStore();
 
   // Fetch itinerary and destination data
   const { data: destinationData, isLoading: isDestinationLoading, error: destinationError } = useQuery({
@@ -73,12 +74,10 @@ export function ItineraryBuilderLayout({ children, className }: ItineraryBuilder
     console.log('Update itinerary dates:', dates);
   };
 
-  const handleAddActivity = () => {
-    // Navigate to activities page
-    const currentPath = window.location.pathname;
-    const activitiesPath = currentPath.replace('/builder', '/activities');
-    window.location.href = activitiesPath;
-  };
+	  const handleAddActivity = () => {
+	    // Activities are now handled inside the builder (map/search panel).
+	    setShowMap(true);
+	  };
 
   const handlePlaceSelect = (place: any) => {
     // TODO: Implement place selection logic for drag-and-drop
