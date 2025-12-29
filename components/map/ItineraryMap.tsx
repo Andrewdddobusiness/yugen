@@ -27,15 +27,44 @@ function ItineraryMapController({
 }: { 
   itineraryCoordinates: [number, number] | null;
   validActivities: any[];
-  mapBounds: google.maps.LatLngBounds | null;
+  mapBounds: google.maps.LatLngBoundsLiteral | null;
 }) {
   const map = useMap("itinerary-map");
+  const lastAppliedKeyRef = React.useRef<string | null>(null);
 
   useEffect(() => {
     if (!map) return;
 
+    const key =
+      mapBounds
+        ? `bounds:${validActivities.length}:${mapBounds.north},${mapBounds.south},${mapBounds.east},${mapBounds.west}`
+        : itineraryCoordinates && validActivities.length === 0
+        ? `dest:${itineraryCoordinates[0]},${itineraryCoordinates[1]}`
+        : null;
+
+    // Prevent re-centering on every render (e.g. when centerCoordinates updates while panning).
+    if (key && lastAppliedKeyRef.current === key) return;
+    if (key) lastAppliedKeyRef.current = key;
+
     if (mapBounds) {
-      map.fitBounds(mapBounds, 50);
+      const { north, south, east, west } = mapBounds;
+      const isSinglePoint = north === south && east === west;
+
+      if (isSinglePoint) {
+        map.setCenter({ lat: north, lng: east });
+        // Avoid "zooming into oblivion" when there's only one itinerary point.
+        map.setZoom(14);
+      } else {
+        map.fitBounds(mapBounds, 50);
+        // Clamp overly aggressive fitBounds zoom on tight clusters.
+        const listener = map.addListener("idle", () => {
+          const z = map.getZoom();
+          if (typeof z === "number" && z > 16) {
+            map.setZoom(16);
+          }
+          listener.remove();
+        });
+      }
     } else if (itineraryCoordinates && validActivities.length === 0) {
       // Set appropriate zoom level for destination when no activities
       map.setCenter({ lat: itineraryCoordinates[0], lng: itineraryCoordinates[1] });
@@ -161,16 +190,28 @@ export function ItineraryMap({
   // Calculate map bounds
   const mapBounds = useMemo(() => {
     if (validActivities.length === 0) return null;
-    
-    const bounds = new google.maps.LatLngBounds();
-    validActivities.forEach(activity => {
-      if (activity.activity?.coordinates) {
-        const [lng, lat] = activity.activity.coordinates;
-        bounds.extend({ lat, lng });
-      }
-    });
-    
-    return bounds;
+
+    let north = -90;
+    let south = 90;
+    let east = -180;
+    let west = 180;
+
+    let found = false;
+    for (const activity of validActivities) {
+      const coords = activity.activity?.coordinates;
+      if (!coords || !Array.isArray(coords) || coords.length !== 2) continue;
+      const [lng, lat] = coords;
+      if (typeof lat !== "number" || typeof lng !== "number") continue;
+      found = true;
+
+      north = Math.max(north, lat);
+      south = Math.min(south, lat);
+      east = Math.max(east, lng);
+      west = Math.min(west, lng);
+    }
+
+    if (!found) return null;
+    return { north, south, east, west };
   }, [validActivities]);
 
   const selectedIdFromStore = useMemo(() => {

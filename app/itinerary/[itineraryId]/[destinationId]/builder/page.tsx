@@ -1,12 +1,11 @@
 "use client";
-import React, { useEffect, useState, useRef, lazy, Suspense } from "react";
+import React, { useEffect, useMemo, useState, useRef, lazy, Suspense } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useItineraryActivityStore, type IItineraryActivity } from "@/store/itineraryActivityStore";
 import { useItineraryLayoutStore } from "@/store/itineraryLayoutStore";
 import { useMapStore } from "@/store/mapStore";
 import Loading from "@/components/loading/Loading";
 import { useParams } from "next/navigation";
-const ItineraryMap = lazy(() => import("@/components/map/ItineraryMap").then(module => ({ default: module.ItineraryMap })));
 const GoogleCalendarView = lazy(() =>
   import("@/components/view/calendar/GoogleCalendarView").then((module) => ({ default: module.GoogleCalendarView }))
 );
@@ -26,6 +25,66 @@ import { useViewStatePreservation } from "@/hooks/useViewStatePreservation";
 import { getDestination } from "@/actions/supabase/destinations";
 import { geocodeAddress } from "@/actions/google/maps";
 
+class MapLoadErrorBoundary extends React.Component<
+  {
+    onRetry: () => void;
+    children: React.ReactNode;
+  },
+  { error: Error | null }
+> {
+  state: { error: Error | null } = { error: null };
+
+  static getDerivedStateFromError(error: Error) {
+    return { error };
+  }
+
+  componentDidCatch(error: Error) {
+    console.error("Itinerary map failed to load:", error);
+  }
+
+  render() {
+    if (!this.state.error) return this.props.children;
+
+    const message = this.state.error.message || String(this.state.error);
+    const isChunkLoadError = /ChunkLoadError|Loading chunk/i.test(message);
+
+    return (
+      <div className="h-full flex items-center justify-center bg-bg-50 dark:bg-ink-900 p-6">
+        <div className="max-w-sm text-center space-y-3">
+          <div className="text-sm font-medium text-ink-900 dark:text-ink-100">Map failed to load</div>
+          <div className="text-xs text-muted-foreground">
+            {isChunkLoadError
+              ? "This can happen after a hot-reload or when the dev server restarts. Try retrying, or reload the page."
+              : "Please retry, or reload the page."}
+          </div>
+          <div className="flex items-center justify-center gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                this.setState({ error: null });
+                this.props.onRetry();
+              }}
+            >
+              Retry
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              onClick={() => {
+                window.location.reload();
+              }}
+            >
+              Reload
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+}
+
 export default function Builder() {
   const { itineraryId, destinationId } = useParams();
   const itinId = itineraryId?.toString();
@@ -43,9 +102,21 @@ export default function Builder() {
   const { setItineraryCoordinates } = useMapStore();
   
   const [targetDate, setTargetDate] = useState<Date | null>(null);
+  const [mapImportAttempt, setMapImportAttempt] = useState(0);
   const listRef = useRef<any>(null);
   const calendarRef = useRef<HTMLDivElement>(null);
   const tableRef = useRef<HTMLDivElement>(null);
+
+  const ItineraryMap = useMemo(
+    () => {
+      // Intentionally re-create the lazy component on retry attempts.
+      void mapImportAttempt;
+      return lazy(() =>
+        import("@/components/map/ItineraryMap").then((module) => ({ default: module.ItineraryMap }))
+      );
+    },
+    [mapImportAttempt]
+  );
   
   const { changeView, currentDate, navigateToDate } = useViewRouter({
     enableUrlSync: true,
@@ -331,14 +402,16 @@ export default function Builder() {
                             </div>
                           </div>
                         }>
-                          <ItineraryMap
-                            activities={filteredActivities}
-                            showRoutes={true}
-                            destinationName={destinationData ? `${destinationData.city}, ${destinationData.country}` : undefined}
-                            onActivitySelect={() => {}}
-                            onActivityEdit={() => {}}
-                            onAddSuggestion={() => {}}
-                          />
+                          <MapLoadErrorBoundary onRetry={() => setMapImportAttempt((v) => v + 1)}>
+                            <ItineraryMap
+                              activities={filteredActivities}
+                              showRoutes={true}
+                              destinationName={destinationData ? `${destinationData.city}, ${destinationData.country}` : undefined}
+                              onActivitySelect={() => {}}
+                              onActivityEdit={() => {}}
+                              onAddSuggestion={() => {}}
+                            />
+                          </MapLoadErrorBoundary>
                         </Suspense>
                       );
                     })()}

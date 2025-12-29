@@ -1,6 +1,5 @@
 "use client";
 import { useState, useEffect } from "react";
-import { createClient } from "@supabase/supabase-js";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -40,40 +39,30 @@ interface ItineraryCardProps {
 export default function ItineraryCard({ itinerary, onDelete }: ItineraryCardProps) {
   const [isHovered, setIsHovered] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [imageExists, setImageExists] = useState(false);
+  const [useUnsplashFallback, setUseUnsplashFallback] = useState(false);
   const [isImageLoading, setIsImageLoading] = useState(true);
 
-  // Check if image exists in Supabase storage
   useEffect(() => {
-    const checkImageExists = async () => {
-      if (!itinerary.city) return;
+    setUseUnsplashFallback(false);
+    setIsImageLoading(true);
+  }, [itinerary.itinerary_id, itinerary.city, itinerary.country]);
 
-      try {
-        const supabase = createClient(
-          process.env.NEXT_PUBLIC_SUPABASE_URL!,
-          process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-        );
+  const supabaseCityImageSrc =
+    itinerary.city && process.env.NEXT_PUBLIC_SUPABASE_URL
+      ? `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/cities/${itinerary.country.toLowerCase()}-${itinerary.city.toLowerCase()}/1.jpg`
+      : null;
 
-        // Try to fetch the image directly
-        const { data, error } = await supabase.storage
-          .from("cities")
-          .download(`${itinerary.country.toLowerCase()}-${itinerary.city.toLowerCase()}/1.jpg`);
+  const unsplashQuery = [itinerary.city, itinerary.country, "travel"]
+    .filter(Boolean)
+    .map((value) => String(value).trim())
+    .filter(Boolean)
+    .join(",");
 
-        if (data && !error) {
-          setImageExists(true);
-        } else {
-          setImageExists(false);
-        }
-      } catch (error) {
-        console.error("Error checking image:", error);
-        setImageExists(false);
-      } finally {
-        setIsImageLoading(false);
-      }
-    };
+  const unsplashImageSrc = `https://source.unsplash.com/featured/1920x1080/?${encodeURIComponent(
+    unsplashQuery || "travel"
+  )}&sig=${itinerary.itinerary_id}`;
 
-    checkImageExists();
-  }, [itinerary.city, itinerary.country]);
+  const imageSrc = useUnsplashFallback || !supabaseCityImageSrc ? unsplashImageSrc : supabaseCityImageSrc;
 
   const handleDelete = async (e: React.MouseEvent) => {
     e.preventDefault();
@@ -107,27 +96,30 @@ export default function ItineraryCard({ itinerary, onDelete }: ItineraryCardProp
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
       >
-        {isImageLoading ? (
-          <Skeleton className="flex items-center justify-center h-40 w-full rounded-t-lg">
-            <ImageIcon size={32} className="text-zinc-300" />
-          </Skeleton>
-        ) : imageExists ? (
+        <div className="relative h-40 w-full overflow-hidden rounded-t-xl">
+          {isImageLoading ? (
+            <Skeleton className="absolute inset-0 flex items-center justify-center">
+              <ImageIcon size={32} className="text-zinc-300" />
+            </Skeleton>
+          ) : null}
           <Image
-            src={`${
-              process.env.NEXT_PUBLIC_SUPABASE_URL
-            }/storage/v1/object/public/cities/${itinerary.country.toLowerCase()}-${(itinerary.city || '').toLowerCase()}/1.jpg`}
-            alt="City Image"
-            width={1920}
-            height={1080}
+            src={imageSrc}
+            alt={`${itinerary.city ? `${itinerary.city}, ` : ""}${itinerary.country} cover`}
+            fill
+            sizes="(max-width: 640px) 100vw, 240px"
             priority={true}
-            className="h-40 w-full object-cover rounded-t-xl"
-            onError={() => setImageExists(false)}
+            className="object-cover"
+            onLoadingComplete={() => setIsImageLoading(false)}
+            onError={() => {
+              if (!useUnsplashFallback) {
+                setUseUnsplashFallback(true);
+                setIsImageLoading(true);
+              } else {
+                setIsImageLoading(false);
+              }
+            }}
           />
-        ) : (
-          <Skeleton className="flex items-center justify-center h-40 w-full rounded-t-lg">
-            <ImageIcon size={32} className="text-zinc-300" />
-          </Skeleton>
-        )}
+        </div>
         <CardHeader>
           <CardTitle className="text-gray-800">
             {itinerary.city && (
