@@ -11,6 +11,42 @@ import {
 } from "@/actions/supabase/actions";
 import { IActivity, IActivityWithLocation } from "./activityStore";
 
+const ITINERARY_ACTIVITY_SELECT_BASE = `
+  itinerary_id,
+  itinerary_activity_id,
+  itinerary_destination_id,
+  activity_id,
+  date,
+  start_time,
+  end_time,
+  notes,
+  deleted_at,
+  activity:activity(*)
+`;
+
+const ITINERARY_ACTIVITY_SELECT_WITH_ACTORS = `
+  itinerary_id,
+  itinerary_activity_id,
+  itinerary_destination_id,
+  activity_id,
+  date,
+  start_time,
+  end_time,
+  notes,
+  deleted_at,
+  created_by,
+  updated_by,
+  activity:activity(*)
+`;
+
+const shouldRetryWithoutActorColumns = (error: any) => {
+  if (!error) return false;
+  const message = String(error.message ?? "");
+  return error.code === "42703" && /(created_by|updated_by)/.test(message);
+};
+
+let itineraryActivityActorColumnsSupported: boolean | null = null;
+
 export interface IItineraryActivity {
   itinerary_activity_id: string;
   itinerary_id?: string;
@@ -56,6 +92,12 @@ interface IItineraryStore {
     itineraryId: string,
     destinationId: string
   ) => Promise<{ success: boolean; error?: string }>;
+  unscheduleItineraryActivityInstance: (
+    itineraryActivityId: string
+  ) => Promise<{ success: boolean; error?: string }>;
+  deleteItineraryActivityInstance: (
+    itineraryActivityId: string
+  ) => Promise<{ success: boolean; error?: string }>;
   removeItineraryActivity: (activityId: string, itineraryId: string) => Promise<{ success: boolean; error?: any }>;
 }
 
@@ -67,28 +109,37 @@ export const useItineraryActivityStore = create<IItineraryStore>((set, get) => (
     );
   },
   fetchItineraryActivities: async (itineraryId: string, destinationId: string) => {
+    if (!itineraryId || !destinationId) return [];
+
     try {
-          const result = await fetchFilteredTableData2(
-        "itinerary_activity",
-        `
-            itinerary_id,
-            itinerary_activity_id, 
-            itinerary_destination_id, 
-            activity_id,
-            date, 
-            start_time, 
-            end_time,
-            notes,
-            deleted_at,
-            created_by,
-            updated_by,
-            activity:activity(*)
-          `,
-        {
-          itinerary_id: itineraryId,
-          itinerary_destination_id: destinationId,
-        }
-      );
+      const baseFilters = {
+        itinerary_id: itineraryId,
+        itinerary_destination_id: destinationId,
+      };
+
+      let result =
+        itineraryActivityActorColumnsSupported === false
+          ? await fetchFilteredTableData2(
+              "itinerary_activity",
+              ITINERARY_ACTIVITY_SELECT_BASE,
+              baseFilters
+            )
+          : await fetchFilteredTableData2(
+              "itinerary_activity",
+              ITINERARY_ACTIVITY_SELECT_WITH_ACTORS,
+              baseFilters
+            );
+
+      if (!result.success && shouldRetryWithoutActorColumns(result.error)) {
+        itineraryActivityActorColumnsSupported = false;
+        result = await fetchFilteredTableData2(
+          "itinerary_activity",
+          ITINERARY_ACTIVITY_SELECT_BASE,
+          baseFilters
+        );
+      } else if (result.success && itineraryActivityActorColumnsSupported == null) {
+        itineraryActivityActorColumnsSupported = true;
+      }
 
       if (result.success && result.data) {
         // Filter out soft-deleted activities
@@ -218,26 +269,36 @@ export const useItineraryActivityStore = create<IItineraryStore>((set, get) => (
         );
 
         // Since we now remove activities from the array, we need to re-add it
-        const { data: reactivatedActivity } = await fetchFilteredTableData2(
-          "itinerary_activity",
-          `
-            itinerary_activity_id, 
-            itinerary_destination_id, 
-            activity_id,
-            date, 
-            start_time, 
-            end_time,
-            notes,
-            deleted_at,
-            created_by,
-            updated_by,
-            activity:activity(*)
-          `,
-          {
-            itinerary_id: itineraryId,
-            activity_id: activityId,
-          }
-        );
+        const reactivatedFilters = {
+          itinerary_id: itineraryId,
+          activity_id: activityId,
+        };
+
+        let reactivated =
+          itineraryActivityActorColumnsSupported === false
+            ? await fetchFilteredTableData2(
+                "itinerary_activity",
+                ITINERARY_ACTIVITY_SELECT_BASE,
+                reactivatedFilters
+              )
+            : await fetchFilteredTableData2(
+                "itinerary_activity",
+                ITINERARY_ACTIVITY_SELECT_WITH_ACTORS,
+                reactivatedFilters
+              );
+
+        if (!reactivated.success && shouldRetryWithoutActorColumns(reactivated.error)) {
+          itineraryActivityActorColumnsSupported = false;
+          reactivated = await fetchFilteredTableData2(
+            "itinerary_activity",
+            ITINERARY_ACTIVITY_SELECT_BASE,
+            reactivatedFilters
+          );
+        } else if (reactivated.success && itineraryActivityActorColumnsSupported == null) {
+          itineraryActivityActorColumnsSupported = true;
+        }
+
+        const reactivatedActivity = reactivated.success ? reactivated.data : null;
         
         if (reactivatedActivity && reactivatedActivity[0]) {
           set((state) => ({
@@ -494,6 +555,52 @@ export const useItineraryActivityStore = create<IItineraryStore>((set, get) => (
     } catch (error) {
       console.error("Error duplicating itinerary activity:", error);
       return { success: false, error: "Failed to duplicate activity" };
+    }
+  },
+  unscheduleItineraryActivityInstance: async (itineraryActivityId: string) => {
+    const id = String(itineraryActivityId ?? "").trim();
+    if (!id) return { success: false, error: "Missing activity id" };
+    return get().optimisticUpdateItineraryActivity(id, {
+      date: null,
+      start_time: null,
+      end_time: null,
+    });
+  },
+  deleteItineraryActivityInstance: async (itineraryActivityId: string) => {
+    const id = String(itineraryActivityId ?? "").trim();
+    if (!/^\d+$/.test(id)) {
+      return { success: false, error: "Invalid activity id" };
+    }
+
+    const current = get().itineraryActivities;
+    const existing = current.find((a) => String(a.itinerary_activity_id) === id);
+    if (!existing) return { success: false, error: "Activity not found" };
+
+    // Optimistic UI: remove immediately.
+    set((state) => ({
+      itineraryActivities: state.itineraryActivities.filter(
+        (activity) => String(activity.itinerary_activity_id) !== id
+      ),
+    }));
+
+    try {
+      const result = await softDeleteTableData2("itinerary_activity", {
+        itinerary_activity_id: id,
+      });
+
+      if (!result.success) {
+        throw new Error(result.message || "Failed to delete activity");
+      }
+
+      return { success: true };
+    } catch (error) {
+      console.error("Error deleting itinerary activity:", error);
+      // Revert on error.
+      set({ itineraryActivities: current });
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : "Failed to delete activity",
+      };
     }
   },
   removeItineraryActivity: async (placeId: string, itineraryId: string) => {

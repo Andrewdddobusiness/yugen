@@ -12,6 +12,7 @@ import { useSchedulingContext } from '@/store/timeSchedulingStore';
 import { getCalendarSlotHeightPx } from './layoutMetrics';
 import { useParams } from 'next/navigation';
 import { useItineraryActivityStore } from '@/store/itineraryActivityStore';
+import { useToast } from '@/components/ui/use-toast';
 
 const accentStyles: Record<ActivityAccent, { border: string; tint: string }> = {
   brand: { border: "border-l-brand-500", tint: "bg-brand-500/10" },
@@ -66,6 +67,10 @@ export function ActivityBlock({
   const schedulingContext = useSchedulingContext();
   const { itineraryId, destinationId } = useParams();
   const duplicateItineraryActivity = useItineraryActivityStore((s) => s.duplicateItineraryActivity);
+  const unscheduleItineraryActivityInstance = useItineraryActivityStore(
+    (s) => s.unscheduleItineraryActivityInstance
+  );
+  const { toast } = useToast();
   const minutesPerSlot = schedulingContext.config.interval;
   const slotHeightPx = getCalendarSlotHeightPx(minutesPerSlot);
   const [isResizing, setIsResizing] = useState(false);
@@ -367,7 +372,7 @@ export function ActivityBlock({
 
           const padding = 8;
           const menuWidth = 200;
-          const menuHeight = 44;
+          const menuHeight = 88;
           const nextX = Math.min(e.clientX, window.innerWidth - menuWidth - padding);
           const nextY = Math.min(e.clientY, window.innerHeight - menuHeight - padding);
           setContextMenu({ x: nextX, y: nextY });
@@ -481,6 +486,29 @@ export function ActivityBlock({
               }}
             >
               Duplicate
+            </button>
+            <button
+              type="button"
+              className="w-full rounded-md px-3 py-2 text-left text-sm text-red-700 hover:bg-red-50"
+              onClick={async (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+
+                const result = await unscheduleItineraryActivityInstance(activity.id);
+                if (!result.success) {
+                  toast({
+                    title: "Could not remove from calendar",
+                    description: result.error ?? "Could not update activity.",
+                    variant: "destructive",
+                  });
+                  return;
+                }
+
+                toast({ title: "Moved to Unscheduled" });
+                closeContextMenu();
+              }}
+            >
+              Remove from calendar
             </button>
           </div>,
           document.body

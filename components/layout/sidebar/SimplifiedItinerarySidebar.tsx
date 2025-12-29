@@ -11,6 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { ActivityCreatedBy } from '@/components/collaboration/ActivityCreatedBy';
+import { useToast } from '@/components/ui/use-toast';
 import { useParams } from 'next/navigation';
 import {
   DndContext,
@@ -99,6 +100,10 @@ function SortableActivityItem({
 }) {
   const { itineraryId, destinationId } = useParams();
   const duplicateItineraryActivity = useItineraryActivityStore((s) => s.duplicateItineraryActivity);
+  const deleteItineraryActivityInstance = useItineraryActivityStore(
+    (s) => s.deleteItineraryActivityInstance
+  );
+  const { toast } = useToast();
   const {
     attributes,
     listeners,
@@ -168,7 +173,7 @@ function SortableActivityItem({
 
           const padding = 8;
           const menuWidth = 200;
-          const menuHeight = 44;
+          const menuHeight = 88;
           const nextX = Math.min(e.clientX, window.innerWidth - menuWidth - padding);
           const nextY = Math.min(e.clientY, window.innerHeight - menuHeight - padding);
           setContextMenu({ x: nextX, y: nextY });
@@ -260,6 +265,32 @@ function SortableActivityItem({
               }}
             >
               Duplicate
+            </button>
+            <button
+              type="button"
+              className="w-full rounded-md px-3 py-2 text-left text-sm text-red-700 hover:bg-red-50"
+              onClick={async (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+
+                const result = await deleteItineraryActivityInstance(
+                  String(activity.itinerary_activity_id)
+                );
+
+                if (!result.success) {
+                  toast({
+                    title: "Delete failed",
+                    description: result.error ?? "Could not delete activity.",
+                    variant: "destructive",
+                  });
+                  return;
+                }
+
+                toast({ title: "Removed from itinerary" });
+                closeContextMenu();
+              }}
+            >
+              Remove from itinerary
             </button>
           </div>,
           document.body
@@ -521,7 +552,7 @@ export function SimplifiedItinerarySidebar({
                     items={activitiesByDate[date].map((a) => `sidebar:${a.itinerary_activity_id}`)}
                     strategy={verticalListSortingStrategy}
                   >
-                    <div className="space-y-1.5 ml-5">
+                    <div className="space-y-1.5 pl-5">
                       {activitiesByDate[date]
                       .sort((a, b) => {
                         if (!a.start_time || !b.start_time) return 0;
