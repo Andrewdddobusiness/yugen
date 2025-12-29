@@ -13,6 +13,7 @@ import { IActivity, IActivityWithLocation } from "./activityStore";
 
 export interface IItineraryActivity {
   itinerary_activity_id: string;
+  itinerary_id?: string;
   itinerary_destination_id: string;
   activity_id: string;
   date: string | null; // Allow null for unscheduled activities
@@ -45,6 +46,16 @@ interface IItineraryStore {
     itineraryId: string,
     destinationId: string
   ) => Promise<{ success: boolean; error?: string }>;
+  addItineraryActivityInstance: (
+    activity: IActivityWithLocation,
+    itineraryId: string,
+    destinationId: string
+  ) => Promise<{ success: boolean; error?: string }>;
+  duplicateItineraryActivity: (
+    itineraryActivityId: string,
+    itineraryId: string,
+    destinationId: string
+  ) => Promise<{ success: boolean; error?: string }>;
   removeItineraryActivity: (activityId: string, itineraryId: string) => Promise<{ success: boolean; error?: any }>;
 }
 
@@ -60,6 +71,7 @@ export const useItineraryActivityStore = create<IItineraryStore>((set, get) => (
           const result = await fetchFilteredTableData2(
         "itinerary_activity",
         `
+            itinerary_id,
             itinerary_activity_id, 
             itinerary_destination_id, 
             activity_id,
@@ -347,6 +359,142 @@ export const useItineraryActivityStore = create<IItineraryStore>((set, get) => (
       console.error("Error inserting itinerary activity:", error);
     }
     return { success: true, error: undefined };
+  },
+  addItineraryActivityInstance: async (activity: IActivityWithLocation, itineraryId: string, destinationId: string) => {
+    if (!activity || !itineraryId || !destinationId) return { success: false, error: undefined };
+
+    // Ensure activity exists and we have an activity_id.
+    let activityId: string | undefined;
+    try {
+      const { exists: activityExists } = await checkEntryExists("activity", {
+        place_id: activity.place_id,
+      });
+      if (!activityExists) {
+        const activityDataToInsert = {
+          place_id: activity.place_id,
+          name: activity.name,
+          types: activity.types,
+          price_level: activity.price_level,
+          address: activity.address,
+          rating: activity.rating,
+          description: activity.description,
+          google_maps_url: activity.google_maps_url,
+          website_url: activity.website_url,
+          photo_names: activity.photo_names,
+          duration: activity.duration,
+          phone_number: activity.phone_number,
+          coordinates: `(${Number(activity.coordinates[1].toFixed(9))}, ${Number(activity.coordinates[0].toFixed(9))})`,
+        };
+        await insertTableData("activity", activityDataToInsert);
+      }
+
+      const { data: activityDataResponse }: any = await fetchFilteredTableData(
+        "activity",
+        "activity_id",
+        "place_id",
+        [activity.place_id]
+      );
+
+      if (Array.isArray(activityDataResponse) && activityDataResponse.length > 0) {
+        activityId = activityDataResponse[0]?.activity_id;
+      }
+    } catch (error) {
+      console.error("Error ensuring activity exists:", error);
+      return { success: false, error: "Failed to create activity instance" };
+    }
+
+    if (!activityId) {
+      return { success: false, error: "Activity id not found" };
+    }
+
+    try {
+      const insertResult = await insertTableData("itinerary_activity", {
+        itinerary_id: itineraryId,
+        itinerary_destination_id: destinationId,
+        activity_id: activityId,
+        date: null,
+        start_time: null,
+        end_time: null,
+        deleted_at: null,
+      });
+
+      const insertedRow = Array.isArray(insertResult.data) ? insertResult.data[0] : null;
+      const insertedId = insertedRow?.itinerary_activity_id;
+      if (!insertResult.success || insertedId == null) {
+        throw new Error(insertResult.message || "Failed to insert itinerary activity instance");
+      }
+
+      set((state) => ({
+        itineraryActivities: [
+          ...state.itineraryActivities,
+          {
+            itinerary_activity_id: String(insertedId),
+            itinerary_id: String(insertedRow?.itinerary_id ?? itineraryId),
+            itinerary_destination_id: String(insertedRow?.itinerary_destination_id ?? destinationId),
+            activity_id: String(insertedRow?.activity_id ?? activityId),
+            date: insertedRow?.date ?? null,
+            start_time: insertedRow?.start_time ?? null,
+            end_time: insertedRow?.end_time ?? null,
+            notes: insertedRow?.notes ?? null,
+            created_by: insertedRow?.created_by ?? null,
+            updated_by: insertedRow?.updated_by ?? null,
+            activity: activity,
+            deleted_at: insertedRow?.deleted_at ?? null,
+          } as IItineraryActivity,
+        ],
+      }));
+
+      return { success: true };
+    } catch (error) {
+      console.error("Error inserting itinerary activity instance:", error);
+      return { success: false, error: "Failed to add another instance" };
+    }
+  },
+  duplicateItineraryActivity: async (itineraryActivityId: string, itineraryId: string, destinationId: string) => {
+    const existing = get().itineraryActivities.find(
+      (a) => String(a.itinerary_activity_id) === String(itineraryActivityId)
+    );
+    if (!existing) return { success: false, error: "Activity not found" };
+    if (!itineraryId || !destinationId) return { success: false, error: "Missing itinerary context" };
+
+    try {
+      const insertResult = await insertTableData("itinerary_activity", {
+        itinerary_id: itineraryId,
+        itinerary_destination_id: destinationId,
+        activity_id: existing.activity_id,
+        date: existing.date,
+        start_time: existing.start_time,
+        end_time: existing.end_time,
+        notes: existing.notes ?? null,
+        deleted_at: null,
+      });
+
+      const insertedRow = Array.isArray(insertResult.data) ? insertResult.data[0] : null;
+      const insertedId = insertedRow?.itinerary_activity_id;
+      if (!insertResult.success || insertedId == null) {
+        throw new Error(insertResult.message || "Failed to duplicate itinerary activity");
+      }
+
+      set((state) => ({
+        itineraryActivities: [
+          ...state.itineraryActivities,
+          {
+            ...existing,
+            itinerary_activity_id: String(insertedId),
+            itinerary_id: String(insertedRow?.itinerary_id ?? itineraryId),
+            itinerary_destination_id: String(insertedRow?.itinerary_destination_id ?? destinationId),
+            deleted_at: insertedRow?.deleted_at ?? null,
+            created_by: insertedRow?.created_by ?? null,
+            updated_by: insertedRow?.updated_by ?? null,
+          },
+        ],
+      }));
+
+      return { success: true };
+    } catch (error) {
+      console.error("Error duplicating itinerary activity:", error);
+      return { success: false, error: "Failed to duplicate activity" };
+    }
   },
   removeItineraryActivity: async (placeId: string, itineraryId: string) => {
     try {

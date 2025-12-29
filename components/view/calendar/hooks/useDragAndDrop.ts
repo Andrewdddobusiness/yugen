@@ -1,5 +1,11 @@
 import { useState, useCallback } from 'react';
-import { DragStartEvent, DragOverEvent, DragEndEvent, DragCancelEvent } from '@dnd-kit/core';
+import {
+  DragStartEvent,
+  DragOverEvent,
+  DragMoveEvent,
+  DragEndEvent,
+  DragCancelEvent,
+} from '@dnd-kit/core';
 import { format } from 'date-fns';
 import { useParams } from 'next/navigation';
 import { useToast } from '@/components/ui/use-toast';
@@ -10,6 +16,41 @@ import { ActivityScheduler, SchedulerWishlistItem } from '../services/activitySc
 import { ScheduledActivity } from './useScheduledActivities';
 import { TimeSlot } from '../TimeGrid';
 import { timeToMinutes } from '@/utils/calendar/collisionDetection';
+
+type DropOverlapMode = 'overlap' | 'trim';
+type TrimPreviewById = Record<string, { startSlot: number; span: number } | null>;
+
+const getEventClientX = (event: Event): number | null => {
+  if ('clientX' in event && typeof (event as MouseEvent).clientX === 'number') {
+    return (event as MouseEvent).clientX;
+  }
+
+  if ('touches' in event) {
+    const touchEvent = event as TouchEvent;
+    const touch = touchEvent.touches[0] ?? touchEvent.changedTouches[0];
+    return touch?.clientX ?? null;
+  }
+
+  return null;
+};
+
+const getDropOverlapMode = (
+  event: Pick<
+    DragOverEvent | DragMoveEvent | DragEndEvent,
+    'activatorEvent' | 'delta' | 'over'
+  >
+): DropOverlapMode => {
+  const overRect = event.over?.rect;
+  if (!overRect) return 'trim';
+
+  const initialClientX = getEventClientX(event.activatorEvent);
+  if (initialClientX == null) return 'trim';
+
+  const currentClientX = initialClientX + event.delta.x;
+  const midpoint = overRect.left + overRect.width / 2;
+
+  return currentClientX > midpoint ? 'overlap' : 'trim';
+};
 
 /**
  * useDragAndDrop - Comprehensive drag and drop logic for calendar grid
@@ -53,6 +94,9 @@ export function useDragAndDrop(
 	    slotIndex: number;
 	    spanSlots: number;
     hasConflict: boolean;
+    mode: DropOverlapMode;
+    hasTimeOverlap: boolean;
+    trimPreviewById?: TrimPreviewById;
   } | null>(null);
 
   // Create scheduler instance
@@ -112,6 +156,8 @@ export function useDragAndDrop(
       setDragOverInfo(null);
       return;
     }
+
+    const mode = getDropOverlapMode(event);
 
     // Check if this is a wishlist item being dragged
     const dragData = active.data?.current;
@@ -190,15 +236,179 @@ export function useDragAndDrop(
       excludeId || undefined
     );
     
-    const hasHighSeverityConflicts = detectedConflicts.some(c => c.severity === 'high');
+    const hasTimeOverlap = detectedConflicts.some((c) => c.type === 'time_overlap');
+    const hasHighSeverityConflicts = detectedConflicts.some(
+      (c) => c.severity === 'high' && c.type !== 'time_overlap'
+    );
+
+    const proposedStartSlot = boundedSlotIndex;
+    const proposedEndSlot = boundedSlotIndex + spanSlots;
+
+    const trimPreviewById: TrimPreviewById | undefined =
+      mode === 'trim' && hasTimeOverlap
+        ? (() => {
+            const preview: TrimPreviewById = {};
+            const overlaps = scheduledActivities.filter((act) => {
+              if (act.position.day !== dayIndex) return false;
+              if (excludeId && String(act.id) === String(excludeId)) return false;
+
+              const start = Math.max(0, act.position.startSlot);
+              const end = Math.max(start + 1, start + Math.max(1, act.position.span));
+              return end > proposedStartSlot && start < proposedEndSlot;
+            });
+
+            for (const act of overlaps) {
+              const start = Math.max(0, act.position.startSlot);
+              const end = Math.max(start + 1, start + Math.max(1, act.position.span));
+
+              let newStart = start;
+              let newEnd = end;
+              let shouldUnschedule = false;
+
+              if (start >= proposedStartSlot && end <= proposedEndSlot) {
+                shouldUnschedule = true;
+              } else if (start < proposedStartSlot && end > proposedEndSlot) {
+                const left = proposedStartSlot - start;
+                const right = end - proposedEndSlot;
+                if (left >= right) newEnd = proposedStartSlot;
+                else newStart = proposedEndSlot;
+              } else if (start < proposedStartSlot && end > proposedStartSlot) {
+                newEnd = proposedStartSlot;
+              } else if (start < proposedEndSlot && end > proposedEndSlot) {
+                newStart = proposedEndSlot;
+              }
+
+              if (!shouldUnschedule && newEnd <= newStart) {
+                shouldUnschedule = true;
+              }
+
+              preview[String(act.id)] = shouldUnschedule
+                ? null
+                : {
+                    startSlot: Math.max(0, newStart),
+                    span: Math.max(1, newEnd - newStart),
+                  };
+            }
+
+            return preview;
+          })()
+        : undefined;
     
     setDragOverInfo({
       dayIndex,
       slotIndex: boundedSlotIndex,
       spanSlots,
-      hasConflict: hasHighSeverityConflicts
+      hasConflict: hasHighSeverityConflicts,
+      mode,
+      hasTimeOverlap,
+      trimPreviewById,
     });
   }, [days, timeSlots, scheduledActivities, scheduler, schedulingContext.config.interval]);
+
+  // DragOver does not always fire when staying over the same slot.
+  // Use DragMove to allow live switching between trim/overlap as the cursor crosses the column midpoint.
+  const handleDragMove = useCallback(
+    (event: DragMoveEvent) => {
+      const { active, over } = event;
+
+      if (!over) {
+        setDragOverInfo(null);
+        return;
+      }
+
+      const dropZoneData = over.id.toString().split('-');
+      if (dropZoneData.length !== 3 || dropZoneData[0] !== 'slot') {
+        setDragOverInfo(null);
+        return;
+      }
+
+      const dayIndex = parseInt(dropZoneData[1]);
+      const slotIndex = parseInt(dropZoneData[2]);
+      if (isNaN(dayIndex) || isNaN(slotIndex)) return;
+
+      const mode = getDropOverlapMode(event);
+      const activeDragId = getActivityIdFromDragId(active.id);
+
+      const dragData = active.data?.current as any;
+      const excludeId =
+        dragData?.type === 'itinerary-activity'
+          ? String(dragData?.item?.itinerary_activity_id ?? activeDragId)
+          : String(activeDragId);
+
+      setDragOverInfo((prev) => {
+        if (!prev) return prev;
+        if (prev.dayIndex !== dayIndex) return prev;
+
+        const boundedSlotIndex = Math.max(
+          0,
+          Math.min(slotIndex, timeSlots.length - Math.max(1, prev.spanSlots))
+        );
+
+        if (prev.slotIndex !== boundedSlotIndex) return prev;
+        if (prev.mode === mode) return prev;
+
+        const proposedStartSlot = boundedSlotIndex;
+        const proposedEndSlot = proposedStartSlot + prev.spanSlots;
+
+        const trimPreviewById: TrimPreviewById | undefined =
+          mode === 'trim' && prev.hasTimeOverlap
+            ? (() => {
+                const preview: TrimPreviewById = {};
+                const overlaps = scheduledActivities.filter((act) => {
+                  if (act.position.day !== dayIndex) return false;
+                  if (excludeId && String(act.id) === String(excludeId)) return false;
+
+                  const start = Math.max(0, act.position.startSlot);
+                  const end = Math.max(start + 1, start + Math.max(1, act.position.span));
+                  return end > proposedStartSlot && start < proposedEndSlot;
+                });
+
+                for (const act of overlaps) {
+                  const start = Math.max(0, act.position.startSlot);
+                  const end = Math.max(start + 1, start + Math.max(1, act.position.span));
+
+                  let newStart = start;
+                  let newEnd = end;
+                  let shouldUnschedule = false;
+
+                  if (start >= proposedStartSlot && end <= proposedEndSlot) {
+                    shouldUnschedule = true;
+                  } else if (start < proposedStartSlot && end > proposedEndSlot) {
+                    const left = proposedStartSlot - start;
+                    const right = end - proposedEndSlot;
+                    if (left >= right) newEnd = proposedStartSlot;
+                    else newStart = proposedEndSlot;
+                  } else if (start < proposedStartSlot && end > proposedStartSlot) {
+                    newEnd = proposedStartSlot;
+                  } else if (start < proposedEndSlot && end > proposedEndSlot) {
+                    newStart = proposedEndSlot;
+                  }
+
+                  if (!shouldUnschedule && newEnd <= newStart) {
+                    shouldUnschedule = true;
+                  }
+
+                  preview[String(act.id)] = shouldUnschedule
+                    ? null
+                    : {
+                        startSlot: Math.max(0, newStart),
+                        span: Math.max(1, newEnd - newStart),
+                      };
+                }
+
+                return preview;
+              })()
+            : undefined;
+
+        return {
+          ...prev,
+          mode,
+          trimPreviewById,
+        };
+      });
+    },
+    [scheduledActivities, timeSlots.length]
+  );
 
   const handleWishlistItemDrop = useCallback(async (wishlistItem: SchedulerWishlistItem, targetDate: Date, targetSlot: TimeSlot) => {
     setIsSaving(true);
@@ -231,7 +441,8 @@ export function useDragAndDrop(
 		    activityId: string,
 		    targetDate: Date,
 		    targetSlot: TimeSlot,
-		    currentDuration: number
+		    currentDuration: number,
+      mode: DropOverlapMode = 'trim'
 		  ) => {
 		    const activityIdString = String(activityId);
 		    if (!/^\d+$/.test(activityIdString)) {
@@ -301,60 +512,62 @@ export function useDragAndDrop(
 	    });
 
 	    let trimmedCount = 0;
-	    for (const act of overlaps) {
-	      const start = timeToMinutes(act.start_time as string);
-	      const end = timeToMinutes(act.end_time as string);
+      if (mode === 'trim') {
+	      for (const act of overlaps) {
+	        const start = timeToMinutes(act.start_time as string);
+	        const end = timeToMinutes(act.end_time as string);
 
-	      if (end <= boundedStartMinutes || start >= boundedEndMinutes) continue;
+	        if (end <= boundedStartMinutes || start >= boundedEndMinutes) continue;
 
-	      let newStart = start;
-	      let newEnd = end;
-	      let shouldUnschedule = false;
+	        let newStart = start;
+	        let newEnd = end;
+	        let shouldUnschedule = false;
 
-	      if (start >= boundedStartMinutes && end <= boundedEndMinutes) {
-	        // Fully covered by the moved activity.
-	        shouldUnschedule = true;
-	      } else if (start < boundedStartMinutes && end > boundedEndMinutes) {
-	        // Spans across the moved activity; keep the larger remaining side.
-	        const left = boundedStartMinutes - start;
-	        const right = end - boundedEndMinutes;
-	        if (left >= right) newEnd = boundedStartMinutes;
-	        else newStart = boundedEndMinutes;
-	      } else if (start < boundedStartMinutes && end > boundedStartMinutes) {
-	        // Overlaps the start of the moved activity.
-	        newEnd = boundedStartMinutes;
-	      } else if (start < boundedEndMinutes && end > boundedEndMinutes) {
-	        // Overlaps the end of the moved activity.
-	        newStart = boundedEndMinutes;
-	      }
+	        if (start >= boundedStartMinutes && end <= boundedEndMinutes) {
+	          // Fully covered by the moved activity.
+	          shouldUnschedule = true;
+	        } else if (start < boundedStartMinutes && end > boundedEndMinutes) {
+	          // Spans across the moved activity; keep the larger remaining side.
+	          const left = boundedStartMinutes - start;
+	          const right = end - boundedEndMinutes;
+	          if (left >= right) newEnd = boundedStartMinutes;
+	          else newStart = boundedEndMinutes;
+	        } else if (start < boundedStartMinutes && end > boundedStartMinutes) {
+	          // Overlaps the start of the moved activity.
+	          newEnd = boundedStartMinutes;
+	        } else if (start < boundedEndMinutes && end > boundedEndMinutes) {
+	          // Overlaps the end of the moved activity.
+	          newStart = boundedEndMinutes;
+	        }
 
-	      if (!shouldUnschedule && newEnd <= newStart) {
-	        shouldUnschedule = true;
-	      }
+	        if (!shouldUnschedule && newEnd <= newStart) {
+	          shouldUnschedule = true;
+	        }
 
-	      const id = String(act.itinerary_activity_id);
-	      previousById.set(id, {
-	        date: act.date,
-	        start_time: act.start_time,
-	        end_time: act.end_time,
-	      });
-
-	      if (shouldUnschedule) {
-	        updatesById.set(id, {
-	          date: null,
-	          start_time: null,
-	          end_time: null,
+	        const id = String(act.itinerary_activity_id);
+	        previousById.set(id, {
+	          date: act.date,
+	          start_time: act.start_time,
+	          end_time: act.end_time,
 	        });
-	      } else {
-	        updatesById.set(id, {
-	          date: newDate,
-	          start_time: minutesToTimeString(newStart),
-	          end_time: minutesToTimeString(newEnd),
-	        });
-	      }
 
-	      trimmedCount++;
-	    }
+	        if (shouldUnschedule) {
+	          updatesById.set(id, {
+	            date: null,
+	            start_time: null,
+	            end_time: null,
+	          });
+	        } else {
+	          updatesById.set(id, {
+	            date: newDate,
+	            start_time: minutesToTimeString(newStart),
+	            end_time: minutesToTimeString(newEnd),
+	          });
+	        }
+
+	        trimmedCount++;
+	      }
+      }
 
 	    // Optimistic UI: update local store immediately.
 	    const activitiesAfterOptimistic = currentActivities.map((act) => {
@@ -440,6 +653,8 @@ export function useDragAndDrop(
 	  }, [schedulingContext.config.endHour, schedulingContext.config.interval, schedulingContext.config.startHour, setItineraryActivities, toast]);
 
 		  const handleDragEnd = useCallback(async (event: DragEndEvent) => {
+        const mode = getDropOverlapMode(event);
+
 		    setActiveId(null);
 		    setActiveType(null);
 		    setDragOverInfo(null);
@@ -551,7 +766,8 @@ export function useDragAndDrop(
 		        resolvedItineraryActivityId,
 		        targetDate,
 		        targetSlot,
-		        duration || 60
+		        duration || 60,
+            mode
 		      );
 		      return;
 		    }
@@ -564,7 +780,8 @@ export function useDragAndDrop(
 	      activeDragId,
 	      targetDate,
 	      targetSlot,
-	      draggedActivity.duration
+	      draggedActivity.duration,
+        mode
 	    );
 			  }, [days, timeSlots, scheduledActivities, handleWishlistItemDrop, handleActivityReschedule, scheduler, destinationId, setItineraryActivities, toast]);
 
@@ -773,6 +990,7 @@ export function useDragAndDrop(
 	    // Drag handlers
 	    handleDragStart,
 	    handleDragOver,
+      handleDragMove,
 	    handleDragEnd,
 	    handleDragCancel,
 	    handleResize,

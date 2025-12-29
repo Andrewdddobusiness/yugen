@@ -1,6 +1,7 @@
 "use client";
 
-import React from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Calendar, Clock, MapPin, ChevronDown, ChevronUp, GripVertical } from 'lucide-react';
 import { useItineraryActivityStore } from '@/store/itineraryActivityStore';
@@ -8,9 +9,9 @@ import { format } from 'date-fns';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
-import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { ActivityCreatedBy } from '@/components/collaboration/ActivityCreatedBy';
+import { useParams } from 'next/navigation';
 import {
   DndContext,
   closestCenter,
@@ -96,6 +97,8 @@ function SortableActivityItem({
   activity: any;
   getActivityTypeIcon: (types: string[] | undefined) => string;
 }) {
+  const { itineraryId, destinationId } = useParams();
+  const duplicateItineraryActivity = useItineraryActivityStore((s) => s.duplicateItineraryActivity);
   const {
     attributes,
     listeners,
@@ -111,74 +114,157 @@ function SortableActivityItem({
     },
   });
 
+  const [contextMenu, setContextMenu] = useState<null | { x: number; y: number }>(null);
+  const contextMenuRef = useRef<HTMLDivElement | null>(null);
+  const closeContextMenu = useCallback(() => setContextMenu(null), []);
+
+  useEffect(() => {
+    if (!contextMenu) return;
+
+    const handlePointerDown = (event: PointerEvent) => {
+      const menu = contextMenuRef.current;
+      if (!menu) {
+        setContextMenu(null);
+        return;
+      }
+      if (menu.contains(event.target as Node)) return;
+      setContextMenu(null);
+    };
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setContextMenu(null);
+      }
+    };
+
+    const handleScrollOrResize = () => setContextMenu(null);
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    window.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("resize", handleScrollOrResize);
+    window.addEventListener("scroll", handleScrollOrResize, true);
+
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("resize", handleScrollOrResize);
+      window.removeEventListener("scroll", handleScrollOrResize, true);
+    };
+  }, [contextMenu]);
+
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
   };
 
   return (
-    <div
-      ref={setNodeRef}
-      style={style}
-      className={cn(
-        "p-2 rounded-md bg-muted/30 hover:bg-muted/60 transition-all duration-200",
-        "cursor-move group border border-transparent hover:border-muted-foreground/20",
-        isDragging && "opacity-50 shadow-lg"
-      )}
-    >
-      <div className="flex items-start gap-2">
-        {/* Drag Handle */}
-        <div
-          {...attributes}
-          {...listeners}
-          className="mt-0.5 cursor-grab active:cursor-grabbing touch-none"
-        >
-          <GripVertical className="h-3 w-3 text-muted-foreground/60 group-hover:text-muted-foreground" />
-        </div>
+    <>
+      <div
+        ref={setNodeRef}
+        style={style}
+        onContextMenu={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
 
-        {/* Activity Type Icon */}
-        <span className="text-sm mt-0.5">
-          {getActivityTypeIcon(activity.activity?.types)}
-        </span>
-
-        {/* Activity Details */}
-        <div className="flex-1 min-w-0">
-          <div className="flex items-start justify-between gap-2">
-            <p className="text-sm font-medium truncate">
-              {activity.activity?.name || 'Unnamed Activity'}
-            </p>
-            <ActivityCreatedBy
-              userId={activity.created_by}
-              mode="avatar"
-              avatarClassName="h-5 w-5"
-            />
+          const padding = 8;
+          const menuWidth = 200;
+          const menuHeight = 44;
+          const nextX = Math.min(e.clientX, window.innerWidth - menuWidth - padding);
+          const nextY = Math.min(e.clientY, window.innerHeight - menuHeight - padding);
+          setContextMenu({ x: nextX, y: nextY });
+        }}
+        className={cn(
+          "p-2 rounded-md bg-muted/30 hover:bg-muted/60 transition-all duration-200",
+          "cursor-move group border border-transparent hover:border-muted-foreground/20",
+          isDragging && "opacity-50 shadow-lg"
+        )}
+      >
+        <div className="flex items-start gap-2">
+          {/* Drag Handle */}
+          <div
+            {...attributes}
+            {...listeners}
+            className="mt-0.5 cursor-grab active:cursor-grabbing touch-none"
+          >
+            <GripVertical className="h-3 w-3 text-muted-foreground/60 group-hover:text-muted-foreground" />
           </div>
-          
-          {/* Time if scheduled */}
-          {activity.start_time && (
-            <div className="flex items-center gap-1 mt-0.5">
-              <Clock className="h-3 w-3 text-muted-foreground" />
-              <span className="text-xs text-muted-foreground">
-                {format(new Date(`2024-01-01T${activity.start_time}`), 'h:mm a')}
-                {activity.end_time && (
-                  <> - {format(new Date(`2024-01-01T${activity.end_time}`), 'h:mm a')}</>
-                )}
-              </span>
-            </div>
-          )}
 
-          {/* Location preview */}
-          {activity.activity?.address && (
-            <div className="flex items-center gap-1 mt-0.5">
-              <MapPin className="h-3 w-3 text-muted-foreground" />
-              <span className="text-xs text-muted-foreground truncate">
-                {activity.activity.address.split(',')[0]}
-              </span>
+          {/* Activity Type Icon */}
+          <span className="text-sm mt-0.5">
+            {getActivityTypeIcon(activity.activity?.types)}
+          </span>
+
+          {/* Activity Details */}
+          <div className="flex-1 min-w-0">
+            <div className="flex items-start justify-between gap-2">
+              <p className="text-sm font-medium truncate">
+                {activity.activity?.name || 'Unnamed Activity'}
+              </p>
+              <ActivityCreatedBy
+                userId={activity.created_by}
+                mode="avatar"
+                avatarClassName="h-5 w-5"
+              />
             </div>
-          )}
+            
+            {/* Time if scheduled */}
+            {activity.start_time && (
+              <div className="flex items-center gap-1 mt-0.5">
+                <Clock className="h-3 w-3 text-muted-foreground" />
+                <span className="text-xs text-muted-foreground">
+                  {format(new Date(`2024-01-01T${activity.start_time}`), 'h:mm a')}
+                  {activity.end_time && (
+                    <> - {format(new Date(`2024-01-01T${activity.end_time}`), 'h:mm a')}</>
+                  )}
+                </span>
+              </div>
+            )}
+
+            {/* Location preview */}
+            {activity.activity?.address && (
+              <div className="flex items-center gap-1 mt-0.5">
+                <MapPin className="h-3 w-3 text-muted-foreground" />
+                <span className="text-xs text-muted-foreground truncate">
+                  {activity.activity.address.split(',')[0]}
+                </span>
+              </div>
+            )}
+          </div>
         </div>
       </div>
-    </div>
+
+      {contextMenu &&
+        createPortal(
+          <div
+            ref={contextMenuRef}
+            className="fixed z-[10000] min-w-48 rounded-lg border border-stroke-200 bg-bg-0 shadow-card p-1"
+            style={{ left: contextMenu.x, top: contextMenu.y }}
+            onContextMenu={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+            }}
+          >
+            <button
+              type="button"
+              className="w-full rounded-md px-3 py-2 text-left text-sm text-ink-900 hover:bg-bg-50"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                if (!itineraryId || !destinationId) return;
+                duplicateItineraryActivity(
+                  String(activity.itinerary_activity_id),
+                  itineraryId.toString(),
+                  destinationId.toString()
+                );
+                closeContextMenu();
+              }}
+            >
+              Duplicate
+            </button>
+          </div>,
+          document.body
+        )}
+    </>
   );
 }
 

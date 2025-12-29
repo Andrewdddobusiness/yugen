@@ -35,6 +35,7 @@ interface CalendarLayoutProps {
 
   // Drag & drop handlers
   onDragStart: (event: any) => void;
+  onDragMove: (event: any) => void;
   onDragOver: (event: any) => void;
   onDragEnd: (event: any) => void;
   onDragCancel?: (event: any) => void;
@@ -57,6 +58,12 @@ interface CalendarLayoutProps {
     slotIndex: number;
     spanSlots: number;
     hasConflict: boolean;
+    mode: "overlap" | "trim";
+    hasTimeOverlap: boolean;
+    trimPreviewById?: Record<
+      string,
+      { startSlot: number; span: number } | null
+    >;
   } | null;
   isSaving: boolean;
 
@@ -92,6 +99,7 @@ export function CalendarLayout({
   timeSlots,
   scheduledActivities,
   onDragStart,
+  onDragMove,
   onDragOver,
   onDragEnd,
   onDragCancel,
@@ -305,6 +313,7 @@ export function CalendarLayout({
         <DndContext
           collisionDetection={pointerWithin}
           onDragStart={onDragStart}
+          onDragMove={onDragMove}
           onDragOver={onDragOver}
           onDragEnd={onDragEnd}
           onDragCancel={onDragCancel}

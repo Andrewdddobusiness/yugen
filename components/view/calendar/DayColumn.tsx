@@ -46,6 +46,12 @@ interface DayColumnProps {
     slotIndex: number;
     spanSlots: number;
     hasConflict: boolean;
+    mode: "overlap" | "trim";
+    hasTimeOverlap: boolean;
+    trimPreviewById?: Record<
+      string,
+      { startSlot: number; span: number } | null
+    >;
   } | null;
   className?: string;
   onResize?: (
@@ -104,6 +110,134 @@ export function DayColumn({
     schedulingContext.config.interval
   );
   const minutesPerSlot = schedulingContext.config.interval;
+  const trimPreviewById =
+    dragOverInfo?.dayIndex === dayIndex && dragOverInfo?.mode === "trim"
+      ? dragOverInfo.trimPreviewById
+      : undefined;
+
+  const getDisplayPosition = React.useCallback(
+    (activity: ScheduledActivity) => {
+      const override = trimPreviewById?.[String(activity.id)];
+      if (override === null) return null;
+      if (override) {
+        return {
+          startSlot: Math.max(0, override.startSlot),
+          span: Math.max(1, override.span),
+        };
+      }
+      return activity.position;
+    },
+    [trimPreviewById]
+  );
+
+  const overlapLayoutById = React.useMemo(() => {
+    type Event = { id: string; start: number; end: number };
+    type Layout = { column: number; columnCount: number };
+
+    const previewStart =
+      dragOverInfo?.dayIndex === dayIndex && dragOverInfo?.mode === "overlap"
+        ? dragOverInfo.slotIndex
+        : null;
+    const previewSpan =
+      dragOverInfo?.dayIndex === dayIndex && dragOverInfo?.mode === "overlap"
+        ? dragOverInfo.spanSlots
+        : null;
+
+    const events: Array<Event & { isPreview: boolean }> = activities
+      .map((activity) => {
+        const position = getDisplayPosition(activity);
+        if (!position) return null;
+        return {
+          id: String(activity.id),
+          start: Math.max(0, position.startSlot),
+          end: Math.max(0, position.startSlot + Math.max(1, position.span)),
+          isPreview: false,
+        };
+      })
+      .filter(
+        (event): event is Event & { isPreview: boolean } => event !== null
+      )
+      .concat(
+        previewStart != null && previewSpan != null
+          ? [
+              {
+                id: "__drag_preview__",
+                start: Math.max(0, previewStart),
+                end: Math.max(0, previewStart + Math.max(1, previewSpan)),
+                isPreview: true,
+              },
+            ]
+          : []
+      )
+      .sort((a, b) => {
+        const startSort = a.start - b.start;
+        if (startSort !== 0) return startSort;
+        if (a.isPreview !== b.isPreview) return a.isPreview ? 1 : -1;
+        return a.end - b.end;
+      });
+
+    const layout: Record<string, Layout> = {};
+
+    const assignCluster = (cluster: Event[]) => {
+      if (cluster.length === 0) return;
+
+      const columnsEnd: number[] = [];
+      const columnById = new Map<string, number>();
+
+      for (const event of cluster) {
+        let bestColumn = -1;
+        let bestEnd = Number.POSITIVE_INFINITY;
+
+        for (let i = 0; i < columnsEnd.length; i += 1) {
+          const colEnd = columnsEnd[i];
+          if (event.start >= colEnd && colEnd < bestEnd) {
+            bestEnd = colEnd;
+            bestColumn = i;
+          }
+        }
+
+        if (bestColumn === -1) {
+          bestColumn = columnsEnd.length;
+          columnsEnd.push(event.end);
+        } else {
+          columnsEnd[bestColumn] = event.end;
+        }
+
+        columnById.set(event.id, bestColumn);
+      }
+
+      const columnCount = Math.max(1, columnsEnd.length);
+      for (const event of cluster) {
+        layout[event.id] = {
+          column: columnById.get(event.id) ?? 0,
+          columnCount,
+        };
+      }
+    };
+
+    let cluster: Event[] = [];
+    let clusterEnd = -1;
+
+    for (const event of events) {
+      if (cluster.length === 0) {
+        cluster = [event];
+        clusterEnd = event.end;
+        continue;
+      }
+
+      if (event.start < clusterEnd) {
+        cluster.push(event);
+        clusterEnd = Math.max(clusterEnd, event.end);
+      } else {
+        assignCluster(cluster);
+        cluster = [event];
+        clusterEnd = event.end;
+      }
+    }
+
+    assignCluster(cluster);
+    return layout;
+  }, [activities, dayIndex, dragOverInfo, getDisplayPosition]);
   const dragPreview =
     dragOverInfo?.dayIndex === dayIndex
       ? {
@@ -113,6 +247,8 @@ export function DayColumn({
             Math.min(dragOverInfo.spanSlots, timeSlots.length - dragOverInfo.slotIndex)
           ),
           hasConflict: dragOverInfo.hasConflict,
+          mode: dragOverInfo.mode,
+          hasTimeOverlap: dragOverInfo.hasTimeOverlap,
         }
       : null;
 
@@ -217,46 +353,96 @@ export function DayColumn({
 
         {/* Drag placement preview */}
         {dragPreview && (
-          <div
-            className={cn(
-              "absolute left-[2px] right-[2px] rounded-lg border-2 border-dashed pointer-events-none z-20",
-              dragPreview.hasConflict
-                ? "bg-red-100/60 border-red-300"
-                : "bg-blue-100/60 border-blue-300"
-            )}
-            style={{
-              top: `${dragPreview.startSlot * slotHeightPx}px`,
-              height: `${dragPreview.spanSlots * slotHeightPx}px`,
-            }}
-          />
+          (() => {
+            const previewLayout = overlapLayoutById["__drag_preview__"];
+            const columnCount =
+              dragPreview.mode === "overlap" && previewLayout
+                ? Math.max(1, previewLayout.columnCount)
+                : 1;
+            const column =
+              dragPreview.mode === "overlap" && previewLayout
+                ? Math.max(0, previewLayout.column)
+                : 0;
+
+            const gutterPx = 4; // left+right padding (2px each)
+            const gapPx = columnCount > 1 ? 4 : 0;
+            const totalGapPx = gapPx * (columnCount - 1);
+            const columnWidth = `calc((100% - ${gutterPx + totalGapPx}px) / ${columnCount})`;
+            const left =
+              columnCount > 1
+                ? `calc(2px + (${columnWidth} + ${gapPx}px) * ${column})`
+                : "2px";
+
+            return (
+              <div
+                className={cn(
+                  "absolute rounded-lg border-2 border-dashed pointer-events-none z-20",
+                  dragPreview.hasConflict
+                    ? "bg-red-100/60 border-red-300"
+                    : "bg-blue-100/60 border-blue-300"
+                )}
+                style={{
+                  top: `${dragPreview.startSlot * slotHeightPx}px`,
+                  height: `${dragPreview.spanSlots * slotHeightPx}px`,
+                  ...(columnCount > 1
+                    ? { left, width: columnWidth }
+                    : { left: "2px", right: "2px" }),
+                }}
+              />
+            );
+          })()
         )}
 
         {/* Activity Blocks */}
         <div className="absolute inset-0 pointer-events-none">
-          {activities.map((activity) => (
-            <div
-              key={activity.id}
-              className="absolute pointer-events-auto"
-              style={{
-                top: `${activity.position.startSlot * slotHeightPx}px`,
-                height: `${activity.position.span * slotHeightPx}px`,
-                left: "2px",
-                right: "2px",
-                zIndex: 1,
-              }}
-            >
-              <ActivityBlock
-                activity={activity}
-                className={cn(
-                  "h-full",
-                  highlightActivityId &&
-                    String(highlightActivityId) === String(activity.id) &&
-                    "ring-2 ring-brand-400/70"
-                )}
-                onResize={onResize}
-              />
-            </div>
-          ))}
+          {activities.map((activity) => {
+            const displayPosition = getDisplayPosition(activity);
+            if (!displayPosition) return null;
+
+            const overlap = overlapLayoutById[String(activity.id)] ?? {
+              column: 0,
+              columnCount: 1,
+            };
+
+            const columnCount = Math.max(1, overlap.columnCount);
+            const column = Math.max(0, overlap.column);
+
+            const gutterPx = 4; // left+right padding (2px each)
+            const gapPx = columnCount > 1 ? 4 : 0;
+            const totalGapPx = gapPx * (columnCount - 1);
+
+            const columnWidth = `calc((100% - ${gutterPx + totalGapPx}px) / ${columnCount})`;
+            const left =
+              columnCount > 1
+                ? `calc(2px + (${columnWidth} + ${gapPx}px) * ${column})`
+                : "2px";
+
+            return (
+              <div
+                key={activity.id}
+                className="absolute pointer-events-auto"
+                style={{
+                  top: `${displayPosition.startSlot * slotHeightPx}px`,
+                  height: `${displayPosition.span * slotHeightPx}px`,
+                  zIndex: 10 + column,
+                  ...(columnCount > 1
+                    ? { left, width: columnWidth }
+                    : { left: "2px", right: "2px" }),
+                }}
+              >
+                <ActivityBlock
+                  activity={activity}
+                  className={cn(
+                    "h-full",
+                    highlightActivityId &&
+                      String(highlightActivityId) === String(activity.id) &&
+                      "ring-2 ring-brand-400/70"
+                  )}
+                  onResize={onResize}
+                />
+              </div>
+            );
+          })}
         </div>
       </div>
     </div>

@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useCallback, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useDraggable } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
 import { GripVertical } from 'lucide-react';
@@ -9,6 +10,8 @@ import { ActivityBlockContent, type ActivityAccent } from './ActivityBlockConten
 import { ActivityBlockPopover } from './ActivityBlockPopover';
 import { useSchedulingContext } from '@/store/timeSchedulingStore';
 import { getCalendarSlotHeightPx } from './layoutMetrics';
+import { useParams } from 'next/navigation';
+import { useItineraryActivityStore } from '@/store/itineraryActivityStore';
 
 const accentStyles: Record<ActivityAccent, { border: string; tint: string }> = {
   brand: { border: "border-l-brand-500", tint: "bg-brand-500/10" },
@@ -61,6 +64,8 @@ export function ActivityBlock({
   onResize
 }: ActivityBlockProps) {
   const schedulingContext = useSchedulingContext();
+  const { itineraryId, destinationId } = useParams();
+  const duplicateItineraryActivity = useItineraryActivityStore((s) => s.duplicateItineraryActivity);
   const minutesPerSlot = schedulingContext.config.interval;
   const slotHeightPx = getCalendarSlotHeightPx(minutesPerSlot);
   const [isResizing, setIsResizing] = useState(false);
@@ -68,8 +73,48 @@ export function ActivityBlock({
   const [showPopover, setShowPopover] = useState(false);
   const [popoverPosition, setPopoverPosition] = useState({ x: 0, y: 0 });
   const [previewHeight, setPreviewHeight] = useState<number>(0);
+  const [contextMenu, setContextMenu] = useState<null | { x: number; y: number }>(null);
   const blockRef = useRef<HTMLDivElement | null>(null);
   const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const contextMenuRef = useRef<HTMLDivElement | null>(null);
+
+  const closeContextMenu = useCallback(() => setContextMenu(null), []);
+
+  useEffect(() => {
+    if (!contextMenu) return;
+
+    const handlePointerDown = (event: PointerEvent) => {
+      const menu = contextMenuRef.current;
+      if (!menu) {
+        setContextMenu(null);
+        return;
+      }
+      if (menu.contains(event.target as Node)) return;
+      setContextMenu(null);
+    };
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setContextMenu(null);
+      }
+    };
+
+    const handleScrollOrResize = () => {
+      setContextMenu(null);
+    };
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    window.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("resize", handleScrollOrResize);
+    window.addEventListener("scroll", handleScrollOrResize, true);
+
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("resize", handleScrollOrResize);
+      window.removeEventListener("scroll", handleScrollOrResize, true);
+    };
+  }, [contextMenu]);
   
   const {
     attributes,
@@ -315,6 +360,18 @@ export function ActivityBlock({
         }}
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
+        onContextMenu={(e) => {
+          if (isOverlay) return;
+          e.preventDefault();
+          e.stopPropagation();
+
+          const padding = 8;
+          const menuWidth = 200;
+          const menuHeight = 44;
+          const nextX = Math.min(e.clientX, window.innerWidth - menuWidth - padding);
+          const nextY = Math.min(e.clientY, window.innerHeight - menuHeight - padding);
+          setContextMenu({ x: nextX, y: nextY });
+        }}
         className={cn(
           "relative rounded-lg overflow-hidden group border border-stroke-200 border-l-4",
           "cursor-default",
@@ -341,7 +398,7 @@ export function ActivityBlock({
 
       {/* Drag Handle - only show on hover and for standard+ blocks */}
       {blockSize !== 'compact' && !isResizing && (
-        <div 
+        <div
           className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity z-20 cursor-move p-1 hover:bg-bg-50 rounded"
           {...listeners}
           {...attributes}
@@ -400,6 +457,34 @@ export function ActivityBlock({
         isVisible={showPopover}
         position={popoverPosition}
       />
+
+      {contextMenu &&
+        createPortal(
+          <div
+            ref={contextMenuRef}
+            className="fixed z-[10000] min-w-48 rounded-lg border border-stroke-200 bg-bg-0 shadow-card p-1"
+            style={{ left: contextMenu.x, top: contextMenu.y }}
+            onContextMenu={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+            }}
+          >
+            <button
+              type="button"
+              className="w-full rounded-md px-3 py-2 text-left text-sm text-ink-900 hover:bg-bg-50"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                if (!itineraryId || !destinationId) return;
+                duplicateItineraryActivity(activity.id, itineraryId.toString(), destinationId.toString());
+                closeContextMenu();
+              }}
+            >
+              Duplicate
+            </button>
+          </div>,
+          document.body
+        )}
     </>
   );
 }

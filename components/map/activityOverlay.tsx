@@ -33,7 +33,8 @@ const getDayName = (dayNumber: number) => {
 export function ActivityOverlay({ onClose }: ActivityOverlayProps) {
   let { itineraryId, destinationId } = useParams();
   const { selectedActivity } = useActivitiesStore();
-  const { insertItineraryActivity, removeItineraryActivity, isActivityAdded } = useItineraryActivityStore();
+  const { insertItineraryActivity, addItineraryActivityInstance, removeItineraryActivity, isActivityAdded } =
+    useItineraryActivityStore();
   const [loading, setLoading] = useState<boolean>(false);
 
   const isAdded = isActivityAdded(selectedActivity?.place_id || "");
@@ -53,6 +54,17 @@ export function ActivityOverlay({ onClose }: ActivityOverlayProps) {
     setLoading(true);
     if (!selectedActivity || !itineraryId) return;
     await removeItineraryActivity(selectedActivity.place_id, itineraryId.toString());
+    setLoading(false);
+  };
+
+  const handleAddAnotherInstance = async () => {
+    setLoading(true);
+    if (!selectedActivity || !itineraryId || !destinationId) return;
+    await addItineraryActivityInstance(
+      selectedActivity as IActivityWithLocation,
+      itineraryId.toString(),
+      destinationId.toString()
+    );
     setLoading(false);
   };
 
@@ -255,9 +267,22 @@ export function ActivityOverlay({ onClose }: ActivityOverlayProps) {
               Please wait
             </Button>
           ) : isAdded ? (
-            <Button variant="secondary" className="w-full rounded-xl text-gray-500" onClick={handleRemoveToItinerary}>
-              Remove from Itinerary
-            </Button>
+            <div className="flex gap-2">
+              <Button
+                variant="default"
+                className="flex-1 rounded-xl bg-[#3F5FA3] text-white shadow-lg hover:bg-[#3F5FA3]/80"
+                onClick={handleAddAnotherInstance}
+              >
+                Add another time
+              </Button>
+              <Button
+                variant="secondary"
+                className="flex-1 rounded-xl text-gray-500"
+                onClick={handleRemoveToItinerary}
+              >
+                Remove all
+              </Button>
+            </div>
           ) : (
             <Button
               variant="default"
