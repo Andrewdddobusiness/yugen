@@ -17,6 +17,33 @@ const parseIntId = (value: string) => {
   return Number(trimmed);
 };
 
+const isMissingTableError = (error: any, tableName: string) => {
+  if (!error) return false;
+  const code = String(error.code ?? "");
+  const message = String(error.message ?? "").toLowerCase();
+  const table = tableName.toLowerCase();
+
+  // Postgres: undefined_table
+  if (code === "42P01") return true;
+
+  // PostgREST schema cache miss (table not found / not exposed)
+  if (code.startsWith("PGRST") && message.includes("schema cache") && message.includes(table)) {
+    return true;
+  }
+  if (code.startsWith("PGRST") && message.includes("could not find") && message.includes(table)) {
+    return true;
+  }
+
+  // PostgREST sometimes wraps Postgres errors into a generic message.
+  if (message.includes("does not exist") && message.includes(table)) return true;
+  if (message.includes("relation") && message.includes("does not exist")) return true;
+
+  return false;
+};
+
+let warnedMissingCollaboratorTable = false;
+let collaboratorTableSupported: boolean | null = null;
+
 export async function listItineraryMembers(itineraryId: string) {
   const itineraryIdInt = parseIntId(itineraryId);
   if (!itineraryIdInt) {
@@ -43,13 +70,37 @@ export async function listItineraryMembers(itineraryId: string) {
     return { success: false as const, message: "Failed to load itinerary", error: itineraryError };
   }
 
-  const { data: collaborators, error: collaboratorsError } = await supabase
-    .from("itinerary_collaborator")
-    .select("user_id,role,removed_at")
-    .eq("itinerary_id", itineraryIdInt);
+  let collaborators: Array<{ user_id: string; role: string; removed_at: string | null }> = [];
+  if (collaboratorTableSupported !== false) {
+    const { data, error } = await supabase
+      .from("itinerary_collaborator")
+      .select("user_id,role,removed_at")
+      .eq("itinerary_id", itineraryIdInt);
 
-  if (collaboratorsError) {
-    return { success: false as const, message: "Failed to load collaborators", error: collaboratorsError };
+    if (error) {
+      if (isMissingTableError(error, "itinerary_collaborator")) {
+        collaboratorTableSupported = false;
+        // Allow the app to still function (owner-only workspace) if the collaboration migration
+        // hasn't been applied yet.
+        if (!warnedMissingCollaboratorTable) {
+          warnedMissingCollaboratorTable = true;
+          console.warn(
+            "[collaboration] itinerary_collaborator table missing; returning owner-only workspace."
+          );
+        }
+      } else {
+        console.error("[collaboration] Failed to load collaborators", error);
+        const details = error.message ? `: ${String(error.message)}` : "";
+        return {
+          success: false as const,
+          message: `Failed to load collaborators${details}`,
+          error,
+        };
+      }
+    } else {
+      if (collaboratorTableSupported == null) collaboratorTableSupported = true;
+      collaborators = (data || []) as any;
+    }
   }
 
   const activeCollaborators = (collaborators || []).filter((row) => row.removed_at == null);
@@ -143,6 +194,165 @@ export async function listItineraryInvitations(itineraryId: string) {
     message: "Loaded invitations",
     data: (data || []) as unknown as ItineraryInvitationRow[],
   };
+}
+
+export async function getOrCreateItineraryInviteLink(itineraryId: string) {
+  const itineraryIdInt = parseIntId(itineraryId);
+  if (!itineraryIdInt) {
+    return { success: false as const, message: "Invalid itinerary id" };
+  }
+
+  const supabase = createClient();
+
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser();
+  if (userError || !user) {
+    return { success: false as const, message: "Not authenticated" };
+  }
+
+  const { data: itinerary, error: itineraryError } = await supabase
+    .from("itinerary")
+    .select("itinerary_id,user_id")
+    .eq("itinerary_id", itineraryIdInt)
+    .single();
+
+  if (itineraryError || !itinerary) {
+    return { success: false as const, message: "Failed to load itinerary", error: itineraryError };
+  }
+
+  if (String(itinerary.user_id) !== String(user.id)) {
+    return { success: false as const, message: "Only the owner can invite" };
+  }
+
+  const { data: existing, error: existingError } = await supabase
+    .from("itinerary_invite_link")
+    .select("itinerary_invite_link_id,role,revoked_at,expires_at,created_at")
+    .eq("itinerary_id", itineraryIdInt)
+    .is("revoked_at", null)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (existingError) {
+    if (isMissingTableError(existingError, "itinerary_invite_link")) {
+      return { success: false as const, message: "Invite links are not enabled yet" };
+    }
+    return { success: false as const, message: "Failed to load invite link", error: existingError };
+  }
+
+  const isExpired =
+    existing?.expires_at != null && new Date(existing.expires_at).getTime() < Date.now();
+
+  if (existing && !isExpired) {
+    return {
+      success: true as const,
+      message: "Loaded invite link",
+      data: {
+        itinerary_invite_link_id: String(existing.itinerary_invite_link_id),
+        role: (existing.role as ItineraryCollaboratorRole) ?? "editor",
+        expires_at: existing.expires_at ?? null,
+      },
+    };
+  }
+
+  if (existing && isExpired) {
+    await supabase
+      .from("itinerary_invite_link")
+      .update({ revoked_at: new Date().toISOString() })
+      .eq("itinerary_invite_link_id", existing.itinerary_invite_link_id);
+  }
+
+  const { data: inserted, error: insertError } = await supabase
+    .from("itinerary_invite_link")
+    .insert({
+      itinerary_id: itineraryIdInt,
+      role: "editor",
+      created_by: user.id,
+      expires_at: null,
+    })
+    .select("itinerary_invite_link_id,role,expires_at")
+    .single();
+
+  if (insertError) {
+    const maybeDuplicate = String(insertError.code ?? "") === "23505";
+    if (maybeDuplicate) {
+      const { data: retry, error: retryError } = await supabase
+        .from("itinerary_invite_link")
+        .select("itinerary_invite_link_id,role,expires_at,created_at")
+        .eq("itinerary_id", itineraryIdInt)
+        .is("revoked_at", null)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (!retryError && retry) {
+        return {
+          success: true as const,
+          message: "Loaded invite link",
+          data: {
+            itinerary_invite_link_id: String(retry.itinerary_invite_link_id),
+            role: (retry.role as ItineraryCollaboratorRole) ?? "editor",
+            expires_at: retry.expires_at ?? null,
+          },
+        };
+      }
+    }
+
+    if (isMissingTableError(insertError, "itinerary_invite_link")) {
+      return { success: false as const, message: "Invite links are not enabled yet", error: insertError };
+    }
+
+    return { success: false as const, message: "Failed to create invite link", error: insertError };
+  }
+
+  return {
+    success: true as const,
+    message: "Invite link created",
+    data: {
+      itinerary_invite_link_id: String(inserted.itinerary_invite_link_id),
+      role: (inserted.role as ItineraryCollaboratorRole) ?? "editor",
+      expires_at: inserted.expires_at ?? null,
+    },
+  };
+}
+
+export async function revokeItineraryInviteLink(inviteLinkId: string) {
+  const linkId = String(inviteLinkId ?? "").trim();
+  if (!linkId) {
+    return { success: false as const, message: "Invalid invite link id" };
+  }
+
+  const supabase = createClient();
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser();
+
+  if (userError || !user) {
+    return { success: false as const, message: "Not authenticated" };
+  }
+
+  const { data, error } = await supabase
+    .from("itinerary_invite_link")
+    .update({ revoked_at: new Date().toISOString() })
+    .eq("itinerary_invite_link_id", linkId)
+    .select("itinerary_invite_link_id")
+    .maybeSingle();
+
+  if (error) {
+    if (isMissingTableError(error, "itinerary_invite_link")) {
+      return { success: false as const, message: "Invite links are not enabled yet", error };
+    }
+    return { success: false as const, message: "Failed to revoke invite link", error };
+  }
+
+  if (!data) {
+    return { success: false as const, message: "Invite link not found" };
+  }
+
+  return { success: true as const, message: "Invite link revoked" };
 }
 
 export async function createItineraryInvitation(params: {
@@ -257,6 +467,40 @@ export async function acceptItineraryInvitation(invitationId: string) {
   return {
     success: true as const,
     message: "Invitation accepted",
+    data: {
+      itinerary_id: String(row.itinerary_id),
+      itinerary_destination_id: String(row.itinerary_destination_id),
+    },
+  };
+}
+
+export async function acceptItineraryInviteLink(inviteLinkId: string) {
+  const linkId = String(inviteLinkId ?? "").trim();
+  if (!linkId) {
+    return { success: false as const, message: "Invalid invite link id" };
+  }
+
+  const supabase = createClient();
+
+  const { data, error } = await supabase.rpc("accept_itinerary_invite_link", {
+    p_link_id: linkId,
+  });
+
+  if (error) {
+    if (isMissingTableError(error, "itinerary_invite_link")) {
+      return { success: false as const, message: "Invite links are not enabled yet", error };
+    }
+    return { success: false as const, message: error.message || "Failed to accept invite link", error };
+  }
+
+  const row = Array.isArray(data) ? data[0] : data;
+  if (!row?.itinerary_id || !row?.itinerary_destination_id) {
+    return { success: false as const, message: "Invite accepted, but itinerary details missing" };
+  }
+
+  return {
+    success: true as const,
+    message: "Invite accepted",
     data: {
       itinerary_id: String(row.itinerary_id),
       itinerary_destination_id: String(row.itinerary_destination_id),

@@ -1,5 +1,6 @@
 -- Yugi Travel Itinerary Application - Complete Database Schema
 -- Created: 2025-08-01
+-- Migration version: 20250801031245
 -- Description: Creates all tables, indexes, RLS policies, and triggers for the Yugi app
 
 -- Enable necessary extensions

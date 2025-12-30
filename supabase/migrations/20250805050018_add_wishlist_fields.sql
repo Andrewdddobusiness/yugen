@@ -1,4 +1,5 @@
 -- Add wishlist-specific fields to search history table
+-- Migration version: 20250805050018
 -- This migration enhances the search history table to properly support wishlist functionality
 
 -- Add new columns for wishlist functionality

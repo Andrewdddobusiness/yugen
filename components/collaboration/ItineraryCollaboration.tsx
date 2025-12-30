@@ -8,33 +8,23 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { useToast } from "@/components/ui/use-toast";
 
 import { createClient as createSupabaseClient } from "@/utils/supabase/client";
 import {
-  createItineraryInvitation,
+  getOrCreateItineraryInviteLink,
   listItineraryChangeLog,
-  listItineraryInvitations,
   listItineraryMembers,
-  revokeItineraryInvitation,
+  revokeItineraryInviteLink,
 } from "@/actions/supabase/collaboration";
 import { useItineraryCollaborationStore } from "@/store/itineraryCollaborationStore";
 import {
   useItineraryCollaborationPanelStore,
   type CollaborationTab,
 } from "@/store/itineraryCollaborationPanelStore";
-import type { ItineraryCollaboratorRole, ItineraryInvitationRow } from "@/types/collaboration";
 
 const getInitials = (name: string | null | undefined) => {
   const trimmed = String(name ?? "").trim();
@@ -64,7 +54,6 @@ export function ItineraryCollaborationTrigger({ itineraryId }: { itineraryId: st
 
   const members = useItineraryCollaborationStore((s) => s.members);
   const activeUserIds = useItineraryCollaborationStore((s) => s.activeUserIds);
-  const currentUserRole = useItineraryCollaborationStore((s) => s.currentUserRole);
 
   const { data: membersResult } = useQuery({
     queryKey: ["itineraryMembers", itineraryId],
@@ -86,8 +75,6 @@ export function ItineraryCollaborationTrigger({ itineraryId }: { itineraryId: st
     });
     setMembers(payload.members);
   }, [membersResult, setItineraryMeta, setMembers]);
-
-  const isOwner = currentUserRole === "owner";
 
   // Presence (Supabase Realtime)
   useEffect(() => {
@@ -119,25 +106,9 @@ export function ItineraryCollaborationTrigger({ itineraryId }: { itineraryId: st
     };
   }, [itineraryId, membersResult, setActiveUserIds]);
 
-  const { data: invitationsResult } = useQuery({
-    queryKey: ["itineraryInvitations", itineraryId],
-    queryFn: () => listItineraryInvitations(itineraryId),
-    enabled: isOwner && !!itineraryId,
-    staleTime: 30_000,
-    refetchOnWindowFocus: false,
-  });
-
   const displayedMembers = useMemo(() => members.slice(0, 4), [members]);
   const overflowCount = Math.max(0, members.length - displayedMembers.length);
   const onlineSet = useMemo(() => new Set(activeUserIds), [activeUserIds]);
-
-  const pendingInvites = useMemo(() => {
-    if (!isOwner || !invitationsResult?.success) return [];
-    return invitationsResult.data.filter((invite) => invite.status === "pending");
-  }, [invitationsResult, isOwner]);
-
-  const displayedInvites = useMemo(() => pendingInvites.slice(0, 2), [pendingInvites]);
-  const overflowInviteCount = Math.max(0, pendingInvites.length - displayedInvites.length);
 
   return (
     <button
@@ -178,21 +149,6 @@ export function ItineraryCollaborationTrigger({ itineraryId }: { itineraryId: st
             <Users className="h-4 w-4" />
           </div>
         )}
-
-        {displayedInvites.map((invite) => (
-          <div
-            key={invite.itinerary_invitation_id}
-            className="h-8 w-8 rounded-full border-2 border-dashed border-muted-foreground/40 bg-bg-0 flex items-center justify-center text-xs text-muted-foreground shadow-sm"
-            title={`Invite pending: ${invite.email}`}
-          >
-            {getInitials(invite.email.split("@")[0] ?? null)}
-          </div>
-        ))}
-        {overflowInviteCount > 0 && (
-          <div className="h-8 w-8 rounded-full border-2 border-dashed border-muted-foreground/40 bg-bg-0 flex items-center justify-center text-xs text-muted-foreground shadow-sm">
-            +{overflowInviteCount}
-          </div>
-        )}
       </div>
     </button>
   );
@@ -211,11 +167,9 @@ export function ItineraryCollaborationPanel({ itineraryId }: { itineraryId: stri
   const setMembers = useItineraryCollaborationStore((s) => s.setMembers);
   const members = useItineraryCollaborationStore((s) => s.members);
   const activeUserIds = useItineraryCollaborationStore((s) => s.activeUserIds);
-  const ownerId = useItineraryCollaborationStore((s) => s.ownerId);
   const currentUserId = useItineraryCollaborationStore((s) => s.currentUserId);
   const currentUserRole = useItineraryCollaborationStore((s) => s.currentUserRole);
 
-  const setInvitations = useItineraryCollaborationStore((s) => s.setInvitations);
   const setHistory = useItineraryCollaborationStore((s) => s.setHistory);
 
   const lastItineraryIdRef = React.useRef<string | null>(null);
@@ -276,19 +230,6 @@ export function ItineraryCollaborationPanel({ itineraryId }: { itineraryId: stri
     return copy;
   }, [members, onlineSet]);
 
-  const { data: invitationsResult, refetch: refetchInvitations, isFetching: invitationsFetching } = useQuery({
-    queryKey: ["itineraryInvitations", itineraryId],
-    queryFn: () => listItineraryInvitations(itineraryId),
-    enabled: isOwner && isOpen && tab === "collaborators" && !!itineraryId,
-    staleTime: 10_000,
-    refetchOnWindowFocus: false,
-  });
-
-  useEffect(() => {
-    if (!invitationsResult?.success) return;
-    setInvitations(invitationsResult.data);
-  }, [invitationsResult, setInvitations]);
-
   const { data: historyResult, refetch: refetchHistory, isFetching: historyFetching } = useQuery({
     queryKey: ["itineraryHistory", itineraryId],
     queryFn: () => listItineraryChangeLog({ itineraryId, limit: 200 }),
@@ -331,105 +272,82 @@ export function ItineraryCollaborationPanel({ itineraryId }: { itineraryId: stri
     };
   }, [isOpen, itineraryId, refetchHistory, tab]);
 
-  const [inviteEmail, setInviteEmail] = useState("");
-  const [inviteRole, setInviteRole] = useState<ItineraryCollaboratorRole>("editor");
-  const [inviteCreating, setInviteCreating] = useState(false);
   const [showInviteForm, setShowInviteForm] = useState(false);
-  const inviteEmailInputRef = React.useRef<HTMLInputElement | null>(null);
+  const [inviteLinkId, setInviteLinkId] = useState<string | null>(null);
+  const [inviteLinkLoading, setInviteLinkLoading] = useState(false);
+  const inviteUrl = inviteLinkId ? buildInviteUrl(inviteLinkId) : null;
 
   useEffect(() => {
-    if (!isOpen || tab !== "collaborators") return;
-    if (!showInviteForm) return;
-    const timer = setTimeout(() => inviteEmailInputRef.current?.focus(), 0);
-    return () => clearTimeout(timer);
-  }, [isOpen, showInviteForm, tab]);
+    if (!isOpen) return;
+    setInviteLinkId(null);
+    setShowInviteForm(false);
+  }, [isOpen, itineraryId]);
 
-  const onCreateInvite = async () => {
-    setInviteCreating(true);
+  const loadInviteLink = async () => {
+    setInviteLinkLoading(true);
     try {
-      const result = await createItineraryInvitation({
-        itineraryId,
-        email: inviteEmail,
-        role: inviteRole,
-      });
-      const normalizedEmail = inviteEmail.trim().toLowerCase();
-
+      const result = await getOrCreateItineraryInviteLink(itineraryId);
       if (!result.success) {
-        const maybeDuplicate =
-          (result as any)?.error?.code === "23505" ||
-          String((result as any)?.error?.message ?? "")
-            .toLowerCase()
-            .includes("duplicate") ||
-          String((result as any)?.error?.message ?? "")
-            .toLowerCase()
-            .includes("unique");
-
-        if (maybeDuplicate) {
-          const existing = await listItineraryInvitations(itineraryId);
-          if (existing.success) {
-            const pending = existing.data.find(
-              (invite) =>
-                invite.status === "pending" &&
-                String(invite.email ?? "").trim().toLowerCase() === normalizedEmail
-            );
-            if (pending) {
-              const inviteUrl = buildInviteUrl(pending.itinerary_invitation_id);
-              await navigator.clipboard.writeText(inviteUrl);
-              toast({
-                title: "Invite already exists",
-                description: "Existing link copied to clipboard.",
-              });
-              setInviteEmail("");
-              await refetchInvitations();
-              return;
-            }
-          }
-        }
-
         throw result.error ?? new Error(result.message);
       }
+      setInviteLinkId(result.data.itinerary_invite_link_id);
+      return result.data.itinerary_invite_link_id;
+    } finally {
+      setInviteLinkLoading(false);
+    }
+  };
 
-      const inviteUrl = buildInviteUrl(result.data.itinerary_invitation_id);
-      await navigator.clipboard.writeText(inviteUrl);
-
+  const onCopyInviteLink = async () => {
+    try {
+      const linkId = inviteLinkId ?? (await loadInviteLink());
+      const url = buildInviteUrl(linkId);
+      await navigator.clipboard.writeText(url);
       toast({
-        title: "Invite created",
-        description: "Link copied to clipboard.",
+        title: "Invite link copied",
+        description: "Anyone with the link can join as an editor.",
       });
-      setInviteEmail("");
-      await refetchInvitations();
     } catch (error) {
       console.error(error);
       toast({
         title: "Invite failed",
-        description: error instanceof Error ? error.message : "Could not create invitation.",
+        description:
+          error instanceof Error
+            ? error.message
+            : "Could not create an invite link. Check migrations and permissions.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const onResetInviteLink = async () => {
+    if (!inviteLinkId) {
+      await onCopyInviteLink();
+      return;
+    }
+
+    setInviteLinkLoading(true);
+    try {
+      const revoked = await revokeItineraryInviteLink(inviteLinkId);
+      if (!revoked.success) {
+        throw revoked.error ?? new Error(revoked.message);
+      }
+      setInviteLinkId(null);
+      const newId = await loadInviteLink();
+      const url = buildInviteUrl(newId);
+      await navigator.clipboard.writeText(url);
+      toast({
+        title: "Invite link reset",
+        description: "New link copied to clipboard.",
+      });
+    } catch (error) {
+      console.error(error);
+      toast({
+        title: "Reset failed",
+        description: error instanceof Error ? error.message : "Could not reset invite link.",
         variant: "destructive",
       });
     } finally {
-      setInviteCreating(false);
-    }
-  };
-
-  const onCopyInvite = async (invite: ItineraryInvitationRow) => {
-    try {
-      const inviteUrl = buildInviteUrl(invite.itinerary_invitation_id);
-      await navigator.clipboard.writeText(inviteUrl);
-      toast({ title: "Copied", description: "Invite link copied to clipboard." });
-    } catch (error) {
-      console.error(error);
-      toast({ title: "Copy failed", description: "Could not copy invite link.", variant: "destructive" });
-    }
-  };
-
-  const onRevokeInvite = async (invite: ItineraryInvitationRow) => {
-    try {
-      const result = await revokeItineraryInvitation(invite.itinerary_invitation_id);
-      if (!result.success) throw result.error ?? new Error(result.message);
-      toast({ title: "Invite revoked" });
-      await refetchInvitations();
-    } catch (error) {
-      console.error(error);
-      toast({ title: "Revoke failed", description: "Could not revoke invitation.", variant: "destructive" });
+      setInviteLinkLoading(false);
     }
   };
 
@@ -494,39 +412,28 @@ export function ItineraryCollaborationPanel({ itineraryId }: { itineraryId: stri
                               ? "Loading…"
                               : !isOwner
                               ? `Only the owner can invite. Owner: ${ownerName}`
-                              : "Create an invite link"
+                              : "Copy invite link"
                           }
-	                        onClick={() => {
+	                        onClick={async () => {
 	                          setShowInviteForm(true);
+	                          await onCopyInviteLink();
 	                        }}
 	                      >
 	                        <UserPlus className="h-4 w-4" />
 	                        Add people
 	                      </Button>
 	                    </div>
-                      <div className="text-xs text-muted-foreground mb-2">
-                        {membersFetching ? (
-                          "Loading workspace members…"
-                        ) : membersResult?.success === false ? (
-                          <span className="text-red-600">
-                            Could not load workspace: {membersResult.message}
-                          </span>
-                        ) : currentUserRole ? (
-                          <>
-                            You are <span className="text-ink-900 font-medium">{currentUserRole}</span>
-                            {" "}
-                            · Owner: <span className="text-ink-900 font-medium">{ownerName}</span>
-                            {process.env.NODE_ENV !== "production" && ownerId && currentUserId ? (
-                              <div className="mt-1 text-[10px] leading-4">
-                                ownerId: <span className="font-mono">{ownerId}</span> · you:{" "}
-                                <span className="font-mono">{currentUserId}</span>
-                              </div>
-                            ) : null}
-                          </>
-                        ) : (
-                          "You may not have access to view collaborators."
-                        )}
-                      </div>
+                      {membersFetching || membersResult?.success === false ? (
+                        <div className="text-xs text-muted-foreground mb-2">
+                          {membersFetching ? (
+                            "Loading workspace members…"
+                          ) : (
+                            <span className="text-red-600">
+                              Could not load workspace: {membersResult.message}
+                            </span>
+                          )}
+                        </div>
+                      ) : null}
 	                    <div className="space-y-2">
                         {membersLoaded && !membersFetching && members.length === 0 ? (
                           <div className="text-sm text-muted-foreground">
@@ -567,92 +474,51 @@ export function ItineraryCollaborationPanel({ itineraryId }: { itineraryId: stri
                   {isOwner && showInviteForm && (
                     <div className="rounded-xl border border-stroke-200 bg-bg-0 p-3">
                       <div className="flex items-center justify-between gap-2 mb-3">
-                        <div className="text-sm font-medium text-ink-900">Invite collaborator</div>
+                        <div className="text-sm font-medium text-ink-900">Invite link</div>
                         <Button
                           type="button"
-                          size="sm"
+                          size="icon"
                           variant="ghost"
-                          onClick={() => {
-                            setShowInviteForm(false);
-                            setInviteEmail("");
-                          }}
+                          onClick={() => setShowInviteForm(false)}
+                          aria-label="Close invite link"
                         >
-                          Cancel
+                          <X className="h-4 w-4" />
                         </Button>
                       </div>
 
                       <div className="space-y-2">
-                        <div className="space-y-1">
-                          <Label htmlFor="invite-email">Email</Label>
-                          <Input
-                            id="invite-email"
-                            ref={inviteEmailInputRef}
-                            value={inviteEmail}
-                            onChange={(e) => setInviteEmail(e.target.value)}
-                            placeholder="person@example.com"
-                          />
-                        </div>
-
-                        <div className="space-y-1">
-                          <Label>Role</Label>
-                          <Select value={inviteRole} onValueChange={(value) => setInviteRole(value as ItineraryCollaboratorRole)}>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select role" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="editor">Editor</SelectItem>
-                              <SelectItem value="viewer">Viewer</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-
-                        <Button type="button" className="w-full" disabled={inviteCreating || !inviteEmail} onClick={onCreateInvite}>
-                          Create invite link
-                        </Button>
-                        <div className="text-xs text-muted-foreground">
-                          Creates a link valid for 7 days and copies it to your clipboard.
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {isOwner && (
-                    <div>
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="text-sm font-medium text-ink-900">Invitations</div>
-                        <Button variant="ghost" size="sm" onClick={() => refetchInvitations()} disabled={invitationsFetching}>
-                          Refresh
-                        </Button>
-                      </div>
-
-                      <div className="space-y-2">
-                        {(invitationsResult?.success ? invitationsResult.data : []).map((invite) => (
-                          <div
-                            key={invite.itinerary_invitation_id}
-                            className="flex items-center justify-between gap-3 rounded-lg border border-stroke-200 bg-bg-0 px-3 py-2"
+                        <Input
+                          value={inviteUrl ?? ""}
+                          placeholder={
+                            inviteLinkLoading
+                              ? "Generating link…"
+                              : "Click “Add people” to generate a link"
+                          }
+                          readOnly
+                        />
+                        <div className="flex gap-2">
+                          <Button
+                            type="button"
+                            className="flex-1 gap-2"
+                            disabled={inviteLinkLoading}
+                            onClick={onCopyInviteLink}
                           >
-                            <div className="min-w-0">
-                              <div className="text-sm font-medium truncate">{invite.email}</div>
-                              <div className="text-xs text-muted-foreground">
-                                {invite.role} · {invite.status}
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-1">
-                              <Button variant="ghost" size="icon" onClick={() => onCopyInvite(invite)} aria-label="Copy invite link">
-                                <Copy className="h-4 w-4" />
-                              </Button>
-                              {invite.status === "pending" && (
-                                <Button variant="ghost" size="icon" onClick={() => onRevokeInvite(invite)} aria-label="Revoke invite">
-                                  <X className="h-4 w-4" />
-                                </Button>
-                              )}
-                            </div>
-                          </div>
-                        ))}
-
-                        {invitationsResult?.success && invitationsResult.data.length === 0 && (
-                          <div className="text-sm text-muted-foreground">No invites yet.</div>
-                        )}
+                            <Copy className="h-4 w-4" />
+                            Copy link
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            disabled={inviteLinkLoading}
+                            onClick={onResetInviteLink}
+                          >
+                            Reset
+                          </Button>
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          Anyone with this link can join this itinerary as an editor. Ask the owner to reset the link if
+                          it ever leaks.
+                        </div>
                       </div>
                     </div>
                   )}

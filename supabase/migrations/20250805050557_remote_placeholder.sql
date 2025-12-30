@@ -1,0 +1,3 @@
+-- Placeholder migration.
+-- This version exists in the linked Supabase project's migration history but was not present
+-- in this repository. It is intentionally empty to keep local migrations aligned with remote.

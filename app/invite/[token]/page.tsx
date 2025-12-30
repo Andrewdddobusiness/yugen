@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { createClient } from "@/utils/supabase/server";
-import { acceptItineraryInvitation } from "@/actions/supabase/collaboration";
+import { acceptItineraryInvitation, acceptItineraryInviteLink } from "@/actions/supabase/collaboration";
 
 export default async function InvitePage({
   params,
@@ -65,17 +65,69 @@ export default async function InvitePage({
     .eq("itinerary_invitation_id", token)
     .maybeSingle();
 
-  async function acceptAction() {
-    "use server";
-    const result = await acceptItineraryInvitation(token);
+  const { data: inviteLink } = await supabase
+    .from("itinerary_invite_link")
+    .select("itinerary_invite_link_id,role,revoked_at,expires_at")
+    .eq("itinerary_invite_link_id", token)
+    .maybeSingle();
+
+  const inviteKind: "invitation" | "link" | null = invite
+    ? "invitation"
+    : inviteLink
+      ? "link"
+      : null;
+
+  const linkExpired =
+    inviteLink?.expires_at != null && new Date(inviteLink.expires_at).getTime() < Date.now();
+  const linkRevoked = inviteLink?.revoked_at != null;
+
+  const canAccept =
+    inviteKind === "invitation"
+      ? invite.status === "pending"
+      : inviteKind === "link"
+        ? !linkExpired && !linkRevoked
+        : false;
+
+  if (inviteKind === "link" && canAccept && !searchParams?.error) {
+    const result = await acceptItineraryInviteLink(token);
     if (!result.success) {
-      const message = result.message || "Failed to accept invitation";
+      const message = result.message || "Failed to accept invite link";
       redirect(`/invite/${encodeURIComponent(token)}?error=${encodeURIComponent(message)}`);
     }
 
     redirect(
       `/itinerary/${result.data.itinerary_id}/${result.data.itinerary_destination_id}/builder?view=calendar`
     );
+  }
+
+  async function acceptAction() {
+    "use server";
+
+    if (inviteKind === "invitation") {
+      const result = await acceptItineraryInvitation(token);
+      if (!result.success) {
+        const message = result.message || "Failed to accept invitation";
+        redirect(`/invite/${encodeURIComponent(token)}?error=${encodeURIComponent(message)}`);
+      }
+
+      redirect(
+        `/itinerary/${result.data.itinerary_id}/${result.data.itinerary_destination_id}/builder?view=calendar`
+      );
+    }
+
+    if (inviteKind === "link") {
+      const result = await acceptItineraryInviteLink(token);
+      if (!result.success) {
+        const message = result.message || "Failed to accept invite link";
+        redirect(`/invite/${encodeURIComponent(token)}?error=${encodeURIComponent(message)}`);
+      }
+
+      redirect(
+        `/itinerary/${result.data.itinerary_id}/${result.data.itinerary_destination_id}/builder?view=calendar`
+      );
+    }
+
+    redirect(`/invite/${encodeURIComponent(token)}?error=${encodeURIComponent("Invite link is invalid")}`);
   }
 
   return (
@@ -87,7 +139,7 @@ export default async function InvitePage({
           <div className="text-sm text-red-600">{searchParams.error}</div>
         ) : null}
 
-        {invite ? (
+        {inviteKind === "invitation" ? (
           <div className="space-y-1 text-sm text-muted-foreground">
             <div>
               Invited email: <span className="text-ink-900">{invite.email}</span>
@@ -99,14 +151,23 @@ export default async function InvitePage({
               Status: <span className="text-ink-900">{invite.status}</span>
             </div>
           </div>
+        ) : inviteKind === "link" ? (
+          <div className="space-y-1 text-sm text-muted-foreground">
+            <div>
+              This is a shareable invite link that grants{" "}
+              <span className="text-ink-900">{inviteLink?.role ?? "editor"}</span> access.
+            </div>
+            {linkRevoked ? <div className="text-red-600">This link has been revoked.</div> : null}
+            {linkExpired ? <div className="text-red-600">This link has expired.</div> : null}
+          </div>
         ) : (
           <div className="text-sm text-muted-foreground">
-            This invitation may be invalid, expired, or not intended for your account.
+            This invite may be invalid, expired, or not available.
           </div>
         )}
 
         <form action={acceptAction} className="space-y-2">
-          <Button className="w-full" disabled={!invite || invite.status !== "pending"}>
+          <Button className="w-full" disabled={!canAccept}>
             Accept invite
           </Button>
           <Link href="/itineraries" className="block">
@@ -119,4 +180,3 @@ export default async function InvitePage({
     </div>
   );
 }
-

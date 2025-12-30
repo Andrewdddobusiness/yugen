@@ -478,7 +478,16 @@ export async function fetchFilteredTableData2(
   const { data, error } = await query;
 
   if (error) {
-    console.error("Fetch failed:", error);
+    const code = String(error.code ?? "");
+    const message = String(error.message ?? "");
+    const isMissingActorColumns =
+      code === "42703" && /(created_by|updated_by)/.test(message);
+
+    // Some environments may not have the collaboration migrations applied yet.
+    // Callers can retry without these columns, so avoid noisy logs.
+    if (!isMissingActorColumns) {
+      console.error("Fetch failed:", error);
+    }
     return { success: false, message: "Fetch failed", error };
   }
 

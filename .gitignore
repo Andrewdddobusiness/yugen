@@ -31,6 +31,7 @@ yarn-error.log*
 .env
 *.env
 .env*
+.supabase-db-password
 
 # vercel
 .vercel

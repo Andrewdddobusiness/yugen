@@ -1,4 +1,5 @@
 -- Create proper user wishlist table
+-- Migration version: 20250805050039
 -- This replaces the flawed approach of using itinerary_search_history for wishlist
 -- Creates a user-centric wishlist system as per UX-004 requirements
 
