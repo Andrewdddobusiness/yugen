@@ -13,6 +13,8 @@ import { Button } from '@/components/ui/button';
 import { ActivityCreatedBy } from '@/components/collaboration/ActivityCreatedBy';
 import { useToast } from '@/components/ui/use-toast';
 import { useParams } from 'next/navigation';
+import { useIsFetching } from '@tanstack/react-query';
+import { Skeleton } from '@/components/ui/skeleton';
 import {
   DndContext,
   closestCenter,
@@ -39,6 +41,34 @@ import {
   useDroppable,
 } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
+
+function SidebarActivitiesSkeleton() {
+  return (
+    <div className="p-3 space-y-4">
+      {Array.from({ length: 3 }).map((_, group) => (
+        <div key={group} className="space-y-2">
+          <div className="flex items-center justify-between px-1 py-1">
+            <Skeleton className="h-4 w-28" />
+            <Skeleton className="h-4 w-10" />
+          </div>
+          <div className="space-y-1.5 pl-5">
+            {Array.from({ length: 3 }).map((__, i) => (
+              <div key={i} className="rounded-md border border-transparent bg-muted/30 p-2">
+                <div className="flex items-start gap-2">
+                  <Skeleton className="h-4 w-4 rounded-sm" />
+                  <div className="flex-1 min-w-0 space-y-2">
+                    <Skeleton className="h-4 w-3/4" />
+                    <Skeleton className="h-3 w-1/2" />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 // Droppable Date Header Component
 function DroppableDateHeader({ date, activitiesCount, isCollapsed, onToggle }: {
@@ -304,6 +334,7 @@ export function SimplifiedItinerarySidebar({
 }: {
   useExternalDndContext?: boolean;
 }) {
+  const { itineraryId, destinationId } = useParams();
   const { itineraryActivities, reorderItineraryActivities, updateItineraryActivity } = useItineraryActivityStore();
   const [collapsedDates, setCollapsedDates] = useState<Set<string>>(new Set());
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -311,6 +342,11 @@ export function SimplifiedItinerarySidebar({
   
   // Filter out deleted activities
   const activeActivities = itineraryActivities.filter(activity => !activity.deleted_at);
+  const isActivitiesFetching =
+    useIsFetching({
+      queryKey: ["itineraryActivities", itineraryId, destinationId],
+    }) > 0;
+  const showSkeleton = isActivitiesFetching && activeActivities.length === 0;
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -520,15 +556,23 @@ export function SimplifiedItinerarySidebar({
           <div className="h-2 w-2 bg-blue-500 rounded-full" />
           Itinerary Overview
         </h3>
-        <p className="text-xs text-muted-foreground mt-1">
-          {activeActivities.length} {activeActivities.length === 1 ? 'activity' : 'activities'} added
-        </p>
+        {showSkeleton ? (
+          <div className="mt-2">
+            <Skeleton className="h-3 w-32" />
+          </div>
+        ) : (
+          <p className="text-xs text-muted-foreground mt-1">
+            {activeActivities.length} {activeActivities.length === 1 ? 'activity' : 'activities'} added
+          </p>
+        )}
       </div>
 
       {/* Activities List */}
       <ScrollArea className="flex-1">
         <div className="p-3 space-y-4">
-          {sortedDates.length === 0 ? (
+          {showSkeleton ? (
+            <SidebarActivitiesSkeleton />
+          ) : sortedDates.length === 0 ? (
             <div className="text-center py-8">
               <p className="text-sm text-muted-foreground">No activities added yet</p>
               <p className="text-xs text-muted-foreground mt-1">

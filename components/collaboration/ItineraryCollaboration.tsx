@@ -429,7 +429,7 @@ export function ItineraryCollaborationPanel({ itineraryId }: { itineraryId: stri
                             "Loading workspace members…"
                           ) : (
                             <span className="text-red-600">
-                              Could not load workspace: {membersResult.message}
+                              Could not load workspace: {membersResult?.message ?? "Unknown error"}
                             </span>
                           )}
                         </div>

@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useItineraryActivityStore, type IItineraryActivity } from "@/store/itineraryActivityStore";
 import { useItineraryLayoutStore } from "@/store/itineraryLayoutStore";
 import { useMapStore } from "@/store/mapStore";
-import Loading from "@/components/loading/Loading";
+import { BuilderPageSkeleton } from "@/components/loading/BuilderPageSkeleton";
 import { useParams } from "next/navigation";
 const GoogleCalendarView = lazy(() =>
   import("@/components/view/calendar/GoogleCalendarView").then((module) => ({ default: module.GoogleCalendarView }))
@@ -298,7 +298,15 @@ export default function Builder() {
     return <div>Error: Missing itinerary or destination ID</div>;
   }
 
-  if (isLoading) return <Loading />;
+  if (isLoading) {
+    return (
+      <BuilderPageSkeleton
+        currentView={currentView}
+        showMap={showMap}
+        isMobile={isMobile}
+      />
+    );
+  }
   if (error) {
     console.error('Builder page error:', error);
     return <div>Error: {error.message || 'Unknown error'}</div>;

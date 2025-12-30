@@ -77,16 +77,14 @@ export default async function InvitePage({
       ? "link"
       : null;
 
-  const linkExpired =
-    inviteLink?.expires_at != null && new Date(inviteLink.expires_at).getTime() < Date.now();
-  const linkRevoked = inviteLink?.revoked_at != null;
+  const invitation = inviteKind === "invitation" ? invite : null;
+  const link = inviteKind === "link" ? inviteLink : null;
+
+  const linkExpired = link?.expires_at != null && new Date(link.expires_at).getTime() < Date.now();
+  const linkRevoked = link?.revoked_at != null;
 
   const canAccept =
-    inviteKind === "invitation"
-      ? invite.status === "pending"
-      : inviteKind === "link"
-        ? !linkExpired && !linkRevoked
-        : false;
+    invitation != null ? invitation.status === "pending" : link != null ? !linkExpired && !linkRevoked : false;
 
   if (inviteKind === "link" && canAccept && !searchParams?.error) {
     const result = await acceptItineraryInviteLink(token);
@@ -142,20 +140,20 @@ export default async function InvitePage({
         {inviteKind === "invitation" ? (
           <div className="space-y-1 text-sm text-muted-foreground">
             <div>
-              Invited email: <span className="text-ink-900">{invite.email}</span>
+              Invited email: <span className="text-ink-900">{invitation?.email ?? ""}</span>
             </div>
             <div>
-              Role: <span className="text-ink-900">{invite.role}</span>
+              Role: <span className="text-ink-900">{invitation?.role ?? ""}</span>
             </div>
             <div>
-              Status: <span className="text-ink-900">{invite.status}</span>
+              Status: <span className="text-ink-900">{invitation?.status ?? ""}</span>
             </div>
           </div>
         ) : inviteKind === "link" ? (
           <div className="space-y-1 text-sm text-muted-foreground">
             <div>
               This is a shareable invite link that grants{" "}
-              <span className="text-ink-900">{inviteLink?.role ?? "editor"}</span> access.
+              <span className="text-ink-900">{link?.role ?? "editor"}</span> access.
             </div>
             {linkRevoked ? <div className="text-red-600">This link has been revoked.</div> : null}
             {linkExpired ? <div className="text-red-600">This link has expired.</div> : null}

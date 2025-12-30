@@ -10,10 +10,29 @@ import ItineraryToolbar from '@/components/layout/header/ItineraryToolbar';
 import ItinerarySidebar from '@/components/layout/sidebar/ItinerarySidebar';
 import { useItineraryLayoutStore } from '@/store/itineraryLayoutStore';
 import { fetchItineraryDestination, fetchItineraryDestinationDateRange } from '@/actions/supabase/actions';
-import Loading from '@/components/loading/Loading';
 import ErrorPage from '@/app/error/page';
 const GoogleMapView = lazy(() => import('@/components/map/GoogleMapView'));
 import { useItineraryActivityStore } from '@/store/itineraryActivityStore';
+import { Skeleton } from '@/components/ui/skeleton';
+
+function ItineraryBuilderLayoutSkeleton() {
+  return (
+    <div className="flex flex-col h-full w-full overflow-hidden bg-gray-50">
+      <div className="sticky top-0 z-40 border-b bg-bg-0/90 backdrop-blur-xl shadow-sm">
+        <div className="p-4 space-y-3">
+          <Skeleton className="h-8 w-60 rounded-md" />
+          <Skeleton className="h-10 w-full max-w-md rounded-full" />
+        </div>
+        <div className="p-4 pt-0">
+          <Skeleton className="h-10 w-full max-w-xl rounded-full" />
+        </div>
+      </div>
+      <div className="flex-1 min-h-0 w-full p-4">
+        <Skeleton className="h-full w-full rounded-xl" />
+      </div>
+    </div>
+  );
+}
 
 interface ItineraryBuilderLayoutProps {
   children: React.ReactNode;
@@ -84,9 +103,7 @@ export function ItineraryBuilderLayout({ children, className }: ItineraryBuilder
     console.log('Place selected:', place);
   };
 
-  if (isDestinationLoading || isDateRangeLoading) {
-    return <Loading />;
-  }
+  if (isDestinationLoading || isDateRangeLoading) return <ItineraryBuilderLayoutSkeleton />;
 
   if (destinationError || destinationData?.error || !destinationData?.data) {
     console.error('ItineraryBuilderLayout error:', destinationError, destinationData);
