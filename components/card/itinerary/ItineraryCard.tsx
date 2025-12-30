@@ -20,6 +20,7 @@ import { ImageIcon, MoreHorizontal } from "lucide-react";
 import { capitalizeFirstLetter } from "@/utils/formatting/capitalise";
 import { formatUserFriendlyDate } from "@/utils/formatting/datetime";
 import { Skeleton } from "@/components/ui/skeleton";
+import { getDestinationStockImageUrl } from "@/utils/images/destinationImages";
 
 export interface IItineraryCard {
   itinerary_id: number;
@@ -37,32 +38,24 @@ interface ItineraryCardProps {
 }
 
 export default function ItineraryCard({ itinerary, onDelete }: ItineraryCardProps) {
+  const router = useRouter();
   const [isHovered, setIsHovered] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [useUnsplashFallback, setUseUnsplashFallback] = useState(false);
+  const [useLocalFallback, setUseLocalFallback] = useState(false);
   const [isImageLoading, setIsImageLoading] = useState(true);
 
   useEffect(() => {
-    setUseUnsplashFallback(false);
+    setUseLocalFallback(false);
     setIsImageLoading(true);
   }, [itinerary.itinerary_id, itinerary.city, itinerary.country]);
 
-  const supabaseCityImageSrc =
-    itinerary.city && process.env.NEXT_PUBLIC_SUPABASE_URL
-      ? `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/cities/${itinerary.country.toLowerCase()}-${itinerary.city.toLowerCase()}/1.jpg`
-      : null;
+  const stockImageSrc = getDestinationStockImageUrl(
+    { city: itinerary.city, country: itinerary.country },
+    { width: 1200, height: 800 }
+  );
 
-  const unsplashQuery = [itinerary.city, itinerary.country, "travel"]
-    .filter(Boolean)
-    .map((value) => String(value).trim())
-    .filter(Boolean)
-    .join(",");
-
-  const unsplashImageSrc = `https://source.unsplash.com/featured/1920x1080/?${encodeURIComponent(
-    unsplashQuery || "travel"
-  )}&sig=${itinerary.itinerary_id}`;
-
-  const imageSrc = useUnsplashFallback || !supabaseCityImageSrc ? unsplashImageSrc : supabaseCityImageSrc;
+  const imageSrc = useLocalFallback ? "/map2.jpg" : stockImageSrc;
+  const builderHref = `/itinerary/${itinerary.itinerary_id}/${itinerary.itinerary_destination_id}/builder`;
 
   const handleDelete = async (e: React.MouseEvent) => {
     e.preventDefault();
@@ -87,13 +80,16 @@ export default function ItineraryCard({ itinerary, onDelete }: ItineraryCardProp
 
   return (
     <Link
-      href={`/itinerary/${itinerary.itinerary_id}/${itinerary.itinerary_destination_id}/builder`}
+      href={builderHref}
       legacyBehavior
       passHref
     >
       <Card
         className="h-60 w-full sm:w-60 cursor-pointer relative backdrop-blur-lg sm:shadow-lg sm:hover:scale-105 transition-all duration-300 sm:active:scale-95 rounded-xl"
-        onMouseEnter={() => setIsHovered(true)}
+        onMouseEnter={() => {
+          setIsHovered(true);
+          router.prefetch(builderHref);
+        }}
         onMouseLeave={() => setIsHovered(false)}
       >
         <div className="relative h-40 w-full overflow-hidden rounded-t-xl">
@@ -111,8 +107,8 @@ export default function ItineraryCard({ itinerary, onDelete }: ItineraryCardProp
             className="object-cover"
             onLoadingComplete={() => setIsImageLoading(false)}
             onError={() => {
-              if (!useUnsplashFallback) {
-                setUseUnsplashFallback(true);
+              if (!useLocalFallback) {
+                setUseLocalFallback(true);
                 setIsImageLoading(true);
               } else {
                 setIsImageLoading(false);

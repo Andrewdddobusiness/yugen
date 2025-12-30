@@ -80,6 +80,12 @@ const nextConfig = {
         hostname: 'source.unsplash.com',
         port: '',
         pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: '**.supabase.co',
+        port: '',
+        pathname: '/storage/v1/object/**',
       }
     ],
     // Allow local development images through our proxy

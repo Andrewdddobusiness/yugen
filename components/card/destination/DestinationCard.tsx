@@ -3,6 +3,7 @@
 import { motion } from "framer-motion";
 import { MapPin, Clock, Users, Star } from "lucide-react";
 import Image from "next/image";
+import { getDestinationStockImageUrl } from "@/utils/images/destinationImages";
 
 interface Destination {
   id: string;
@@ -39,18 +40,6 @@ const destinationStats: Record<string, { rating: number; timeToVisit: string }> 
   "dubai": { rating: 4.6, timeToVisit: "2-4 days" }
 };
 
-// Real destination images from Unsplash
-const destinationImages: Record<string, string> = {
-  "paris": "https://images.unsplash.com/photo-1502602898536-47ad22581b52?w=400&h=300&fit=crop&auto=format&q=75", // Eiffel Tower
-  "tokyo": "https://images.unsplash.com/photo-1540959733332-eab4deabeeaf?w=400&h=300&fit=crop&auto=format&q=75", // Tokyo cityscape
-  "london": "https://images.unsplash.com/photo-1513635269975-59663e0ac1ad?w=400&h=300&fit=crop&auto=format&q=75", // Big Ben
-  "new-york": "https://images.unsplash.com/photo-1496442226666-8d4d0e62e6e9?w=400&h=300&fit=crop&auto=format&q=75", // NYC skyline
-  "rome": "https://images.unsplash.com/photo-1552832230-c0197dd311b5?w=400&h=300&fit=crop&auto=format&q=75", // Colosseum
-  "barcelona": "https://images.unsplash.com/photo-1539037116277-4db20889f2d4?w=400&h=300&fit=crop&auto=format&q=75", // Sagrada Familia
-  "sydney": "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=400&h=300&fit=crop&auto=format&q=75", // Sydney Opera House
-  "dubai": "https://images.unsplash.com/photo-1512453979798-5ea266f8880c?w=400&h=300&fit=crop&auto=format&q=75", // Dubai skyline
-};
-
 export default function DestinationCard({ 
   destination, 
   onClick, 
@@ -58,6 +47,10 @@ export default function DestinationCard({
   size = "medium" 
 }: DestinationCardProps) {
   const stats = destinationStats[destination.id] || { travelers: "500K+", rating: 4.5, timeToVisit: "3-5 days" };
+  const stockImageUrl = getDestinationStockImageUrl(
+    { id: destination.id, city: destination.city, country: destination.country },
+    { width: 400, height: 300 }
+  );
   
   const sizeClasses = {
     small: "h-20",
@@ -82,7 +75,7 @@ export default function DestinationCard({
           {/* Background Image */}
           <div className="absolute inset-0">
             <Image
-              src={destinationImages[destination.id] || `https://images.unsplash.com/photo-1499856871958-5b9627545d1a?w=400&h=300&fit=crop&crop=faces,entropy&auto=format&q=75`}
+              src={stockImageUrl}
               alt={destination.name}
               fill
               className="object-cover transition-transform duration-300 group-hover:scale-105"
@@ -120,7 +113,7 @@ export default function DestinationCard({
           {/* Image Section */}
           <div className="relative h-2/3">
             <Image
-              src={destinationImages[destination.id] || `https://images.unsplash.com/photo-1499856871958-5b9627545d1a?w=400&h=300&fit=crop&crop=faces,entropy&auto=format&q=75`}
+              src={stockImageUrl}
               alt={destination.name}
               fill
               className="object-cover transition-transform duration-300 group-hover:scale-105"

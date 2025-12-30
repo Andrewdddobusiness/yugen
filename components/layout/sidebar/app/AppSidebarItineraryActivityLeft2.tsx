@@ -4,6 +4,7 @@ import * as React from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useParams, usePathname } from "next/navigation";
+import dynamic from "next/dynamic";
 import { NotebookPen, SquareChevronLeft, TextSearch } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -23,7 +24,6 @@ import {
 } from "@/components/ui/sidebar";
 
 import { NavUser } from "./NavUser";
-import { SimplifiedItinerarySidebar } from "@/components/layout/sidebar/SimplifiedItinerarySidebar";
 import { DateRange } from "react-day-picker";
 import { Skeleton } from "@/components/ui/skeleton";
 import { DatePickerWithRangePopover3 } from "@/components/form/date/DateRangePickerPopover3";
@@ -31,6 +31,23 @@ import { useEffect, useState } from "react";
 import { fetchItineraryDestination, setItineraryDestinationDateRange } from "@/actions/supabase/actions";
 import { Separator } from "@/components/ui/separator";
 import { useDateRangeStore } from '@/store/dateRangeStore';
+
+const SimplifiedItinerarySidebar = dynamic(
+  () => import("@/components/layout/sidebar/SimplifiedItinerarySidebar").then((mod) => mod.SimplifiedItinerarySidebar),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="p-3 space-y-3">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <div key={i} className="rounded-xl border border-stroke-200 bg-bg-50/60 p-3">
+            <Skeleton className="h-4 w-3/4" />
+            <Skeleton className="mt-2 h-3 w-1/2" />
+          </div>
+        ))}
+      </div>
+    ),
+  }
+);
 
 
 export function AppSidebarItineraryActivityLeft({
@@ -150,16 +167,16 @@ export function AppSidebarItineraryActivityLeft({
                 {navItems.map((item) => (
                   <SidebarMenuItem key={item.title}>
                     <SidebarMenuButton
+                      asChild
                       className={cn(
                         pathname === item.href && "bg-sidebar-accent text-sidebar-accent-foreground",
                         "transition-colors"
                       )}
-                      onClick={() => {
-                        window.location.href = item.href;
-                      }}
                     >
-                      <item.icon className="h-4 w-4" />
-                      <span>{item.title}</span>
+                      <Link href={item.href}>
+                        <item.icon className="h-4 w-4" />
+                        <span>{item.title}</span>
+                      </Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
                 ))}

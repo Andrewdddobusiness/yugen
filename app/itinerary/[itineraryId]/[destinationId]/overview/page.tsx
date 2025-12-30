@@ -13,6 +13,7 @@ import { capitalizeFirstLetter } from "@/utils/formatting/capitalise";
 
 import { fetchCityDetails } from "@/actions/supabase/actions";
 import { Skeleton } from "@/components/ui/skeleton";
+import { getDestinationStockImageUrl } from "@/utils/images/destinationImages";
 
 import { Suspense } from "react";
 
@@ -72,10 +73,13 @@ function OverviewContent() {
       <div className="p-4 h-1/4 relative">
         {cityData ? (
           <Image
-            src={
-              process.env.NEXT_PUBLIC_SUPABASE_URL +
-              `/storage/v1/object/public/cities/co1_c${cityData.destination_city_id}/1.jpg`
-            }
+            src={getDestinationStockImageUrl(
+              {
+                city: cityData?.cities?.city_name,
+                country: cityData?.cities?.countries?.country_name,
+              },
+              { width: 1920, height: 1080 }
+            )}
             alt="Image"
             width="1920"
             height="1080"

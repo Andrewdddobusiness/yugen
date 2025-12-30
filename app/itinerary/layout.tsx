@@ -1,22 +1,10 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ComponentType, type CSSProperties, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useParams, usePathname } from "next/navigation";
 import dynamic from "next/dynamic";
-import {
-  closestCenter,
-  DndContext,
-  KeyboardSensor,
-  PointerSensor,
-  pointerWithin,
-  useSensor,
-  useSensors,
-  type CollisionDetection,
-} from "@dnd-kit/core";
-import { sortableKeyboardCoordinates } from "@dnd-kit/sortable";
 
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
-import { AppSidebarItineraryActivityLeft } from "@/components/layout/sidebar/app/AppSidebarItineraryActivityLeft2";
 import { Separator } from "@/components/ui/separator";
 import {
   Breadcrumb,
@@ -40,22 +28,50 @@ import { useStripeSubscriptionStore, ISubscriptionDetails } from "@/store/stripe
 import { createClient } from "@/utils/supabase/client";
 import { useItineraryLayoutStore } from "@/store/itineraryLayoutStore";
 import { useItineraryActivityStore } from "@/store/itineraryActivityStore";
+import { useItineraryCollaborationPanelStore } from "@/store/itineraryCollaborationPanelStore";
 
 import { Button } from "@/components/ui/button";
 import { Download, Share, Users } from "lucide-react";
 import Loading from "@/components/loading/Loading";
-import {
-  ItineraryCollaborationPanel,
-  ItineraryCollaborationTrigger,
-  openItineraryCollaborationPanel,
-} from "@/components/collaboration/ItineraryCollaboration";
 
 const ShareExportDialog = dynamic(
   () => import("@/components/dialog/export/ShareExportDialog").then((mod) => mod.ShareExportDialog),
   { ssr: false }
 );
 
-export default function Layout({ children }: { children: React.ReactNode }) {
+const AppSidebarItineraryActivityLeft = dynamic(
+  () =>
+    import("@/components/layout/sidebar/app/AppSidebarItineraryActivityLeft2").then(
+      (mod) => mod.AppSidebarItineraryActivityLeft
+    ),
+  {
+    ssr: false,
+    loading: () => <div className="shrink-0" style={{ width: "var(--sidebar-width-icon)" }} />,
+  }
+);
+
+const ItineraryCollaborationTrigger = dynamic(
+  () =>
+    import("@/components/collaboration/ItineraryCollaboration").then((mod) => mod.ItineraryCollaborationTrigger),
+  {
+    ssr: false,
+    loading: () => (
+      <button
+        type="button"
+        className="h-8 w-24 rounded-full bg-muted animate-pulse"
+        aria-label="Open collaboration panel"
+      />
+    ),
+  }
+);
+
+const ItineraryCollaborationPanel = dynamic(
+  () =>
+    import("@/components/collaboration/ItineraryCollaboration").then((mod) => mod.ItineraryCollaborationPanel),
+  { ssr: false }
+);
+
+export default function Layout({ children }: { children: ReactNode }) {
   const { itineraryId, destinationId } = useParams();
   const pathname = usePathname();
 
@@ -64,7 +80,43 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   
   const isBuilderPage = pathname.includes("/builder");
   const currentView = useItineraryLayoutStore((state) => state.currentView);
+  const setSharedDndActive = useItineraryLayoutStore((state) => state.setSharedDndActive);
+  const sharedDndActive = useItineraryLayoutStore((state) => state.sharedDndActive);
   const enableSharedDnd = isBuilderPage && currentView === "calendar";
+  const collaborationOpen = useItineraryCollaborationPanelStore((state) => state.isOpen);
+  const openCollaboration = useItineraryCollaborationPanelStore((state) => state.open);
+
+  const [SharedDndProvider, setSharedDndProvider] = useState<ComponentType<{ children: ReactNode }> | null>(null);
+
+  useEffect(() => {
+    if (!enableSharedDnd) {
+      setSharedDndActive(false);
+      return;
+    }
+
+    if (SharedDndProvider) {
+      setSharedDndActive(true);
+      return;
+    }
+
+    let cancelled = false;
+    setSharedDndActive(false);
+
+    import("@/components/dnd/SharedCalendarDndProvider")
+      .then((mod) => {
+        if (cancelled) return;
+        setSharedDndProvider(() => mod.SharedCalendarDndProvider);
+        setSharedDndActive(true);
+      })
+      .catch((error) => {
+        console.error("Failed to load shared calendar DnD provider:", error);
+        setSharedDndActive(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [enableSharedDnd, setSharedDndActive, SharedDndProvider]);
 
   //**** STORES ****//
   const { setUser, setUserLoading, setProfileUrl, setIsProfileUrlLoading } = useUserStore();
@@ -215,24 +267,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
 
-  const sensors = useSensors(
-    useSensor(PointerSensor, {
-      activationConstraint: { distance: 6 },
-    }),
-    useSensor(KeyboardSensor, {
-      coordinateGetter: sortableKeyboardCoordinates,
-    })
-  );
-
-  const collisionDetection: CollisionDetection = (args) => {
-    const pointerCollisions = pointerWithin(args);
-    const slotCollision = pointerCollisions.find((collision) =>
-      collision.id.toString().startsWith("slot-")
-    );
-    if (slotCollision) return [slotCollision];
-    return closestCenter(args);
-  };
-
   if (!itineraryIdValue || !destinationIdValue) {
     return <Loading />;
   }
@@ -292,7 +326,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const shell = (
     <>
       <AppSidebarItineraryActivityLeft
-        useExternalDndContext={enableSharedDnd}
+        useExternalDndContext={enableSharedDnd && sharedDndActive}
       />
       <main className="flex min-w-0 flex-1 w-full">
         <div className="flex min-w-0 flex-1 flex-col w-full">
@@ -329,7 +363,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               <DropdownMenuContent>
                 <DropdownMenuItem
                   className="cursor-pointer"
-                  onSelect={() => openItineraryCollaborationPanel("collaborators")}
+                  onSelect={() => openCollaboration("collaborators")}
                 >
                   <Users className="size-4" />
                   <span>Invite Collaborators</span>
@@ -346,10 +380,13 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           </header>
           <div className="min-w-0 flex-1 w-full">{children}</div>
         </div>
-        <ItineraryCollaborationPanel itineraryId={itineraryIdValue} />
+        {collaborationOpen ? <ItineraryCollaborationPanel itineraryId={itineraryIdValue} /> : null}
       </main>
     </>
   );
+
+  const sharedDndShell =
+    enableSharedDnd && SharedDndProvider && sharedDndActive ? <SharedDndProvider>{shell}</SharedDndProvider> : shell;
 
   return (
     <>
@@ -360,19 +397,10 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             "--sidebar-width": "420px",
             "--sidebar-width-icon": "48px",
             "--sidebar-width-mobile": "320px",
-          } as React.CSSProperties
+          } as CSSProperties
         }
       >
-        {enableSharedDnd ? (
-          <DndContext
-            sensors={sensors}
-            collisionDetection={collisionDetection}
-          >
-            {shell}
-          </DndContext>
-        ) : (
-          shell
-        )}
+        {sharedDndShell}
     </SidebarProvider>
     <ShareExportDialog
       open={exportDialogOpen}

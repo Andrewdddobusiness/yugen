@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useCallback, useMemo, useRef } from 'react';
-import { useRouter, useSearchParams, usePathname } from 'next/navigation';
+import { useEffect, useCallback, useRef, useState } from 'react';
+import { usePathname } from 'next/navigation';
 import { useItineraryLayoutStore } from '@/store/itineraryLayoutStore';
 import { format, isValid, parseISO } from 'date-fns';
 
@@ -15,17 +15,29 @@ interface UseViewRouterOptions {
   onDateChange?: (date: Date | null) => void;
 }
 
+const validViews: ViewMode[] = ['calendar', 'table', 'list'];
+const isValidView = (view: string | null): view is ViewMode =>
+  view !== null && validViews.includes(view as ViewMode);
+
+const parseUrlDate = (dateStr: string | null): Date | null => {
+  if (!dateStr) return null;
+  try {
+    const date = parseISO(dateStr);
+    return isValid(date) ? date : null;
+  } catch {
+    return null;
+  }
+};
+
 export function useViewRouter(options: UseViewRouterOptions = {}) {
   const {
     enableUrlSync = true,
     paramName = 'view',
     dateParamName = 'date',
     defaultView = 'table',
-    onDateChange
+    onDateChange,
   } = options;
 
-  const router = useRouter();
-  const searchParams = useSearchParams();
   const pathname = usePathname();
   
   const { 
@@ -35,19 +47,18 @@ export function useViewRouter(options: UseViewRouterOptions = {}) {
     defaultView: storeDefaultView 
   } = useItineraryLayoutStore();
 
-  // Get view from URL or use default
-  const urlView = searchParams.get(paramName) as ViewMode | null;
-  const urlDate = searchParams.get(dateParamName);
-  const validViews: ViewMode[] = ['calendar', 'table', 'list'];
-  const isValidView = (view: string | null): view is ViewMode => 
-    view !== null && validViews.includes(view as ViewMode);
+  const currentViewRef = useRef(currentView);
+  useEffect(() => {
+    currentViewRef.current = currentView;
+  }, [currentView]);
 
   const onDateChangeRef = useRef<UseViewRouterOptions['onDateChange']>(onDateChange);
   useEffect(() => {
     onDateChangeRef.current = onDateChange;
   }, [onDateChange]);
 
-  const lastNotifiedDateParamRef = useRef<string | null>(null);
+  const [currentDate, setCurrentDate] = useState<Date | null>(null);
+  const lastNotifiedDateKeyRef = useRef<string | null>(null);
   const debugEnabledRef = useRef(false);
   useEffect(() => {
     if (process.env.NODE_ENV !== 'development') return;
@@ -62,55 +73,57 @@ export function useViewRouter(options: UseViewRouterOptions = {}) {
     console.log('[useViewRouter]', ...args);
   }, []);
 
-  // Parse date from URL
-  const parseUrlDate = useCallback((dateStr: string | null): Date | null => {
-    if (!dateStr) return null;
-    
-    try {
-      const date = parseISO(dateStr);
-      return isValid(date) ? date : null;
-    } catch {
-      return null;
-    }
+  const notifyDateIfChanged = useCallback((date: Date | null) => {
+    const key = date ? format(date, 'yyyy-MM-dd') : null;
+    if (key === lastNotifiedDateKeyRef.current) return;
+    lastNotifiedDateKeyRef.current = key;
+    onDateChangeRef.current?.(date);
   }, []);
 
-  const parsedUrlDate = useMemo(() => parseUrlDate(urlDate), [parseUrlDate, urlDate]);
+  const setCurrentDateIfChanged = useCallback((date: Date | null) => {
+    setCurrentDate((prev) => {
+      const prevTime = prev?.getTime() ?? null;
+      const nextTime = date?.getTime() ?? null;
+      return prevTime === nextTime ? prev : date;
+    });
+    notifyDateIfChanged(date);
+  }, [notifyDateIfChanged]);
 
-  // Sync URL with store on mount
+  // Sync URL with store on mount and on back/forward (popstate).
+  // We intentionally avoid Next.js router.replace here because changing only search params
+  // triggers an RSC navigation (POST "flight" request), which makes view switching feel slow.
   useEffect(() => {
     if (!enableUrlSync) return;
+    if (typeof window === 'undefined') return;
 
-    // If the URL doesn't specify a view, keep whatever the store has (persisted)
-    // instead of forcing the "default" view on every refresh.
-    const targetView = isValidView(urlView) ? urlView : currentView;
-    
-    if (targetView !== currentView) {
-      setCurrentView(targetView);
-    }
+    const syncFromUrl = () => {
+      const params = new URLSearchParams(window.location.search);
+      const urlView = params.get(paramName);
+      const urlDate = params.get(dateParamName);
 
-    // Handle date parameter
-    const nextDateParam = urlDate ?? null;
-    if (nextDateParam !== lastNotifiedDateParamRef.current) {
-      lastNotifiedDateParamRef.current = nextDateParam;
-      const targetDate = parseUrlDate(nextDateParam);
-      debugLog('sync-date', { urlDate: nextDateParam, targetDate });
-      onDateChangeRef.current?.(targetDate);
-    }
-  }, [
-    urlView,
-    urlDate,
-    currentView,
-    setCurrentView,
-    enableUrlSync,
-    parseUrlDate,
-    debugLog,
-  ]);
+      const storeView = currentViewRef.current;
+      const targetView = isValidView(urlView) ? urlView : storeView;
+      if (targetView !== storeView) {
+        debugLog('sync-view', { urlView, storeView, targetView });
+        setCurrentView(targetView);
+      }
+
+      const parsed = parseUrlDate(urlDate);
+      debugLog('sync-date', { urlDate, parsed });
+      setCurrentDateIfChanged(parsed);
+    };
+
+    syncFromUrl();
+    window.addEventListener('popstate', syncFromUrl);
+    return () => window.removeEventListener('popstate', syncFromUrl);
+  }, [enableUrlSync, paramName, dateParamName, debugLog, setCurrentView, setCurrentDateIfChanged]);
 
   // Update URL when view or date changes
   const updateUrl = useCallback((view?: ViewMode, date?: Date | null, replace = true) => {
     if (!enableUrlSync) return;
+    if (typeof window === 'undefined') return;
 
-    const params = new URLSearchParams(searchParams.toString());
+    const params = new URLSearchParams(window.location.search);
     
     // Handle view parameter
     if (view !== undefined) {
@@ -125,23 +138,38 @@ export function useViewRouter(options: UseViewRouterOptions = {}) {
     if (date !== undefined) {
       if (date === null) {
         params.delete(dateParamName);
-        lastNotifiedDateParamRef.current = null;
       } else {
         const dateStr = format(date, 'yyyy-MM-dd');
         params.set(dateParamName, dateStr);
-        lastNotifiedDateParamRef.current = dateStr;
       }
     }
 
     const newUrl = `${pathname}${params.toString() ? `?${params.toString()}` : ''}`;
     
-    // Use replace or push based on parameter
-    if (replace) {
-      router.replace(newUrl, { scroll: false });
-    } else {
-      router.push(newUrl, { scroll: false });
+    // Use history API to avoid triggering an RSC navigation.
+    // IMPORTANT: preserve Next.js App Router's internal history state.
+    const writeHistory = () => {
+      const state: any = window.history.state;
+      const hasNextState = !!(state && (state.__NA || state._N));
+      if (!hasNextState) return false;
+
+      if (replace) {
+        window.history.replaceState(state, '', newUrl);
+      } else {
+        window.history.pushState(state, '', newUrl);
+      }
+
+      return true;
+    };
+
+    // If this runs before Next patches history (possible on very slow devices),
+    // avoid clobbering the internal state; retry once on the next tick.
+    if (!writeHistory()) {
+      setTimeout(() => {
+        writeHistory();
+      }, 0);
     }
-  }, [router, pathname, searchParams, paramName, dateParamName, storeDefaultView, defaultView, enableUrlSync]);
+  }, [pathname, paramName, dateParamName, storeDefaultView, defaultView, enableUrlSync]);
 
   // Enhanced view change with URL sync and error handling
   const changeView = useCallback(async (view: ViewMode, date?: Date | null) => {
@@ -150,64 +178,60 @@ export function useViewRouter(options: UseViewRouterOptions = {}) {
     }
     
     try {
-      // Update URL first for immediate feedback
-      updateUrl(view, date);
-      
-      // Then update store with transition
+      // Update store first for immediate UI response.
       if (view !== currentView) {
         await setViewWithTransition(view);
       }
       
-      // Notify date change if provided
-      if (date !== undefined && onDateChange) {
-        onDateChange(date);
+      if (date !== undefined) {
+        setCurrentDateIfChanged(date);
       }
+
+      updateUrl(view, date);
     } catch (error) {
       console.error('Failed to change view:', error);
-      // Revert URL if transition failed
-      updateUrl(currentView, undefined);
       throw error;
     }
-  }, [currentView, updateUrl, setViewWithTransition, onDateChange]);
+  }, [currentView, updateUrl, setViewWithTransition, setCurrentDateIfChanged]);
 
   // Quick view change without transition but with error handling
   const changeViewInstant = useCallback((view: ViewMode, date?: Date | null) => {
     if (view === currentView && date === undefined) return;
     
     try {
-      updateUrl(view, date);
-      
       if (view !== currentView) {
         setCurrentView(view);
       }
       
-      if (date !== undefined && onDateChange) {
-        onDateChange(date);
+      if (date !== undefined) {
+        setCurrentDateIfChanged(date);
       }
+
+      updateUrl(view, date);
     } catch (error) {
       console.error('Failed to change view instantly:', error);
       throw error;
     }
-  }, [currentView, updateUrl, setCurrentView, onDateChange]);
+  }, [currentView, updateUrl, setCurrentView, setCurrentDateIfChanged]);
 
   // Navigate to specific date in current view with error handling
   const navigateToDate = useCallback((date: Date | null, pushHistory = false) => {
     try {
       debugLog('navigate-to-date', { date, pushHistory });
+      setCurrentDateIfChanged(date);
       updateUrl(undefined, date, !pushHistory);
-      
-      if (onDateChange) {
-        onDateChange(date);
-      }
     } catch (error) {
       console.error('Failed to navigate to date:', error);
       throw error;
     }
-  }, [updateUrl, onDateChange, debugLog]);
+  }, [updateUrl, debugLog, setCurrentDateIfChanged]);
 
   // Generate shareable URL for specific view and/or date
   const getShareableUrl = useCallback((view?: ViewMode, date?: Date | null) => {
-    const params = new URLSearchParams(searchParams.toString());
+    const params =
+      typeof window !== 'undefined'
+        ? new URLSearchParams(window.location.search)
+        : new URLSearchParams();
     
     // Handle view parameter
     if (view !== undefined) {
@@ -232,11 +256,14 @@ export function useViewRouter(options: UseViewRouterOptions = {}) {
       : pathname;
       
     return `${baseUrl}${params.toString() ? `?${params.toString()}` : ''}`;
-  }, [pathname, searchParams, paramName, dateParamName, storeDefaultView, defaultView]);
+  }, [pathname, paramName, dateParamName, storeDefaultView, defaultView]);
 
   // Navigate to specific view with optional query params
   const navigateToView = useCallback((view: ViewMode, additionalParams?: Record<string, string>) => {
-    const params = new URLSearchParams(searchParams.toString());
+    const params =
+      typeof window !== 'undefined'
+        ? new URLSearchParams(window.location.search)
+        : new URLSearchParams();
     
     // Add view param
     if (view === (storeDefaultView || defaultView)) {
@@ -257,8 +284,15 @@ export function useViewRouter(options: UseViewRouterOptions = {}) {
     }
 
     const newUrl = `${pathname}${params.toString() ? `?${params.toString()}` : ''}`;
-    router.push(newUrl);
-  }, [router, pathname, searchParams, paramName, storeDefaultView, defaultView]);
+    if (typeof window === 'undefined') return;
+
+    // Preserve Next.js App Router internal state; avoid dispatching a synthetic popstate
+    // event (Next also listens to it and can enter a bad state).
+    const state: any = window.history.state;
+    const hasNextState = !!(state && (state.__NA || state._N));
+    if (!hasNextState) return;
+    window.history.pushState(state, '', newUrl);
+  }, [pathname, paramName, storeDefaultView, defaultView]);
 
   // Generate deep link URL patterns
   const getDeepLinkUrl = useCallback((view: ViewMode, date: Date) => {
@@ -279,7 +313,7 @@ export function useViewRouter(options: UseViewRouterOptions = {}) {
 
   return {
     currentView,
-    currentDate: parsedUrlDate,
+    currentDate,
     changeView,
     changeViewInstant,
     navigateToDate,
@@ -287,7 +321,7 @@ export function useViewRouter(options: UseViewRouterOptions = {}) {
     getDeepLinkUrl,
     navigateToView,
     isValidView,
-    urlView: isValidView(urlView) ? urlView : null,
-    urlDate: parsedUrlDate,
+    urlView: null,
+    urlDate: currentDate,
   };
 }

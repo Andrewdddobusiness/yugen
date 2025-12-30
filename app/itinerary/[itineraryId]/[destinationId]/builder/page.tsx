@@ -7,24 +7,26 @@ import { useMapStore } from "@/store/mapStore";
 import { BuilderPageSkeleton } from "@/components/loading/BuilderPageSkeleton";
 import { useParams } from "next/navigation";
 import { fetchBuilderBootstrap } from "@/actions/supabase/builderBootstrap";
-const GoogleCalendarView = lazy(() =>
-  import("@/components/view/calendar/GoogleCalendarView").then((module) => ({ default: module.GoogleCalendarView }))
-);
-const ItineraryTableView = lazy(() =>
-  import("@/components/table/ItineraryTable").then((module) => ({ default: module.ItineraryTableView }))
-);
-const ItineraryListView = lazy(() =>
-  import("@/components/list/containers/ItineraryListView").then((module) => ({ default: module.ItineraryListView }))
-);
+const loadGoogleCalendarView = () =>
+  import("@/components/view/calendar/GoogleCalendarView").then((module) => ({ default: module.GoogleCalendarView }));
+const loadItineraryTableView = () =>
+  import("@/components/table/ItineraryTable").then((module) => ({ default: module.ItineraryTableView }));
+const loadItineraryListView = () =>
+  import("@/components/list/containers/ItineraryListView").then((module) => ({ default: module.ItineraryListView }));
+
+const GoogleCalendarView = lazy(loadGoogleCalendarView);
+const ItineraryTableView = lazy(loadItineraryTableView);
+const ItineraryListView = lazy(loadItineraryListView);
 import { Button } from "@/components/ui/button";
 import { Map as MapIcon, X } from "lucide-react";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable';
 import { ViewToggle } from "@/components/view/toggle/ViewToggle";
-import { ViewTransition, ViewLoadingState } from "@/components/view/toggle/ViewTransition";
+import { ViewTransition } from "@/components/view/toggle/ViewTransition";
 import { useViewRouter } from "@/hooks/useViewRouter";
 import { useViewStatePreservation } from "@/hooks/useViewStatePreservation";
 import { getDestination } from "@/actions/supabase/destinations";
 import { geocodeAddress } from "@/actions/google/maps";
+import { BuilderViewSkeleton } from "@/components/loading/BuilderViewSkeleton";
 
 class MapLoadErrorBoundary extends React.Component<
   {
@@ -95,6 +97,7 @@ export default function Builder() {
   const { 
     currentView, 
     showMap, 
+    sharedDndActive,
     isTransitioningView,
     updateContextData,
     setCurrentView, 
@@ -138,6 +141,25 @@ export default function Builder() {
   
   const [isMobile, setIsMobile] = useState(false);
 
+  // Prefetch view chunks so switching views doesn't feel like a navigation.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const preload = () => {
+      void loadGoogleCalendarView();
+      void loadItineraryTableView();
+      void loadItineraryListView();
+    };
+
+    if ("requestIdleCallback" in window) {
+      const id = (window as any).requestIdleCallback(preload, { timeout: 1000 });
+      return () => (window as any).cancelIdleCallback?.(id);
+    }
+
+    const id: ReturnType<typeof setTimeout> = setTimeout(preload, 0);
+    return () => clearTimeout(id);
+  }, []);
+
   // View state preservation
   const { saveScrollPosition, restoreScrollPosition } = useViewStatePreservation({
     onViewEnter: (view) => {
@@ -148,9 +170,9 @@ export default function Builder() {
                       view === 'table' ? tableRef.current : null;
         
         if (element) {
-          restoreScrollPosition(element, view, 200);
+          restoreScrollPosition(element, view, 50);
         }
-      }, 300); // Wait for view transition to complete
+      }, 0);
     },
     onViewExit: (view) => {
       // Save scroll position for the exiting view
@@ -351,10 +373,9 @@ export default function Builder() {
                   <div className="h-full min-h-0 bg-bg-50 dark:bg-ink-900">
                     <ViewTransition 
                       viewKey={currentView}
-                      loadingComponent={<ViewLoadingState />}
                       className="h-full w-full"
                     >
-                      <Suspense fallback={<ViewLoadingState />}>
+                      <Suspense fallback={<BuilderViewSkeleton view={currentView} />}>
                         {currentView === 'calendar' ? (
                           <div ref={calendarRef} className="h-full w-full overflow-hidden">
                             <GoogleCalendarView
@@ -362,7 +383,7 @@ export default function Builder() {
                               className="h-full w-full"
                               selectedDate={currentDate ?? undefined}
                               onSelectedDateChange={(date) => navigateToDate(date)}
-                              useExternalDndContext
+                              useExternalDndContext={sharedDndActive}
                             />
                           </div>
                         ) : currentView === 'table' ? (
@@ -435,10 +456,9 @@ export default function Builder() {
               <div className="h-full w-full bg-bg-50 dark:bg-ink-900">
                 <ViewTransition 
                   viewKey={currentView}
-                  loadingComponent={<ViewLoadingState />}
                   className="h-full w-full"
                 >
-                  <Suspense fallback={<ViewLoadingState />}>
+                  <Suspense fallback={<BuilderViewSkeleton view={currentView} />}>
                     {currentView === 'calendar' ? (
                           <div ref={calendarRef} className="h-full w-full overflow-hidden">
                             <GoogleCalendarView
@@ -446,7 +466,7 @@ export default function Builder() {
                               className="h-full w-full"
                               selectedDate={currentDate ?? undefined}
                               onSelectedDateChange={(date) => navigateToDate(date)}
-                              useExternalDndContext
+                              useExternalDndContext={sharedDndActive}
                             />
                           </div>
                         ) : currentView === 'table' ? (

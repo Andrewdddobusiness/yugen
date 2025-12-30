@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useCallback, useEffect } from "react";
-import { motion } from "framer-motion";
 import { Calendar, Table, List, Map, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -66,6 +65,24 @@ export function ViewToggle({
 }: ViewToggleProps) {
   const { currentView, showMap, isTransitioningView, toggleMap } = useItineraryLayoutStore();
 
+  const prefetchView = useCallback((view: ViewMode) => {
+    // Warm the JS chunk so switching views feels instant.
+    // This is especially noticeable for the List view which has more UI.
+    if (typeof window === "undefined") return;
+
+    switch (view) {
+      case "calendar":
+        void import("@/components/view/calendar/GoogleCalendarView");
+        break;
+      case "table":
+        void import("@/components/table/ItineraryTable");
+        break;
+      case "list":
+        void import("@/components/list/containers/ItineraryListView");
+        break;
+    }
+  }, []);
+
   const handleViewChange = useCallback(
     (view: ViewMode) => {
       if (view === currentView || isTransitioning || isTransitioningView) return;
@@ -128,30 +145,21 @@ export function ViewToggle({
                     size="sm"
                     disabled={isTransitioning || isTransitioningView}
                     onClick={() => handleViewChange(config.id)}
+                    onPointerEnter={() => prefetchView(config.id)}
+                    onPointerDown={() => prefetchView(config.id)}
+                    onFocus={() => prefetchView(config.id)}
                     className={cn(
                       "relative transition-colors duration-200 bg-transparent hover:bg-transparent",
+                      isActive && "bg-bg-0 dark:bg-white/10 shadow-sm",
                       isActive
                         ? "text-brand-500"
                         : "text-ink-500 dark:text-white/60 hover:text-ink-900 dark:hover:text-white"
                     )}
                   >
-                    {isActive && (
-                      <motion.div
-                        layoutId="activeView"
-                        className="absolute inset-0 bg-bg-0 dark:bg-white/10 shadow-sm rounded-[inherit]"
-                        initial={false}
-                        transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
-                      />
-                    )}
-
                     {isTransitioning && isActive && (
-                      <motion.div
-                        initial={{ opacity: 0, scale: 0.8 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        className="absolute inset-0 flex items-center justify-center z-20"
-                      >
+                      <div className="absolute inset-0 flex items-center justify-center z-20">
                         <div className="w-4 h-4 border-2 border-stroke-200 border-t-brand-500 rounded-full animate-spin" />
-                      </motion.div>
+                      </div>
                     )}
 
                     <div className="relative z-10 flex items-center">
