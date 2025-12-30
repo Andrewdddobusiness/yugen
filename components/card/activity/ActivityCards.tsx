@@ -29,11 +29,6 @@ export default function ActivityCards({ activities, onSelectActivity }: IActivit
         itineraryId.toString(), 
         destinationId.toString()
       );
-      
-      queryClient.invalidateQueries({
-        queryKey: ["itineraryActivities", itineraryId, destinationId],
-        exact: true,
-      });
     } catch (error) {
       console.error("Error adding activity:", error);
     } finally {
@@ -50,11 +45,6 @@ export default function ActivityCards({ activities, onSelectActivity }: IActivit
         activity.place_id, 
         Array.isArray(itineraryId) ? itineraryId[0] : itineraryId
       );
-      
-      queryClient.invalidateQueries({
-        queryKey: ["itineraryActivities", itineraryId, destinationId],
-        exact: true,
-      });
     } catch (error) {
       console.error("Error removing activity:", error);
     } finally {

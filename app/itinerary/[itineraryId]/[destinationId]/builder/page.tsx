@@ -6,6 +6,7 @@ import { useItineraryLayoutStore } from "@/store/itineraryLayoutStore";
 import { useMapStore } from "@/store/mapStore";
 import { BuilderPageSkeleton } from "@/components/loading/BuilderPageSkeleton";
 import { useParams } from "next/navigation";
+import { fetchBuilderBootstrap } from "@/actions/supabase/builderBootstrap";
 const GoogleCalendarView = lazy(() =>
   import("@/components/view/calendar/GoogleCalendarView").then((module) => ({ default: module.GoogleCalendarView }))
 );
@@ -90,7 +91,7 @@ export default function Builder() {
   const itinId = itineraryId?.toString();
   const destId = destinationId?.toString();
 
-  const { itineraryActivities, fetchItineraryActivities, setItineraryActivities } = useItineraryActivityStore();
+  const { itineraryActivities, setItineraryActivities } = useItineraryActivityStore();
   const { 
     currentView, 
     showMap, 
@@ -163,28 +164,25 @@ export default function Builder() {
     },
   });
 
-  // Fetch itinerary activities
-  const { isLoading, error, data } = useQuery({
-    queryKey: ["itineraryActivities", itineraryId, destinationId],
-    queryFn: () => fetchItineraryActivities(itinId, destId),
-    enabled: !!itineraryId && !!destinationId,
+  // Batch builder critical-path reads into one request (destination + activities + collaboration data).
+  const {
+    isLoading,
+    error,
+    data: bootstrap,
+  } = useQuery({
+    queryKey: ["builderBootstrap", itineraryId, destinationId],
+    queryFn: async () => {
+      const result = await fetchBuilderBootstrap(itinId!, destId!);
+      if (!result.success) {
+        throw new Error(result.message || "Failed to load builder data");
+      }
+      return result.data;
+    },
+    enabled: !!itinId && !!destId,
     staleTime: 10 * 60 * 1000,
     gcTime: 20 * 60 * 1000,
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
-  });
-
-  // Fetch destination data for map centering
-  const { data: destinationData } = useQuery({
-    queryKey: ["destination", destinationId],
-    queryFn: async () => {
-      const result = await getDestination(destId);
-      if (result.success && result.data) {
-        return result.data;
-      }
-      return null;
-    },
-    enabled: !!destinationId,
   });
 
   // Detect mobile devices
@@ -200,12 +198,14 @@ export default function Builder() {
 
   // Separate effects to reduce unnecessary re-runs
   useEffect(() => {
-    if (!data) return;
+    if (!bootstrap?.activities) return;
     if (!destId) return;
 
     const current = useItineraryActivityStore.getState().itineraryActivities;
 
-    // Only hydrate from react-query when the store is empty OR when the store
+    const data = bootstrap.activities as IItineraryActivity[];
+
+    // Only hydrate from the bootstrap payload when the store is empty OR when the store
     // is for a different destination. This avoids view/date URL navigations
     // re-applying stale cached query data over optimistic store updates.
     const hasDifferentDestination = current.some(
@@ -238,7 +238,7 @@ export default function Builder() {
     if (changed) {
       setItineraryActivities(Array.from(byId.values()));
     }
-  }, [data, destId, setItineraryActivities]);
+  }, [bootstrap, destId, setItineraryActivities]);
 
   // Context data update in separate effect with memoized calculation
   useEffect(() => {
@@ -272,8 +272,9 @@ export default function Builder() {
   // Geocode destination and set map coordinates
   useEffect(() => {
     const geocodeDestination = async () => {
-      if (destinationData?.city && destinationData?.country) {
-        const address = `${destinationData.city}, ${destinationData.country}`;
+      const destination = bootstrap?.destination;
+      if (destination?.city && destination?.country) {
+        const address = `${destination.city}, ${destination.country}`;
         
         try {
           const result = await geocodeAddress(address);
@@ -291,7 +292,7 @@ export default function Builder() {
     };
 
     geocodeDestination();
-  }, [destinationData, setItineraryCoordinates]);
+  }, [bootstrap, setItineraryCoordinates]);
 
   if (!itineraryId || !destinationId) {
     console.error('Missing required route params');
@@ -414,7 +415,11 @@ export default function Builder() {
                             <ItineraryMap
                               activities={filteredActivities}
                               showRoutes={true}
-                              destinationName={destinationData ? `${destinationData.city}, ${destinationData.country}` : undefined}
+                              destinationName={
+                                bootstrap?.destination?.city && bootstrap?.destination?.country
+                                  ? `${bootstrap.destination.city}, ${bootstrap.destination.country}`
+                                  : undefined
+                              }
                               onActivitySelect={() => {}}
                               onActivityEdit={() => {}}
                               onAddSuggestion={() => {}}

@@ -96,9 +96,9 @@ export function useTravelTimes(
       });
 
       if (daysWithValidActivities.length === 0) {
-        setTravelTimes({});
-        setLoading({});
-        setError({});
+        setTravelTimes((prev) => (Object.keys(prev).length > 0 ? {} : prev));
+        setLoading((prev) => (Object.keys(prev).length > 0 ? {} : prev));
+        setError((prev) => (Object.keys(prev).length > 0 ? {} : prev));
         return;
       }
 

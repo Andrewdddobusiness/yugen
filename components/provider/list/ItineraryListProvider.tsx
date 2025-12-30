@@ -6,6 +6,7 @@ import { useParams } from 'next/navigation';
 import { useItineraryActivityStore, IItineraryActivity } from '@/store/itineraryActivityStore';
 import { useItineraryLayoutStore } from '@/store/itineraryLayoutStore';
 import { useTravelTimes } from '@/components/hooks/use-travel-times';
+import type { ActivityWithCoordinates } from '@/utils/travel/travelTimeUtils';
 import type { TravelMode } from '@/actions/google/travelTime';
 import type { FilterableActivity } from '../../list/SearchAndFilter';
 
@@ -94,8 +95,9 @@ export function ItineraryListProvider({ children }: ItineraryListProviderProps) 
   const { itineraryActivities, removeItineraryActivity } = useItineraryActivityStore();
 
   // Filter out deleted activities
-  const activeActivities = itineraryActivities.filter(
-    (activity) => activity.deleted_at === null
+  const activeActivities = useMemo(
+    () => itineraryActivities.filter((activity) => activity.deleted_at === null),
+    [itineraryActivities]
   );
 
   // Activity removal handler
@@ -252,24 +254,30 @@ export function ItineraryListProvider({ children }: ItineraryListProviderProps) 
   }, [groupedActivities]);
 
   // Travel time integration
+  const travelTimeGroupedActivities = useMemo<Array<[string, ActivityWithCoordinates[]]>>(() => {
+    return groupedActivities.map(([date, activities]) => [
+      date,
+      activities.map((activity) => ({
+        itinerary_activity_id: activity.itinerary_activity_id,
+        start_time: activity.start_time,
+        end_time: activity.end_time,
+        activity: activity.activity
+          ? {
+              name: activity.activity.name,
+              coordinates: activity.activity.coordinates,
+            }
+          : undefined,
+      })),
+    ]);
+  }, [groupedActivities]);
+
   const { 
     travelTimes, 
     loading: travelTimesLoading, 
     error: travelTimesError,
     refreshTravelTimes
   } = useTravelTimes(
-    groupedActivities.map(([date, activities]) => [
-      date,
-      activities.map(activity => ({
-        itinerary_activity_id: activity.itinerary_activity_id,
-        start_time: activity.start_time,
-        end_time: activity.end_time,
-        activity: activity.activity ? {
-          name: activity.activity.name,
-          coordinates: activity.activity.coordinates
-        } : undefined
-      }))
-    ]),
+    travelTimeGroupedActivities,
     { modes: travelModes, autoRefresh: false }
   );
 
