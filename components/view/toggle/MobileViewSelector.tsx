@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
-import { Calendar, Table, List, ChevronDown, Check } from "lucide-react";
+import { Calendar, Table, ChevronDown, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useItineraryLayoutStore } from "@/store/itineraryLayoutStore";
 
@@ -28,12 +28,6 @@ const viewConfigs: ViewConfig[] = [
     label: 'Table',
     icon: Table,
     description: 'Detailed data view'
-  },
-  {
-    id: 'list',
-    label: 'List',
-    icon: List,
-    description: 'Simple day-by-day view'
   }
 ];
 
@@ -49,7 +43,8 @@ export function MobileViewSelector({
   const { currentView, setCurrentView, isTransitioningView } = useItineraryLayoutStore();
   const [isOpen, setIsOpen] = useState(false);
 
-  const currentConfig = viewConfigs.find(config => config.id === currentView);
+  const safeCurrentView = currentView === 'list' ? 'table' : currentView;
+  const currentConfig = viewConfigs.find(config => config.id === safeCurrentView);
   const CurrentIcon = currentConfig?.icon || Calendar;
 
   const handleViewChange = (view: ViewMode) => {
@@ -131,7 +126,7 @@ export function MobileViewSelector({
               <div className="p-2 space-y-1">
                 {viewConfigs.map((config) => {
                   const Icon = config.icon;
-                  const isActive = currentView === config.id;
+                  const isActive = safeCurrentView === config.id;
                   
                   return (
                     <motion.button

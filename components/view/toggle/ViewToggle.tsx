@@ -1,12 +1,13 @@
 "use client";
 
 import React, { useCallback, useEffect } from "react";
-import { Calendar, Table, List, Map, X } from "lucide-react";
+import { Calendar, Table, Map, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { useItineraryLayoutStore } from "@/store/itineraryLayoutStore";
 import { MobileViewSelector } from "./MobileViewSelector";
+import { ActivityCategoryColorsPopover } from "./ActivityCategoryColorsPopover";
 
 export type ViewMode = "calendar" | "table" | "list";
 
@@ -35,14 +36,6 @@ const viewConfigs: ViewConfig[] = [
     description: "Structured data view with sorting and filtering",
     keyboardShortcut: "Ctrl+2",
     recommendedFor: ["detailed-planning", "data-analysis"],
-  },
-  {
-    id: "list",
-    label: "List",
-    icon: List,
-    description: "Simple day-by-day itinerary view",
-    keyboardShortcut: "Ctrl+3",
-    recommendedFor: ["quick-overview", "mobile-viewing"],
   },
 ];
 
@@ -77,9 +70,6 @@ export function ViewToggle({
       case "table":
         void import("@/components/table/ItineraryTable");
         break;
-      case "list":
-        void import("@/components/list/containers/ItineraryListView");
-        break;
     }
   }, []);
 
@@ -103,10 +93,6 @@ export function ViewToggle({
         case "2":
           event.preventDefault();
           handleViewChange("table");
-          break;
-        case "3":
-          event.preventDefault();
-          handleViewChange("list");
           break;
         case "m":
           event.preventDefault();
@@ -207,6 +193,8 @@ export function ViewToggle({
             </TooltipContent>
           </Tooltip>
         )}
+
+        <ActivityCategoryColorsPopover />
       </div>
     </TooltipProvider>
   );

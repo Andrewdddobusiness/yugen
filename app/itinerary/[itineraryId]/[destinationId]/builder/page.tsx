@@ -103,6 +103,8 @@ export default function Builder() {
     setCurrentView, 
     toggleMap 
   } = useItineraryLayoutStore();
+  // List view is temporarily disabled (minimal builder UI).
+  const effectiveView = currentView === "list" ? "table" : currentView;
   const { setItineraryCoordinates } = useMapStore();
   
   const [targetDate, setTargetDate] = useState<Date | null>(null);
@@ -148,7 +150,6 @@ export default function Builder() {
     const preload = () => {
       void loadGoogleCalendarView();
       void loadItineraryTableView();
-      void loadItineraryListView();
     };
 
     if ("requestIdleCallback" in window) {
@@ -324,7 +325,7 @@ export default function Builder() {
   if (isLoading) {
     return (
       <BuilderPageSkeleton
-        currentView={currentView}
+        currentView={effectiveView}
         showMap={showMap}
         isMobile={isMobile}
       />
@@ -372,11 +373,11 @@ export default function Builder() {
                 <ResizablePanel defaultSize={60} className="min-w-0">
                   <div className="h-full min-h-0 bg-bg-50 dark:bg-ink-900">
                     <ViewTransition 
-                      viewKey={currentView}
+                      viewKey={effectiveView}
                       className="h-full w-full"
                     >
-                      <Suspense fallback={<BuilderViewSkeleton view={currentView} />}>
-                        {currentView === 'calendar' ? (
+                      <Suspense fallback={<BuilderViewSkeleton view={effectiveView} />}>
+                        {effectiveView === 'calendar' ? (
                           <div ref={calendarRef} className="h-full w-full overflow-hidden">
                             <GoogleCalendarView
                               isLoading={false}
@@ -386,20 +387,11 @@ export default function Builder() {
                               useExternalDndContext={sharedDndActive}
                             />
                           </div>
-                        ) : currentView === 'table' ? (
+                        ) : (
                           <div ref={tableRef} className="h-full w-full overflow-auto">
                             <div className="p-4 min-w-0">
                               <ItineraryTableView showMap={showMap} onToggleMap={toggleMap} />
                             </div>
-                          </div>
-                        ) : (
-                          <div className="h-full w-full overflow-y-auto">
-                            <ItineraryListView
-                              ref={listRef}
-                              showMap={showMap}
-                              onToggleMap={toggleMap}
-                              targetDate={targetDate}
-                            />
                           </div>
                         )}
                       </Suspense>
@@ -455,11 +447,11 @@ export default function Builder() {
             ) : (
               <div className="h-full w-full bg-bg-50 dark:bg-ink-900">
                 <ViewTransition 
-                  viewKey={currentView}
+                  viewKey={effectiveView}
                   className="h-full w-full"
                 >
-                  <Suspense fallback={<BuilderViewSkeleton view={currentView} />}>
-                    {currentView === 'calendar' ? (
+                  <Suspense fallback={<BuilderViewSkeleton view={effectiveView} />}>
+                    {effectiveView === 'calendar' ? (
                           <div ref={calendarRef} className="h-full w-full overflow-hidden">
                             <GoogleCalendarView
                               isLoading={false}
@@ -469,21 +461,12 @@ export default function Builder() {
                               useExternalDndContext={sharedDndActive}
                             />
                           </div>
-                        ) : currentView === 'table' ? (
-                          <div ref={tableRef} className="h-full w-full overflow-auto">
-                            <div className="p-4 min-w-0">
-                              <ItineraryTableView showMap={false} onToggleMap={toggleMap} />
-                        </div>
-                      </div>
                     ) : (
-                      <div className="h-full w-full overflow-y-auto">
-                        <ItineraryListView
-                          ref={listRef}
-                          showMap={false}
-                          onToggleMap={toggleMap}
-                          targetDate={targetDate}
-                        />
+                      <div ref={tableRef} className="h-full w-full overflow-auto">
+                        <div className="p-4 min-w-0">
+                          <ItineraryTableView showMap={false} onToggleMap={toggleMap} />
                       </div>
+                    </div>
                     )}
                   </Suspense>
                 </ViewTransition>

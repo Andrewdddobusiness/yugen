@@ -3,8 +3,7 @@
 import React from 'react';
 import { Clock, MapPin, Star, DollarSign, Phone, Globe, CalendarCheck, AlertCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
-
-export type ActivityAccent = "brand" | "teal" | "amber" | "coral" | "lime" | "tan";
+import type { ActivityAccent } from '@/lib/activityAccent';
 
 interface ActivityData {
   name: string;
@@ -38,6 +37,7 @@ interface ActivityBlockContentProps {
   activity: ScheduledActivity;
   blockSize: 'compact' | 'standard' | 'extended';
   activityAccent: ActivityAccent;
+  customAccentColor?: string;
   isResizing?: boolean;
   isDragging?: boolean;
 }
@@ -46,6 +46,7 @@ export function ActivityBlockContent({
   activity,
   blockSize,
   activityAccent,
+  customAccentColor,
   isResizing,
   isDragging
 }: ActivityBlockContentProps) {
@@ -121,6 +122,8 @@ export function ActivityBlockContent({
     lime: "bg-lime-500",
     tan: "bg-tan-500",
   };
+
+  const accentDotStyle = customAccentColor ? { backgroundColor: customAccentColor } : undefined;
 
   const chipClass =
     "inline-flex items-center gap-1 rounded-full border border-stroke-200 bg-bg-0/70 px-2 py-0.5 text-xs font-medium text-ink-700 dark:border-white/10 dark:bg-white/5 dark:text-white/80";
@@ -204,14 +207,26 @@ export function ActivityBlockContent({
             
             {priceLevel && (
               <span className={chipClass}>
-                <span className={cn("h-1.5 w-1.5 rounded-full", accentDotClass[activityAccent])} />
+                <span
+                  className={cn(
+                    "h-1.5 w-1.5 rounded-full",
+                    customAccentColor ? "bg-transparent" : accentDotClass[activityAccent]
+                  )}
+                  style={accentDotStyle}
+                />
                 {priceLevel}
               </span>
             )}
           </div>
 
           <span className={chipClass}>
-            <span className={cn("h-1.5 w-1.5 rounded-full", accentDotClass[activityAccent])} />
+            <span
+              className={cn(
+                "h-1.5 w-1.5 rounded-full",
+                customAccentColor ? "bg-transparent" : accentDotClass[activityAccent]
+              )}
+              style={accentDotStyle}
+            />
             {getDurationText(activity.duration)}
           </span>
         </div>

@@ -15,6 +15,8 @@ import { useToast } from '@/components/ui/use-toast';
 import { useParams } from 'next/navigation';
 import { useIsFetching } from '@tanstack/react-query';
 import { Skeleton } from '@/components/ui/skeleton';
+import { ACTIVITY_ACCENT_BORDER_CLASSES, getActivityThemeForTypes } from '@/lib/activityAccent';
+import { useItineraryLayoutStore } from '@/store/itineraryLayoutStore';
 import {
   DndContext,
   closestCenter,
@@ -123,10 +125,14 @@ function DroppableDateHeader({ date, activitiesCount, isCollapsed, onToggle }: {
 // Sortable Activity Item Component
 function SortableActivityItem({ 
   activity, 
-  getActivityTypeIcon 
+  getActivityTypeIcon,
+  accentBorderClassName,
+  accentBorderColor,
 }: { 
   activity: any;
   getActivityTypeIcon: (types: string[] | undefined) => string;
+  accentBorderClassName: string;
+  accentBorderColor?: string;
 }) {
   const { itineraryId, destinationId } = useParams();
   const duplicateItineraryActivity = useItineraryActivityStore((s) => s.duplicateItineraryActivity);
@@ -196,7 +202,7 @@ function SortableActivityItem({
     <>
       <div
         ref={setNodeRef}
-        style={style}
+        style={{ ...style, ...(accentBorderColor ? { borderLeftColor: accentBorderColor } : {}) }}
         onContextMenu={(e) => {
           e.preventDefault();
           e.stopPropagation();
@@ -209,61 +215,64 @@ function SortableActivityItem({
           setContextMenu({ x: nextX, y: nextY });
         }}
         className={cn(
-          "p-2 rounded-md bg-muted/30 hover:bg-muted/60 transition-all duration-200",
-          "cursor-move group border border-transparent hover:border-muted-foreground/20",
+          "w-full rounded-md border border-stroke-200 border-l-4 bg-muted/30 hover:bg-muted/60 transition-colors duration-200",
+          "cursor-move group overflow-hidden",
+          !accentBorderColor && accentBorderClassName,
           isDragging && "opacity-50 shadow-lg"
         )}
       >
-        <div className="flex items-start gap-2">
-          {/* Drag Handle */}
-          <div
-            {...attributes}
-            {...listeners}
-            className="mt-0.5 cursor-grab active:cursor-grabbing touch-none"
-          >
-            <GripVertical className="h-3 w-3 text-muted-foreground/60 group-hover:text-muted-foreground" />
-          </div>
-
-          {/* Activity Type Icon */}
-          <span className="text-sm mt-0.5">
-            {getActivityTypeIcon(activity.activity?.types)}
-          </span>
-
-          {/* Activity Details */}
-          <div className="flex-1 min-w-0">
-            <div className="flex items-start justify-between gap-2">
-              <p className="text-sm font-medium truncate">
-                {activity.activity?.name || 'Unnamed Activity'}
-              </p>
-              <ActivityCreatedBy
-                userId={activity.created_by}
-                mode="avatar"
-                avatarClassName="h-5 w-5"
-              />
+        <div className="p-2">
+          <div className="flex items-start gap-2">
+            {/* Drag Handle */}
+            <div
+              {...attributes}
+              {...listeners}
+              className="mt-0.5 cursor-grab active:cursor-grabbing touch-none"
+            >
+              <GripVertical className="h-3 w-3 text-muted-foreground/60 group-hover:text-muted-foreground" />
             </div>
-            
-            {/* Time if scheduled */}
-            {activity.start_time && (
-              <div className="flex items-center gap-1 mt-0.5">
-                <Clock className="h-3 w-3 text-muted-foreground" />
-                <span className="text-xs text-muted-foreground">
-                  {format(new Date(`2024-01-01T${activity.start_time}`), 'h:mm a')}
-                  {activity.end_time && (
-                    <> - {format(new Date(`2024-01-01T${activity.end_time}`), 'h:mm a')}</>
-                  )}
-                </span>
-              </div>
-            )}
 
-            {/* Location preview */}
-            {activity.activity?.address && (
-              <div className="flex items-center gap-1 mt-0.5">
-                <MapPin className="h-3 w-3 text-muted-foreground" />
-                <span className="text-xs text-muted-foreground truncate">
-                  {activity.activity.address.split(',')[0]}
-                </span>
+            {/* Activity Type Icon */}
+            <span className="text-sm mt-0.5">
+              {getActivityTypeIcon(activity.activity?.types)}
+            </span>
+
+            {/* Activity Details */}
+            <div className="flex-1 min-w-0">
+              <div className="flex items-start justify-between gap-2">
+                <p className="text-sm font-medium truncate">
+                  {activity.activity?.name || 'Unnamed Activity'}
+                </p>
+                <ActivityCreatedBy
+                  userId={activity.created_by}
+                  mode="avatar"
+                  avatarClassName="h-5 w-5"
+                />
               </div>
-            )}
+              
+              {/* Time if scheduled */}
+              {activity.start_time && (
+                <div className="flex items-center gap-1 mt-0.5">
+                  <Clock className="h-3 w-3 text-muted-foreground" />
+                  <span className="text-xs text-muted-foreground">
+                    {format(new Date(`2024-01-01T${activity.start_time}`), 'h:mm a')}
+                    {activity.end_time && (
+                      <> - {format(new Date(`2024-01-01T${activity.end_time}`), 'h:mm a')}</>
+                    )}
+                  </span>
+                </div>
+              )}
+
+              {/* Location preview */}
+              {activity.activity?.address && (
+                <div className="flex items-center gap-1 mt-0.5">
+                  <MapPin className="h-3 w-3 text-muted-foreground" />
+                  <span className="text-xs text-muted-foreground truncate">
+                    {activity.activity.address.split(',')[0]}
+                  </span>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -336,9 +345,10 @@ export function SimplifiedItinerarySidebar({
 }) {
   const { itineraryId, destinationId } = useParams();
   const { itineraryActivities, reorderItineraryActivities, updateItineraryActivity } = useItineraryActivityStore();
+  const activityCategoryAccents = useItineraryLayoutStore((s) => s.activityCategoryAccents);
+  const activityCategoryCustomColors = useItineraryLayoutStore((s) => s.activityCategoryCustomColors);
   const [collapsedDates, setCollapsedDates] = useState<Set<string>>(new Set());
   const [activeId, setActiveId] = useState<string | null>(null);
-  const MAX_VISIBLE_ACTIVITIES = 3;
   
   // Filter out deleted activities
   const activeActivities = itineraryActivities.filter(activity => !activity.deleted_at);
@@ -602,13 +612,24 @@ export function SimplifiedItinerarySidebar({
                         if (!a.start_time || !b.start_time) return 0;
                         return a.start_time.localeCompare(b.start_time);
                       })
-                      .map((activity) => (
-                        <SortableActivityItem
-                          key={activity.itinerary_activity_id}
-                          activity={activity}
-                          getActivityTypeIcon={getActivityTypeIcon}
-                        />
-                      ))}
+                      .map((activity) => {
+                        const { accent, customHex } = getActivityThemeForTypes(
+                          activity.activity?.types,
+                          activity.activity_id || activity.itinerary_activity_id,
+                          activityCategoryAccents,
+                          activityCategoryCustomColors
+                        );
+
+                        return (
+                          <SortableActivityItem
+                            key={activity.itinerary_activity_id}
+                            activity={activity}
+                            getActivityTypeIcon={getActivityTypeIcon}
+                            accentBorderClassName={ACTIVITY_ACCENT_BORDER_CLASSES[accent]}
+                            accentBorderColor={customHex ?? undefined}
+                          />
+                        );
+                      })}
                     </div>
                   </SortableContext>
                 )}

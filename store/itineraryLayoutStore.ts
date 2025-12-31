@@ -1,5 +1,10 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import {
+  DEFAULT_ACTIVITY_CATEGORY_ACCENTS,
+  type ActivityAccent,
+  type ActivityCategory,
+} from '@/lib/activityAccent';
 
 export interface ItineraryLayoutState {
   // View settings
@@ -72,6 +77,10 @@ export interface ItineraryLayoutState {
     compactMode: boolean;
   };
 
+  // Activity appearance preferences
+  activityCategoryAccents: Record<ActivityCategory, ActivityAccent>;
+  activityCategoryCustomColors: Partial<Record<ActivityCategory, string>>;
+
   // Actions
   setCurrentView: (view: 'calendar' | 'table' | 'list') => void;
   setViewWithTransition: (view: 'calendar' | 'table' | 'list') => Promise<void>;
@@ -100,6 +109,10 @@ export interface ItineraryLayoutState {
   
   updateLayoutPreferences: (preferences: Partial<ItineraryLayoutState['layoutPreferences']>) => void;
   resetLayout: () => void;
+
+  setActivityCategoryAccent: (category: ActivityCategory, accent: ActivityAccent) => void;
+  setActivityCategoryCustomColor: (category: ActivityCategory, hex: string | null) => void;
+  resetActivityCategoryAccents: () => void;
   
   // View state preservation actions
   saveViewState: <T extends keyof ItineraryLayoutState['viewStates']>(
@@ -179,6 +192,8 @@ export const useItineraryLayoutStore = create<ItineraryLayoutState>()(
       searchQuery: '',
       activeFilters: [],
       layoutPreferences: defaultLayoutPreferences,
+      activityCategoryAccents: { ...DEFAULT_ACTIVITY_CATEGORY_ACCENTS },
+      activityCategoryCustomColors: {},
 
       // View actions
       setCurrentView: (view) => {
@@ -316,8 +331,29 @@ export const useItineraryLayoutStore = create<ItineraryLayoutState>()(
           searchQuery: '',
           activeFilters: [],
           layoutPreferences: defaultLayoutPreferences,
+          activityCategoryAccents: { ...DEFAULT_ACTIVITY_CATEGORY_ACCENTS },
+          activityCategoryCustomColors: {},
         });
       },
+
+      setActivityCategoryAccent: (category, accent) =>
+        set((state) => ({
+          activityCategoryAccents: { ...state.activityCategoryAccents, [category]: accent },
+        })),
+
+      setActivityCategoryCustomColor: (category, hex) =>
+        set((state) => {
+          const next = { ...state.activityCategoryCustomColors };
+          if (!hex) {
+            delete next[category];
+          } else {
+            next[category] = hex;
+          }
+          return { activityCategoryCustomColors: next };
+        }),
+
+      resetActivityCategoryAccents: () =>
+        set({ activityCategoryAccents: { ...DEFAULT_ACTIVITY_CATEGORY_ACCENTS }, activityCategoryCustomColors: {} }),
 
       // View state preservation actions
       saveViewState: (view, state) => {
@@ -366,6 +402,8 @@ export const useItineraryLayoutStore = create<ItineraryLayoutState>()(
         sidebarCollapsed: state.sidebarCollapsed,
         sidebarActiveTab: state.sidebarActiveTab,
         layoutPreferences: state.layoutPreferences,
+        activityCategoryAccents: state.activityCategoryAccents,
+        activityCategoryCustomColors: state.activityCategoryCustomColors,
         contextData: {
           ...state.contextData,
           // Don't persist timestamps

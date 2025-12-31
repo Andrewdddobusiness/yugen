@@ -6,13 +6,15 @@ import { useDraggable } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
 import { GripVertical } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { ActivityBlockContent, type ActivityAccent } from './ActivityBlockContent';
+import { ActivityBlockContent } from './ActivityBlockContent';
 import { ActivityBlockPopover } from './ActivityBlockPopover';
 import { useSchedulingContext } from '@/store/timeSchedulingStore';
 import { getCalendarSlotHeightPx } from './layoutMetrics';
 import { useParams } from 'next/navigation';
 import { useItineraryActivityStore } from '@/store/itineraryActivityStore';
 import { useToast } from '@/components/ui/use-toast';
+import { getActivityThemeForTypes, hexToRgba, type ActivityAccent } from '@/lib/activityAccent';
+import { useItineraryLayoutStore } from '@/store/itineraryLayoutStore';
 
 const accentStyles: Record<ActivityAccent, { border: string; tint: string }> = {
   brand: { border: "border-l-brand-500", tint: "bg-brand-500/10" },
@@ -304,48 +306,16 @@ export function ActivityBlock({
     return 'extended';                          // 3+ hours
   };
 
-  // Generate color based on activity category following the color coding system
-  const getActivityAccent = (types?: string[], activityId?: unknown): ActivityAccent => {
-    if (types && types.length > 0) {
-      const primaryType = types[0].toLowerCase();
-      
-      // Category-based accents (calendar blocks use tinted fills + accent borders)
-      if (primaryType.includes('restaurant') || primaryType.includes('food') || primaryType.includes('meal')) {
-        return 'amber';
-      }
-      if (primaryType.includes('tourist_attraction') || primaryType.includes('museum') || primaryType.includes('landmark')) {
-        return 'brand';
-      }
-      if (primaryType.includes('shopping') || primaryType.includes('store') || primaryType.includes('mall')) {
-        return 'teal';
-      }
-      if (primaryType.includes('park') || primaryType.includes('natural') || primaryType.includes('outdoor')) {
-        return 'lime';
-      }
-      if (primaryType.includes('entertainment') || primaryType.includes('amusement') || primaryType.includes('night_club')) {
-        return 'coral';
-      }
-      if (primaryType.includes('lodging') || primaryType.includes('hotel') || primaryType.includes('accommodation')) {
-        return 'tan';
-      }
-      if (primaryType.includes('transit') || primaryType.includes('transport') || primaryType.includes('airport')) {
-        return 'amber';
-      }
-    }
-
-    // Fallback to hash-based accent for consistency
-    const accents: ActivityAccent[] = ["brand", "teal", "amber", "tan", "lime", "coral"];
-    const activityIdString = activityId == null ? '' : String(activityId);
-    const hash = activityIdString.split('').reduce((a, b) => {
-      a = ((a << 5) - a) + b.charCodeAt(0);
-      return a & a;
-    }, 0);
-    
-    return accents[Math.abs(hash) % accents.length];
-  };
-
   const blockSize = getBlockSize(activity.duration);
-  const activityAccent = getActivityAccent(activity.activity?.types, activity.activityId || activity.id);
+  const activityCategoryAccents = useItineraryLayoutStore((s) => s.activityCategoryAccents);
+  const activityCategoryCustomColors = useItineraryLayoutStore((s) => s.activityCategoryCustomColors);
+  const { accent: activityAccent, customHex } = getActivityThemeForTypes(
+    activity.activity?.types,
+    activity.activityId || activity.id,
+    activityCategoryAccents,
+    activityCategoryCustomColors
+  );
+  const customTint = customHex ? hexToRgba(customHex, 0.1) : null;
 
   const blockHeight =
     isResizing && previewHeight > 0
@@ -361,6 +331,7 @@ export function ActivityBlock({
         style={{
           ...style,
           ...(blockHeight ? { height: blockHeight } : {}),
+          ...(customHex ? { borderLeftColor: customHex } : {}),
           transition: isResizing ? 'none' : 'height 0.2s ease'
         }}
         onMouseEnter={handleMouseEnter}
@@ -385,7 +356,7 @@ export function ActivityBlock({
           isDragging && "opacity-50 rotate-1 shadow-float",
           isResizing && "shadow-float ring-2 ring-brand-400/50 z-30",
           isOverlay && "shadow-2xl border-2 border-white",
-          accentStyles[activityAccent].border,
+          !customHex && accentStyles[activityAccent].border,
           "bg-bg-0",
           className
         )}
@@ -395,10 +366,8 @@ export function ActivityBlock({
     >
       <div
         aria-hidden="true"
-        className={cn(
-          "absolute inset-0 pointer-events-none",
-          accentStyles[activityAccent].tint
-        )}
+        className={cn("absolute inset-0 pointer-events-none", !customHex && accentStyles[activityAccent].tint)}
+        style={customTint ? { backgroundColor: customTint } : undefined}
       />
 
       {/* Drag Handle - only show on hover and for standard+ blocks */}
@@ -418,6 +387,7 @@ export function ActivityBlock({
         activity={activity}
         blockSize={blockSize}
         activityAccent={activityAccent}
+        customAccentColor={customHex ?? undefined}
         isResizing={isResizing}
         isDragging={isDragging}
       />
