@@ -188,7 +188,7 @@ export function ViewToggle({
                 {showMap ? "Hide Map" : "Show Map"}
               </Button>
             </TooltipTrigger>
-            <TooltipContent>
+            <TooltipContent side="bottom">
               <p>{showMap ? "Hide" : "Show"} map panel (Ctrl+M)</p>
             </TooltipContent>
           </Tooltip>

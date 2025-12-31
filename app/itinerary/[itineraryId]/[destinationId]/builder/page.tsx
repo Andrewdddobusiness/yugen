@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useItineraryActivityStore, type IItineraryActivity } from "@/store/itineraryActivityStore";
 import { useItineraryLayoutStore } from "@/store/itineraryLayoutStore";
 import { useMapStore } from "@/store/mapStore";
+import { useItinerarySlotStore, type IItinerarySlot, type IItinerarySlotOption } from "@/store/itinerarySlotStore";
 import { BuilderPageSkeleton } from "@/components/loading/BuilderPageSkeleton";
 import { useParams } from "next/navigation";
 import { fetchBuilderBootstrap } from "@/actions/supabase/builderBootstrap";
@@ -94,6 +95,7 @@ export default function Builder() {
   const destId = destinationId?.toString();
 
   const { itineraryActivities, setItineraryActivities } = useItineraryActivityStore();
+  const { setSlots, setSlotOptions } = useItinerarySlotStore();
   const { 
     currentView, 
     showMap, 
@@ -262,6 +264,61 @@ export default function Builder() {
       setItineraryActivities(Array.from(byId.values()));
     }
   }, [bootstrap, destId, setItineraryActivities]);
+
+  useEffect(() => {
+    if (!bootstrap) return;
+    if (!destId) return;
+
+    const incomingSlots = (bootstrap.slots ?? []) as IItinerarySlot[];
+    const incomingOptions = (bootstrap.slotOptions ?? []) as IItinerarySlotOption[];
+
+    const currentSlots = useItinerarySlotStore.getState().slots;
+    const currentOptions = useItinerarySlotStore.getState().slotOptions;
+
+    const hasDifferentDestination = currentSlots.some(
+      (slot) => !!slot.itinerary_destination_id && String(slot.itinerary_destination_id) !== destId
+    );
+
+    if (currentSlots.length === 0 || hasDifferentDestination) {
+      setSlots(incomingSlots);
+      setSlotOptions(incomingOptions);
+      return;
+    }
+
+    const slotsById = new Map<string, IItinerarySlot>();
+    for (const slot of currentSlots) {
+      slotsById.set(String(slot.itinerary_slot_id), slot);
+    }
+
+    let slotsChanged = false;
+    for (const slot of incomingSlots) {
+      const id = String(slot.itinerary_slot_id);
+      if (!slotsById.has(id)) {
+        slotsById.set(id, slot);
+        slotsChanged = true;
+      }
+    }
+    if (slotsChanged) {
+      setSlots(Array.from(slotsById.values()));
+    }
+
+    const optionsById = new Map<string, IItinerarySlotOption>();
+    for (const option of currentOptions) {
+      optionsById.set(String(option.itinerary_slot_option_id), option);
+    }
+
+    let optionsChanged = false;
+    for (const option of incomingOptions) {
+      const id = String(option.itinerary_slot_option_id);
+      if (!optionsById.has(id)) {
+        optionsById.set(id, option);
+        optionsChanged = true;
+      }
+    }
+    if (optionsChanged) {
+      setSlotOptions(Array.from(optionsById.values()));
+    }
+  }, [bootstrap, destId, setSlots, setSlotOptions]);
 
   // Context data update in separate effect with memoized calculation
   useEffect(() => {
