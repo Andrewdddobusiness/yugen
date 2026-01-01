@@ -2,13 +2,14 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { format, parseISO } from "date-fns";
 import { Copy, History, UserPlus, Users, X } from "lucide-react";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
@@ -25,6 +26,7 @@ import {
   useItineraryCollaborationPanelStore,
   type CollaborationTab,
 } from "@/store/itineraryCollaborationPanelStore";
+import { useItineraryActivityStore } from "@/store/itineraryActivityStore";
 
 const getInitials = (name: string | null | undefined) => {
   const trimmed = String(name ?? "").trim();
@@ -41,16 +43,126 @@ const buildInviteUrl = (invitationId: string) => {
   return `${window.location.origin}/invite/${invitationId}`;
 };
 
+const formatTimestamp = (value: string) => {
+  try {
+    return format(parseISO(value), "PP p");
+  } catch {
+    return value;
+  }
+};
+
+type ItineraryActivityAuditSnapshot = {
+  itinerary_activity_id?: unknown;
+  activity_id?: unknown;
+  date?: string | null;
+  start_time?: string | null;
+  end_time?: string | null;
+  notes?: string | null;
+  deleted_at?: string | null;
+};
+
+const toActivitySnapshot = (
+  value: unknown
+): ItineraryActivityAuditSnapshot | null => {
+  if (!value || typeof value !== "object") return null;
+  const v = value as any;
+  return {
+    itinerary_activity_id: v.itinerary_activity_id,
+    activity_id: v.activity_id,
+    date: v.date ?? null,
+    start_time: v.start_time ?? null,
+    end_time: v.end_time ?? null,
+    notes: v.notes ?? null,
+    deleted_at: v.deleted_at ?? null,
+  };
+};
+
+const formatSchedule = (
+  date: string | null | undefined,
+  start: string | null | undefined,
+  end: string | null | undefined
+) => {
+  if (!date || !start || !end) return "Unscheduled";
+
+  const dateLabel = (() => {
+    try {
+      return format(parseISO(date), "EEE, MMM d");
+    } catch {
+      return date;
+    }
+  })();
+
+  const toTimeLabel = (time: string) => {
+    const [h, m] = time.split(":").map((v) => Number(v));
+    if (!Number.isFinite(h) || !Number.isFinite(m)) return time;
+    const d = new Date();
+    d.setHours(h, m, 0, 0);
+    return d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  };
+
+  return `${dateLabel} · ${toTimeLabel(start)}–${toTimeLabel(end)}`;
+};
+
+const HistorySkeleton = ({ count = 8 }: { count?: number }) => (
+  <div className="space-y-2">
+    {Array.from({ length: count }).map((_, idx) => (
+      <div
+        key={idx}
+        className="rounded-xl border border-stroke-200 bg-bg-0 p-3"
+      >
+        <div className="flex items-start gap-3">
+          <Skeleton className="h-9 w-9 rounded-full" />
+          <div className="flex-1 space-y-2">
+            <div className="flex items-center justify-between gap-2">
+              <Skeleton className="h-4 w-40" />
+              <Skeleton className="h-3 w-16" />
+            </div>
+            <Skeleton className="h-3 w-56" />
+          </div>
+        </div>
+      </div>
+    ))}
+  </div>
+);
+
+const MembersSkeleton = ({ count = 3 }: { count?: number }) => (
+  <div className="space-y-2">
+    {Array.from({ length: count }).map((_, idx) => (
+      <div
+        key={idx}
+        className="flex items-center justify-between rounded-xl border border-stroke-200 bg-bg-0 px-3 py-2.5"
+      >
+        <div className="flex items-center gap-3">
+          <Skeleton className="h-9 w-9 rounded-full" />
+          <div className="space-y-2">
+            <Skeleton className="h-4 w-32" />
+            <Skeleton className="h-3 w-20" />
+          </div>
+        </div>
+        <Skeleton className="h-6 w-16 rounded-md" />
+      </div>
+    ))}
+  </div>
+);
+
 export function openItineraryCollaborationPanel(tab?: CollaborationTab) {
   useItineraryCollaborationPanelStore.getState().open(tab);
 }
 
-export function ItineraryCollaborationTrigger({ itineraryId }: { itineraryId: string }) {
+export function ItineraryCollaborationTrigger({
+  itineraryId,
+}: {
+  itineraryId: string;
+}) {
   const open = useItineraryCollaborationPanelStore((s) => s.open);
 
-  const setItineraryMeta = useItineraryCollaborationStore((s) => s.setItineraryMeta);
+  const setItineraryMeta = useItineraryCollaborationStore(
+    (s) => s.setItineraryMeta
+  );
   const setMembers = useItineraryCollaborationStore((s) => s.setMembers);
-  const setActiveUserIds = useItineraryCollaborationStore((s) => s.setActiveUserIds);
+  const setActiveUserIds = useItineraryCollaborationStore(
+    (s) => s.setActiveUserIds
+  );
 
   const members = useItineraryCollaborationStore((s) => s.members);
   const activeUserIds = useItineraryCollaborationStore((s) => s.activeUserIds);
@@ -132,8 +244,13 @@ export function ItineraryCollaborationTrigger({ itineraryId }: { itineraryId: st
                   ].join(" ")}
                 >
                   <Avatar className="h-8 w-8 rounded-full">
-                    <AvatarImage src={member.profile?.avatar_url ?? undefined} alt={name ?? "User"} />
-                    <AvatarFallback className="text-xs">{getInitials(name)}</AvatarFallback>
+                    <AvatarImage
+                      src={member.profile?.avatar_url ?? undefined}
+                      alt={name ?? "User"}
+                    />
+                    <AvatarFallback className="text-xs">
+                      {getInitials(name)}
+                    </AvatarFallback>
                   </Avatar>
                 </div>
               );
@@ -154,7 +271,11 @@ export function ItineraryCollaborationTrigger({ itineraryId }: { itineraryId: st
   );
 }
 
-export function ItineraryCollaborationPanel({ itineraryId }: { itineraryId: string }) {
+export function ItineraryCollaborationPanel({
+  itineraryId,
+}: {
+  itineraryId: string;
+}) {
   const { toast } = useToast();
 
   const isOpen = useItineraryCollaborationPanelStore((s) => s.isOpen);
@@ -163,14 +284,29 @@ export function ItineraryCollaborationPanel({ itineraryId }: { itineraryId: stri
   const close = useItineraryCollaborationPanelStore((s) => s.close);
 
   const resetStore = useItineraryCollaborationStore((s) => s.reset);
-  const setItineraryMeta = useItineraryCollaborationStore((s) => s.setItineraryMeta);
+  const setItineraryMeta = useItineraryCollaborationStore(
+    (s) => s.setItineraryMeta
+  );
   const setMembers = useItineraryCollaborationStore((s) => s.setMembers);
   const members = useItineraryCollaborationStore((s) => s.members);
   const activeUserIds = useItineraryCollaborationStore((s) => s.activeUserIds);
   const currentUserId = useItineraryCollaborationStore((s) => s.currentUserId);
-  const currentUserRole = useItineraryCollaborationStore((s) => s.currentUserRole);
+  const currentUserRole = useItineraryCollaborationStore(
+    (s) => s.currentUserRole
+  );
 
   const setHistory = useItineraryCollaborationStore((s) => s.setHistory);
+  const itineraryActivities = useItineraryActivityStore(
+    (s) => s.itineraryActivities
+  );
+
+  const itineraryActivityById = useMemo(() => {
+    const map = new Map<string, any>();
+    for (const activity of itineraryActivities) {
+      map.set(String(activity.itinerary_activity_id), activity);
+    }
+    return map;
+  }, [itineraryActivities]);
 
   const lastItineraryIdRef = React.useRef<string | null>(null);
   useEffect(() => {
@@ -213,7 +349,9 @@ export function ItineraryCollaborationPanel({ itineraryId }: { itineraryId: stri
   );
   const ownerName =
     ownerMember?.profile?.display_name?.trim() ||
-    (ownerMember?.user_id ? `Owner (${ownerMember.user_id.slice(0, 8)}…)` : "Owner");
+    (ownerMember?.user_id
+      ? `Owner (${ownerMember.user_id.slice(0, 8)}…)`
+      : "Owner");
 
   const sortedMembers = useMemo(() => {
     const copy = [...members];
@@ -230,7 +368,11 @@ export function ItineraryCollaborationPanel({ itineraryId }: { itineraryId: stri
     return copy;
   }, [members, onlineSet]);
 
-  const { data: historyResult, refetch: refetchHistory, isFetching: historyFetching } = useQuery({
+  const {
+    data: historyResult,
+    refetch: refetchHistory,
+    isFetching: historyFetching,
+  } = useQuery({
     queryKey: ["itineraryHistory", itineraryId],
     queryFn: () => listItineraryChangeLog({ itineraryId, limit: 200 }),
     enabled: isOpen && tab === "history" && !!itineraryId,
@@ -243,6 +385,16 @@ export function ItineraryCollaborationPanel({ itineraryId }: { itineraryId: stri
     if (!historyResult?.success) return;
     setHistory(historyResult.data);
   }, [historyResult, setHistory]);
+
+  const historyScrollRef = React.useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (!isOpen) return;
+    if (tab !== "history") return;
+    const raf = requestAnimationFrame(() => {
+      historyScrollRef.current?.scrollTo({ top: 0 });
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [isOpen, itineraryId, tab]);
 
   // Realtime-ish updates for history (inserts only)
   useEffect(() => {
@@ -343,7 +495,10 @@ export function ItineraryCollaborationPanel({ itineraryId }: { itineraryId: stri
       console.error(error);
       toast({
         title: "Reset failed",
-        description: error instanceof Error ? error.message : "Could not reset invite link.",
+        description:
+          error instanceof Error
+            ? error.message
+            : "Could not reset invite link.",
         variant: "destructive",
       });
     } finally {
@@ -355,17 +510,29 @@ export function ItineraryCollaborationPanel({ itineraryId }: { itineraryId: stri
     <aside
       className={cn(
         "sticky top-0 h-screen shrink-0 border-l border-stroke-200 bg-bg-0 overflow-hidden transition-[width] duration-200 ease-out",
-        isOpen ? "w-[var(--sidebar-width-mobile)] sm:w-[var(--sidebar-width)]" : "w-0"
+        isOpen
+          ? "w-[var(--sidebar-width-mobile)] sm:w-[var(--sidebar-width)]"
+          : "w-0"
       )}
       aria-hidden={!isOpen}
     >
-      <div className={cn("h-full flex flex-col", !isOpen && "opacity-0 pointer-events-none")}>
-        <div className="p-4 border-b border-stroke-200 flex items-center justify-between">
+      <div
+        className={cn(
+          "h-full min-h-0 flex flex-col",
+          !isOpen && "opacity-0 pointer-events-none"
+        )}
+      >
+        <div className="px-4 py-3 border-b border-stroke-200 flex items-center justify-between">
           <div className="flex items-center gap-2 font-semibold">
             <Users className="h-5 w-5" />
             Collaboration
           </div>
-          <Button variant="ghost" size="icon" onClick={close} aria-label="Close collaboration panel">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={close}
+            aria-label="Close collaboration panel"
+          >
             <X className="h-4 w-4" />
           </Button>
         </div>
@@ -375,7 +542,7 @@ export function ItineraryCollaborationPanel({ itineraryId }: { itineraryId: stri
           onValueChange={(value) => setTab(value as CollaborationTab)}
           className="flex min-h-0 flex-1 flex-col"
         >
-          <div className="px-4 pt-4">
+          <div className="px-4 py-3">
             <TabsList className="w-full">
               <TabsTrigger value="collaborators" className="flex-1">
                 <Users className="h-4 w-4 mr-2" />
@@ -388,178 +555,352 @@ export function ItineraryCollaborationPanel({ itineraryId }: { itineraryId: stri
             </TabsList>
           </div>
 
-          <TabsContent value="collaborators" className="mt-0 flex min-h-0 flex-1 flex-col">
-            <ScrollArea className="flex-1 px-4 pb-6">
-              <div className="mt-4 space-y-4">
-	                  <div>
-	                    <div className="flex items-center justify-between gap-2 mb-2">
-	                      <div className="flex items-center gap-2 min-w-0">
-	                        <div className="text-sm font-medium text-ink-900 truncate">
-	                          Workspace
-	                        </div>
-	                        <Badge variant="secondary" className="shrink-0">
-	                          {members.length}
-	                        </Badge>
-	                      </div>
-	                      <Button
-	                        type="button"
-	                        size="sm"
-	                        variant="outline"
-	                        className="gap-2"
-                          disabled={!isRoleKnown || !isOwner}
-                          title={
-                            !isRoleKnown
-                              ? "Loading…"
-                              : !isOwner
-                              ? `Only the owner can invite. Owner: ${ownerName}`
-                              : "Copy invite link"
-                          }
-	                        onClick={async () => {
-	                          setShowInviteForm(true);
-	                          await onCopyInviteLink();
-	                        }}
-	                      >
-	                        <UserPlus className="h-4 w-4" />
-	                        Add people
-	                      </Button>
-	                    </div>
-                      {membersFetching || membersResult?.success === false ? (
-                        <div className="text-xs text-muted-foreground mb-2">
-                          {membersFetching ? (
-                            "Loading workspace members…"
-                          ) : (
-                            <span className="text-red-600">
-                              Could not load workspace: {membersResult?.message ?? "Unknown error"}
-                            </span>
-                          )}
-                        </div>
-                      ) : null}
-	                    <div className="space-y-2">
-                        {membersLoaded && !membersFetching && members.length === 0 ? (
-                          <div className="text-sm text-muted-foreground">
-                            No members found for this itinerary.
-                          </div>
-                        ) : null}
-	                      {sortedMembers.map((member) => {
-	                        const name = member.profile?.display_name ?? "Unknown";
-	                        const online = onlineSet.has(member.user_id);
-                          const isYou = currentUserId && member.user_id === currentUserId;
-	                        return (
-	                          <div
-	                            key={member.user_id}
-	                            className="flex items-center justify-between rounded-lg border border-stroke-200 bg-bg-0 px-3 py-2"
-	                          >
+          <TabsContent
+            value="collaborators"
+            className="mt-0 min-h-0 flex-1"
+          >
+            <div className="h-full overflow-y-auto px-4 pb-6 pt-3">
+              <div className="space-y-4">
+                <div>
+                  <div className="flex items-center justify-between gap-2 mb-3">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div className="text-sm font-medium text-ink-900 truncate">
+                        Workspace
+                      </div>
+                      <Badge variant="secondary" className="shrink-0">
+                        {members.length}
+                      </Badge>
+                    </div>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="gap-2"
+                      disabled={!isRoleKnown || !isOwner}
+                      title={
+                        !isRoleKnown
+                          ? "Loading…"
+                          : !isOwner
+                          ? `Only the owner can invite. Owner: ${ownerName}`
+                          : "Copy invite link"
+                      }
+                      onClick={async () => {
+                        setShowInviteForm(true);
+                        await onCopyInviteLink();
+                      }}
+                    >
+                      <UserPlus className="h-4 w-4" />
+                      Add people
+                    </Button>
+                  </div>
+                  {membersResult?.success === false ? (
+                    <div className="text-sm text-red-600">
+                      Could not load workspace
+                      {membersResult.message ? `: ${membersResult.message}` : "."}
+                    </div>
+                  ) : null}
+                  <div className="space-y-2">
+                    {membersFetching && !membersLoaded ? (
+                      <MembersSkeleton count={3} />
+                    ) : membersLoaded && members.length === 0 ? (
+                      <div className="text-sm text-muted-foreground">
+                        No members found for this itinerary.
+                      </div>
+                    ) : (
+                      sortedMembers.map((member) => {
+                        const name = member.profile?.display_name ?? "Unknown";
+                        const online = onlineSet.has(member.user_id);
+                        const isYou =
+                          currentUserId && member.user_id === currentUserId;
+                        return (
+                          <div
+                            key={member.user_id}
+                            className="flex items-center justify-between rounded-xl border border-stroke-200 bg-bg-0 px-3 py-2.5"
+                          >
                             <div className="flex items-center gap-3 min-w-0">
-                              <div className={online ? "ring-2 ring-lime-400 rounded-full" : ""}>
+                              <div
+                                className={
+                                  online
+                                    ? "ring-2 ring-lime-400 rounded-full"
+                                    : ""
+                                }
+                              >
                                 <Avatar className="h-9 w-9 rounded-full">
-                                  <AvatarImage src={member.profile?.avatar_url ?? undefined} alt={name} />
-                                  <AvatarFallback className="text-xs">{getInitials(name)}</AvatarFallback>
+                                  <AvatarImage
+                                    src={member.profile?.avatar_url ?? undefined}
+                                    alt={name}
+                                  />
+                                  <AvatarFallback className="text-xs">
+                                    {getInitials(name)}
+                                  </AvatarFallback>
                                 </Avatar>
                               </div>
-	                              <div className="min-w-0">
-	                                <div className="text-sm font-medium text-ink-900 truncate">
-                                      {name}
-                                      {isYou ? <span className="text-muted-foreground font-normal"> (you)</span> : null}
-                                    </div>
-	                                <div className="text-xs text-muted-foreground">{online ? "Active now" : "Offline"}</div>
-	                              </div>
-	                            </div>
-	                            <Badge variant={member.role === "owner" ? "default" : "secondary"}>{member.role}</Badge>
-	                          </div>
+                              <div className="min-w-0">
+                                <div className="text-sm font-medium text-ink-900 truncate">
+                                  {name}
+                                  {isYou ? (
+                                    <span className="text-muted-foreground font-normal">
+                                      {" "}
+                                      (you)
+                                    </span>
+                                  ) : null}
+                                </div>
+                                <div className="text-xs text-muted-foreground">
+                                  {online ? "Active now" : "Offline"}
+                                </div>
+                              </div>
+                            </div>
+                            <Badge
+                              variant={
+                                member.role === "owner"
+                                  ? "default"
+                                  : "secondary"
+                              }
+                              className="capitalize"
+                            >
+                              {member.role}
+                            </Badge>
+                          </div>
                         );
-                      })}
-                    </div>
+                      })
+                    )}
                   </div>
+                </div>
 
-                  {isOwner && showInviteForm && (
-                    <div className="rounded-xl border border-stroke-200 bg-bg-0 p-3">
-                      <div className="flex items-center justify-between gap-2 mb-3">
-                        <div className="text-sm font-medium text-ink-900">Invite link</div>
+                {isOwner && showInviteForm && (
+                  <div className="rounded-xl border border-stroke-200 bg-bg-0 p-3">
+                    <div className="flex items-center justify-between gap-2 mb-3">
+                      <div className="text-sm font-medium text-ink-900">
+                        Invite link
+                      </div>
+                      <Button
+                        type="button"
+                        size="icon"
+                        variant="ghost"
+                        onClick={() => setShowInviteForm(false)}
+                        aria-label="Close invite link"
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Input
+                        value={inviteUrl ?? ""}
+                        placeholder={
+                          inviteLinkLoading
+                            ? "Generating link…"
+                            : "Click “Add people” to generate a link"
+                        }
+                        readOnly
+                      />
+                      <div className="flex gap-2">
                         <Button
                           type="button"
-                          size="icon"
-                          variant="ghost"
-                          onClick={() => setShowInviteForm(false)}
-                          aria-label="Close invite link"
+                          className="flex-1 gap-2"
+                          disabled={inviteLinkLoading}
+                          onClick={onCopyInviteLink}
                         >
-                          <X className="h-4 w-4" />
+                          <Copy className="h-4 w-4" />
+                          Copy link
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          disabled={inviteLinkLoading}
+                          onClick={onResetInviteLink}
+                        >
+                          Reset
                         </Button>
                       </div>
-
-                      <div className="space-y-2">
-                        <Input
-                          value={inviteUrl ?? ""}
-                          placeholder={
-                            inviteLinkLoading
-                              ? "Generating link…"
-                              : "Click “Add people” to generate a link"
-                          }
-                          readOnly
-                        />
-                        <div className="flex gap-2">
-                          <Button
-                            type="button"
-                            className="flex-1 gap-2"
-                            disabled={inviteLinkLoading}
-                            onClick={onCopyInviteLink}
-                          >
-                            <Copy className="h-4 w-4" />
-                            Copy link
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            disabled={inviteLinkLoading}
-                            onClick={onResetInviteLink}
-                          >
-                            Reset
-                          </Button>
-                        </div>
-                        <div className="text-xs text-muted-foreground">
-                          Anyone with this link can join this itinerary as an editor. Ask the owner to reset the link if
-                          it ever leaks.
-                        </div>
+                      <div className="text-xs text-muted-foreground">
+                        Anyone with this link can join this itinerary as an
+                        editor. Ask the owner to reset the link if it ever
+                        leaks.
                       </div>
                     </div>
-                  )}
+                  </div>
+                )}
               </div>
-            </ScrollArea>
+            </div>
           </TabsContent>
 
-          <TabsContent value="history" className="mt-0 flex min-h-0 flex-1 flex-col">
-            <ScrollArea className="flex-1 px-4 pb-6">
-              <div className="mt-4 space-y-2">
-                  {historyResult?.success &&
-                    historyResult.data.map((row) => {
-                      const actorName = row.actor_profile?.display_name ?? "Unknown";
-                      const timestamp = new Date(row.created_at).toLocaleString();
+          <TabsContent
+            value="history"
+            className="mt-0 min-h-0 flex-1"
+          >
+            <div
+              ref={historyScrollRef}
+              className="h-full overflow-y-auto px-4 pb-6 pt-3"
+            >
+              <div className="space-y-2">
+                {historyFetching && !historyResult ? (
+                  <HistorySkeleton />
+                ) : null}
+
+                {historyResult?.success === false && !historyFetching ? (
+                  <div className="text-sm text-red-600">
+                    Could not load history
+                    {historyResult.message ? `: ${historyResult.message}` : "."}
+                  </div>
+                ) : null}
+
+                {historyResult?.success
+                  ? historyResult.data.map((row) => {
+                      const actorName =
+                        row.actor_profile?.display_name ?? "Unknown";
+                      const actorAvatar =
+                        row.actor_profile?.avatar_url ?? undefined;
+                      const timestamp = formatTimestamp(row.created_at);
+
+                      const before = toActivitySnapshot(row.before);
+                      const after = toActivitySnapshot(row.after);
+                      const snapshot = after ?? before;
+
+                      const knownActivity = itineraryActivityById.get(
+                        String(row.entity_id)
+                      );
+                      const activityIdHint =
+                        snapshot?.activity_id != null
+                          ? String(snapshot.activity_id)
+                          : null;
+                      const knownName = knownActivity?.activity?.name;
+                      const activityName =
+                        (typeof knownName === "string" ? knownName.trim() : "") ||
+                        (activityIdHint
+                          ? `Activity #${activityIdHint}`
+                          : `Activity #${row.entity_id}`);
+
+                      const beforeSchedule = before
+                        ? formatSchedule(
+                            before.date,
+                            before.start_time,
+                            before.end_time
+                          )
+                        : null;
+                      const afterSchedule = after
+                        ? formatSchedule(
+                            after.date,
+                            after.start_time,
+                            after.end_time
+                          )
+                        : null;
+
+                      const scheduleChanged =
+                        beforeSchedule &&
+                        afterSchedule &&
+                        beforeSchedule !== afterSchedule;
+
+                      const notesChanged =
+                        row.action === "UPDATE" &&
+                        before?.notes !== after?.notes &&
+                        String(before?.notes ?? "") !==
+                          String(after?.notes ?? "");
+
+                      const headline = (() => {
+                        if (row.entity_type !== "itinerary_activity") {
+                          return `${actorName} · ${row.action}`;
+                        }
+
+                        if (row.action === "INSERT") return `${actorName} added`;
+                        if (row.action === "DELETE")
+                          return `${actorName} removed`;
+
+                        // UPDATE
+                        if (
+                          beforeSchedule === "Unscheduled" &&
+                          afterSchedule &&
+                          afterSchedule !== "Unscheduled"
+                        ) {
+                          return `${actorName} scheduled`;
+                        }
+                        if (
+                          afterSchedule === "Unscheduled" &&
+                          beforeSchedule &&
+                          beforeSchedule !== "Unscheduled"
+                        ) {
+                          return `${actorName} moved to Unscheduled`;
+                        }
+                        if (scheduleChanged) return `${actorName} rescheduled`;
+                        if (notesChanged) return `${actorName} updated notes`;
+                        return `${actorName} updated`;
+                      })();
+
+                      const detail = (() => {
+                        if (row.entity_type !== "itinerary_activity") return null;
+
+                        if (row.action === "INSERT") return afterSchedule;
+                        if (row.action === "DELETE") return beforeSchedule;
+
+                        if (scheduleChanged) {
+                          return `${beforeSchedule} → ${afterSchedule}`;
+                        }
+
+                        if (afterSchedule) return afterSchedule;
+                        return null;
+                      })();
+
                       return (
                         <div
                           key={row.itinerary_change_log_id}
-                          className="rounded-lg border border-stroke-200 bg-bg-0 px-3 py-2"
+                          className="rounded-xl border border-stroke-200 bg-bg-0 p-3"
                         >
-                          <div className="flex items-center justify-between gap-3">
-                            <div className="text-sm font-medium truncate">
-                              {actorName} · {row.action}
+                          <div className="flex items-start gap-3">
+                            <Avatar className="h-9 w-9 rounded-full">
+                              <AvatarImage src={actorAvatar} alt={actorName} />
+                              <AvatarFallback className="text-xs">
+                                {getInitials(actorName)}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center justify-between gap-2">
+                                <div className="text-sm font-medium text-ink-900 truncate">
+                                  {headline}
+                                </div>
+                                <div className="text-xs text-muted-foreground shrink-0">
+                                  {timestamp}
+                                </div>
+                              </div>
+                              <div className="text-sm text-ink-900 truncate">
+                                {activityName}
+                              </div>
+                              {detail ? (
+                                <div className="text-xs text-muted-foreground mt-1">
+                                  {detail}
+                                </div>
+                              ) : null}
+                              {row.entity_type === "itinerary_activity" &&
+                              row.action === "UPDATE" &&
+                              !scheduleChanged &&
+                              notesChanged ? (
+                                <div className="text-xs text-muted-foreground mt-1">
+                                  Notes updated
+                                </div>
+                              ) : null}
+                              {row.entity_type !== "itinerary_activity" ? (
+                                <div className="text-xs text-muted-foreground mt-1">
+                                  {row.entity_type} #{row.entity_id}
+                                </div>
+                              ) : null}
+                              {snapshot?.deleted_at ? (
+                                <div className="text-xs text-muted-foreground mt-1">
+                                  Deleted
+                                </div>
+                              ) : null}
                             </div>
-                            <div className="text-xs text-muted-foreground shrink-0">{timestamp}</div>
-                          </div>
-                          <div className="text-xs text-muted-foreground mt-1">
-                            {row.entity_type} #{row.entity_id}
                           </div>
                         </div>
                       );
-                    })}
+                    })
+                  : null}
 
-                  {historyResult?.success && historyResult.data.length === 0 && (
-                    <div className="text-sm text-muted-foreground">No changes yet.</div>
-                  )}
-
-                  {!historyResult?.success && historyFetching && (
-                    <div className="text-sm text-muted-foreground">Loading…</div>
-                  )}
+                {historyResult?.success && historyResult.data.length === 0 ? (
+                  <div className="text-sm text-muted-foreground">
+                    No changes yet.
+                  </div>
+                ) : null}
               </div>
-            </ScrollArea>
+            </div>
           </TabsContent>
         </Tabs>
       </div>
