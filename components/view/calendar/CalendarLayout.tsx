@@ -248,6 +248,7 @@ export function CalendarLayout({
                   (act) => act.position.day === dayIndex
                 )}
                 highlightActivityId={highlightActivityId}
+                onSelectDate={onDateChange}
                 allDayActivities={
                   allDayActivitiesByDay.get(format(day, "yyyy-MM-dd")) ?? []
                 }

@@ -12,6 +12,58 @@ type BootstrapResult = {
   history: any[];
 };
 
+const parsePointToLngLat = (value: unknown): [number, number] | null => {
+  if (!value) return null;
+
+  // Already normalized: [lng, lat]
+  if (Array.isArray(value) && value.length === 2) {
+    const lng = Number(value[0]);
+    const lat = Number(value[1]);
+    if (Number.isFinite(lat) && Number.isFinite(lng)) return [lng, lat];
+    return null;
+  }
+
+  // Supabase may return Postgres point as "(lat,lng)"
+  if (typeof value === "string") {
+    const match = value.trim().match(/^\(?\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*\)?$/);
+    if (!match) return null;
+    const lat = Number(match[1]);
+    const lng = Number(match[2]);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+    return [lng, lat];
+  }
+
+  // Sometimes returned as { x: lat, y: lng }
+  if (typeof value === "object") {
+    const x = (value as any).x;
+    const y = (value as any).y;
+    const lat = Number(x);
+    const lng = Number(y);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+    return [lng, lat];
+  }
+
+  return null;
+};
+
+const normalizeBootstrapActivities = (activities: any[]) => {
+  return activities.map((row) => {
+    const activity = row?.activity;
+    if (!activity || typeof activity !== "object") return row;
+
+    const normalized = parsePointToLngLat((activity as any).coordinates);
+    if (!normalized) return row;
+
+    return {
+      ...row,
+      activity: {
+        ...activity,
+        coordinates: normalized,
+      },
+    };
+  });
+};
+
 export async function fetchBuilderBootstrap(
   itineraryId: string,
   destinationId: string
@@ -30,12 +82,61 @@ export async function fetchBuilderBootstrap(
   });
 
   if (!error && data) {
+    const rawActivities = Array.isArray(data.activities) ? data.activities : [];
+    let normalizedActivities = normalizeBootstrapActivities(rawActivities);
+
+    // Backwards-compat: older versions of the RPC did not include `activity.coordinates`.
+    // If coordinates are missing, fetch them in one extra query and merge in.
+    const missingActivityIds = Array.from(
+      new Set(
+        normalizedActivities.flatMap((row) => {
+          const activity = row?.activity;
+          const activityId = activity?.activity_id;
+          if (activityId == null) return [];
+          const coords = activity?.coordinates;
+          if (Array.isArray(coords) && coords.length === 2) return [];
+          return [activityId];
+        })
+      )
+    );
+
+    if (missingActivityIds.length > 0) {
+      const { data: coordsRows } = await supabase
+        .from("activity")
+        .select("activity_id,coordinates")
+        .in("activity_id", missingActivityIds);
+
+      const coordsById = new Map<string, [number, number]>();
+      for (const row of coordsRows ?? []) {
+        const parsed = parsePointToLngLat((row as any).coordinates);
+        if (!parsed) continue;
+        coordsById.set(String((row as any).activity_id), parsed);
+      }
+
+      if (coordsById.size > 0) {
+        normalizedActivities = normalizedActivities.map((row) => {
+          const activity = row?.activity;
+          if (!activity) return row;
+          const activityId = String((activity as any).activity_id ?? "");
+          const coords = coordsById.get(activityId);
+          if (!coords) return row;
+          return {
+            ...row,
+            activity: {
+              ...activity,
+              coordinates: coords,
+            },
+          };
+        });
+      }
+    }
+
     return {
       success: true,
       data: {
         itinerary: data.itinerary ?? null,
         destination: data.destination ?? null,
-        activities: Array.isArray(data.activities) ? data.activities : [],
+        activities: normalizedActivities,
         slots: Array.isArray(data.slots) ? data.slots : [],
         slotOptions: Array.isArray(data.slot_options) ? data.slot_options : [],
         collaborators: Array.isArray(data.collaborators) ? data.collaborators : [],
@@ -58,9 +159,9 @@ export async function fetchBuilderBootstrap(
       .maybeSingle();
 
     const selectWithActors =
-      "itinerary_id,itinerary_activity_id,itinerary_destination_id,activity_id,date,start_time,end_time,notes,deleted_at,created_by,updated_by,activity:activity(activity_id,place_id,name,duration,price_level,rating,types,address)";
+      "itinerary_id,itinerary_activity_id,itinerary_destination_id,activity_id,date,start_time,end_time,notes,deleted_at,created_by,updated_by,activity:activity(activity_id,place_id,name,coordinates,duration,price_level,rating,types,address)";
     const selectWithoutActors =
-      "itinerary_id,itinerary_activity_id,itinerary_destination_id,activity_id,date,start_time,end_time,notes,deleted_at,activity:activity(activity_id,place_id,name,duration,price_level,rating,types,address)";
+      "itinerary_id,itinerary_activity_id,itinerary_destination_id,activity_id,date,start_time,end_time,notes,deleted_at,activity:activity(activity_id,place_id,name,coordinates,duration,price_level,rating,types,address)";
 
     const { data: activitiesWithActors, error: activitiesWithActorsError } = await supabase
       .from("itinerary_activity")
@@ -97,7 +198,9 @@ export async function fetchBuilderBootstrap(
         data: {
           itinerary: null,
           destination: destinationRow ?? null,
-          activities: Array.isArray(activitiesWithoutActors) ? activitiesWithoutActors : [],
+          activities: Array.isArray(activitiesWithoutActors)
+            ? normalizeBootstrapActivities(activitiesWithoutActors)
+            : [],
           slots: [],
           slotOptions: [],
           collaborators: [],
@@ -111,7 +214,9 @@ export async function fetchBuilderBootstrap(
       data: {
         itinerary: null,
         destination: destinationRow ?? null,
-        activities: Array.isArray(activitiesWithActors) ? activitiesWithActors : [],
+        activities: Array.isArray(activitiesWithActors)
+          ? normalizeBootstrapActivities(activitiesWithActors)
+          : [],
         slots: [],
         slotOptions: [],
         collaborators: [],

@@ -1,6 +1,7 @@
 "use client";
 import React, { useEffect, useMemo, useState, useRef, lazy, Suspense } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { format as formatDate } from "date-fns";
 import { useItineraryActivityStore, type IItineraryActivity } from "@/store/itineraryActivityStore";
 import { useItineraryLayoutStore } from "@/store/itineraryLayoutStore";
 import { useMapStore } from "@/store/mapStore";
@@ -485,6 +486,11 @@ export default function Builder() {
                             <ItineraryMap
                               activities={filteredActivities}
                               showRoutes={true}
+                              selectedDate={
+                                currentDate
+                                  ? formatDate(currentDate, "yyyy-MM-dd")
+                                  : undefined
+                              }
                               destinationName={
                                 bootstrap?.destination?.city && bootstrap?.destination?.country
                                   ? `${bootstrap.destination.city}, ${bootstrap.destination.country}`

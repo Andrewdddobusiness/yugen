@@ -18,9 +18,11 @@ To enable map functionality in the application, you need to configure Google Map
 ### 2. Enable Required APIs
 Navigate to the [API Library](https://console.cloud.google.com/apis/library) and enable:
 - **Maps JavaScript API** (required for map display)
-- **Places API** (required for location search)
+- **Places API (New)** (required for location search via `places.googleapis.com`)
 - **Geocoding API** (optional, for address lookups)
-- **Directions API** (optional, for route calculations)
+- **Routes API** (required for road-following route lines and travel times)
+
+Note: Google is moving features off legacy endpoints. If you see `LegacyApiNotActivatedMapError` for Directions/Distance Matrix, enable and use **Routes API** instead.
 
 ### 3. Create API Credentials
 1. Go to [Credentials](https://console.cloud.google.com/apis/credentials)
@@ -30,7 +32,10 @@ Navigate to the [API Library](https://console.cloud.google.com/apis/library) and
    - Click on the key to edit it
    - Under "API restrictions", select "Restrict key"
    - Choose the APIs you enabled above
-   - Under "Website restrictions", add your domains (e.g., `localhost:3000` for development)
+
+Recommended: create two keys
+- **Browser key** (used by the Maps JavaScript API): restrict by HTTP referrers (e.g. `http://localhost:3000/*`, your production domain) and restrict APIs to **Maps JavaScript API**.
+- **Server key** (used by server actions for Places/Routes): restrict APIs to **Places API (New)** / **Routes API** / **Geocoding API**. Use IP restrictions only if you have stable egress IPs; otherwise leave application restrictions unset.
 
 ### 4. Create a Map ID (Required for Advanced Features)
 1. Go to [Map Management](https://console.cloud.google.com/google/maps-apis/map-ids)
@@ -40,12 +45,15 @@ Navigate to the [API Library](https://console.cloud.google.com/apis/library) and
 5. Copy the Map ID
 
 ### 5. Configure Environment Variables
-Add the following to your `.env.local` file:
+Add the following to your `.env` / `.env.local` file:
 
 ```env
 # Google Maps Configuration
 NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=your-api-key-here
 NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID=your-map-id-here
+
+# Server-only key for Routes API (recommended)
+GOOGLE_ROUTES_API_KEY=your-server-routes-api-key
 ```
 
 **Important Notes:**
@@ -55,6 +63,21 @@ NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID=your-map-id-here
 - Use different keys for development and production
 
 ## Troubleshooting
+
+### Debugging Routes/Travel Times
+To see detailed logs for the road routes and travel-time requests:
+
+1. Add to your `.env` / `.env.local`:
+   - `GOOGLE_ROUTES_DEBUG=1`
+   - Optional (verbose point lists): `GOOGLE_ROUTES_DEBUG_VERBOSE=1`
+2. Restart the dev server: `pnpm run dev`
+3. Click “Travel times” / show routes and watch the server terminal logs:
+   - `[routes] ...` for waypoint route polylines
+   - `[travel] ...` for travel-time requests
+
+To see client-side logs in the browser console:
+- Set `NEXT_PUBLIC_GOOGLE_ROUTES_DEBUG=1` (requires a dev server restart), or
+- Run `localStorage.setItem("debug:routes","1")` in DevTools (no restart).
 
 ### Map Shows Gray/Blank Area
 - **Check API Key**: Ensure the API key is valid and properly configured

@@ -41,6 +41,7 @@ interface DayColumnProps {
   activities: ScheduledActivity[];
   allDayActivities?: Array<{ id: string; name: string }>;
   highlightActivityId?: string | null;
+  onSelectDate?: (date: Date) => void;
   dragOverInfo?: {
     dayIndex: number;
     slotIndex: number;
@@ -99,6 +100,7 @@ export function DayColumn({
   activities,
   allDayActivities = [],
   highlightActivityId,
+  onSelectDate,
   dragOverInfo,
   className,
   onResize,
@@ -114,6 +116,10 @@ export function DayColumn({
     dragOverInfo?.dayIndex === dayIndex && dragOverInfo?.mode === "trim"
       ? dragOverInfo.trimPreviewById
       : undefined;
+
+  const handleSelectDate = React.useCallback(() => {
+    onSelectDate?.(date);
+  }, [date, onSelectDate]);
 
   const getDisplayPosition = React.useCallback(
     (activity: ScheduledActivity) => {
@@ -258,10 +264,24 @@ export function DayColumn({
       <div
         className={cn(
           "sticky top-0 z-30 border-b border-stroke-200 flex flex-col items-center justify-center px-2 py-1 bg-bg-0/90 backdrop-blur-sm shrink-0",
+          onSelectDate && "cursor-pointer hover:bg-bg-50/80",
           isCurrentDay && "bg-brand-500/10 border-brand-400/60",
           isWeekendDay && "bg-bg-50"
         )}
         style={{ height: CALENDAR_HEADER_HEIGHT_PX }}
+        role={onSelectDate ? "button" : undefined}
+        tabIndex={onSelectDate ? 0 : undefined}
+        onClick={onSelectDate ? handleSelectDate : undefined}
+        onKeyDown={
+          onSelectDate
+            ? (event) => {
+                if (event.key === "Enter" || event.key === " ") {
+                  event.preventDefault();
+                  handleSelectDate();
+                }
+              }
+            : undefined
+        }
       >
         <div className="text-xs text-ink-500 uppercase tracking-wide leading-none">
           {format(date, "EEE")}

@@ -1,5 +1,5 @@
-import { forwardRef, useContext, useEffect, useImperativeHandle, useRef } from 'react';
-import { GoogleMapsContext, useMap } from '@vis.gl/react-google-maps';
+import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react';
+import { useMap } from '@vis.gl/react-google-maps';
 
 export type PolylineProps = google.maps.PolylineOptions & {
   path?: google.maps.LatLng[] | google.maps.LatLngLiteral[];
@@ -57,7 +57,9 @@ export const Polyline = forwardRef<PolylineRef, PolylineProps>((props, ref) => {
 
   useEffect(() => {
     if (!polylineRef.current) return;
-    polylineRef.current.setPath(path || []);
+    // `Polyline.setPath` only accepts `LatLng[]` / `MVCArray<LatLng>` but our code frequently
+    // passes `LatLngLiteral[]`. `setOptions` supports the full `PolylineOptions.path` union.
+    polylineRef.current.setOptions({ path: path || [] });
   }, [path]);
 
   useEffect(() => {

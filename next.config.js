@@ -13,6 +13,9 @@ const nextConfig = {
     turbo: {
       // Enable faster bundling when available
     },
+    // Fix dev-time "missing chunk module" crashes when importing certain ESM
+    // packages from React Server Components.
+    serverComponentsExternalPackages: ["@supabase/ssr"],
     optimizePackageImports: [
       'lucide-react',
       '@radix-ui/react-icons',

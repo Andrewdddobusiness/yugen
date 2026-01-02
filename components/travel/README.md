@@ -4,7 +4,7 @@ A comprehensive travel time calculation and display system for the Journey itine
 
 ## Features
 
-- **Real-time travel time calculations** using Google Maps Distance Matrix API
+- **Real-time travel time calculations** using Google Routes API
 - **Multiple transport modes** (walking, driving, transit, bicycling)
 - **Smart mode selection** based on distance and travel time
 - **24-hour caching** to reduce API calls and improve performance
@@ -115,11 +115,10 @@ This reduces API calls while ensuring fresh data when needed.
 
 ## API Integration
 
-Uses Google Maps Distance Matrix API with the following features:
+Uses Google Routes API (computeRoutes) with the following features:
 
 - **Multiple transport modes** supported
-- **Real-time traffic data** for driving directions
-- **Departure time optimization** for transit and driving
+- **Optional departure time support** for transit/driving
 - **Automatic fallbacks** when routes are unavailable
 - **Rate limiting protection** through intelligent caching
 

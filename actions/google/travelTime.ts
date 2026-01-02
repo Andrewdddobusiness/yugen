@@ -2,7 +2,7 @@
 
 import type { Coordinates, DatabaseResponse } from "@/types/database";
 
-// Travel mode types supported by Google Maps Distance Matrix API
+// Travel mode types supported by Google Routes API (computeRoutes)
 export type TravelMode = 'driving' | 'walking' | 'transit' | 'bicycling';
 
 export interface TravelTimeResult {
@@ -38,6 +38,20 @@ export interface TravelTimeResponse {
  */
 const travelTimeCache = new Map<string, { data: TravelTimeResponse; timestamp: number }>();
 const CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hours
+const ROUTES_DEBUG = process.env.GOOGLE_ROUTES_DEBUG === "1" || process.env.GOOGLE_ROUTES_DEBUG === "true";
+const ROUTES_DEBUG_VERBOSE =
+  process.env.GOOGLE_ROUTES_DEBUG_VERBOSE === "1" || process.env.GOOGLE_ROUTES_DEBUG_VERBOSE === "true";
+
+function debugLog(message: string, details?: Record<string, unknown>) {
+  if (!ROUTES_DEBUG) return;
+  if (details) console.log(`[travel] ${message}`, details);
+  else console.log(`[travel] ${message}`);
+}
+
+function roundCoord(value: number, decimals = 4): number {
+  const pow = 10 ** decimals;
+  return Math.round(value * pow) / pow;
+}
 
 /**
  * Generate a cache key for travel time requests
@@ -64,7 +78,7 @@ function cleanupCache() {
 }
 
 /**
- * Calculate travel time between two points using Google Maps Distance Matrix API
+ * Calculate travel time between two points using Google Routes API (computeRoutes)
  */
 export async function calculateTravelTime(
   origin: Coordinates,
@@ -73,12 +87,18 @@ export async function calculateTravelTime(
   departureTime?: Date
 ): Promise<DatabaseResponse<TravelTimeResponse>> {
   try {
-    const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+    const apiKey = process.env.GOOGLE_ROUTES_API_KEY ?? process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+    const keySource = process.env.GOOGLE_ROUTES_API_KEY
+      ? "GOOGLE_ROUTES_API_KEY"
+      : process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
+        ? "NEXT_PUBLIC_GOOGLE_MAPS_API_KEY"
+        : "none";
     
     if (!apiKey || apiKey === 'your-google-maps-api-key-here') {
+      debugLog("missing api key", { keySource });
       return {
         success: false,
-        error: { message: "Google Maps API key not configured" }
+        error: { message: "Routes API key not configured", code: "API_KEY_NOT_CONFIGURED" }
       };
     }
 
@@ -87,6 +107,7 @@ export async function calculateTravelTime(
     const cached = travelTimeCache.get(cacheKey);
     
     if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
+      debugLog("cache hit", { cacheKey, modes: [...modes].sort(), keySource });
       return {
         success: true,
         data: cached.data
@@ -100,6 +121,10 @@ export async function calculateTravelTime(
 
     // Validate coordinates
     if (!isValidCoordinates(origin) || !isValidCoordinates(destination)) {
+      debugLog("invalid coordinates", {
+        origin: { lat: roundCoord(origin.lat), lng: roundCoord(origin.lng) },
+        destination: { lat: roundCoord(destination.lat), lng: roundCoord(destination.lng) },
+      });
       return {
         success: false,
         error: { message: "Invalid coordinates provided" }
@@ -133,6 +158,7 @@ export async function calculateTravelTime(
         timestamp: Date.now()
       });
 
+      debugLog("same location shortcut", { cacheKey, modes: [...modes].sort() });
       return {
         success: true,
         data: sameLocationResult
@@ -140,13 +166,34 @@ export async function calculateTravelTime(
     }
 
     const results: { [mode in TravelMode]?: TravelTimeResult } = {};
+    debugLog("computeRoutes batch start", {
+      cacheKey,
+      keySource,
+      modes: [...modes].sort(),
+      origin: { lat: roundCoord(origin.lat), lng: roundCoord(origin.lng) },
+      destination: { lat: roundCoord(destination.lat), lng: roundCoord(destination.lng) },
+      ...(ROUTES_DEBUG_VERBOSE && departureTime ? { departureTime: departureTime.toISOString() } : null),
+    });
     
     // Make requests for each travel mode
     const promises = modes.map(async (mode) => {
       try {
-        const result = await fetchDistanceMatrix(origin, destination, mode, departureTime);
+        const result = await fetchRoutesTravelTime(origin, destination, mode, departureTime);
         if (result.success && result.data) {
           results[mode] = result.data;
+          debugLog("computeRoutes mode ok", {
+            cacheKey,
+            mode,
+            durationSeconds: result.data.duration.value,
+            distanceMeters: result.data.distance.value,
+          });
+        } else {
+          debugLog("computeRoutes mode failed", {
+            cacheKey,
+            mode,
+            code: result.error?.code,
+            message: result.error?.message,
+          });
         }
       } catch (error) {
         console.error(`Error fetching travel time for mode ${mode}:`, error);
@@ -157,6 +204,7 @@ export async function calculateTravelTime(
 
     // If no results were successful, return an error
     if (Object.keys(results).length === 0) {
+      debugLog("computeRoutes batch failed (no results)", { cacheKey, modes: [...modes].sort() });
       return {
         success: false,
         error: { message: "Unable to calculate travel time for any transport mode" }
@@ -174,6 +222,7 @@ export async function calculateTravelTime(
       timestamp: Date.now()
     });
 
+    debugLog("computeRoutes batch ok", { cacheKey, modes: Object.keys(results) });
     return {
       success: true,
       data: response
@@ -192,74 +241,115 @@ export async function calculateTravelTime(
 }
 
 /**
- * Fetch travel time for a specific mode using Distance Matrix API
+ * Fetch travel time for a specific mode using Routes API (computeRoutes)
  */
-async function fetchDistanceMatrix(
+async function fetchRoutesTravelTime(
   origin: Coordinates,
   destination: Coordinates,
   mode: TravelMode,
   departureTime?: Date
 ): Promise<DatabaseResponse<TravelTimeResult>> {
   try {
-    const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
-    
-    const originStr = `${origin.lat},${origin.lng}`;
-    const destinationStr = `${destination.lat},${destination.lng}`;
-    
-    let url = `https://maps.googleapis.com/maps/api/distancematrix/json?` +
-      `origins=${encodeURIComponent(originStr)}` +
-      `&destinations=${encodeURIComponent(destinationStr)}` +
-      `&mode=${mode}` +
-      `&units=metric` +
-      `&key=${apiKey}`;
+    const apiKey = process.env.GOOGLE_ROUTES_API_KEY ?? process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+    const keySource = process.env.GOOGLE_ROUTES_API_KEY
+      ? "GOOGLE_ROUTES_API_KEY"
+      : process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
+        ? "NEXT_PUBLIC_GOOGLE_MAPS_API_KEY"
+        : "none";
 
-    // Add departure time for driving and transit modes
-    if ((mode === 'driving' || mode === 'transit') && departureTime) {
-      const departureTimestamp = Math.floor(departureTime.getTime() / 1000);
-      url += `&departure_time=${departureTimestamp}`;
+    if (!apiKey || apiKey === "your-google-maps-api-key-here") {
+      return {
+        success: false,
+        error: { message: "Routes API key not configured", code: "API_KEY_NOT_CONFIGURED" },
+      };
+    }
+    
+    const body: any = {
+      origin: {
+        location: {
+          latLng: { latitude: origin.lat, longitude: origin.lng },
+        },
+      },
+      destination: {
+        location: {
+          latLng: { latitude: destination.lat, longitude: destination.lng },
+        },
+      },
+      travelMode: mapMode(mode),
+    };
+
+    // If provided, pass departure time through (helps for transit and optionally traffic-aware drive).
+    if (departureTime && (mode === "driving" || mode === "transit")) {
+      body.departureTime = departureTime.toISOString();
     }
 
-    // Add traffic model for driving
-    if (mode === 'driving') {
-      url += '&traffic_model=best_guess';
+    // Optional: traffic-aware routing for driving when a departure time is known.
+    if (mode === "driving" && departureTime) {
+      body.routingPreference = "TRAFFIC_AWARE";
     }
 
-    const response = await fetch(url, {
+    const response = await fetch("https://routes.googleapis.com/directions/v2:computeRoutes", {
+      method: "POST",
       headers: {
-        'Referer': process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000',
-      }
+        "Content-Type": "application/json",
+        "X-Goog-Api-Key": apiKey,
+        "X-Goog-FieldMask": "routes.distanceMeters,routes.duration",
+      },
+      body: JSON.stringify(body),
     });
 
     if (!response.ok) {
+      const errorBody = await response.json().catch(() => null);
+      const errorMessage =
+        errorBody?.error?.message ||
+        errorBody?.message ||
+        `${response.status} ${response.statusText}`.trim() ||
+        "Routes API request failed";
+
+      const lowered = String(errorMessage).toLowerCase();
+      const code =
+        response.status === 403 &&
+        (lowered.includes("disabled") ||
+          lowered.includes("not enabled") ||
+          lowered.includes("is not enabled") ||
+          lowered.includes("has not been used"))
+          ? "ROUTES_API_DISABLED"
+          : response.status === 429
+            ? "RATE_LIMITED"
+            : response.status === 400
+              ? "INVALID_ARGUMENT"
+              : "ROUTES_API_ERROR";
+
+      debugLog("computeRoutes response error", {
+        mode,
+        keySource,
+        status: response.status,
+        code,
+        message: errorMessage,
+      });
       return {
         success: false,
         error: { 
-          message: "Distance Matrix API request failed",
-          code: response.status.toString()
+          message: errorMessage,
+          code,
+          details: errorBody,
         }
       };
     }
 
-    const data = await response.json();
+    const data = await response.json().catch(() => null);
 
-    if (data.status !== 'OK') {
+    const route = Array.isArray(data?.routes) ? data.routes[0] : null;
+    const distanceMeters = typeof route?.distanceMeters === "number" ? route.distanceMeters : null;
+    const durationSeconds = toSeconds(route?.duration);
+
+    if (distanceMeters == null || durationSeconds == null) {
       return {
         success: false,
-        error: { 
-          message: `Distance Matrix API error: ${data.status}`,
-          details: data
-        }
-      };
-    }
-
-    const element = data.rows[0]?.elements[0];
-    if (!element || element.status !== 'OK') {
-      return {
-        success: false,
-        error: { 
+        error: {
           message: `No route found for ${mode} mode`,
-          details: element
-        }
+          details: data,
+        },
       };
     }
 
@@ -267,14 +357,20 @@ async function fetchDistanceMatrix(
       success: true,
       data: {
         mode,
-        duration: element.duration,
-        distance: element.distance,
-        status: element.status
+        duration: {
+          value: durationSeconds,
+          text: formatDurationText(durationSeconds),
+        },
+        distance: {
+          value: distanceMeters,
+          text: formatDistanceText(distanceMeters),
+        },
+        status: "OK",
       }
     };
 
   } catch (error: any) {
-    console.error(`Error fetching distance matrix for ${mode}:`, error);
+    console.error(`Error fetching Routes API travel time for ${mode}:`, error);
     return {
       success: false,
       error: { 
@@ -372,6 +468,47 @@ function getDistanceFromLatLonInMeters(lat1: number, lon1: number, lat2: number,
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 
   return R * c;
+}
+
+function mapMode(mode: TravelMode): "DRIVE" | "WALK" | "TRANSIT" | "BICYCLE" {
+  switch (mode) {
+    case "walking":
+      return "WALK";
+    case "transit":
+      return "TRANSIT";
+    case "bicycling":
+      return "BICYCLE";
+    case "driving":
+    default:
+      return "DRIVE";
+  }
+}
+
+function toSeconds(duration: unknown): number | null {
+  if (typeof duration === "number" && Number.isFinite(duration)) return duration;
+  if (typeof duration !== "string") return null;
+  const match = duration.match(/^(\d+(?:\.\d+)?)s$/);
+  if (!match) return null;
+  const seconds = Number(match[1]);
+  return Number.isFinite(seconds) ? Math.round(seconds) : null;
+}
+
+function formatDurationText(totalSeconds: number): string {
+  const seconds = Math.max(0, Math.round(totalSeconds));
+  const minutes = Math.round(seconds / 60);
+  if (minutes < 60) return `${minutes} mins`;
+  const hours = Math.floor(minutes / 60);
+  const remaining = minutes % 60;
+  if (remaining === 0) return `${hours} hr`;
+  return `${hours} hr ${remaining} mins`;
+}
+
+function formatDistanceText(meters: number): string {
+  const m = Math.max(0, Math.round(meters));
+  if (m < 1000) return `${m} m`;
+  const km = m / 1000;
+  if (km < 10) return `${km.toFixed(1)} km`;
+  return `${Math.round(km)} km`;
 }
 
 /**
