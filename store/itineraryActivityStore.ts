@@ -10,6 +10,7 @@ import {
   setActivityName,
 } from "@/actions/supabase/actions";
 import { IActivity, IActivityWithLocation } from "./activityStore";
+import type { TravelMode } from "@/actions/google/travelTime";
 
 const ITINERARY_ACTIVITY_SELECT_BASE = `
   itinerary_id,
@@ -20,6 +21,7 @@ const ITINERARY_ACTIVITY_SELECT_BASE = `
   start_time,
   end_time,
   notes,
+  travel_mode_to_next,
   deleted_at,
   activity:activity(*)
 `;
@@ -33,6 +35,7 @@ const ITINERARY_ACTIVITY_SELECT_WITH_ACTORS = `
   start_time,
   end_time,
   notes,
+  travel_mode_to_next,
   deleted_at,
   created_by,
   updated_by,
@@ -56,6 +59,7 @@ export interface IItineraryActivity {
   start_time: string | null; // Allow null for unscheduled activities
   end_time: string | null; // Allow null for unscheduled activities
   notes?: string;
+  travel_mode_to_next?: TravelMode | null;
   deleted_at: string | null;
   created_by?: string | null;
   updated_by?: string | null;
@@ -209,7 +213,18 @@ export const useItineraryActivityStore = create<IItineraryStore>((set, get) => (
           ["itinerary_activity_id"]
         );
         if (!result.success) {
-          throw new Error(result.message || "Failed to update activity");
+          const code = String((result as any)?.error?.code ?? "");
+          const message = String((result as any)?.error?.message ?? result.message ?? "");
+          const isTravelModeSchemaCacheIssue =
+            code === "PGRST204" && message.toLowerCase().includes("travel_mode_to_next");
+
+          if (isTravelModeSchemaCacheIssue) {
+            throw new Error(
+              "Missing `travel_mode_to_next` on Supabase API. Apply the migration and refresh the PostgREST schema cache (restart Supabase / reload schema)."
+            );
+          }
+
+          throw new Error(message || "Failed to update activity");
         }
       }
 

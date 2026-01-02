@@ -76,6 +76,7 @@ function ItineraryListContent({ containerRef, className }: ItineraryListContaine
     travelTimes,
     travelTimesLoading,
     refreshTravelTimes,
+    updateTravelModeToNext,
     handleRemoveActivity,
     availableDates,
     filterableActivities,
@@ -228,6 +229,7 @@ function ItineraryListContent({ containerRef, className }: ItineraryListContaine
                           }])
                         ) : {}}
                         travelTimesLoading={!!travelTimesLoading[date]}
+                        onTravelModeChange={updateTravelModeToNext}
                         searchTerm={currentSearchTerm}
                       />
 

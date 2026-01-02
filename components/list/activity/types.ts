@@ -1,9 +1,12 @@
+import type { TravelMode } from '@/actions/google/travelTime';
+
 export interface ItineraryActivity {
   itinerary_activity_id: string;
   date: string | null;
   start_time: string | null;
   end_time: string | null;
   notes?: string;
+  travel_mode_to_next?: TravelMode | null;
   created_by?: string | null;
   updated_by?: string | null;
   activity?: {

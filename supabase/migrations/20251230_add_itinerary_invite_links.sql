@@ -2,7 +2,6 @@
 -- Created: 2025-12-30
 
 create extension if not exists "uuid-ossp";
-
 -- =====================================================
 -- TABLES
 -- =====================================================
@@ -17,18 +16,15 @@ create table if not exists public.itinerary_invite_link (
   revoked_at timestamp with time zone,
   expires_at timestamp with time zone
 );
-
 create index if not exists idx_itinerary_invite_link_itinerary_id on public.itinerary_invite_link(itinerary_id);
 create unique index if not exists idx_itinerary_invite_link_active_unique
   on public.itinerary_invite_link(itinerary_id)
   where revoked_at is null;
-
 -- =====================================================
 -- ROW LEVEL SECURITY
 -- =====================================================
 
 alter table public.itinerary_invite_link enable row level security;
-
 drop policy if exists "Owners can manage invite links" on public.itinerary_invite_link;
 create policy "Owners can manage invite links" on public.itinerary_invite_link
   for all
@@ -48,7 +44,6 @@ create policy "Owners can manage invite links" on public.itinerary_invite_link
         and i.user_id = auth.uid()
     )
   );
-
 -- =====================================================
 -- UPDATED_AT TRIGGER (REUSE handle_updated_at)
 -- =====================================================
@@ -57,7 +52,6 @@ drop trigger if exists set_timestamp_itinerary_invite_link on public.itinerary_i
 create trigger set_timestamp_itinerary_invite_link
   before update on public.itinerary_invite_link
   for each row execute function public.handle_updated_at();
-
 -- =====================================================
 -- INVITE ACCEPTANCE RPC
 -- =====================================================
@@ -114,9 +108,6 @@ begin
   return next;
 end;
 $$;
-
 grant execute on function public.accept_itinerary_invite_link(uuid) to authenticated;
-
 -- Defensive; Supabase may already set default privileges.
 grant select, insert, update, delete on table public.itinerary_invite_link to authenticated;
-

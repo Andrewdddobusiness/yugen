@@ -4,7 +4,7 @@ import React, { useMemo, useState, useEffect } from 'react';
 import type { MapMouseEvent } from '@vis.gl/react-google-maps';
 import { APIProvider, Map as GoogleMap, MapCameraChangedEvent, useMap, AdvancedMarker } from '@vis.gl/react-google-maps';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Car, MapPin, PersonStanding, Train } from 'lucide-react';
+import { Bike, Car, MapPin, PersonStanding, Train } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 import CustomMarker from './CustomMarker';
@@ -13,9 +13,11 @@ import { ActivityOverlay } from './ActivityOverlay';
 import { MapExport } from './MapExport';
 import { Polyline } from './Polyline';
 import { Switch } from '@/components/ui/switch';
+import { TravelModeSelect } from '@/components/travel/TravelModeSelect';
 import { useMapStore } from '@/store/mapStore';
 import { useActivitiesStore } from '@/store/activityStore';
 import { useSearchHistoryStore } from '@/store/searchHistoryStore';
+import { useItineraryActivityStore } from '@/store/itineraryActivityStore';
 import SearchField from '@/components/search/SearchField';
 import { getRadiusForZoom } from './zoomRadiusMap';
 import { fetchPlaceDetails } from '@/actions/google/actions';
@@ -86,6 +88,7 @@ interface ItineraryActivity {
   start_time: string | null;
   end_time: string | null;
   notes?: string;
+  travel_mode_to_next?: TravelMode | null;
   activity?: {
     activity_id?: string;
     name: string;
@@ -101,14 +104,12 @@ interface ItineraryActivity {
   };
 }
 
-function DayRoutePolyline({
+function DayRoutePolylines({
   activities,
-  fallbackPath,
   strokeColor,
   onRouteStatusChange,
 }: {
   activities: ItineraryActivity[];
-  fallbackPath: google.maps.LatLngLiteral[] | null;
   strokeColor: string;
   onRouteStatusChange?: (status: { source: "routes_api" | "fallback" | "none"; status?: string }) => void;
 }) {
@@ -130,170 +131,296 @@ function DayRoutePolyline({
     new Map()
   );
   const lastEmittedStatusRef = React.useRef<string>("");
-  const [path, setPath] = React.useState<google.maps.LatLngLiteral[] | null>(
-    null
-  );
-  const [routeStatus, setRouteStatus] = React.useState<string | null>(null);
-
-  const routePoints = useMemo(() => {
-    const points: google.maps.LatLngLiteral[] = [];
-    for (const activity of activities) {
-      const coords = activity.activity?.coordinates;
-      if (!coords || coords.length !== 2) continue;
-      const [lng, lat] = coords;
-      if (typeof lat !== "number" || typeof lng !== "number") continue;
-      points.push({ lat, lng });
-    }
-    return points;
-  }, [activities]);
-
-  const routePointsRef = React.useRef<google.maps.LatLngLiteral[]>([]);
-  routePointsRef.current = routePoints;
-
-  const requestKey = useMemo(() => {
-    if (routePoints.length < 2) return null;
-    return routePoints
-      .map((p) => `${p.lat.toFixed(5)},${p.lng.toFixed(5)}`)
-      .join("|");
-  }, [routePoints]);
+  const unmountedRef = React.useRef(false);
+  const [pathsByKey, setPathsByKey] = React.useState<
+    Record<string, google.maps.LatLngLiteral[] | null>
+  >({});
+  const [statusByKey, setStatusByKey] = React.useState<Record<string, string | null>>({});
 
   useEffect(() => {
-    const points = routePointsRef.current;
-    if (!requestKey) {
-      setPath(null);
-      setRouteStatus(null);
-      return;
-    }
+    // Fast Refresh can re-run effect cleanups; ensure we don't get "stuck" in an unmounted state.
+    unmountedRef.current = false;
+    return () => {
+      unmountedRef.current = true;
+    };
+  }, []);
 
-    if (points.length > 25) {
-      setPath(null);
-      setRouteStatus("MAX_WAYPOINTS_EXCEEDED");
-      return;
-    }
-
-    const cached = cacheRef.current.get(requestKey);
-    if (cached) {
-      if (isDebugEnabled()) {
-        console.debug("[map] route polyline cache hit", {
-          points: points.length,
-          requestKey,
-        });
+  useEffect(() => {
+    if (activities.length < 2) {
+      if (onRouteStatusChange) {
+        const key = "none:";
+        if (lastEmittedStatusRef.current !== key) {
+          lastEmittedStatusRef.current = key;
+          onRouteStatusChange({ source: "none" });
+        }
       }
-      setPath(cached);
-      setRouteStatus(null);
       return;
     }
 
-    let cancelled = false;
-    setPath(null);
-    setRouteStatus("LOADING");
+    const allowedKeys = new Set<string>();
+    for (let i = 0; i < activities.length - 1; i += 1) {
+      const from = activities[i];
+      const to = activities[i + 1];
+      const fromCoords = from.activity?.coordinates;
+      const toCoords = to.activity?.coordinates;
+      if (!fromCoords || !toCoords || fromCoords.length !== 2 || toCoords.length !== 2) {
+        continue;
+      }
+      const [fromLng, fromLat] = fromCoords;
+      const [toLng, toLat] = toCoords;
+      if (
+        typeof fromLat !== "number" ||
+        typeof fromLng !== "number" ||
+        typeof toLat !== "number" ||
+        typeof toLng !== "number"
+      ) {
+        continue;
+      }
+
+      const mode = (from.travel_mode_to_next ?? "driving") as TravelMode;
+      const key = `${from.itinerary_activity_id}->${to.itinerary_activity_id}:${mode}:${fromLat.toFixed(5)},${fromLng.toFixed(5)}|${toLat.toFixed(5)},${toLng.toFixed(5)}`;
+      allowedKeys.add(key);
+    }
+
+    if (allowedKeys.size === 0) {
+      if (onRouteStatusChange) {
+        const key = "none:";
+        if (lastEmittedStatusRef.current !== key) {
+          lastEmittedStatusRef.current = key;
+          onRouteStatusChange({ source: "none" });
+        }
+      }
+      return;
+    }
+
+    setPathsByKey((prev) => {
+      const prevKeys = Object.keys(prev);
+      const hasExtraneousKey = prevKeys.some((key) => !allowedKeys.has(key));
+      if (!hasExtraneousKey) return prev;
+      const next: typeof prev = {};
+      for (const key of prevKeys) {
+        if (allowedKeys.has(key)) next[key] = prev[key];
+      }
+      return next;
+    });
+
+    setStatusByKey((prev) => {
+      const prevKeys = Object.keys(prev);
+      const hasExtraneousKey = prevKeys.some((key) => !allowedKeys.has(key));
+      if (!hasExtraneousKey) return prev;
+      const next: typeof prev = {};
+      for (const key of prevKeys) {
+        if (allowedKeys.has(key)) next[key] = prev[key];
+      }
+      return next;
+    });
+  }, [activities, onRouteStatusChange]);
+
+  const segmentRequests = useMemo(() => {
+    const segments: Array<{
+      key: string;
+      mode: TravelMode;
+      points: Array<{ lat: number; lng: number }>;
+      fallbackPath: google.maps.LatLngLiteral[];
+    }> = [];
+
+    if (activities.length < 2) return segments;
+
+    for (let i = 0; i < activities.length - 1; i += 1) {
+      const from = activities[i];
+      const to = activities[i + 1];
+      const fromCoords = from.activity?.coordinates;
+      const toCoords = to.activity?.coordinates;
+      if (!fromCoords || !toCoords || fromCoords.length !== 2 || toCoords.length !== 2) {
+        continue;
+      }
+
+      const [fromLng, fromLat] = fromCoords;
+      const [toLng, toLat] = toCoords;
+      if (
+        typeof fromLat !== "number" ||
+        typeof fromLng !== "number" ||
+        typeof toLat !== "number" ||
+        typeof toLng !== "number"
+      ) {
+        continue;
+      }
+
+      const origin = { lat: fromLat, lng: fromLng };
+      const destination = { lat: toLat, lng: toLng };
+      const mode = (from.travel_mode_to_next ?? "driving") as TravelMode;
+      const key = `${from.itinerary_activity_id}->${to.itinerary_activity_id}:${mode}:${origin.lat.toFixed(5)},${origin.lng.toFixed(5)}|${destination.lat.toFixed(5)},${destination.lng.toFixed(5)}`;
+
+      segments.push({
+        key,
+        mode,
+        points: [origin, destination],
+        fallbackPath: [origin, destination],
+      });
+    }
+
+    return segments;
+  }, [activities]);
+
+  useEffect(() => {
+    if (segmentRequests.length === 0) return;
+
+    const missing = segmentRequests.filter(
+      (segment) => pathsByKey[segment.key] === undefined && statusByKey[segment.key] === undefined
+    );
+    if (missing.length === 0) return;
+
+    setStatusByKey((prev) => {
+      const next = { ...prev };
+      for (const segment of missing) {
+        next[segment.key] = "LOADING";
+      }
+      return next;
+    });
 
     (async () => {
-      try {
-        if (isDebugEnabled()) {
-          console.debug("[map] routes api request", {
-            points: points.length,
-            requestKey,
-            origin: points[0],
-            destination: points[points.length - 1],
-          });
-        }
-        const result = await computeRoutePolyline(
-          points.map((p) => ({ lat: p.lat, lng: p.lng })),
-          "driving"
-        );
+      const nextPaths: Record<string, google.maps.LatLngLiteral[] | null> = {};
+      const nextStatuses: Record<string, string | null> = {};
 
-        if (cancelled) return;
-
-        if (!result.success || !result.data) {
-          console.warn("[map] routes api failed:", result.error);
-          if (isDebugEnabled()) {
-            console.debug("[map] routes api failed", {
-              requestKey,
-              code: result.error?.code,
-              message: result.error?.message,
-            });
+      await Promise.all(
+        missing.map(async (segment) => {
+          const cached = cacheRef.current.get(segment.key);
+          if (cached) {
+            nextPaths[segment.key] = cached;
+            nextStatuses[segment.key] = null;
+            return;
           }
-          setPath(null);
-          setRouteStatus(result.error?.code || "ROUTES_API_ERROR");
-          return;
-        }
 
-        const decoded = decodeEncodedPolyline(result.data.encodedPolyline);
-        if (decoded.length < 2) {
-          setPath(null);
-          setRouteStatus("EMPTY_ROUTE");
-          return;
-        }
+          try {
+            if (isDebugEnabled()) {
+              console.debug("[map] routes api segment request", {
+                key: segment.key,
+                mode: segment.mode,
+                origin: segment.points[0],
+                destination: segment.points[segment.points.length - 1],
+              });
+            }
 
-        cacheRef.current.set(requestKey, decoded);
-        if (isDebugEnabled()) {
-          console.debug("[map] routes api ok", {
-            requestKey,
-            decodedPoints: decoded.length,
-            encodedPolylineLength: result.data.encodedPolyline.length,
-          });
-        }
-        setPath(decoded);
-        setRouteStatus(null);
-      } catch (error) {
-        if (cancelled) return;
-        console.warn("[map] routes api request failed:", error);
-        setPath(null);
-        setRouteStatus("ROUTES_API_ERROR");
-      }
+            const result = await computeRoutePolyline(segment.points, segment.mode);
+            if (!result.success || !result.data) {
+              nextPaths[segment.key] = null;
+              nextStatuses[segment.key] = result.error?.code || "ROUTES_API_ERROR";
+              return;
+            }
+
+            const decoded = decodeEncodedPolyline(result.data.encodedPolyline);
+            if (decoded.length < 2) {
+              nextPaths[segment.key] = null;
+              nextStatuses[segment.key] = "EMPTY_ROUTE";
+              return;
+            }
+
+            cacheRef.current.set(segment.key, decoded);
+            nextPaths[segment.key] = decoded;
+            nextStatuses[segment.key] = null;
+          } catch (error) {
+            console.warn("[map] routes api segment request failed:", error);
+            nextPaths[segment.key] = null;
+            nextStatuses[segment.key] = "ROUTES_API_ERROR";
+          }
+        })
+      );
+
+      if (unmountedRef.current) return;
+
+      setPathsByKey((prev) => ({ ...prev, ...nextPaths }));
+      setStatusByKey((prev) => ({ ...prev, ...nextStatuses }));
     })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [isDebugEnabled, requestKey]);
+  }, [isDebugEnabled, pathsByKey, segmentRequests, statusByKey]);
 
   useEffect(() => {
     if (!onRouteStatusChange) return;
 
-    const next =
-      path && path.length >= 2
-        ? { source: "routes_api" as const }
-        : fallbackPath && fallbackPath.length >= 2
-          ? { source: "fallback" as const, status: routeStatus ?? undefined }
-          : { source: "none" as const, status: routeStatus ?? undefined };
+    if (segmentRequests.length === 0) {
+      const key = "none:";
+      if (lastEmittedStatusRef.current !== key) {
+        lastEmittedStatusRef.current = key;
+        onRouteStatusChange({ source: "none" });
+      }
+      return;
+    }
 
-    const key = `${next.source}:${next.status ?? ""}`;
-    if (lastEmittedStatusRef.current === key) return;
-    lastEmittedStatusRef.current = key;
+    const keys = segmentRequests.map((segment) => segment.key);
+    const hasAnyRoadRoute = keys.some((key) => {
+      const path = pathsByKey[key];
+      return Array.isArray(path) && path.length >= 2;
+    });
+
+    const isLoading = keys.some((key) => statusByKey[key] === "LOADING");
+    const errorCodes = keys
+      .map((key) => statusByKey[key])
+      .filter((status): status is string => !!status && status !== "LOADING");
+    const uniqueErrors = Array.from(new Set(errorCodes));
+
+    const allRoadRoute = hasAnyRoadRoute && keys.every((key) => {
+      const path = pathsByKey[key];
+      return Array.isArray(path) && path.length >= 2;
+    });
+
+    let status: string | undefined;
+    if (isLoading) {
+      status = "LOADING";
+    } else if (allRoadRoute) {
+      status = undefined;
+    } else if (hasAnyRoadRoute) {
+      status = uniqueErrors.length === 1 ? uniqueErrors[0] : "PARTIAL";
+    } else {
+      status = uniqueErrors.length === 1 ? uniqueErrors[0] : undefined;
+    }
+
+    const next = hasAnyRoadRoute
+      ? { source: "routes_api" as const, status }
+      : { source: "fallback" as const, status };
+
+    const emittedKey = `${next.source}:${next.status ?? ""}`;
+    if (lastEmittedStatusRef.current === emittedKey) return;
+    lastEmittedStatusRef.current = emittedKey;
     onRouteStatusChange(next);
-  }, [fallbackPath, onRouteStatusChange, path, routeStatus]);
+  }, [onRouteStatusChange, pathsByKey, segmentRequests, statusByKey]);
 
-  const effectivePath = path ?? fallbackPath;
-  if (!effectivePath) return null;
-
-  const isFallback = !path;
-  const fallbackIcons: google.maps.IconSequence[] | undefined = isFallback
-    ? [
-        {
-          icon: {
-            path: "M 0,-1 0,1",
-            strokeOpacity: 0.7,
-            scale: 4,
-            strokeColor,
-          },
-          offset: "0",
-          repeat: "12px",
-        },
-      ]
-    : undefined;
+  if (segmentRequests.length === 0) return null;
 
   return (
-    <Polyline
-      path={effectivePath}
-      strokeColor={strokeColor}
-      strokeOpacity={isFallback ? 0 : 0.45}
-      strokeWeight={3}
-      icons={fallbackIcons}
-      geodesic={false}
-      clickable={false}
-    />
+    <>
+      {segmentRequests.map((segment) => {
+        const path = pathsByKey[segment.key] ?? null;
+        const effectivePath = path && path.length >= 2 ? path : segment.fallbackPath;
+
+        const isFallback = !path || path.length < 2;
+        const fallbackIcons: google.maps.IconSequence[] | undefined = isFallback
+          ? [
+              {
+                icon: {
+                  path: "M 0,-1 0,1",
+                  strokeOpacity: 0.7,
+                  scale: 4,
+                  strokeColor,
+                },
+                offset: "0",
+                repeat: "12px",
+              },
+            ]
+          : undefined;
+
+        return (
+          <Polyline
+            key={segment.key}
+            path={effectivePath}
+            strokeColor={strokeColor}
+            strokeOpacity={isFallback ? 0 : 0.45}
+            strokeWeight={3}
+            icons={fallbackIcons}
+            geodesic={false}
+            clickable={false}
+          />
+        );
+      })}
+    </>
   );
 }
 
@@ -367,8 +494,12 @@ export function ItineraryMap({
   const { centerCoordinates, itineraryCoordinates, initialZoom, setCenterCoordinates, setRadius } = useMapStore();
   const { selectedActivity, setSelectedActivity } = useActivitiesStore();
   const { selectedSearchQuery } = useSearchHistoryStore();
+  const { optimisticUpdateItineraryActivity } = useItineraryActivityStore();
   const [isPlaceDetailsLoading, setIsPlaceDetailsLoading] = useState(false);
   const [showTravelTimes, setShowTravelTimes] = useState(false);
+  const [isUpdatingRouteMode, setIsUpdatingRouteMode] = useState(false);
+  const [showSegmentModes, setShowSegmentModes] = useState(false);
+  const [savingSegmentModeFor, setSavingSegmentModeFor] = useState<string | null>(null);
   const [routeLineStatus, setRouteLineStatus] = useState<{
     source: "routes_api" | "fallback" | "none";
     status?: string;
@@ -476,36 +607,127 @@ export function ItineraryMap({
     return sorted;
   }, [normalizedSelectedDate, showRoutes, validActivities]);
 
+  const dayRouteModeState = useMemo(() => {
+    if (routeActivities.length < 2) {
+      return { mode: null as TravelMode | null, isMixed: false };
+    }
+
+    const fromActivities = routeActivities.slice(0, -1);
+    const modes = new Set<TravelMode>();
+    for (const activity of fromActivities) {
+      modes.add((activity.travel_mode_to_next ?? "driving") as TravelMode);
+    }
+
+    if (modes.size === 1) {
+      return { mode: Array.from(modes)[0] ?? null, isMixed: false };
+    }
+
+    return { mode: null as TravelMode | null, isMixed: true };
+  }, [routeActivities]);
+
+  const routePolylineMode: TravelMode = dayRouteModeState.mode ?? "driving";
+
+  const routePolylineModeLabel = useMemo(() => {
+    switch (routePolylineMode) {
+      case "walking":
+        return "Walk";
+      case "transit":
+        return "Transit";
+      case "bicycling":
+        return "Bike";
+      case "driving":
+      default:
+        return "Drive";
+    }
+  }, [routePolylineMode]);
+
+  const applyRouteModeToDay = React.useCallback(
+    async (mode: TravelMode) => {
+      if (!normalizedSelectedDate) return;
+      if (routeActivities.length < 2) return;
+
+      setIsUpdatingRouteMode(true);
+      try {
+        const fromActivities = routeActivities.slice(0, -1);
+        const results = await Promise.all(
+          fromActivities.map((activity) =>
+            optimisticUpdateItineraryActivity(String(activity.itinerary_activity_id), {
+              travel_mode_to_next: mode,
+            })
+          )
+        );
+
+        const failed = results.filter((r) => !r.success);
+        if (failed.length > 0) {
+          console.error("Failed to update some segment modes:", failed.map((r) => r.error));
+        }
+      } finally {
+        setIsUpdatingRouteMode(false);
+      }
+    },
+    [normalizedSelectedDate, optimisticUpdateItineraryActivity, routeActivities]
+  );
+
+  const routeSegmentModes = useMemo(() => {
+    if (routeActivities.length < 2) return [];
+
+    return routeActivities.slice(0, -1).map((from, index) => {
+      const to = routeActivities[index + 1];
+      return {
+        fromId: String(from.itinerary_activity_id),
+        fromName: from.activity?.name ?? "From",
+        toName: to.activity?.name ?? "To",
+        mode: (from.travel_mode_to_next ?? "driving") as TravelMode,
+      };
+    });
+  }, [routeActivities]);
+
+  const setSegmentMode = React.useCallback(
+    async (fromId: string, mode: TravelMode) => {
+      setSavingSegmentModeFor(fromId);
+      try {
+        const result = await optimisticUpdateItineraryActivity(fromId, {
+          travel_mode_to_next: mode,
+        });
+        if (!result.success) {
+          console.error("Failed to update segment mode:", result.error);
+        }
+      } finally {
+        setSavingSegmentModeFor(null);
+      }
+    },
+    [optimisticUpdateItineraryActivity]
+  );
+
   const routeStatusLabel = useMemo(() => {
     if (!showRoutes || !normalizedSelectedDate || routeActivities.length < 2) return null;
-    if (routeLineStatus?.source === "routes_api") return "Road route";
-
     const status = routeLineStatus?.status;
-    if (!status) return "Straight line (routes unavailable)";
     if (status === "LOADING") return "Loading road route…";
+
+    if (routeLineStatus?.source === "routes_api") {
+      const modeLabel = dayRouteModeState.isMixed ? "Mixed modes" : routePolylineModeLabel;
+      if (status) {
+        return `Road route (${modeLabel}, partial)`;
+      }
+      return `Road route (${modeLabel})`;
+    }
+
+    if (!status) return "Straight line (routes unavailable)";
     if (status === "ROUTES_API_DISABLED") return "Straight line (Routes API disabled)";
     if (status === "API_KEY_NOT_CONFIGURED") return "Straight line (Routes API key missing)";
-    if (status === "MAX_WAYPOINTS_EXCEEDED") return "Straight line (too many waypoints)";
     if (status === "ZERO_RESULTS") return "Straight line (no route found)";
     if (status === "NO_ROUTE") return "Straight line (no route found)";
     if (status === "RATE_LIMITED") return "Straight line (rate limited)";
     return `Straight line (${status})`;
-  }, [normalizedSelectedDate, routeActivities.length, routeLineStatus?.source, routeLineStatus?.status, showRoutes]);
-
-  const routePath = useMemo(() => {
-    if (routeActivities.length < 2) return null;
-    const path: google.maps.LatLngLiteral[] = [];
-
-    for (const activity of routeActivities) {
-      const coords = activity.activity?.coordinates;
-      if (!coords || coords.length !== 2) continue;
-      const [lng, lat] = coords;
-      if (typeof lat !== "number" || typeof lng !== "number") continue;
-      path.push({ lat, lng });
-    }
-
-    return path.length >= 2 ? path : null;
-  }, [routeActivities]);
+  }, [
+    dayRouteModeState.isMixed,
+    normalizedSelectedDate,
+    routeActivities.length,
+    routeLineStatus?.source,
+    routeLineStatus?.status,
+    routePolylineModeLabel,
+    showRoutes,
+  ]);
 
   const travelSegments = useMemo(() => {
     if (!showRoutes) return [];
@@ -514,6 +736,7 @@ export function ItineraryMap({
 
     const segments: Array<{
       key: string;
+      preferredMode: TravelMode;
       origin: { lat: number; lng: number };
       destination: { lat: number; lng: number };
       midpoint: { lat: number; lng: number };
@@ -542,9 +765,11 @@ export function ItineraryMap({
       const origin = { lat: fromLat, lng: fromLng };
       const destination = { lat: toLat, lng: toLng };
       const midpoint = { lat: (fromLat + toLat) / 2, lng: (fromLng + toLng) / 2 };
+      const preferredMode = (from.travel_mode_to_next ?? "driving") as TravelMode;
 
       segments.push({
-        key: `${from.itinerary_activity_id}->${to.itinerary_activity_id}`,
+        key: `${from.itinerary_activity_id}->${to.itinerary_activity_id}:${preferredMode}`,
+        preferredMode,
         origin,
         destination,
         midpoint,
@@ -608,10 +833,15 @@ export function ItineraryMap({
       await Promise.all(
         missingSegments.map(async (segment) => {
           try {
+            const baseModes: TravelMode[] = ["walking", "driving", "transit"];
+            const requestedModes = Array.from(
+              new Set<TravelMode>([...baseModes, segment.preferredMode])
+            );
+
             const result = await calculateTravelTime(
               segment.origin,
               segment.destination,
-              ["walking", "driving", "transit"]
+              requestedModes
             );
 
             if (!result.success || !result.data) {
@@ -626,23 +856,24 @@ export function ItineraryMap({
               return;
             }
 
-            const best = pickBest(result.data.results as any);
-            if (!best) {
+            const chosen = (result.data.results as any)?.[segment.preferredMode] ?? pickBest(result.data.results as any);
+
+            if (!chosen) {
               next[segment.key] = null;
               return;
             }
 
             next[segment.key] = {
-              durationText: best.duration?.text ?? "",
-              mode: best.mode as TravelMode,
-              distanceText: best.distance?.text ?? undefined,
+              durationText: chosen.duration?.text ?? "",
+              mode: chosen.mode as TravelMode,
+              distanceText: chosen.distance?.text ?? undefined,
             };
             if (debugEnabled) {
               console.debug("[map] travel time ok", {
                 segment: segment.key,
-                bestMode: best.mode,
-                duration: best.duration?.text,
-                distance: best.distance?.text,
+                bestMode: chosen.mode,
+                duration: chosen.duration?.text,
+                distance: chosen.distance?.text,
               });
             }
           } catch (error) {
@@ -670,6 +901,8 @@ export function ItineraryMap({
     switch (mode) {
       case "walking":
         return <PersonStanding className="h-3 w-3" />;
+      case "bicycling":
+        return <Bike className="h-3 w-3" />;
       case "transit":
         return <Train className="h-3 w-3" />;
       case "driving":
@@ -883,9 +1116,8 @@ export function ItineraryMap({
 
           {/* Route (road-following) between the selected day's activities */}
           {showRoutes && normalizedSelectedDate && routeActivities.length >= 2 ? (
-            <DayRoutePolyline
+            <DayRoutePolylines
               activities={routeActivities}
-              fallbackPath={routePath}
               strokeColor={activeDayColor}
               onRouteStatusChange={setRouteLineStatus}
             />
@@ -1015,6 +1247,58 @@ export function ItineraryMap({
                 <div className="flex items-center justify-between gap-3">
                   <div className="text-xs text-ink-600">Route</div>
                   <div className="text-[11px] text-ink-500">{routeStatusLabel}</div>
+                </div>
+              ) : null}
+
+              <div className="flex items-center justify-between gap-3">
+                <div className="text-xs text-ink-600">Mode</div>
+                <div className="flex items-center gap-2">
+                  {isUpdatingRouteMode ? (
+                    <div className="text-[11px] text-ink-500">Saving…</div>
+                  ) : null}
+                  <TravelModeSelect
+                    value={dayRouteModeState.mode ?? undefined}
+                    onValueChange={applyRouteModeToDay}
+                    placeholder={dayRouteModeState.isMixed ? "Mixed" : "Mode"}
+                    disabled={isUpdatingRouteMode}
+                    className="w-[110px] bg-bg-0/80"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between gap-3">
+                <div className="text-xs text-ink-600">Segments</div>
+                <button
+                  type="button"
+                  onClick={() => setShowSegmentModes((prev) => !prev)}
+                  className="text-[11px] text-ink-500 hover:text-ink-700"
+                >
+                  {showSegmentModes ? "Hide" : "Edit"}
+                </button>
+              </div>
+
+              {showSegmentModes ? (
+                <div className="max-h-40 overflow-auto rounded-md border border-stroke-200 bg-bg-0/60 p-2 space-y-2">
+                  {routeSegmentModes.map((segment) => (
+                    <div key={segment.fromId} className="flex items-center justify-between gap-2">
+                      <div className="min-w-0 pr-2">
+                        <div className="truncate text-[11px] text-ink-700">
+                          {segment.fromName} → {segment.toName}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {savingSegmentModeFor === segment.fromId ? (
+                          <div className="text-[11px] text-ink-500">Saving…</div>
+                        ) : null}
+                        <TravelModeSelect
+                          value={segment.mode}
+                          onValueChange={(mode) => setSegmentMode(segment.fromId, mode)}
+                          disabled={savingSegmentModeFor === segment.fromId}
+                          className="w-[110px] bg-bg-0/80"
+                        />
+                      </div>
+                    </div>
+                  ))}
                 </div>
               ) : null}
 

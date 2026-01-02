@@ -16,13 +16,10 @@ create table if not exists public.itinerary_slot (
   deleted_at timestamp with time zone,
   unique (itinerary_id, itinerary_destination_id, date, start_time, end_time)
 );
-
 create index if not exists idx_itinerary_slot_itinerary_destination_date
   on public.itinerary_slot(itinerary_id, itinerary_destination_id, date);
-
 create index if not exists idx_itinerary_slot_primary_activity
   on public.itinerary_slot(primary_itinerary_activity_id);
-
 create table if not exists public.itinerary_slot_option (
   itinerary_slot_option_id serial primary key,
   itinerary_slot_id integer references public.itinerary_slot(itinerary_slot_id) on delete cascade not null,
@@ -32,13 +29,10 @@ create table if not exists public.itinerary_slot_option (
   unique (itinerary_slot_id, itinerary_activity_id),
   unique (itinerary_activity_id)
 );
-
 create index if not exists idx_itinerary_slot_option_slot_id
   on public.itinerary_slot_option(itinerary_slot_id);
-
 create index if not exists idx_itinerary_slot_option_activity_id
   on public.itinerary_slot_option(itinerary_activity_id);
-
 -- Actor helpers
 create or replace function public.set_itinerary_slot_actor()
 returns trigger as $$
@@ -59,12 +53,10 @@ begin
   return new;
 end;
 $$ language plpgsql;
-
 drop trigger if exists set_itinerary_slot_actor on public.itinerary_slot;
 create trigger set_itinerary_slot_actor
   before insert or update on public.itinerary_slot
   for each row execute function public.set_itinerary_slot_actor();
-
 create or replace function public.set_itinerary_slot_option_actor()
 returns trigger as $$
 begin
@@ -79,22 +71,18 @@ begin
   return new;
 end;
 $$ language plpgsql;
-
 drop trigger if exists set_itinerary_slot_option_actor on public.itinerary_slot_option;
 create trigger set_itinerary_slot_option_actor
   before insert on public.itinerary_slot_option
   for each row execute function public.set_itinerary_slot_option_actor();
-
 -- updated_at timestamp trigger
 drop trigger if exists set_timestamp_itinerary_slot on public.itinerary_slot;
 create trigger set_timestamp_itinerary_slot
   before update on public.itinerary_slot
   for each row execute function public.handle_updated_at();
-
 -- Enable RLS
 alter table public.itinerary_slot enable row level security;
 alter table public.itinerary_slot_option enable row level security;
-
 -- RLS policies - Slots
 drop policy if exists "Users can view itinerary slots" on public.itinerary_slot;
 create policy "Users can view itinerary slots" on public.itinerary_slot
@@ -111,7 +99,6 @@ create policy "Users can view itinerary slots" on public.itinerary_slot
         )
     )
   );
-
 drop policy if exists "Users can insert itinerary slots" on public.itinerary_slot;
 create policy "Users can insert itinerary slots" on public.itinerary_slot
   for insert with check (
@@ -126,7 +113,6 @@ create policy "Users can insert itinerary slots" on public.itinerary_slot
         )
     )
   );
-
 drop policy if exists "Users can update itinerary slots" on public.itinerary_slot;
 create policy "Users can update itinerary slots" on public.itinerary_slot
   for update using (
@@ -141,7 +127,6 @@ create policy "Users can update itinerary slots" on public.itinerary_slot
         )
     )
   );
-
 drop policy if exists "Users can delete itinerary slots" on public.itinerary_slot;
 create policy "Users can delete itinerary slots" on public.itinerary_slot
   for delete using (
@@ -156,7 +141,6 @@ create policy "Users can delete itinerary slots" on public.itinerary_slot
         )
     )
   );
-
 -- RLS policies - Slot options
 drop policy if exists "Users can view itinerary slot options" on public.itinerary_slot_option;
 create policy "Users can view itinerary slot options" on public.itinerary_slot_option
@@ -174,7 +158,6 @@ create policy "Users can view itinerary slot options" on public.itinerary_slot_o
         )
     )
   );
-
 drop policy if exists "Users can insert itinerary slot options" on public.itinerary_slot_option;
 create policy "Users can insert itinerary slot options" on public.itinerary_slot_option
   for insert with check (
@@ -190,7 +173,6 @@ create policy "Users can insert itinerary slot options" on public.itinerary_slot
         )
     )
   );
-
 drop policy if exists "Users can update itinerary slot options" on public.itinerary_slot_option;
 create policy "Users can update itinerary slot options" on public.itinerary_slot_option
   for update using (
@@ -206,7 +188,6 @@ create policy "Users can update itinerary slot options" on public.itinerary_slot
         )
     )
   );
-
 drop policy if exists "Users can delete itinerary slot options" on public.itinerary_slot_option;
 create policy "Users can delete itinerary slot options" on public.itinerary_slot_option
   for delete using (
@@ -222,7 +203,6 @@ create policy "Users can delete itinerary slot options" on public.itinerary_slot
         )
     )
   );
-
 -- =====================================================
 -- Backfill: create slots only for exact-time overlaps (>= 2 activities sharing the same day/time).
 -- =====================================================
@@ -235,8 +215,8 @@ with grouped as (
     ia.start_time,
     ia.end_time,
     min(ia.itinerary_activity_id) as primary_itinerary_activity_id,
-    coalesce(min(ia.created_by), i.user_id) as created_by,
-    coalesce(min(ia.updated_by), min(ia.created_by), i.user_id) as updated_by,
+    coalesce(min(ia.created_by::text)::uuid, i.user_id) as created_by,
+    coalesce(min(ia.updated_by::text)::uuid, min(ia.created_by::text)::uuid, i.user_id) as updated_by,
     count(*) as option_count
   from public.itinerary_activity ia
   join public.itinerary i on i.itinerary_id = ia.itinerary_id
@@ -307,7 +287,6 @@ where ia.deleted_at is null
       and g.end_time = ia.end_time
   )
 on conflict do nothing;
-
 -- =====================================================
 -- Builder bootstrap RPC: include slots + slot options.
 -- =====================================================

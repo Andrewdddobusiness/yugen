@@ -115,6 +115,7 @@ export interface ItineraryActivity {
   start_time: string | null;
   end_time: string | null;
   notes: string | null;
+  travel_mode_to_next?: string | null;
   is_booked: boolean;
   booking_reference: string | null;
   cost: number | null;

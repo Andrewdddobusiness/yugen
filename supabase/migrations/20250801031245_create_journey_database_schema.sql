@@ -1,12 +1,7 @@
--- Yugi Travel Itinerary Application - Complete Database Schema
--- Created: 2025-08-01
--- Migration version: 20250801031245
--- Description: Creates all tables, indexes, RLS policies, and triggers for the Yugi app
-
 -- Enable necessary extensions
 create extension if not exists "uuid-ossp";
 
--- Create tables for the Yugi travel itinerary application
+-- Create tables for the Journey travel itinerary application
 
 -- Users table (extends Supabase auth.users)
 create table if not exists public.profiles (
@@ -150,10 +145,6 @@ create table if not exists public.itinerary_search_history (
   searched_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
 
--- =====================================================
--- INDEXES FOR PERFORMANCE
--- =====================================================
-
 -- Create indexes for better performance
 create index if not exists idx_itinerary_user_id on public.itinerary(user_id);
 create index if not exists idx_itinerary_deleted_at on public.itinerary(deleted_at);
@@ -163,10 +154,6 @@ create index if not exists idx_itinerary_activity_itinerary_id on public.itinera
 create index if not exists idx_itinerary_activity_date on public.itinerary_activity(date);
 create index if not exists idx_itinerary_activity_deleted_at on public.itinerary_activity(deleted_at);
 create index if not exists idx_search_history_itinerary_id on public.itinerary_search_history(itinerary_id);
-
--- =====================================================
--- ROW LEVEL SECURITY (RLS)
--- =====================================================
 
 -- Enable Row Level Security (RLS)
 alter table public.profiles enable row level security;
@@ -305,10 +292,6 @@ create policy "Users can delete own search history" on public.itinerary_search_h
 -- Activities, reviews, and open_hours are public read-only tables
 -- No RLS needed as they contain public place information
 
--- =====================================================
--- TRIGGERS AND FUNCTIONS
--- =====================================================
-
 -- Functions for automatic timestamp updates
 create or replace function public.handle_updated_at()
 returns trigger as $$
@@ -337,28 +320,4 @@ create trigger set_timestamp_activity
 
 create trigger set_timestamp_itinerary_activity
   before update on public.itinerary_activity
-  for each row execute function public.handle_updated_at();
-
--- =====================================================
--- COMMENTS FOR DOCUMENTATION
--- =====================================================
-
--- Add helpful comments to tables
-comment on table public.profiles is 'User profile extensions for auth.users';
-comment on table public.countries is 'Reference table for countries';
-comment on table public.cities is 'Reference table for cities with travel information';
-comment on table public.itinerary is 'Main itinerary table - each user can have multiple itineraries';
-comment on table public.itinerary_destination is 'Destinations within an itinerary - supports multi-city trips';
-comment on table public.activity is 'Master table of all activities/places from Google Places API';
-comment on table public.review is 'Reviews for activities from Google Places API';
-comment on table public.open_hours is 'Opening hours for activities';
-comment on table public.itinerary_activity is 'Junction table - activities scheduled in specific itineraries';
-comment on table public.itinerary_search_history is 'Track user searches to build a wishlist per itinerary';
-
--- Add comments to key columns
-comment on column public.activity.place_id is 'Google Places API place_id - unique identifier';
-comment on column public.activity.coordinates is 'PostgreSQL point type storing lat,lng coordinates';
-comment on column public.activity.types is 'Array of Google Places types (restaurant, tourist_attraction, etc.)';
-comment on column public.open_hours.day is 'Day of week: 0=Sunday, 1=Monday, ..., 6=Saturday';
-comment on column public.itinerary_activity.deleted_at is 'Soft delete timestamp - null means active';
-comment on column public.itinerary.is_public is 'Whether itinerary can be viewed by other users';
+  for each row execute function public.handle_updated_at();;

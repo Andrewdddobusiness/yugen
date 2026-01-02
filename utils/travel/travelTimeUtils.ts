@@ -5,8 +5,10 @@ export interface ActivityWithCoordinates {
   itinerary_activity_id: string;
   start_time: string | null;
   end_time: string | null;
+  travel_mode_to_next?: TravelMode | null;
   activity?: {
     name: string;
+    // Stored as [lng, lat] across the app.
     coordinates?: [number, number];
   };
 }
@@ -51,6 +53,9 @@ export async function getTravelTimesBetweenActivities(
     return [];
   }
 
+  // Ensure we request any explicitly selected per-segment modes in addition to defaults.
+  const requestedModes = Array.from(new Set<TravelMode>(modes));
+
   // Create pairs of consecutive activities
   const activityPairs = [];
   for (let i = 0; i < activitiesWithCoords.length - 1; i++) {
@@ -58,14 +63,19 @@ export async function getTravelTimesBetweenActivities(
     const toActivity = activitiesWithCoords[i + 1];
     
     if (fromActivity.activity?.coordinates && toActivity.activity?.coordinates) {
+      const preferredMode = fromActivity.travel_mode_to_next ?? null;
+      if (preferredMode) {
+        requestedModes.push(preferredMode);
+      }
+
       activityPairs.push({
         from: {
-          lat: fromActivity.activity.coordinates[0],
-          lng: fromActivity.activity.coordinates[1]
+          lat: fromActivity.activity.coordinates[1],
+          lng: fromActivity.activity.coordinates[0]
         },
         to: {
-          lat: toActivity.activity.coordinates[0],
-          lng: toActivity.activity.coordinates[1]
+          lat: toActivity.activity.coordinates[1],
+          lng: toActivity.activity.coordinates[0]
         },
         fromId: fromActivity.itinerary_activity_id,
         toId: toActivity.itinerary_activity_id
@@ -78,28 +88,40 @@ export async function getTravelTimesBetweenActivities(
   }
 
   try {
-    const batchResult = await calculateBatchTravelTimes(activityPairs, modes);
+    const uniqueRequestedModes = Array.from(new Set<TravelMode>(requestedModes));
+    const batchResult = await calculateBatchTravelTimes(activityPairs, uniqueRequestedModes);
     
     if (!batchResult.success || !batchResult.data) {
       console.error('Failed to calculate batch travel times:', batchResult.error);
       return [];
     }
 
+    const preferredModeByFromId = new Map<string, TravelMode | null>();
+    for (const activity of activitiesWithCoords) {
+      preferredModeByFromId.set(
+        activity.itinerary_activity_id,
+        activity.travel_mode_to_next ?? null
+      );
+    }
+
     const travelTimes: TravelTimeResult[] = [];
 
     for (const result of batchResult.data) {
-      // Get the best travel option (prioritize walking for short distances, driving for longer)
-      const bestTravelTime = getBestTravelTime(result.travelTimes.results);
+      const preferredMode = preferredModeByFromId.get(result.fromId) ?? null;
+      const selectedTravelTime =
+        preferredMode && result.travelTimes.results[preferredMode]
+          ? result.travelTimes.results[preferredMode]
+          : getBestTravelTime(result.travelTimes.results);
       
-      if (bestTravelTime) {
+      if (selectedTravelTime) {
         travelTimes.push({
           fromActivityId: result.fromId,
           toActivityId: result.toId,
-          duration: bestTravelTime.duration.text,
-          distance: bestTravelTime.distance.text,
-          mode: bestTravelTime.mode,
-          durationValue: bestTravelTime.duration.value,
-          distanceValue: bestTravelTime.distance.value
+          duration: selectedTravelTime.duration.text,
+          distance: selectedTravelTime.distance.text,
+          mode: selectedTravelTime.mode,
+          durationValue: selectedTravelTime.duration.value,
+          distanceValue: selectedTravelTime.distance.value
         });
       }
     }

@@ -1,5 +1,4 @@
 -- Add wishlist-specific fields to search history table
--- Migration version: 20250805050018
 -- This migration enhances the search history table to properly support wishlist functionality
 
 -- Add new columns for wishlist functionality
@@ -41,4 +40,4 @@ DROP TRIGGER IF EXISTS trigger_update_search_history_updated_at ON public.itiner
 CREATE TRIGGER trigger_update_search_history_updated_at
   BEFORE UPDATE ON public.itinerary_search_history
   FOR EACH ROW
-  EXECUTE FUNCTION update_search_history_updated_at();
+  EXECUTE FUNCTION update_search_history_updated_at();;

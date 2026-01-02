@@ -1,6 +1,24 @@
--- Builder bootstrap RPC (batch critical-path reads into one round-trip)
--- Created: 2025-12-31
+-- Add per-route travel mode selection to itinerary activities.
+-- `travel_mode_to_next` stores the user's preferred mode from this activity to the next activity in the day.
+-- Supported values mirror Google Routes API modes: driving, walking, transit, bicycling.
 
+alter table public.itinerary_activity
+  add column if not exists travel_mode_to_next text not null default 'driving';
+
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_constraint
+    where conname = 'itinerary_activity_travel_mode_to_next_check'
+  ) then
+    alter table public.itinerary_activity
+      add constraint itinerary_activity_travel_mode_to_next_check
+      check (travel_mode_to_next in ('driving', 'walking', 'transit', 'bicycling'));
+  end if;
+end $$;
+
+-- Update builder bootstrap RPC to include itinerary_activity.travel_mode_to_next.
 create or replace function public.get_itinerary_builder_bootstrap(
   _itinerary_id integer,
   _itinerary_destination_id integer
@@ -42,6 +60,7 @@ as $$
             ia.start_time,
             ia.end_time,
             ia.notes,
+            ia.travel_mode_to_next,
             ia.deleted_at,
             ia.created_by,
             ia.updated_by,
@@ -49,6 +68,12 @@ as $$
               'activity_id', a.activity_id,
               'place_id', a.place_id,
               'name', a.name,
+              -- Coordinates are stored in Postgres as point(lat,lng); client expects [lng, lat]
+              'coordinates',
+                case
+                  when a.coordinates is null then null
+                  else jsonb_build_array(a.coordinates[1], a.coordinates[0])
+                end,
               'duration', a.duration,
               'price_level', a.price_level,
               'rating', a.rating,
@@ -62,6 +87,52 @@ as $$
             and ia.deleted_at is null
           limit 2000
         ) x
+      ),
+    'slots',
+      (
+        select coalesce(
+          jsonb_agg(to_jsonb(s) order by s.date, s.start_time),
+          '[]'::jsonb
+        )
+        from (
+          select
+            islot.itinerary_slot_id,
+            islot.itinerary_id,
+            islot.itinerary_destination_id,
+            islot.date,
+            islot.start_time,
+            islot.end_time,
+            islot.primary_itinerary_activity_id,
+            islot.created_by,
+            islot.updated_by,
+            islot.created_at,
+            islot.updated_at,
+            islot.deleted_at
+          from public.itinerary_slot islot
+          where islot.itinerary_id = _itinerary_id
+            and islot.itinerary_destination_id = _itinerary_destination_id
+            and islot.deleted_at is null
+        ) s
+      ),
+    'slot_options',
+      (
+        select coalesce(
+          jsonb_agg(to_jsonb(o) order by o.itinerary_slot_id, o.itinerary_slot_option_id),
+          '[]'::jsonb
+        )
+        from (
+          select
+            opt.itinerary_slot_option_id,
+            opt.itinerary_slot_id,
+            opt.itinerary_activity_id,
+            opt.created_by,
+            opt.created_at
+          from public.itinerary_slot_option opt
+          join public.itinerary_slot islot on islot.itinerary_slot_id = opt.itinerary_slot_id
+          where islot.itinerary_id = _itinerary_id
+            and islot.itinerary_destination_id = _itinerary_destination_id
+            and islot.deleted_at is null
+        ) o
       ),
     'collaborators',
       (
@@ -108,3 +179,6 @@ as $$
       )
   );
 $$;
+
+-- Ensure Supabase PostgREST picks up the new column immediately.
+notify pgrst, 'reload schema';

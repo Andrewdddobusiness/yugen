@@ -1,5 +1,4 @@
 -- Create proper user wishlist table
--- Migration version: 20250805050039
 -- This replaces the flawed approach of using itinerary_search_history for wishlist
 -- Creates a user-centric wishlist system as per UX-004 requirements
 
@@ -57,14 +56,4 @@ DROP TRIGGER IF EXISTS trigger_update_user_wishlist_updated_at ON public.user_wi
 CREATE TRIGGER trigger_update_user_wishlist_updated_at
   BEFORE UPDATE ON public.user_wishlist
   FOR EACH ROW
-  EXECUTE FUNCTION update_user_wishlist_updated_at();
-
--- Optional: Remove the incorrect wishlist fields from search history
--- (Commented out to preserve existing data, uncomment if you want to clean up)
--- ALTER TABLE public.itinerary_search_history 
--- DROP COLUMN IF EXISTS is_saved_to_wishlist,
--- DROP COLUMN IF EXISTS notes,
--- DROP COLUMN IF EXISTS priority,
--- DROP COLUMN IF EXISTS categories,
--- DROP COLUMN IF EXISTS tags,
--- DROP COLUMN IF EXISTS visit_status;
+  EXECUTE FUNCTION update_user_wishlist_updated_at();;

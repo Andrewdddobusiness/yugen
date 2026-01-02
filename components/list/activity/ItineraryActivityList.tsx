@@ -9,6 +9,8 @@ import { DayTimeSlots } from '../time-management/DayTimeSlots';
 import { shouldShowTravelTime, getTravelTimeColor, formatTravelTime } from '@/utils/travel/travelTimeUtils';
 import type { TravelTimeResult } from '@/utils/travel/travelTimeUtils';
 import type { ItineraryActivity, EditingField } from './types';
+import { TravelModeSelect } from '@/components/travel/TravelModeSelect';
+import type { TravelMode } from '@/actions/google/travelTime';
 
 interface ItineraryActivityListProps {
   date: string;
@@ -42,8 +44,9 @@ interface ItineraryActivityListProps {
   
   // Travel time props
   travelTimes: { [activityId: string]: string };
-  travelTimesData: { [activityId: string]: { duration: string; durationValue: number; mode: string } };
+  travelTimesData: { [activityId: string]: { duration: string; durationValue: number; mode: TravelMode } };
   travelTimesLoading: boolean;
+  onTravelModeChange?: (activityId: string, mode: TravelMode) => void;
   
   // Search props
   searchTerm: string;
@@ -75,6 +78,7 @@ export function ItineraryActivityList({
   travelTimes,
   travelTimesData,
   travelTimesLoading,
+  onTravelModeChange,
   searchTerm,
 }: ItineraryActivityListProps) {
   
@@ -164,7 +168,14 @@ export function ItineraryActivityList({
                     <span className={cn("font-medium", getTravelTimeColor(currentTravelData.durationValue))}>
                       {currentTravelData.duration}
                     </span>
-                    <span className="text-gray-400">(travel time)</span>
+                    <span className="text-gray-400 hidden sm:inline">(travel time)</span>
+                    <TravelModeSelect
+                      value={(activity.travel_mode_to_next ?? currentTravelData.mode) as TravelMode}
+                      onValueChange={(mode) => onTravelModeChange?.(activity.itinerary_activity_id, mode)}
+                      disabled={!onTravelModeChange}
+                      className="w-[110px] bg-white/70"
+                      placeholder="Mode"
+                    />
                   </div>
                 </div>
               )}

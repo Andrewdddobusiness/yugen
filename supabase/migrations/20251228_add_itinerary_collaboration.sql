@@ -2,7 +2,6 @@
 -- Created: 2025-12-28
 
 create extension if not exists "uuid-ossp";
-
 -- =====================================================
 -- TABLES
 -- =====================================================
@@ -18,10 +17,8 @@ create table if not exists public.itinerary_collaborator (
   removed_at timestamp with time zone,
   unique (itinerary_id, user_id)
 );
-
 create index if not exists idx_itinerary_collaborator_itinerary_id on public.itinerary_collaborator(itinerary_id);
 create index if not exists idx_itinerary_collaborator_user_id on public.itinerary_collaborator(user_id);
-
 create table if not exists public.itinerary_invitation (
   itinerary_invitation_id uuid primary key default uuid_generate_v4(),
   itinerary_id integer references public.itinerary(itinerary_id) on delete cascade not null,
@@ -36,13 +33,11 @@ create table if not exists public.itinerary_invitation (
   revoked_at timestamp with time zone,
   expires_at timestamp with time zone
 );
-
 create index if not exists idx_itinerary_invitation_itinerary_id on public.itinerary_invitation(itinerary_id);
 create index if not exists idx_itinerary_invitation_email on public.itinerary_invitation(lower(email));
 create unique index if not exists idx_itinerary_invitation_pending_unique
   on public.itinerary_invitation(itinerary_id, lower(email))
   where status = 'pending';
-
 create table if not exists public.itinerary_change_log (
   itinerary_change_log_id bigserial primary key,
   itinerary_id integer references public.itinerary(itinerary_id) on delete cascade not null,
@@ -55,30 +50,24 @@ create table if not exists public.itinerary_change_log (
   after jsonb,
   created_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
-
 create index if not exists idx_itinerary_change_log_itinerary_id
   on public.itinerary_change_log(itinerary_id, created_at desc);
-
 -- =====================================================
 -- ITINERARY ACTIVITY ACTOR COLUMNS
 -- =====================================================
 
 alter table public.itinerary_activity
   add column if not exists created_by uuid references auth.users(id) on delete set null;
-
 alter table public.itinerary_activity
   add column if not exists updated_by uuid references auth.users(id) on delete set null;
-
 update public.itinerary_activity ia
 set created_by = i.user_id
 from public.itinerary i
 where ia.created_by is null
   and i.itinerary_id = ia.itinerary_id;
-
 update public.itinerary_activity ia
 set updated_by = coalesce(ia.updated_by, ia.created_by)
 where ia.updated_by is null;
-
 create or replace function public.set_itinerary_activity_actor()
 returns trigger as $$
 begin
@@ -98,12 +87,10 @@ begin
   return new;
 end;
 $$ language plpgsql;
-
 drop trigger if exists set_itinerary_activity_actor on public.itinerary_activity;
 create trigger set_itinerary_activity_actor
   before insert or update on public.itinerary_activity
   for each row execute function public.set_itinerary_activity_actor();
-
 -- =====================================================
 -- AUDIT LOGGING (ITINERARY ACTIVITY)
 -- =====================================================
@@ -173,12 +160,10 @@ begin
   return null;
 end;
 $$;
-
 drop trigger if exists log_itinerary_activity_change on public.itinerary_activity;
 create trigger log_itinerary_activity_change
   after insert or update or delete on public.itinerary_activity
   for each row execute function public.log_itinerary_activity_change();
-
 -- =====================================================
 -- RLS HELPERS
 -- =====================================================
@@ -199,7 +184,6 @@ as $$
       and ic.removed_at is null
   );
 $$;
-
 create or replace function public.is_itinerary_editor(_itinerary_id integer)
 returns boolean
 language sql
@@ -217,7 +201,6 @@ as $$
       and ic.removed_at is null
   );
 $$;
-
 -- =====================================================
 -- ENABLE RLS
 -- =====================================================
@@ -225,7 +208,6 @@ $$;
 alter table public.itinerary_collaborator enable row level security;
 alter table public.itinerary_invitation enable row level security;
 alter table public.itinerary_change_log enable row level security;
-
 -- =====================================================
 -- UPDATED RLS POLICIES (ALLOW COLLABORATORS)
 -- =====================================================
@@ -241,19 +223,15 @@ create policy "Users can view own itineraries" on public.itinerary
       or public.is_itinerary_collaborator(itinerary_id)
     )
   );
-
 drop policy if exists "Users can insert own itineraries" on public.itinerary;
 create policy "Users can insert own itineraries" on public.itinerary
   for insert with check (auth.uid() = user_id);
-
 drop policy if exists "Users can update own itineraries" on public.itinerary;
 create policy "Users can update own itineraries" on public.itinerary
   for update using (auth.uid() = user_id);
-
 drop policy if exists "Users can delete own itineraries" on public.itinerary;
 create policy "Users can delete own itineraries" on public.itinerary
   for delete using (auth.uid() = user_id);
-
 -- Itinerary destinations
 drop policy if exists "Users can view own itinerary destinations" on public.itinerary_destination;
 create policy "Users can view own itinerary destinations" on public.itinerary_destination
@@ -270,7 +248,6 @@ create policy "Users can view own itinerary destinations" on public.itinerary_de
         )
     )
   );
-
 drop policy if exists "Users can insert own itinerary destinations" on public.itinerary_destination;
 create policy "Users can insert own itinerary destinations" on public.itinerary_destination
   for insert with check (
@@ -285,7 +262,6 @@ create policy "Users can insert own itinerary destinations" on public.itinerary_
         )
     )
   );
-
 drop policy if exists "Users can update own itinerary destinations" on public.itinerary_destination;
 create policy "Users can update own itinerary destinations" on public.itinerary_destination
   for update using (
@@ -300,7 +276,6 @@ create policy "Users can update own itinerary destinations" on public.itinerary_
         )
     )
   );
-
 drop policy if exists "Users can delete own itinerary destinations" on public.itinerary_destination;
 create policy "Users can delete own itinerary destinations" on public.itinerary_destination
   for delete using (
@@ -315,7 +290,6 @@ create policy "Users can delete own itinerary destinations" on public.itinerary_
         )
     )
   );
-
 -- Itinerary activities
 drop policy if exists "Users can view own itinerary activities" on public.itinerary_activity;
 create policy "Users can view own itinerary activities" on public.itinerary_activity
@@ -332,7 +306,6 @@ create policy "Users can view own itinerary activities" on public.itinerary_acti
         )
     )
   );
-
 drop policy if exists "Users can insert own itinerary activities" on public.itinerary_activity;
 create policy "Users can insert own itinerary activities" on public.itinerary_activity
   for insert with check (
@@ -347,7 +320,6 @@ create policy "Users can insert own itinerary activities" on public.itinerary_ac
         )
     )
   );
-
 drop policy if exists "Users can update own itinerary activities" on public.itinerary_activity;
 create policy "Users can update own itinerary activities" on public.itinerary_activity
   for update using (
@@ -362,7 +334,6 @@ create policy "Users can update own itinerary activities" on public.itinerary_ac
         )
     )
   );
-
 drop policy if exists "Users can delete own itinerary activities" on public.itinerary_activity;
 create policy "Users can delete own itinerary activities" on public.itinerary_activity
   for delete using (
@@ -377,7 +348,6 @@ create policy "Users can delete own itinerary activities" on public.itinerary_ac
         )
     )
   );
-
 -- Search history
 drop policy if exists "Users can view own search history" on public.itinerary_search_history;
 create policy "Users can view own search history" on public.itinerary_search_history
@@ -394,7 +364,6 @@ create policy "Users can view own search history" on public.itinerary_search_his
         )
     )
   );
-
 drop policy if exists "Users can insert own search history" on public.itinerary_search_history;
 create policy "Users can insert own search history" on public.itinerary_search_history
   for insert with check (
@@ -409,7 +378,6 @@ create policy "Users can insert own search history" on public.itinerary_search_h
         )
     )
   );
-
 drop policy if exists "Users can delete own search history" on public.itinerary_search_history;
 create policy "Users can delete own search history" on public.itinerary_search_history
   for delete using (
@@ -424,7 +392,6 @@ create policy "Users can delete own search history" on public.itinerary_search_h
         )
     )
   );
-
 -- Collaborators: members can view; owners can manage
 drop policy if exists "Users can view collaborators" on public.itinerary_collaborator;
 create policy "Users can view collaborators" on public.itinerary_collaborator
@@ -441,7 +408,6 @@ create policy "Users can view collaborators" on public.itinerary_collaborator
         )
     )
   );
-
 drop policy if exists "Owners can manage collaborators" on public.itinerary_collaborator;
 create policy "Owners can manage collaborators" on public.itinerary_collaborator
   for all
@@ -461,7 +427,6 @@ create policy "Owners can manage collaborators" on public.itinerary_collaborator
         and i.user_id = auth.uid()
     )
   );
-
 -- Invitations: owners can manage; invitees can view after login (by email match)
 drop policy if exists "Owners can manage invitations" on public.itinerary_invitation;
 create policy "Owners can manage invitations" on public.itinerary_invitation
@@ -482,11 +447,9 @@ create policy "Owners can manage invitations" on public.itinerary_invitation
         and i.user_id = auth.uid()
     )
   );
-
 drop policy if exists "Invitees can view invitations" on public.itinerary_invitation;
 create policy "Invitees can view invitations" on public.itinerary_invitation
   for select using (lower(email) = lower(coalesce(auth.jwt() ->> 'email', '')));
-
 -- Change log: members can view
 drop policy if exists "Members can view change log" on public.itinerary_change_log;
 create policy "Members can view change log" on public.itinerary_change_log
@@ -503,7 +466,6 @@ create policy "Members can view change log" on public.itinerary_change_log
         )
     )
   );
-
 -- Profiles: allow viewing other users' profiles when they share an itinerary
 drop policy if exists "Users can view collaborator profiles" on public.profiles;
 create policy "Users can view collaborator profiles" on public.profiles
@@ -530,7 +492,6 @@ create policy "Users can view collaborator profiles" on public.profiles
         )
     )
   );
-
 -- =====================================================
 -- UPDATED_AT TRIGGERS FOR NEW TABLES
 -- =====================================================
@@ -539,12 +500,10 @@ drop trigger if exists set_timestamp_itinerary_collaborator on public.itinerary_
 create trigger set_timestamp_itinerary_collaborator
   before update on public.itinerary_collaborator
   for each row execute function public.handle_updated_at();
-
 drop trigger if exists set_timestamp_itinerary_invitation on public.itinerary_invitation;
 create trigger set_timestamp_itinerary_invitation
   before update on public.itinerary_invitation
   for each row execute function public.handle_updated_at();
-
 -- =====================================================
 -- INVITE ACCEPTANCE RPC
 -- =====================================================
@@ -618,9 +577,7 @@ begin
   return next;
 end;
 $$;
-
 grant execute on function public.accept_itinerary_invitation(uuid) to authenticated;
-
 -- =====================================================
 -- GRANTS (DEFENSIVE; SUPABASE MAY ALREADY SET DEFAULT PRIVILEGES)
 -- =====================================================

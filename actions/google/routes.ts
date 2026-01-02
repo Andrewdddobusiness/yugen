@@ -42,10 +42,17 @@ function toSeconds(duration: unknown): number | undefined {
   return Number.isFinite(seconds) ? seconds : undefined;
 }
 
-function generateCacheKey(points: Coordinates[], mode: RouteTravelMode): string {
+function generateCacheKey(points: Coordinates[], mode: RouteTravelMode, departureTime?: Date): string {
   const rounded = points
     .map((p) => `${Math.round(p.lat * 1e5)},${Math.round(p.lng * 1e5)}`)
     .join("|");
+
+  // Transit routes depend on schedules, so bucket the cache by hour.
+  if (mode === "transit") {
+    const timeKey = departureTime ? Math.floor(departureTime.getTime() / (60 * 60 * 1000)) : "now";
+    return `${mode}:${rounded}|${timeKey}`;
+  }
+
   return `${mode}:${rounded}`;
 }
 
@@ -134,7 +141,8 @@ export async function computeRoutePolyline(
       };
     }
 
-    const cacheKey = generateCacheKey(points, mode);
+    const departureTime = mode === "transit" ? new Date() : undefined;
+    const cacheKey = generateCacheKey(points, mode, departureTime);
     const cached = routeCache.get(cacheKey);
     if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
       debugLog("cache hit", { cacheKey, mode, points: points.length });
@@ -152,14 +160,18 @@ export async function computeRoutePolyline(
           }))
         : [];
 
-    const body = {
+    const body: any = {
       origin: { location: { latLng: { latitude: origin.lat, longitude: origin.lng } } },
       destination: { location: { latLng: { latitude: destination.lat, longitude: destination.lng } } },
       intermediates,
       travelMode: mapMode(mode),
       polylineQuality: "HIGH_QUALITY",
       polylineEncoding: "ENCODED_POLYLINE",
-    } as const;
+    };
+
+    if (departureTime) {
+      body.departureTime = departureTime.toISOString();
+    }
 
     debugLog("computeRoutes request", {
       cacheKey,

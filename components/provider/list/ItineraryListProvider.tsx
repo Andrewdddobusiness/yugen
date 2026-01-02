@@ -41,6 +41,9 @@ interface ItineraryListContextType {
   travelTimesLoading: Record<string, boolean>;
   travelTimesError: any;
   refreshTravelTimes: () => void;
+
+  // Per-route travel mode
+  updateTravelModeToNext: (itineraryActivityId: string, mode: TravelMode) => Promise<void>;
   
   // Activity operations
   handleRemoveActivity: (placeId: string) => Promise<void>;
@@ -92,7 +95,7 @@ export function ItineraryListProvider({ children }: ItineraryListProviderProps) 
     return new Set([today, 'unscheduled']);
   });
 
-  const { itineraryActivities, removeItineraryActivity } = useItineraryActivityStore();
+  const { itineraryActivities, removeItineraryActivity, optimisticUpdateItineraryActivity } = useItineraryActivityStore();
 
   // Filter out deleted activities
   const activeActivities = useMemo(
@@ -109,6 +112,18 @@ export function ItineraryListProvider({ children }: ItineraryListProviderProps) 
       console.error("Error removing activity:", error);
     }
   }, [itineraryId, removeItineraryActivity]);
+
+  const updateTravelModeToNext = useCallback(
+    async (itineraryActivityId: string, mode: TravelMode) => {
+      const result = await optimisticUpdateItineraryActivity(itineraryActivityId, {
+        travel_mode_to_next: mode,
+      });
+      if (!result.success) {
+        console.error("Failed to update travel mode:", result.error);
+      }
+    },
+    [optimisticUpdateItineraryActivity]
+  );
 
   // Group activities by date
   const groupActivitiesByDate = useCallback((activities: ItineraryActivity[]) => {
@@ -261,6 +276,7 @@ export function ItineraryListProvider({ children }: ItineraryListProviderProps) 
         itinerary_activity_id: activity.itinerary_activity_id,
         start_time: activity.start_time,
         end_time: activity.end_time,
+        travel_mode_to_next: activity.travel_mode_to_next ?? null,
         activity: activity.activity
           ? {
               name: activity.activity.name,
@@ -302,6 +318,7 @@ export function ItineraryListProvider({ children }: ItineraryListProviderProps) 
     travelTimesLoading,
     travelTimesError,
     refreshTravelTimes,
+    updateTravelModeToNext,
     handleRemoveActivity,
     availableDates,
     filterableActivities,
@@ -326,6 +343,7 @@ export function ItineraryListProvider({ children }: ItineraryListProviderProps) 
     travelTimesLoading,
     travelTimesError,
     refreshTravelTimes,
+    updateTravelModeToNext,
     handleRemoveActivity,
     availableDates,
     filterableActivities,

@@ -149,7 +149,7 @@ export async function fetchBuilderBootstrap(
 
   // Fallback for environments that haven't applied newer migrations yet.
   // Keep this fast: fetch only what the builder needs to render, and gracefully
-  // handle missing columns (created_by/updated_by) and missing tables (collaboration/slots).
+  // handle missing columns (created_by/updated_by/travel_mode_to_next) and missing tables (collaboration/slots).
   if (errorCode === "42883" || errorCode === "42703" || errorCode === "42P01") {
     const { data: destinationRow } = await supabase
       .from("itinerary_destination")
@@ -158,39 +158,58 @@ export async function fetchBuilderBootstrap(
       .eq("itinerary_destination_id", dest)
       .maybeSingle();
 
-    const selectWithActors =
+    const isMissingColumn = (err: any, column: string) => {
+      if (!err) return false;
+      const code = String(err.code ?? "");
+      if (code !== "42703") return false;
+      const message = String(err.message ?? "").toLowerCase();
+      return message.includes(column.toLowerCase());
+    };
+
+    const selectWithActorsWithMode =
+      "itinerary_id,itinerary_activity_id,itinerary_destination_id,activity_id,date,start_time,end_time,notes,travel_mode_to_next,deleted_at,created_by,updated_by,activity:activity(activity_id,place_id,name,coordinates,duration,price_level,rating,types,address)";
+    const selectWithActorsWithoutMode =
       "itinerary_id,itinerary_activity_id,itinerary_destination_id,activity_id,date,start_time,end_time,notes,deleted_at,created_by,updated_by,activity:activity(activity_id,place_id,name,coordinates,duration,price_level,rating,types,address)";
-    const selectWithoutActors =
+    const selectWithoutActorsWithMode =
+      "itinerary_id,itinerary_activity_id,itinerary_destination_id,activity_id,date,start_time,end_time,notes,travel_mode_to_next,deleted_at,activity:activity(activity_id,place_id,name,coordinates,duration,price_level,rating,types,address)";
+    const selectWithoutActorsWithoutMode =
       "itinerary_id,itinerary_activity_id,itinerary_destination_id,activity_id,date,start_time,end_time,notes,deleted_at,activity:activity(activity_id,place_id,name,coordinates,duration,price_level,rating,types,address)";
 
     const { data: activitiesWithActors, error: activitiesWithActorsError } = await supabase
       .from("itinerary_activity")
-      .select(selectWithActors)
+      .select(selectWithActorsWithMode)
       .eq("itinerary_id", itin)
       .eq("itinerary_destination_id", dest)
       .limit(2000);
 
     if (activitiesWithActorsError) {
-      const activitiesErrorCode = String(activitiesWithActorsError.code ?? "");
-      const activitiesMessage = String(activitiesWithActorsError.message ?? "").toLowerCase();
       const missingActors =
-        activitiesErrorCode === "42703" ||
-        activitiesMessage.includes("created_by") ||
-        activitiesMessage.includes("updated_by");
+        isMissingColumn(activitiesWithActorsError, "created_by") ||
+        isMissingColumn(activitiesWithActorsError, "updated_by");
+      const missingMode = isMissingColumn(activitiesWithActorsError, "travel_mode_to_next");
 
-      if (!missingActors) {
+      const retrySelect =
+        missingActors && missingMode
+          ? selectWithoutActorsWithoutMode
+          : missingActors
+            ? selectWithoutActorsWithMode
+            : missingMode
+              ? selectWithActorsWithoutMode
+              : null;
+
+      if (!retrySelect) {
         return { success: false, message: "Failed to load activities", error: activitiesWithActorsError };
       }
 
-      const { data: activitiesWithoutActors, error: activitiesWithoutActorsError } = await supabase
+      const { data: activitiesFallback, error: activitiesFallbackError } = await supabase
         .from("itinerary_activity")
-        .select(selectWithoutActors)
+        .select(retrySelect)
         .eq("itinerary_id", itin)
         .eq("itinerary_destination_id", dest)
         .limit(2000);
 
-      if (activitiesWithoutActorsError) {
-        return { success: false, message: "Failed to load activities", error: activitiesWithoutActorsError };
+      if (activitiesFallbackError) {
+        return { success: false, message: "Failed to load activities", error: activitiesFallbackError };
       }
 
       return {
@@ -198,8 +217,8 @@ export async function fetchBuilderBootstrap(
         data: {
           itinerary: null,
           destination: destinationRow ?? null,
-          activities: Array.isArray(activitiesWithoutActors)
-            ? normalizeBootstrapActivities(activitiesWithoutActors)
+          activities: Array.isArray(activitiesFallback)
+            ? normalizeBootstrapActivities(activitiesFallback)
             : [],
           slots: [],
           slotOptions: [],
