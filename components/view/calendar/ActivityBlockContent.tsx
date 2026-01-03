@@ -131,8 +131,8 @@ export function ActivityBlockContent({
   if (blockSize === 'compact') {
     // Compact block for < 1 hour activities
     return (
-      <div className="p-1.5 flex items-center space-x-2 min-h-0">
-        <div className="flex-shrink-0 text-xs">
+      <div className="p-1.5 pr-6 flex items-center space-x-2 min-h-0">
+        <div className="flex-shrink-0 flex items-center gap-1 text-xs">
           {typeof categoryIcon === 'string' ? (
             <span className="text-xs">{categoryIcon}</span>
           ) : (
@@ -240,7 +240,7 @@ export function ActivityBlockContent({
       {/* Header with name, category, and status */}
       <div className="flex items-start justify-between mb-2">
         <div className="flex-1 min-w-0">
-          <div className="font-semibold text-sm text-ink-900 dark:text-white/90 leading-tight">
+          <div className="font-semibold text-sm text-ink-900 dark:text-white/90 leading-tight truncate">
             {activity.activity?.name || 'Untitled Activity'}
           </div>
           {category && (

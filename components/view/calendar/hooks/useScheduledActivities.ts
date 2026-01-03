@@ -15,6 +15,7 @@ export interface ScheduledActivity {
   endTime: string;
   duration: number;
   position: { day: number; startSlot: number; span: number };
+  waypointNumber?: number;
   activity?: {
     name: string;
     address?: string;
@@ -38,6 +39,61 @@ export function useScheduledActivities(days: Date[], timeSlots: TimeSlot[]): Sch
   const { itineraryActivities } = useItineraryActivityStore();
 
   const scheduledActivities: ScheduledActivity[] = useMemo(() => {
+    const parseTimeToMinutes = (time: string | null | undefined) => {
+      if (!time) return null;
+      const [hourStr, minuteStr] = time.split(":");
+      const hour = Number(hourStr);
+      const minute = Number(minuteStr);
+      if (!Number.isFinite(hour) || !Number.isFinite(minute)) return null;
+      return hour * 60 + minute;
+    };
+
+    const waypointNumberById = new Map<string, number>();
+    const candidatesByDay = new Map<number, Array<{ id: string; startMinutes: number | null; name: string }>>();
+
+    for (const activity of itineraryActivities) {
+      if (!activity.date) continue;
+      if (activity.deleted_at !== null) continue;
+      if (
+        !activity.activity?.coordinates ||
+        !Array.isArray(activity.activity.coordinates) ||
+        activity.activity.coordinates.length !== 2
+      ) {
+        continue;
+      }
+
+      const activityDate = new Date(activity.date as string);
+      const dayIndex = days.findIndex((day) => isSameDay(day, activityDate));
+      if (dayIndex === -1) continue;
+
+      const list = candidatesByDay.get(dayIndex);
+      const entry = {
+        id: String(activity.itinerary_activity_id),
+        startMinutes: parseTimeToMinutes(activity.start_time),
+        name: activity.activity?.name ?? "",
+      };
+      if (list) list.push(entry);
+      else candidatesByDay.set(dayIndex, [entry]);
+    }
+
+    for (const list of candidatesByDay.values()) {
+      list.sort((a, b) => {
+        if (a.startMinutes != null && b.startMinutes != null && a.startMinutes !== b.startMinutes) {
+          return a.startMinutes - b.startMinutes;
+        }
+        if (a.startMinutes != null && b.startMinutes == null) return -1;
+        if (a.startMinutes == null && b.startMinutes != null) return 1;
+
+        const nameSort = a.name.localeCompare(b.name);
+        if (nameSort !== 0) return nameSort;
+        return a.id.localeCompare(b.id);
+      });
+
+      list.forEach((entry, idx) => {
+        waypointNumberById.set(entry.id, idx + 1);
+      });
+    }
+
     return itineraryActivities
       .filter(activity => activity.date && activity.start_time && activity.end_time)
       .map(activity => {
@@ -92,6 +148,7 @@ export function useScheduledActivities(days: Date[], timeSlots: TimeSlot[]): Sch
           startTime: activity.start_time as string,
           endTime: activity.end_time as string,
           duration,
+          waypointNumber: waypointNumberById.get(String(activity.itinerary_activity_id)),
           position: {
             day: dayIndex,
             startSlot: Math.max(0, startSlot),

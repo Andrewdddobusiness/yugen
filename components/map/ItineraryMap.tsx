@@ -570,10 +570,9 @@ export function ItineraryMap({
     });
   }, [activities, normalizedSelectedDate, visibleDaySet]);
 
-  const routeActivities = useMemo(() => {
-    if (!showRoutes) return [];
-    if (!normalizedSelectedDate) return [];
-    if (validActivities.length < 2) return [];
+  const orderedActivitiesForMarkers = useMemo(() => {
+    if (!normalizedSelectedDate) return validActivities;
+    if (validActivities.length < 2) return validActivities;
 
     const parseTimeToMinutes = (time: string | null | undefined) => {
       if (!time) return null;
@@ -584,7 +583,7 @@ export function ItineraryMap({
       return hour * 60 + minute;
     };
 
-    const sorted = [...validActivities].sort((a, b) => {
+    return [...validActivities].sort((a, b) => {
       const aStart = parseTimeToMinutes(a.start_time);
       const bStart = parseTimeToMinutes(b.start_time);
 
@@ -603,9 +602,14 @@ export function ItineraryMap({
         String(b.itinerary_activity_id)
       );
     });
+  }, [normalizedSelectedDate, validActivities]);
 
-    return sorted;
-  }, [normalizedSelectedDate, showRoutes, validActivities]);
+  const routeActivities = useMemo(() => {
+    if (!showRoutes) return [];
+    if (!normalizedSelectedDate) return [];
+    if (orderedActivitiesForMarkers.length < 2) return [];
+    return orderedActivitiesForMarkers;
+  }, [normalizedSelectedDate, orderedActivitiesForMarkers, showRoutes]);
 
   const dayRouteModeState = useMemo(() => {
     if (routeActivities.length < 2) {
@@ -1144,7 +1148,7 @@ export function ItineraryMap({
             : null}
           
           {/* Itinerary Waypoints (blue) */}
-          {validActivities.map((activity, index) => {
+          {orderedActivitiesForMarkers.map((activity, index) => {
             const coords = markerPositionByItineraryActivityId.get(
               String(activity.itinerary_activity_id)
             );

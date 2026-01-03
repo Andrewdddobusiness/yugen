@@ -15,6 +15,7 @@ import { useItineraryActivityStore } from '@/store/itineraryActivityStore';
 import { useToast } from '@/components/ui/use-toast';
 import { getActivityThemeForTypes, hexToRgba, type ActivityAccent } from '@/lib/activityAccent';
 import { useItineraryLayoutStore } from '@/store/itineraryLayoutStore';
+import { colors } from '@/lib/colors/colors';
 
 const accentStyles: Record<ActivityAccent, { border: string; tint: string }> = {
   brand: { border: "border-l-brand-500", tint: "bg-brand-500/10" },
@@ -46,6 +47,7 @@ interface ScheduledActivity {
   endTime: string;
   duration: number;
   position: { day: number; startSlot: number; span: number };
+  waypointNumber?: number;
   activity?: ActivityData;
   notes?: string;
   is_booked?: boolean;
@@ -324,6 +326,36 @@ export function ActivityBlock({
         ? `${Math.max(1, activity.position.span) * slotHeightPx}px`
         : undefined;
 
+  const waypointBadge = useCallback(() => {
+    if (activity.waypointNumber == null) return null;
+
+    const palette = [
+      colors.Blue, // Sun
+      colors.Purple, // Mon
+      colors.Green, // Tue
+      colors.Yellow, // Wed
+      colors.Orange, // Thu
+      colors.Red, // Fri
+      colors.TangyOrange, // Sat
+    ];
+
+    const dayColor = palette[activity.date.getDay()] ?? colors.Blue;
+
+    return (
+      <div
+        className="absolute top-1 right-1 z-10 pointer-events-none"
+        title={`Map waypoint ${activity.waypointNumber}`}
+      >
+        <div
+          className="inline-flex h-5 w-5 items-center justify-center rounded-full text-[11px] font-semibold text-white shadow-sm ring-2 ring-bg-0/90"
+          style={{ backgroundColor: dayColor }}
+        >
+          {activity.waypointNumber}
+        </div>
+      </div>
+    );
+  }, [activity.date, activity.waypointNumber]);
+
   return (
     <>
       <div
@@ -360,15 +392,17 @@ export function ActivityBlock({
           "bg-bg-0",
           className
         )}
-      role="button"
-      tabIndex={0}
-      aria-label={`Move ${activity.activity?.name || 'activity'}`}
-    >
+        role="button"
+        tabIndex={0}
+        aria-label={`Move ${activity.activity?.name || 'activity'}`}
+      >
       <div
         aria-hidden="true"
         className={cn("absolute inset-0 pointer-events-none", !customHex && accentStyles[activityAccent].tint)}
         style={customTint ? { backgroundColor: customTint } : undefined}
       />
+
+      {waypointBadge()}
 
       {/* Drag Handle - only show on hover and for standard+ blocks */}
       {blockSize !== 'compact' && !isResizing && (
