@@ -309,6 +309,7 @@ export function ActivityBlock({
   };
 
   const blockSize = getBlockSize(activity.duration);
+  const hideWaypointBadgeOnHover = blockSize !== "compact" && !isResizing;
   const activityCategoryAccents = useItineraryLayoutStore((s) => s.activityCategoryAccents);
   const activityCategoryCustomColors = useItineraryLayoutStore((s) => s.activityCategoryCustomColors);
   const { accent: activityAccent, customHex } = getActivityThemeForTypes(
@@ -343,18 +344,46 @@ export function ActivityBlock({
 
     return (
       <div
-        className="absolute top-1 right-1 z-10 pointer-events-none"
+        className={cn(
+          "absolute -top-3 -right-3 z-10 pointer-events-none transition-opacity",
+          hideWaypointBadgeOnHover && "group-hover:opacity-0"
+        )}
         title={`Map waypoint ${activity.waypointNumber}`}
       >
-        <div
-          className="inline-flex h-5 w-5 items-center justify-center rounded-full text-[11px] font-semibold text-white shadow-sm ring-2 ring-bg-0/90"
-          style={{ backgroundColor: dayColor }}
-        >
-          {activity.waypointNumber}
+        <div className="relative inline-flex items-center justify-center">
+          <svg
+            width={28}
+            height={36}
+            viewBox="-4 -4 32 40"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+            className="relative"
+            style={{ filter: "drop-shadow(0 2px 4px rgba(0,0,0,0.2))" }}
+          >
+            <path
+              d="M12 0C5.372 0 0 5.372 0 12c0 7.346 9.09 17.777 11.412 20.19.401.417 1.068.417 1.469 0C15.203 29.777 24 19.346 24 12c0-6.628-5.372-12-12-12z"
+              fill="white"
+              stroke="white"
+              strokeWidth="4"
+              strokeLinejoin="round"
+            />
+            <path
+              d="M12 1.5C6.201 1.5 1.5 6.201 1.5 12c0 6.708 8.308 16.24 10.428 18.466.366.38.975.38 1.341 0C15.39 28.24 22.5 18.708 22.5 12c0-5.799-4.701-10.5-10.5-10.5z"
+              fill={dayColor}
+            />
+          </svg>
+          <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-[60%]">
+            <span
+              className="text-sm font-semibold text-white"
+              style={{ textShadow: "0 1px 2px rgba(0,0,0,0.2)" }}
+            >
+              {activity.waypointNumber}
+            </span>
+          </div>
         </div>
       </div>
     );
-  }, [activity.date, activity.waypointNumber]);
+  }, [activity.date, activity.waypointNumber, hideWaypointBadgeOnHover]);
 
   return (
     <>
@@ -381,7 +410,7 @@ export function ActivityBlock({
           setContextMenu({ x: nextX, y: nextY });
         }}
         className={cn(
-          "relative rounded-lg overflow-hidden group border border-stroke-200 border-l-4",
+          "relative rounded-lg overflow-visible group border border-stroke-200 border-l-4",
           "cursor-default",
           isResizing && "cursor-ns-resize select-none",
           "shadow-sm hover:shadow-card active:shadow-float",

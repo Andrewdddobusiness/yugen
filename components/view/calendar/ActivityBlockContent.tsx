@@ -194,8 +194,8 @@ export function ActivityBlockContent({
         </div>
 
         {/* Rating and price */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-2">
+        <div className="flex flex-wrap items-center gap-1">
+          <div className="flex flex-wrap items-center gap-1 min-w-0">
             {activity.activity?.rating && (
               <div className="flex items-center">
                 <Star className="h-3 w-3 text-amber-500 mr-0.5" />
@@ -219,7 +219,7 @@ export function ActivityBlockContent({
             )}
           </div>
 
-          <span className={chipClass}>
+          <span className={cn(chipClass, "ml-auto")}>
             <span
               className={cn(
                 "h-1.5 w-1.5 rounded-full",
