@@ -31,8 +31,8 @@ export function NavMainItineraryActivity() {
   const queryClient = useQueryClient();
 
   const { data: destinationData, isLoading: isDestinationLoading } = useQuery({
-    queryKey: ["itineraryDestination", itineraryId],
-    queryFn: () => fetchItineraryDestination(itineraryId as string),
+    queryKey: ["itineraryDestination", itineraryId, destinationId],
+    queryFn: () => fetchItineraryDestination(itineraryId as string, destinationId as string | undefined),
     enabled: !!itineraryId,
     staleTime: Infinity,
     refetchOnWindowFocus: false,

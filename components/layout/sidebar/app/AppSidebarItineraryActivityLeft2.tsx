@@ -66,8 +66,8 @@ export function AppSidebarItineraryActivityLeft({
   const { setDateRange: setStoreDateRange } = useDateRangeStore();
 
   const { data: destinationData } = useQuery({
-    queryKey: ["itineraryDestination", itineraryId],
-    queryFn: () => fetchItineraryDestination(itineraryId as string),
+    queryKey: ["itineraryDestination", itineraryId, destinationId],
+    queryFn: () => fetchItineraryDestination(itineraryId as string, destinationId as string | undefined),
     enabled: !!itineraryId,
     staleTime: Infinity,
     refetchOnWindowFocus: false,

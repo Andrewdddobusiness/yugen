@@ -64,8 +64,8 @@ export function ItineraryBuilderLayout({ children, className }: ItineraryBuilder
 
   // Fetch itinerary and destination data
   const { data: destinationData, isLoading: isDestinationLoading, error: destinationError } = useQuery({
-    queryKey: ["itineraryDestination", itineraryId],
-    queryFn: () => fetchItineraryDestination(itineraryId as string),
+    queryKey: ["itineraryDestination", itineraryId, destinationId],
+    queryFn: () => fetchItineraryDestination(itineraryId as string, destinationId as string | undefined),
     enabled: !!itineraryId,
   });
 
@@ -132,6 +132,7 @@ export function ItineraryBuilderLayout({ children, className }: ItineraryBuilder
       {layoutPreferences.showToolbar && (
         <ItineraryToolbar
           itineraryId={itineraryId?.toString()}
+          destinationId={destinationId?.toString()}
           currentView={currentView}
           onViewChange={setCurrentView}
           showMap={showMap}

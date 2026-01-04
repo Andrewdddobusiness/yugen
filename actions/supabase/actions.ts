@@ -538,10 +538,10 @@ export const fetchCityDetails = async (itineraryId: any) => {
   return { data };
 };
 
-export const fetchItineraryDestination = async (itineraryId: string) => {
+export const fetchItineraryDestination = async (itineraryId: string, destinationId?: string) => {
   const supabase = createClient();
 
-  const { data, error } = await supabase
+  let query = supabase
     .from("itinerary_destination")
     .select(
       `
@@ -552,8 +552,16 @@ export const fetchItineraryDestination = async (itineraryId: string) => {
       to_date
     `
     )
-    .eq("itinerary_id", itineraryId)
-    .single();
+    .eq("itinerary_id", itineraryId);
+
+  if (destinationId) {
+    query = query.eq("itinerary_destination_id", destinationId);
+  } else {
+    // When destinationId isn't provided, fall back to the first destination to avoid `.single()` errors.
+    query = query.order("order_number", { ascending: true }).limit(1);
+  }
+
+  const { data, error } = await query.single();
 
   if (error) {
     console.error("Error fetching itinerary destination:", error);

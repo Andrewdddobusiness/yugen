@@ -7,6 +7,7 @@ import { Download, Share, Users } from "lucide-react";
 
 interface ItineraryToolbarProps {
   itineraryId?: string;
+  destinationId?: string;
   currentView: "table" | "calendar" | "list";
   onViewChange: (view: "table" | "calendar" | "list") => void;
   showMap: boolean;
@@ -27,6 +28,7 @@ const ShareExportDialog = dynamic(
 
 export default function ItineraryToolbar({
   itineraryId,
+  destinationId,
   currentView,
   onViewChange,
   showMap,
@@ -58,7 +60,12 @@ export default function ItineraryToolbar({
         <Button variant="ghost" size="icon" onClick={() => setShowExportDialog(true)}>
           <Share className="h-4 w-4" />
         </Button>
-        <ShareExportDialog open={showExportDialog} onOpenChange={setShowExportDialog} itineraryId={itineraryId} />
+        <ShareExportDialog
+          open={showExportDialog}
+          onOpenChange={setShowExportDialog}
+          itineraryId={itineraryId}
+          destinationId={destinationId}
+        />
       </div>
     </div>
   );

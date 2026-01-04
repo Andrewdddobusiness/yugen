@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { ExportDownloadState } from "@/components/dialog/export/ExportDownloadState";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
+import { downloadKML } from "@/utils/export/kmlExport";
 
 interface ExportOption {
   id: string;
@@ -56,8 +57,8 @@ export function ShareExportDialog({ open, onOpenChange, itineraryId, destination
   }, [itineraryActivitiesData, setItineraryActivities]);
 
   const { data: destinationData, isLoading: isDestinationLoading } = useQuery({
-    queryKey: ["itineraryDestination", itineraryId],
-    queryFn: () => fetchItineraryDestination(itineraryId as string),
+    queryKey: ["itineraryDestination", itineraryId, destinationId],
+    queryFn: () => fetchItineraryDestination(itineraryId as string, destinationId),
     enabled: dialogOpen && !!itineraryId,
     staleTime: Infinity,
     refetchOnMount: false,
@@ -128,11 +129,9 @@ export function ShareExportDialog({ open, onOpenChange, itineraryId, destination
     }
   };
 
-  const handleDownloadKML = async () => {
-    if (kmlData) {
-      const { exportToMyMaps } = await import("@/utils/export/mapsExport");
-      exportToMyMaps(kmlData.content, kmlData.fileName.replace(".kml", ""));
-    }
+  const handleDownloadKML = () => {
+    if (!kmlData) return;
+    downloadKML(kmlData.content, kmlData.fileName);
   };
 
   const executeExport = async () => {
@@ -164,7 +163,7 @@ export function ShareExportDialog({ open, onOpenChange, itineraryId, destination
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[460px] !bg-white/75 backdrop-blur-2xl !border-stroke-200/60 !shadow-float dark:!bg-ink-900/55 dark:!border-white/10">
+      <DialogContent className="sm:max-w-[460px] !bg-bg-0 !border-stroke-200/60 !shadow-float dark:!bg-ink-900 dark:!border-white/10">
         {showDownloadState ? (
           <ExportDownloadState
             type={showDownloadState}
