@@ -104,6 +104,54 @@ interface ItineraryActivity {
   };
 }
 
+const DAY_OF_WEEK_PALETTE = [
+  colors.Blue, // Sun
+  colors.Purple, // Mon
+  colors.Green, // Tue
+  colors.Yellow, // Wed
+  colors.Orange, // Thu
+  colors.Red, // Fri
+  colors.TangyOrange, // Sat
+];
+
+function getDayColorForDayKey(dayKey: string | null) {
+  if (!dayKey) return colors.Blue;
+
+  // Use local time so colors match the UI's local calendar.
+  const date = new Date(`${dayKey}T00:00:00`);
+  const dayIndex = Number.isFinite(date.getTime()) ? date.getDay() : 0;
+  return DAY_OF_WEEK_PALETTE[dayIndex] ?? colors.Blue;
+}
+
+function parseTimeToMinutes(time: string | null | undefined) {
+  if (!time) return null;
+  const parts = time.split(":");
+  const hour = Number(parts[0]);
+  const minute = Number(parts[1]);
+  if (!Number.isFinite(hour) || !Number.isFinite(minute)) return null;
+  return hour * 60 + minute;
+}
+
+function sortActivitiesForWaypoints(activities: ItineraryActivity[]) {
+  return [...activities].sort((a, b) => {
+    const aStart = parseTimeToMinutes(a.start_time);
+    const bStart = parseTimeToMinutes(b.start_time);
+
+    if (aStart != null && bStart != null && aStart !== bStart) {
+      return aStart - bStart;
+    }
+    if (aStart != null && bStart == null) return -1;
+    if (aStart == null && bStart != null) return 1;
+
+    const aName = a.activity?.name ?? "";
+    const bName = b.activity?.name ?? "";
+    const nameSort = aName.localeCompare(bName);
+    if (nameSort !== 0) return nameSort;
+
+    return String(a.itinerary_activity_id).localeCompare(String(b.itinerary_activity_id));
+  });
+}
+
 function DayRoutePolylines({
   activities,
   strokeColor,
@@ -474,12 +522,10 @@ interface ItineraryMapProps {
   className?: string;
 }
 
-const EMPTY_VISIBLE_DAYS: string[] = [];
-
 export function ItineraryMap({
   activities,
   selectedActivityId,
-  visibleDays = EMPTY_VISIBLE_DAYS,
+  visibleDays,
   showRoutes = true,
   showSuggestions = false,
   showExport = false,
@@ -533,25 +579,13 @@ export function ItineraryMap({
     [selectedDate]
   );
 
-  const activeDayColor = useMemo(() => {
-    if (!normalizedSelectedDate) return colors.Blue;
-    const palette = [
-      colors.Blue, // Sun
-      colors.Purple, // Mon
-      colors.Green, // Tue
-      colors.Yellow, // Wed
-      colors.Orange, // Thu
-      colors.Red, // Fri
-      colors.TangyOrange, // Sat
-    ];
-
-    // Use local time so colors match the UI's local calendar.
-    const date = new Date(`${normalizedSelectedDate}T00:00:00`);
-    const dayIndex = Number.isFinite(date.getTime()) ? date.getDay() : 0;
-    return palette[dayIndex] ?? colors.Blue;
-  }, [normalizedSelectedDate]);
+  const activeDayColor = useMemo(
+    () => getDayColorForDayKey(normalizedSelectedDate),
+    [normalizedSelectedDate]
+  );
 
   const visibleDaySet = useMemo(() => {
+    if (visibleDays === undefined) return null;
     return new Set((visibleDays ?? []).map((day) => day.slice(0, 10)));
   }, [visibleDays]);
 
@@ -561,55 +595,64 @@ export function ItineraryMap({
       const coords = activity.activity?.coordinates;
       const hasCoords = coords && Array.isArray(coords) && coords.length === 2;
       const activityDay = activity.date ? activity.date.slice(0, 10) : null;
-      const isVisible = normalizedSelectedDate
-        ? activityDay === normalizedSelectedDate
-        : visibleDaySet.size === 0
-          ? true
-          : activityDay != null && visibleDaySet.has(activityDay);
+      const isVisible = visibleDaySet
+        ? activityDay != null && visibleDaySet.has(activityDay)
+        : normalizedSelectedDate
+          ? activityDay === normalizedSelectedDate
+          : true;
       return hasCoords && isVisible;
     });
   }, [activities, normalizedSelectedDate, visibleDaySet]);
 
-  const orderedActivitiesForMarkers = useMemo(() => {
-    if (!normalizedSelectedDate) return validActivities;
-    if (validActivities.length < 2) return validActivities;
-
-    const parseTimeToMinutes = (time: string | null | undefined) => {
-      if (!time) return null;
-      const parts = time.split(":");
-      const hour = Number(parts[0]);
-      const minute = Number(parts[1]);
-      if (!Number.isFinite(hour) || !Number.isFinite(minute)) return null;
-      return hour * 60 + minute;
+  const markerItems = useMemo(() => {
+    type MarkerItem = {
+      activity: ItineraryActivity;
+      dayKey: string;
+      waypointNumber: number;
+      color: string;
     };
 
-    return [...validActivities].sort((a, b) => {
-      const aStart = parseTimeToMinutes(a.start_time);
-      const bStart = parseTimeToMinutes(b.start_time);
+    const groups = new Map<string, ItineraryActivity[]>();
+    for (const activity of validActivities) {
+      const dayKey = activity.date ? activity.date.slice(0, 10) : null;
+      if (!dayKey) continue;
+      const list = groups.get(dayKey);
+      if (list) list.push(activity);
+      else groups.set(dayKey, [activity]);
+    }
 
-      if (aStart != null && bStart != null && aStart !== bStart) {
-        return aStart - bStart;
+    const items: MarkerItem[] = [];
+    const dayKeys = Array.from(groups.keys()).sort();
+    for (const dayKey of dayKeys) {
+      const sorted = sortActivitiesForWaypoints(groups.get(dayKey) ?? []);
+      const color = getDayColorForDayKey(dayKey);
+      for (let index = 0; index < sorted.length; index += 1) {
+        items.push({
+          activity: sorted[index],
+          dayKey,
+          waypointNumber: index + 1,
+          color,
+        });
       }
-      if (aStart != null && bStart == null) return -1;
-      if (aStart == null && bStart != null) return 1;
+    }
 
-      const aName = a.activity?.name ?? "";
-      const bName = b.activity?.name ?? "";
-      const nameSort = aName.localeCompare(bName);
-      if (nameSort !== 0) return nameSort;
+    return items;
+  }, [validActivities]);
 
-      return String(a.itinerary_activity_id).localeCompare(
-        String(b.itinerary_activity_id)
-      );
-    });
+  const orderedActivitiesForSelectedDay = useMemo(() => {
+    if (!normalizedSelectedDate) return [];
+    const selected = validActivities.filter(
+      (activity) => (activity.date ? activity.date.slice(0, 10) : null) === normalizedSelectedDate
+    );
+    return sortActivitiesForWaypoints(selected);
   }, [normalizedSelectedDate, validActivities]);
 
   const routeActivities = useMemo(() => {
     if (!showRoutes) return [];
     if (!normalizedSelectedDate) return [];
-    if (orderedActivitiesForMarkers.length < 2) return [];
-    return orderedActivitiesForMarkers;
-  }, [normalizedSelectedDate, orderedActivitiesForMarkers, showRoutes]);
+    if (orderedActivitiesForSelectedDay.length < 2) return [];
+    return orderedActivitiesForSelectedDay;
+  }, [normalizedSelectedDate, orderedActivitiesForSelectedDay, showRoutes]);
 
   const dayRouteModeState = useMemo(() => {
     if (routeActivities.length < 2) {
@@ -1147,8 +1190,8 @@ export function ItineraryMap({
               })
             : null}
           
-          {/* Itinerary Waypoints (blue) */}
-          {orderedActivitiesForMarkers.map((activity, index) => {
+          {/* Itinerary Waypoints */}
+          {markerItems.map(({ activity, waypointNumber, color }) => {
             const coords = markerPositionByItineraryActivityId.get(
               String(activity.itinerary_activity_id)
             );
@@ -1169,8 +1212,8 @@ export function ItineraryMap({
                 className="cursor-pointer"
               >
                 <CustomMarker
-                  number={index + 1}
-                  color={activeDayColor}
+                  number={waypointNumber}
+                  color={color}
                   size={isSelected ? "lg" : "md"}
                   isSelected={isSelected}
                 />

@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { DndContext, DragOverlay, pointerWithin } from "@dnd-kit/core";
-import { format } from "date-fns";
+import { format, isToday, isWeekend } from "date-fns";
 import { DayColumn } from "./DayColumn";
 import { ActivityBlock } from "./ActivityBlock";
 import { TimeGrid } from "./TimeGrid";
@@ -18,6 +18,33 @@ import {
 import { MonthGrid } from "./MonthGrid";
 import { useItineraryActivityStore } from "@/store/itineraryActivityStore";
 import { SidebarActivityDragOverlay } from "./SidebarActivityDragOverlay";
+import { useItineraryLayoutStore } from "@/store/itineraryLayoutStore";
+import { colors } from "@/lib/colors/colors";
+
+const DAY_OF_WEEK_PALETTE = [
+  colors.Blue, // Sun
+  colors.Purple, // Mon
+  colors.Green, // Tue
+  colors.Yellow, // Wed
+  colors.Orange, // Thu
+  colors.Red, // Fri
+  colors.TangyOrange, // Sat
+];
+
+const EMPTY_ACTIVE_DAYS: string[] = [];
+
+function getDayColor(date: Date) {
+  return DAY_OF_WEEK_PALETTE[date.getDay()] ?? colors.Blue;
+}
+
+function areStringArraysEqual(a: string[], b: string[]) {
+  if (a === b) return true;
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i += 1) {
+    if (a[i] !== b[i]) return false;
+  }
+  return true;
+}
 
 interface CalendarLayoutProps {
   // Calendar configuration
@@ -119,6 +146,66 @@ export function CalendarLayout({
     schedulingContext.config.interval
   );
   const { itineraryActivities } = useItineraryActivityStore();
+  const activeDays = useItineraryLayoutStore((s) => s.viewStates.calendar.activeDays);
+  const saveViewState = useItineraryLayoutStore((s) => s.saveViewState);
+
+  const visibleDayKeys = useMemo(
+    () => days.map((day) => format(day, "yyyy-MM-dd")),
+    [days]
+  );
+
+  const defaultActiveDays = EMPTY_ACTIVE_DAYS;
+
+  const activeDayKeys = useMemo(() => {
+    const order = new Map(visibleDayKeys.map((key, index) => [key, index]));
+    const normalize = (keys: string[]) =>
+      keys
+        .filter((key) => order.has(key))
+        .sort((a, b) => (order.get(a) ?? 0) - (order.get(b) ?? 0));
+
+    if (activeDays == null) return defaultActiveDays;
+    if (activeDays.length === 0) return [];
+
+    const pruned = normalize(activeDays);
+    if (activeDays.length > 0 && pruned.length === 0) return defaultActiveDays;
+    return pruned;
+  }, [activeDays, defaultActiveDays, visibleDayKeys]);
+
+  useEffect(() => {
+    if (activeDays == null) {
+      saveViewState("calendar", { activeDays: defaultActiveDays });
+      return;
+    }
+
+    const order = new Map(visibleDayKeys.map((key, index) => [key, index]));
+    const normalized = activeDays
+      .filter((key) => order.has(key))
+      .sort((a, b) => (order.get(a) ?? 0) - (order.get(b) ?? 0));
+    let next =
+      activeDays.length > 0 && normalized.length === 0 ? defaultActiveDays : normalized;
+
+    if (!areStringArraysEqual(activeDays, next)) {
+      saveViewState("calendar", { activeDays: next });
+    }
+  }, [activeDays, defaultActiveDays, saveViewState, visibleDayKeys]);
+
+  const activeDaySet = useMemo(() => new Set(activeDayKeys), [activeDayKeys]);
+
+  const toggleActiveDay = React.useCallback(
+    (date: Date) => {
+      const dayKey = format(date, "yyyy-MM-dd");
+      const base = activeDays ?? defaultActiveDays;
+      const isActive = base.includes(dayKey);
+      const next = isActive ? base.filter((key) => key !== dayKey) : [...base, dayKey];
+
+      const order = new Map(visibleDayKeys.map((key, index) => [key, index]));
+      const normalized = next
+        .filter((key) => order.has(key))
+        .sort((a, b) => (order.get(a) ?? 0) - (order.get(b) ?? 0));
+      saveViewState("calendar", { activeDays: normalized });
+    },
+    [activeDays, defaultActiveDays, saveViewState, visibleDayKeys]
+  );
 
   const activeSidebarActivity = useMemo(() => {
     if (activeType !== "itinerary-activity" || !activeId) return null;
@@ -183,84 +270,185 @@ export function CalendarLayout({
           />
         </div>
       ) : (
-        <div className="flex-1 min-h-0 flex items-start overflow-y-auto overflow-x-hidden bg-bg-0 dark:bg-ink-900">
-          {/* Time Column using enhanced TimeGrid */}
-          <TimeGrid
-            config={schedulingContext.config}
-            className="border-r border-stroke-200 bg-bg-0/80 backdrop-blur-sm"
+        <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden bg-bg-0 dark:bg-ink-900">
+          {/* Sticky column headers (Sun/Mon/...) */}
+          <div
+            className="sticky top-0 z-50 flex items-stretch border-b border-stroke-200/70 bg-bg-0/90 backdrop-blur-sm"
+            style={{ height: CALENDAR_HEADER_HEIGHT_PX }}
           >
-            {(slots) => (
-              <div className="w-24 flex-shrink-0 bg-bg-0/70">
-                <div
-                  className="sticky top-0 z-40 border-b border-stroke-200/70 bg-bg-0/90 backdrop-blur-sm shrink-0"
-                  style={{ height: CALENDAR_HEADER_HEIGHT_PX }}
-                />
-                <div className="relative">
-                  {slots.map((slot) => {
-                    return (
-                      <div
-                        key={slot.time}
-                        className={cn(
-                          "border-b relative",
-                          slot.isHour
-                            ? "border-stroke-200"
-                            : "border-stroke-200/70",
-                          "bg-bg-0/60"
-                        )}
-                        style={{ height: `${slotHeightPx}px` }}
-                      >
-                        {(slot.isHour ||
-                          schedulingContext.config.interval === 15) && (
-                          <div
-                            className={cn(
-                              "absolute top-1 right-2 text-xs px-1 bg-bg-0/90",
-                              slot.isHour
-                                ? "text-ink-700 font-medium"
-                                : "text-ink-500"
-                            )}
-                          >
-                            {schedulingContext.config.interval === 15 ||
-                            slot.isHour
-                              ? slot.label
-                              : ""}
-                          </div>
-                        )}
-                        {slot.isHour && (
-                          <div className="absolute left-0 top-0 w-2 h-px bg-stroke-200" />
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-          </TimeGrid>
+            <div className="w-24 flex-shrink-0 border-r border-stroke-200 bg-bg-0/70" />
+            <div className="flex-1 flex min-w-0">
+              {days.map((day, dayIndex) => {
+                const dayKey = visibleDayKeys[dayIndex] ?? format(day, "yyyy-MM-dd");
+                const isActiveDay = activeDaySet.has(dayKey);
+                const dayColor = getDayColor(day);
+                const isCurrentDay = isToday(day);
+                const isWeekendDay = isWeekend(day);
+                const allDayActivities = allDayActivitiesByDay.get(dayKey) ?? [];
 
-          {/* Days Grid */}
-          <div className="flex-1 flex items-start min-w-0 bg-bg-0">
-            {days.map((day, dayIndex) => (
-              <DayColumn
-                key={format(day, "yyyy-MM-dd")}
-                date={day}
-                dayIndex={dayIndex}
-                timeSlots={timeSlots}
-                activities={scheduledActivities.filter(
-                  (act) => act.position.day === dayIndex
-                )}
-                highlightActivityId={highlightActivityId}
-                onSelectDate={onDateChange}
-                allDayActivities={
-                  allDayActivitiesByDay.get(format(day, "yyyy-MM-dd")) ?? []
-                }
-                dragOverInfo={dragOverInfo}
-                onResize={onResize}
-                className={
-                  dayIndex < days.length - 1
-                    ? "border-r border-stroke-200/70"
-                    : ""
-                }
-              />
-            ))}
+                return (
+                  <div
+                    key={`header:${dayKey}`}
+                    className={cn(
+                      "flex-1 flex flex-col items-center justify-center px-2 py-1 relative",
+                      dayIndex < days.length - 1 && "border-r border-stroke-200/70",
+                      onDateChange && "cursor-pointer hover:bg-bg-50/80",
+                      isCurrentDay && "bg-brand-500/10 border-brand-400/60",
+                      isWeekendDay && "bg-bg-50"
+                    )}
+                    role={onDateChange ? "button" : undefined}
+                    tabIndex={onDateChange ? 0 : undefined}
+                    aria-pressed={onDateChange ? isActiveDay : undefined}
+                    onClick={
+                      onDateChange
+                        ? () => {
+                            toggleActiveDay(day);
+                            onDateChange(day);
+                          }
+                        : undefined
+                    }
+                    onKeyDown={
+                      onDateChange
+                        ? (event) => {
+                            if (event.key === "Enter" || event.key === " ") {
+                              event.preventDefault();
+                              toggleActiveDay(day);
+                              onDateChange(day);
+                            }
+                          }
+                        : undefined
+                    }
+                  >
+                    {isActiveDay ? (
+                      <div
+                        className="absolute top-0 left-0 right-0 h-1"
+                        style={{ backgroundColor: dayColor }}
+                      />
+                    ) : null}
+                    <div className="text-xs text-ink-500 uppercase tracking-wide leading-none">
+                      {format(day, "EEE")}
+                    </div>
+                    <div
+                      className={cn(
+                        "text-lg font-semibold leading-none",
+                        isCurrentDay ? "text-brand-600" : "text-ink-900"
+                      )}
+                    >
+                      {format(day, "d")}
+                    </div>
+                    {isCurrentDay && (
+                      <div className="w-1 h-1 bg-brand-500 rounded-full mt-1" />
+                    )}
+                    {allDayActivities.length > 0 ? (
+                      <div className="absolute top-1 right-1">
+                        <div
+                          className={cn(
+                            "min-w-5 h-5 px-1 rounded-full flex items-center justify-center",
+                            "text-[10px] font-semibold",
+                            "bg-brand-500/10 text-brand-700 border border-brand-500/20"
+                          )}
+                          title={`${allDayActivities.length} date-only activit${
+                            allDayActivities.length === 1 ? "y" : "ies"
+                          }`}
+                        >
+                          +{allDayActivities.length}
+                        </div>
+                      </div>
+                    ) : null}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="flex items-start min-w-0">
+            {/* Time Column using enhanced TimeGrid */}
+            <TimeGrid
+              config={schedulingContext.config}
+              className="border-r border-stroke-200 bg-bg-0/80 backdrop-blur-sm"
+            >
+              {(slots) => (
+                <div className="w-24 flex-shrink-0 bg-bg-0/70">
+                  <div className="relative">
+                    {slots.map((slot) => {
+                      return (
+                        <div
+                          key={slot.time}
+                          className={cn(
+                            "border-b relative",
+                            slot.isHour
+                              ? "border-stroke-200"
+                              : "border-stroke-200/70",
+                            "bg-bg-0/60"
+                          )}
+                          style={{ height: `${slotHeightPx}px` }}
+                        >
+                          {(slot.isHour ||
+                            schedulingContext.config.interval === 15) && (
+                            <div
+                              className={cn(
+                                "absolute top-1 right-2 text-xs px-1 bg-bg-0/90",
+                                slot.isHour
+                                  ? "text-ink-700 font-medium"
+                                  : "text-ink-500"
+                              )}
+                            >
+                              {schedulingContext.config.interval === 15 ||
+                              slot.isHour
+                                ? slot.label
+                                : ""}
+                            </div>
+                          )}
+                          {slot.isHour && (
+                            <div className="absolute left-0 top-0 w-2 h-px bg-stroke-200" />
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </TimeGrid>
+
+            {/* Days Grid */}
+            <div className="flex-1 flex items-start min-w-0 bg-bg-0">
+              {days.map((day, dayIndex) => (
+                (() => {
+                  const dayKey = visibleDayKeys[dayIndex] ?? format(day, "yyyy-MM-dd");
+                  const isActiveDay = activeDaySet.has(dayKey);
+                  const dayColor = getDayColor(day);
+
+                  return (
+                <DayColumn
+                  key={dayKey}
+                  date={day}
+                  dayIndex={dayIndex}
+                  timeSlots={timeSlots}
+                  activities={scheduledActivities.filter(
+                    (act) => act.position.day === dayIndex
+                  )}
+                  highlightActivityId={highlightActivityId}
+                  onSelectDate={onDateChange}
+                  isActive={isActiveDay}
+                  activeColor={dayColor}
+                  onToggleActiveDay={toggleActiveDay}
+                  showWaypoints={isActiveDay}
+                  showHeader={false}
+                  allDayActivities={
+                    allDayActivitiesByDay.get(format(day, "yyyy-MM-dd")) ?? []
+                  }
+                  dragOverInfo={dragOverInfo}
+                  onResize={onResize}
+                  className={
+                    dayIndex < days.length - 1
+                      ? "border-r border-stroke-200/70"
+                      : ""
+                  }
+                />
+                  );
+                })()
+              ))}
+            </div>
           </div>
         </div>
       )}
@@ -278,6 +466,7 @@ export function CalendarLayout({
                 activity={activeActivity}
                 isOverlay
                 className="opacity-80 rotate-3 shadow-lg"
+                showWaypointBadge={activeDaySet.has(format(activeActivity.date, "yyyy-MM-dd"))}
               />
               )
             )}

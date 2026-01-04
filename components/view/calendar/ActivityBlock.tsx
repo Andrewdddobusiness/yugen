@@ -59,6 +59,7 @@ interface ActivityBlockProps {
   activity: ScheduledActivity;
   isOverlay?: boolean;
   className?: string;
+  showWaypointBadge?: boolean;
   onResize?: (activityId: string, newDuration: number, resizeDirection: 'top' | 'bottom') => void;
 }
 
@@ -66,6 +67,7 @@ export function ActivityBlock({
   activity,
   isOverlay = false,
   className,
+  showWaypointBadge = true,
   onResize
 }: ActivityBlockProps) {
   const schedulingContext = useSchedulingContext();
@@ -302,13 +304,24 @@ export function ActivityBlock({
   } : undefined;
 
   // Determine block size based on duration
-  const getBlockSize = (duration: number): 'compact' | 'standard' | 'extended' => {
-    if (duration < 60) return 'compact';        // < 1 hour
-    if (duration < 180) return 'standard';      // 1-3 hours  
-    return 'extended';                          // 3+ hours
+  const estimatedHeightPx =
+    isResizing && previewHeight > 0
+      ? previewHeight
+      : Math.max(1, activity.position.span) * slotHeightPx;
+
+  const getBlockSize = (
+    duration: number,
+    heightPx: number
+  ): "compact" | "standard" | "extended" => {
+    // If the visual height is too small, collapse content aggressively.
+    if (heightPx < 84) return "compact";
+    if (duration < 60) return "compact"; // < 1 hour
+    if (duration < 180) return "standard"; // 1-3 hours
+    return "extended"; // 3+ hours
   };
 
-  const blockSize = getBlockSize(activity.duration);
+  const blockSize = getBlockSize(activity.duration, estimatedHeightPx);
+  const showPills = blockSize === "standard" && estimatedHeightPx >= 116;
   const hideWaypointBadgeOnHover = blockSize !== "compact" && !isResizing;
   const activityCategoryAccents = useItineraryLayoutStore((s) => s.activityCategoryAccents);
   const activityCategoryCustomColors = useItineraryLayoutStore((s) => s.activityCategoryCustomColors);
@@ -328,6 +341,7 @@ export function ActivityBlock({
         : undefined;
 
   const waypointBadge = useCallback(() => {
+    if (!showWaypointBadge) return null;
     if (activity.waypointNumber == null) return null;
 
     const palette = [
@@ -383,7 +397,7 @@ export function ActivityBlock({
         </div>
       </div>
     );
-  }, [activity.date, activity.waypointNumber, hideWaypointBadgeOnHover]);
+  }, [activity.date, activity.waypointNumber, hideWaypointBadgeOnHover, showWaypointBadge]);
 
   return (
     <>
@@ -451,6 +465,7 @@ export function ActivityBlock({
         blockSize={blockSize}
         activityAccent={activityAccent}
         customAccentColor={customHex ?? undefined}
+        showPills={showPills}
         isResizing={isResizing}
         isDragging={isDragging}
       />

@@ -38,6 +38,7 @@ interface ActivityBlockContentProps {
   blockSize: 'compact' | 'standard' | 'extended';
   activityAccent: ActivityAccent;
   customAccentColor?: string;
+  showPills?: boolean;
   isResizing?: boolean;
   isDragging?: boolean;
 }
@@ -47,6 +48,7 @@ export function ActivityBlockContent({
   blockSize,
   activityAccent,
   customAccentColor,
+  showPills = true,
   isResizing,
   isDragging
 }: ActivityBlockContentProps) {
@@ -193,20 +195,35 @@ export function ActivityBlockContent({
           </span>
         </div>
 
-        {/* Rating and price */}
-        <div className="flex flex-wrap items-center gap-1">
-          <div className="flex flex-wrap items-center gap-1 min-w-0">
-            {activity.activity?.rating && (
-              <div className="flex items-center">
-                <Star className="h-3 w-3 text-amber-500 mr-0.5" />
-                <span className="text-xs text-ink-500 dark:text-white/60">
-                  {activity.activity.rating.toFixed(1)}
+        {/* Rating + optional pills (hide when card is too small) */}
+        {activity.activity?.rating || (showPills && (priceLevel || activity.duration)) ? (
+          <div className="flex flex-wrap items-center gap-1">
+            <div className="flex flex-wrap items-center gap-1 min-w-0">
+              {activity.activity?.rating && (
+                <div className="flex items-center">
+                  <Star className="h-3 w-3 text-amber-500 mr-0.5" />
+                  <span className="text-xs text-ink-500 dark:text-white/60">
+                    {activity.activity.rating.toFixed(1)}
+                  </span>
+                </div>
+              )}
+
+              {showPills && priceLevel ? (
+                <span className={chipClass}>
+                  <span
+                    className={cn(
+                      "h-1.5 w-1.5 rounded-full",
+                      customAccentColor ? "bg-transparent" : accentDotClass[activityAccent]
+                    )}
+                    style={accentDotStyle}
+                  />
+                  {priceLevel}
                 </span>
-              </div>
-            )}
-            
-            {priceLevel && (
-              <span className={chipClass}>
+              ) : null}
+            </div>
+
+            {showPills ? (
+              <span className={cn(chipClass, "ml-auto")}>
                 <span
                   className={cn(
                     "h-1.5 w-1.5 rounded-full",
@@ -214,22 +231,11 @@ export function ActivityBlockContent({
                   )}
                   style={accentDotStyle}
                 />
-                {priceLevel}
+                {getDurationText(activity.duration)}
               </span>
-            )}
+            ) : null}
           </div>
-
-          <span className={cn(chipClass, "ml-auto")}>
-            <span
-              className={cn(
-                "h-1.5 w-1.5 rounded-full",
-                customAccentColor ? "bg-transparent" : accentDotClass[activityAccent]
-              )}
-              style={accentDotStyle}
-            />
-            {getDurationText(activity.duration)}
-          </span>
-        </div>
+        ) : null}
       </div>
     );
   }

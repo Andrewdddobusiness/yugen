@@ -42,6 +42,11 @@ interface DayColumnProps {
   allDayActivities?: Array<{ id: string; name: string }>;
   highlightActivityId?: string | null;
   onSelectDate?: (date: Date) => void;
+  isActive?: boolean;
+  activeColor?: string;
+  onToggleActiveDay?: (date: Date) => void;
+  showWaypoints?: boolean;
+  showHeader?: boolean;
   dragOverInfo?: {
     dayIndex: number;
     slotIndex: number;
@@ -104,6 +109,11 @@ export function DayColumn({
   dragOverInfo,
   className,
   onResize,
+  isActive,
+  activeColor,
+  onToggleActiveDay,
+  showWaypoints = true,
+  showHeader = true,
 }: DayColumnProps) {
   const isCurrentDay = isToday(date);
   const isWeekendDay = isWeekend(date);
@@ -117,9 +127,10 @@ export function DayColumn({
       ? dragOverInfo.trimPreviewById
       : undefined;
 
-  const handleSelectDate = React.useCallback(() => {
+  const handleHeaderActivate = React.useCallback(() => {
+    onToggleActiveDay?.(date);
     onSelectDate?.(date);
-  }, [date, onSelectDate]);
+  }, [date, onSelectDate, onToggleActiveDay]);
 
   const getDisplayPosition = React.useCallback(
     (activity: ScheduledActivity) => {
@@ -261,59 +272,68 @@ export function DayColumn({
   return (
     <div className={cn("flex-1 flex flex-col", className)}>
       {/* Day Header */}
-      <div
-        className={cn(
-          "sticky top-0 z-30 border-b border-stroke-200 flex flex-col items-center justify-center px-2 py-1 bg-bg-0/90 backdrop-blur-sm shrink-0",
-          onSelectDate && "cursor-pointer hover:bg-bg-50/80",
-          isCurrentDay && "bg-brand-500/10 border-brand-400/60",
-          isWeekendDay && "bg-bg-50"
-        )}
-        style={{ height: CALENDAR_HEADER_HEIGHT_PX }}
-        role={onSelectDate ? "button" : undefined}
-        tabIndex={onSelectDate ? 0 : undefined}
-        onClick={onSelectDate ? handleSelectDate : undefined}
-        onKeyDown={
-          onSelectDate
-            ? (event) => {
-                if (event.key === "Enter" || event.key === " ") {
-                  event.preventDefault();
-                  handleSelectDate();
-                }
-              }
-            : undefined
-        }
-      >
-        <div className="text-xs text-ink-500 uppercase tracking-wide leading-none">
-          {format(date, "EEE")}
-        </div>
+      {showHeader ? (
         <div
           className={cn(
-            "text-lg font-semibold leading-none",
-            isCurrentDay ? "text-brand-600" : "text-ink-900"
+            "sticky top-0 z-30 border-b border-stroke-200 flex flex-col items-center justify-center px-2 py-1 bg-bg-0/90 backdrop-blur-sm shrink-0 relative",
+            onSelectDate && "cursor-pointer hover:bg-bg-50/80",
+            isCurrentDay && "bg-brand-500/10 border-brand-400/60",
+            isWeekendDay && "bg-bg-50"
           )}
+          style={{ height: CALENDAR_HEADER_HEIGHT_PX }}
+          role={onSelectDate ? "button" : undefined}
+          tabIndex={onSelectDate ? 0 : undefined}
+          aria-pressed={onSelectDate ? Boolean(isActive) : undefined}
+          onClick={onSelectDate ? handleHeaderActivate : undefined}
+          onKeyDown={
+            onSelectDate
+              ? (event) => {
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    handleHeaderActivate();
+                  }
+                }
+              : undefined
+          }
         >
-          {format(date, "d")}
-        </div>
-        {isCurrentDay && (
-          <div className="w-1 h-1 bg-brand-500 rounded-full mt-1" />
-        )}
-        {allDayActivities.length > 0 && (
-          <div className="absolute top-1 right-1">
+          {isActive && activeColor ? (
             <div
-              className={cn(
-                "min-w-5 h-5 px-1 rounded-full flex items-center justify-center",
-                "text-[10px] font-semibold",
-                "bg-brand-500/10 text-brand-700 border border-brand-500/20"
-              )}
-              title={`${allDayActivities.length} date-only activit${
-                allDayActivities.length === 1 ? "y" : "ies"
-              }`}
-            >
-              +{allDayActivities.length}
-            </div>
+              className="absolute top-0 left-0 right-0 h-1"
+              style={{ backgroundColor: activeColor }}
+            />
+          ) : null}
+          <div className="text-xs text-ink-500 uppercase tracking-wide leading-none">
+            {format(date, "EEE")}
           </div>
-        )}
-      </div>
+          <div
+            className={cn(
+              "text-lg font-semibold leading-none",
+              isCurrentDay ? "text-brand-600" : "text-ink-900"
+            )}
+          >
+            {format(date, "d")}
+          </div>
+          {isCurrentDay && (
+            <div className="w-1 h-1 bg-brand-500 rounded-full mt-1" />
+          )}
+          {allDayActivities.length > 0 && (
+            <div className="absolute top-1 right-1">
+              <div
+                className={cn(
+                  "min-w-5 h-5 px-1 rounded-full flex items-center justify-center",
+                  "text-[10px] font-semibold",
+                  "bg-brand-500/10 text-brand-700 border border-brand-500/20"
+                )}
+                title={`${allDayActivities.length} date-only activit${
+                  allDayActivities.length === 1 ? "y" : "ies"
+                }`}
+              >
+                +{allDayActivities.length}
+              </div>
+            </div>
+          )}
+        </div>
+      ) : null}
 
       {/* Time Slots */}
       <div className="flex-1 relative">
@@ -459,6 +479,7 @@ export function DayColumn({
                       "ring-2 ring-brand-400/70"
                   )}
                   onResize={onResize}
+                  showWaypointBadge={showWaypoints}
                 />
               </div>
             );

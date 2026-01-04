@@ -37,6 +37,7 @@ export interface ItineraryLayoutState {
       selectedDate: string | null;
       viewMode: 'day' | '3-day' | 'week' | 'month';
       scrollPosition: number;
+      activeDays?: string[];
     };
     table: {
       expandedCards: string[];
@@ -163,6 +164,7 @@ const defaultViewStates = {
     selectedDate: null,
     viewMode: 'week' as const,
     scrollPosition: 0,
+    activeDays: [],
   },
   table: {
     expandedCards: [],
@@ -398,7 +400,14 @@ export const useItineraryLayoutStore = create<ItineraryLayoutState>()(
         defaultView: state.defaultView,
         viewPreferences: state.viewPreferences,
         transitionDuration: state.transitionDuration,
-        viewStates: state.viewStates,
+        viewStates: {
+          ...state.viewStates,
+          calendar: {
+            ...state.viewStates.calendar,
+            // Reset on reload so users explicitly pick visible day columns.
+            activeDays: undefined,
+          },
+        },
         sidebarCollapsed: state.sidebarCollapsed,
         sidebarActiveTab: state.sidebarActiveTab,
         layoutPreferences: state.layoutPreferences,
@@ -410,6 +419,32 @@ export const useItineraryLayoutStore = create<ItineraryLayoutState>()(
           lastActivity: null,
         },
       }),
+      merge: (persistedState, currentState) => {
+        const typedPersisted = persistedState as Partial<ItineraryLayoutState>;
+
+        return {
+          ...currentState,
+          ...typedPersisted,
+          viewStates: {
+            ...currentState.viewStates,
+            ...typedPersisted.viewStates,
+            calendar: {
+              ...currentState.viewStates.calendar,
+              ...typedPersisted.viewStates?.calendar,
+              // Always start with no active day columns.
+              activeDays: currentState.viewStates.calendar.activeDays,
+            },
+            list: {
+              ...currentState.viewStates.list,
+              ...typedPersisted.viewStates?.list,
+            },
+            table: {
+              ...currentState.viewStates.table,
+              ...typedPersisted.viewStates?.table,
+            },
+          },
+        };
+      },
     }
   )
 );

@@ -106,6 +106,7 @@ export default function Builder() {
     setCurrentView, 
     toggleMap 
   } = useItineraryLayoutStore();
+  const activeDays = useItineraryLayoutStore((s) => s.viewStates.calendar.activeDays);
   // List view is temporarily disabled (minimal builder UI).
   const effectiveView = currentView === "list" ? "table" : currentView;
   const { setItineraryCoordinates } = useMapStore();
@@ -486,6 +487,7 @@ export default function Builder() {
                             <ItineraryMap
                               activities={filteredActivities}
                               showRoutes={true}
+                              visibleDays={activeDays}
                               selectedDate={
                                 currentDate
                                   ? formatDate(currentDate, "yyyy-MM-dd")
