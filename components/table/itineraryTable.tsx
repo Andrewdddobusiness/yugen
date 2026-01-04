@@ -16,8 +16,8 @@ import { cn } from "@/lib/utils";
 import { useDateRangeStore } from "@/store/dateRangeStore";
 
 import { useParams } from "next/navigation";
-import ItineraryTableRow from "@/components/table/ItineraryTableRow";
-import { ItineraryTableDateHeader } from "@/components/table/ItineraryTableDateHeader";
+import ItineraryTableRow from "@/components/table/itineraryTableRow";
+import { ItineraryTableDateHeader } from "@/components/table/itineraryTableDateHeader";
 
 interface ItineraryTableViewProps {
   showMap?: boolean;
@@ -246,7 +246,7 @@ export function ItineraryTableView({ showMap, onToggleMap }: ItineraryTableViewP
         <TableHeader>
           <TableRow className="flex w-full text-md">
             <TableHead className="flex items-center w-[20%] min-w-[200px] text-black">Activity Name</TableHead>
-            <TableHead className="flex items-center w-[10%] min-w-[100px] text-black">Type</TableHead>
+            <TableHead className="flex items-center w-[200px] min-w-[200px] shrink-0 text-black">Type</TableHead>
             <TableHead className="flex items-center w-[20%] min-w-[200px] text-black">Address</TableHead>
             <TableHead className="flex items-center w-[15%] min-w-[150px] text-black">Date</TableHead>
             <TableHead className="flex items-center w-[15%] min-w-[150px] text-black">Time</TableHead>

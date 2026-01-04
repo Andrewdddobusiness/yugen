@@ -17,6 +17,9 @@ import { formatCategoryType } from "@/utils/formatting/types";
 import { useActivitiesStore } from "@/store/activityStore";
 import { useMap } from "@vis.gl/react-google-maps";
 import { ActivityCreatedBy } from "@/components/collaboration/ActivityCreatedBy";
+import { useItineraryLayoutStore } from "@/store/itineraryLayoutStore";
+import { ACTIVITY_ACCENT_DOT_CLASSES, getActivityThemeForTypes, hexToRgba } from "@/lib/activityAccent";
+import { cn } from "@/lib/utils";
 
 interface ItineraryTableRowProps {
   activity: any; // Replace with proper type
@@ -45,16 +48,19 @@ export default function ItineraryTableRow({
     }
   }, [map]);
 
-  const getTypeBadgeVariant = (type: string) => {
-    switch (type?.toLowerCase()) {
-      case "restaurant":
-        return "default";
-      case "attraction":
-        return "secondary";
-      default:
-        return "default";
-    }
-  };
+  const activityCategoryAccents = useItineraryLayoutStore((s) => s.activityCategoryAccents);
+  const activityCategoryCustomColors = useItineraryLayoutStore((s) => s.activityCategoryCustomColors);
+  const activityTheme = getActivityThemeForTypes(
+    activity.activity?.types,
+    activity.activity_id || activity.itinerary_activity_id,
+    activityCategoryAccents,
+    activityCategoryCustomColors
+  );
+  const primaryType = activity.activity?.types?.[0];
+  const primaryTypeLabel = primaryType ? formatCategoryType(primaryType) : null;
+  const customTint = activityTheme.customHex ? hexToRgba(activityTheme.customHex, 0.12) : null;
+  const dotClass = activityTheme.customHex ? "bg-transparent" : ACTIVITY_ACCENT_DOT_CLASSES[activityTheme.accent];
+  const dotStyle = activityTheme.customHex ? { backgroundColor: activityTheme.customHex } : undefined;
 
   const handleRowClick = () => {
     if (activity.activity) {
@@ -83,20 +89,29 @@ export default function ItineraryTableRow({
           />
         </div>
       </TableCell>
-      <TableCell className="w-[10%] min-w-[100px]">
-        {activity.activity?.types && (
+      <TableCell className="w-[200px] min-w-[200px] shrink-0">
+        {primaryTypeLabel && (
           <TooltipProvider>
             <Tooltip>
-              <TooltipTrigger>
+              <TooltipTrigger className="inline-flex max-w-full p-0">
                 <Badge
-                  variant={getTypeBadgeVariant(activity.activity.types[0])}
-                  className="bg-[#3F5FA3] hover:bg-[#3F5FA3]/80 px-2 flex items-center justify-start w-fit"
+                  className={cn(
+                    "max-w-full min-w-0",
+                    "inline-flex items-center gap-1.5",
+                    "rounded-full border border-stroke-200",
+                    "bg-bg-0 px-2.5 py-1 text-[11px] font-medium text-ink-900 shadow-sm",
+                    "hover:bg-bg-50",
+                    "dark:border-white/10 dark:bg-white/5 dark:text-white/80 dark:hover:bg-white/10"
+                  )}
+                  style={activityTheme.customHex ? { borderColor: activityTheme.customHex, backgroundColor: customTint ?? undefined } : undefined}
+                  title={primaryTypeLabel}
                 >
-                  <span className="line-clamp-1 text-left">{formatCategoryType(activity.activity.types[0])}</span>
+                  <span className={cn("h-1.5 w-1.5 shrink-0 rounded-full", dotClass)} style={dotStyle} />
+                  <span className="min-w-0 truncate">{primaryTypeLabel}</span>
                 </Badge>
               </TooltipTrigger>
-              <TooltipContent>
-                <p>{formatCategoryType(activity.activity.types[0])}</p>
+              <TooltipContent className="max-w-[280px] break-words">
+                <p className="font-medium">{primaryTypeLabel}</p>
               </TooltipContent>
             </Tooltip>
           </TooltipProvider>

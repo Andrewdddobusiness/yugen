@@ -68,7 +68,7 @@ export function ViewToggle({
         void import("@/components/view/calendar/GoogleCalendarView");
         break;
       case "table":
-        void import("@/components/table/ItineraryTable");
+        void import("@/components/table/itineraryTable");
         break;
     }
   }, []);

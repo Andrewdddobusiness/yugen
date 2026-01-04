@@ -70,7 +70,7 @@ export function ActivityCategoryColorsPopover({ className }: { className?: strin
             <div className="text-sm font-semibold text-ink-900 dark:text-ink-100">
               Activity colors
             </div>
-            <div className="text-xs text-muted-foreground">Applies to calendar + sidebar.</div>
+            <div className="text-xs text-muted-foreground">Applies to calendar + sidebar + table.</div>
           </div>
           <Button
             type="button"
@@ -142,7 +142,7 @@ export function ActivityCategoryColorsPopover({ className }: { className?: strin
         <DialogContent className="max-w-sm">
           <DialogHeader>
             <DialogTitle>{editingLabel ? `${editingLabel} color` : "Choose a color"}</DialogTitle>
-            <DialogDescription>Applies to calendar + sidebar.</DialogDescription>
+            <DialogDescription>Applies to calendar + sidebar + table.</DialogDescription>
           </DialogHeader>
 
           {editingCategory ? (

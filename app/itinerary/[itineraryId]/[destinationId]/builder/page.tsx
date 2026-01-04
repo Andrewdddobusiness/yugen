@@ -12,7 +12,7 @@ import { fetchBuilderBootstrap } from "@/actions/supabase/builderBootstrap";
 const loadGoogleCalendarView = () =>
   import("@/components/view/calendar/GoogleCalendarView").then((module) => ({ default: module.GoogleCalendarView }));
 const loadItineraryTableView = () =>
-  import("@/components/table/ItineraryTable").then((module) => ({ default: module.ItineraryTableView }));
+  import("@/components/table/itineraryTable").then((module) => ({ default: module.ItineraryTableView }));
 const loadItineraryListView = () =>
   import("@/components/list/containers/ItineraryListView").then((module) => ({ default: module.ItineraryListView }));
 
