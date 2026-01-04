@@ -5,6 +5,8 @@ import { format, isSameDay, isSameMonth, isToday, isWeekend, startOfMonth } from
 import { cn } from "@/lib/utils";
 import type { ScheduledActivity } from "./hooks/useScheduledActivities";
 import { useItineraryActivityStore } from "@/store/itineraryActivityStore";
+import { useItineraryLayoutStore } from "@/store/itineraryLayoutStore";
+import { ACTIVITY_ACCENT_DOT_CLASSES, getActivityThemeForTypes } from "@/lib/activityAccent";
 
 interface MonthGridProps {
   monthDate: Date;
@@ -25,6 +27,8 @@ export function MonthGrid({
 }: MonthGridProps) {
   const monthStart = startOfMonth(monthDate);
   const { itineraryActivities } = useItineraryActivityStore();
+  const activityCategoryAccents = useItineraryLayoutStore((s) => s.activityCategoryAccents);
+  const activityCategoryCustomColors = useItineraryLayoutStore((s) => s.activityCategoryCustomColors);
 
   const activitiesByDay = useMemo(() => {
     // Prefer source-of-truth itinerary activities so month view can show date-only items too.
@@ -37,26 +41,40 @@ export function MonthGrid({
               const dateKey = (a.date ?? "").slice(0, 10); // YYYY-MM-DD
               const startTime = a.start_time ? a.start_time.slice(0, 5) : null; // HH:mm
               return {
-                id: a.itinerary_activity_id,
+                id: String(a.itinerary_activity_id),
+                activityId: a.activity_id || a.itinerary_activity_id,
                 dateKey,
                 startTime,
                 name: a.activity?.name ?? "Activity",
+                types: a.activity?.types ?? [],
               };
             })
         : scheduledActivities.map((a) => ({
             id: a.id,
+            activityId: a.activityId || a.id,
             dateKey: format(a.date, "yyyy-MM-dd"),
             startTime: a.startTime ? a.startTime.slice(0, 5) : null,
             name: a.activity?.name ?? "Activity",
+            types: a.activity?.types ?? [],
           }));
 
-    const map = new Map<string, Array<{ id: string; startTime: string | null; name: string }>>();
+    const map = new Map<
+      string,
+      Array<{ id: string; activityId: unknown; startTime: string | null; name: string; types: string[] }>
+    >();
 
     for (const item of source) {
       if (!item.dateKey) continue;
       const existing = map.get(item.dateKey);
-      if (existing) existing.push({ id: item.id, startTime: item.startTime, name: item.name });
-      else map.set(item.dateKey, [{ id: item.id, startTime: item.startTime, name: item.name }]);
+      const payload = {
+        id: item.id,
+        activityId: item.activityId,
+        startTime: item.startTime,
+        name: item.name,
+        types: item.types,
+      };
+      if (existing) existing.push(payload);
+      else map.set(item.dateKey, [payload]);
     }
 
     for (const list of map.values()) {
@@ -127,30 +145,41 @@ export function MonthGrid({
               </div>
 
               <div className="mt-1 space-y-1 min-h-0 overflow-hidden">
-                {cellEvents.map((activity) => (
-                  <div
-                    key={activity.id}
-                    className={cn(
-                      "flex items-center gap-1.5 truncate text-[11px] leading-4",
-                      !inMonth && "text-ink-400",
-                      inMonth && "text-ink-700"
-                    )}
-                    title={activity.name}
-                  >
-                    <span
+                {cellEvents.map((activity) => {
+                  const theme = getActivityThemeForTypes(
+                    activity.types,
+                    activity.activityId,
+                    activityCategoryAccents,
+                    activityCategoryCustomColors
+                  );
+
+                  return (
+                    <div
+                      key={activity.id}
                       className={cn(
-                        "inline-block w-1.5 h-1.5 rounded-full flex-shrink-0",
-                        activity.startTime ? "bg-brand-500" : "bg-ink-400"
+                        "flex items-center gap-1.5 truncate text-[11px] leading-4",
+                        !inMonth && "text-ink-400",
+                        inMonth && "text-ink-700"
                       )}
-                    />
-                    {activity.startTime && (
-                      <span className={cn("font-medium flex-shrink-0", !inMonth && "text-ink-400")}>
-                        {activity.startTime}
-                      </span>
-                    )}
-                    <span className="truncate">{activity.name}</span>
-                  </div>
-                ))}
+                      title={activity.name}
+                    >
+                      <span
+                        className={cn(
+                          "inline-block w-1.5 h-1.5 rounded-full flex-shrink-0",
+                          !inMonth && "opacity-60",
+                          theme.customHex ? "bg-transparent" : ACTIVITY_ACCENT_DOT_CLASSES[theme.accent]
+                        )}
+                        style={theme.customHex ? { backgroundColor: theme.customHex } : undefined}
+                      />
+                      {activity.startTime && (
+                        <span className={cn("font-medium flex-shrink-0", !inMonth && "text-ink-400")}>
+                          {activity.startTime}
+                        </span>
+                      )}
+                      <span className="truncate">{activity.name}</span>
+                    </div>
+                  );
+                })}
 
                 {overflowCount > 0 && (
                   <div className={cn("text-[11px] leading-4 px-1", inMonth ? "text-ink-500" : "text-ink-400")}>
