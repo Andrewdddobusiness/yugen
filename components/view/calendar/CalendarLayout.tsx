@@ -266,7 +266,10 @@ export function CalendarLayout({
             monthDate={selectedDate}
             days={days}
             scheduledActivities={scheduledActivities}
-            onSelectDate={(date) => onDateChange?.(date)}
+            onSelectDate={(date) => {
+              toggleActiveDay(date);
+              onDateChange?.(date);
+            }}
           />
         </div>
       ) : (

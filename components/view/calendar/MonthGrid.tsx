@@ -7,6 +7,7 @@ import type { ScheduledActivity } from "./hooks/useScheduledActivities";
 import { useItineraryActivityStore } from "@/store/itineraryActivityStore";
 import { useItineraryLayoutStore } from "@/store/itineraryLayoutStore";
 import { ACTIVITY_ACCENT_DOT_CLASSES, getActivityThemeForTypes } from "@/lib/activityAccent";
+import { colors } from "@/lib/colors/colors";
 
 interface MonthGridProps {
   monthDate: Date;
@@ -17,6 +18,20 @@ interface MonthGridProps {
 }
 
 const weekdayLabels = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
+
+const DAY_OF_WEEK_PALETTE = [
+  colors.Blue, // Sun
+  colors.Purple, // Mon
+  colors.Green, // Tue
+  colors.Yellow, // Wed
+  colors.Orange, // Thu
+  colors.Red, // Fri
+  colors.TangyOrange, // Sat
+];
+
+function getDayColor(date: Date) {
+  return DAY_OF_WEEK_PALETTE[date.getDay()] ?? colors.Blue;
+}
 
 export function MonthGrid({
   monthDate,
@@ -29,6 +44,8 @@ export function MonthGrid({
   const { itineraryActivities } = useItineraryActivityStore();
   const activityCategoryAccents = useItineraryLayoutStore((s) => s.activityCategoryAccents);
   const activityCategoryCustomColors = useItineraryLayoutStore((s) => s.activityCategoryCustomColors);
+  const activeDays = useItineraryLayoutStore((s) => s.viewStates.calendar.activeDays ?? []);
+  const activeDaySet = useMemo(() => new Set(activeDays ?? []), [activeDays]);
 
   const activitiesByDay = useMemo(() => {
     // Prefer source-of-truth itinerary activities so month view can show date-only items too.
@@ -110,6 +127,8 @@ export function MonthGrid({
           const isCurrentDay = isToday(day);
           const isWeekendDay = isWeekend(day);
           const dayKey = format(day, "yyyy-MM-dd");
+          const isActiveDay = activeDaySet.has(dayKey);
+          const dayColor = getDayColor(day);
           const dayActivities = activitiesByDay.get(dayKey) ?? [];
 
           const isLastColumn = index % 7 === 6;
@@ -121,6 +140,7 @@ export function MonthGrid({
               key={dayKey}
               type="button"
               onClick={() => onSelectDate?.(day)}
+              aria-pressed={Boolean(isActiveDay)}
               className={cn(
                 "relative flex flex-col min-h-0 p-2 text-left transition-colors",
                 "border-b border-stroke-200/70",
@@ -131,6 +151,13 @@ export function MonthGrid({
                 "hover:bg-brand-500/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40"
               )}
             >
+              {isActiveDay ? (
+                <span
+                  aria-hidden="true"
+                  className="absolute top-0 left-0 right-0 h-1"
+                  style={{ backgroundColor: dayColor }}
+                />
+              ) : null}
               <div className="flex items-center justify-between">
                 <div
                   className={cn(
