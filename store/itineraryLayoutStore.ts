@@ -44,6 +44,11 @@ export interface ItineraryLayoutState {
       sortColumn?: string;
       sortDirection?: 'asc' | 'desc';
       scrollPosition: number;
+      filters?: {
+        searchText: string;
+        categories: ActivityCategory[];
+        schedule: 'all' | 'scheduled' | 'unscheduled';
+      };
     };
   };
   
@@ -171,6 +176,11 @@ const defaultViewStates = {
     sortColumn: undefined,
     sortDirection: undefined,
     scrollPosition: 0,
+    filters: {
+      searchText: "",
+      categories: [],
+      schedule: "all" as const,
+    },
   },
 };
 

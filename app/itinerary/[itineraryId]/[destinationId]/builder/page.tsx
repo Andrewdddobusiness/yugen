@@ -447,10 +447,8 @@ export default function Builder() {
                             />
                           </div>
                         ) : (
-                          <div ref={tableRef} className="h-full w-full overflow-auto">
-                            <div className="p-4 min-w-0">
-                              <ItineraryTableView showMap={showMap} onToggleMap={toggleMap} />
-                            </div>
+                          <div ref={tableRef} className="h-full w-full min-w-0 min-h-0 overflow-hidden">
+                            <ItineraryTableView showMap={showMap} onToggleMap={toggleMap} />
                           </div>
                         )}
                       </Suspense>
@@ -527,11 +525,9 @@ export default function Builder() {
                             />
                           </div>
                     ) : (
-                      <div ref={tableRef} className="h-full w-full overflow-auto">
-                        <div className="p-4 min-w-0">
-                          <ItineraryTableView showMap={false} onToggleMap={toggleMap} />
+                      <div ref={tableRef} className="h-full w-full min-w-0 min-h-0 overflow-hidden">
+                        <ItineraryTableView showMap={false} onToggleMap={toggleMap} />
                       </div>
-                    </div>
                     )}
                   </Suspense>
                 </ViewTransition>
