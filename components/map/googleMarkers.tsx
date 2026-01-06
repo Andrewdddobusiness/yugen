@@ -3,7 +3,7 @@ import { IActivity, useActivitiesStore } from "@/store/activityStore";
 import { useActivityTabStore } from "@/store/activityTabStore";
 
 import { colors, TColor } from "@/lib/colors/colors";
-import GoogleMarker from "./GoogleMarker";
+import GoogleMarker from "./googleMarker";
 
 export default function GoogleMarkers({
   color,

@@ -31,8 +31,9 @@ import { useItineraryActivityStore } from "@/store/itineraryActivityStore";
 import { useItineraryCollaborationPanelStore } from "@/store/itineraryCollaborationPanelStore";
 
 import { Button } from "@/components/ui/button";
-import { Download, Share, Users } from "lucide-react";
+import { Download, Share, Sparkles, Users } from "lucide-react";
 import Loading from "@/components/loading/Loading";
+import { ItineraryAssistantSheet, ItineraryAssistantSidebar } from "@/components/ai/ItineraryAssistantSheet";
 
 const ShareExportDialog = dynamic(
   () => import("@/components/dialog/export/ShareExportDialog").then((mod) => mod.ShareExportDialog),
@@ -85,6 +86,7 @@ export default function Layout({ children }: { children: ReactNode }) {
   const enableSharedDnd = isBuilderPage && currentView === "calendar";
   const collaborationOpen = useItineraryCollaborationPanelStore((state) => state.isOpen);
   const openCollaboration = useItineraryCollaborationPanelStore((state) => state.open);
+  const closeCollaboration = useItineraryCollaborationPanelStore((state) => state.close);
 
   const [SharedDndProvider, setSharedDndProvider] = useState<ComponentType<{ children: ReactNode }> | null>(null);
 
@@ -266,6 +268,12 @@ export default function Layout({ children }: { children: ReactNode }) {
 	  };
 
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
+  const [assistantOpen, setAssistantOpen] = useState(false);
+
+  useEffect(() => {
+    if (!collaborationOpen) return;
+    setAssistantOpen(false);
+  }, [collaborationOpen]);
 
   if (!itineraryIdValue || !destinationIdValue) {
     return <Loading />;
@@ -349,6 +357,34 @@ export default function Layout({ children }: { children: ReactNode }) {
 
             <ItineraryCollaborationTrigger itineraryId={itineraryIdValue} />
 
+            <div className="md:hidden">
+              <ItineraryAssistantSheet
+                itineraryId={itineraryIdValue}
+                destinationId={destinationIdValue}
+                className="ml-0"
+                onOpenChange={(open) => {
+                  if (!open) return;
+                  closeCollaboration();
+                }}
+              />
+            </div>
+            <Button
+              type="button"
+              variant={assistantOpen ? "default" : "outline"}
+              size="sm"
+              className="hidden md:inline-flex h-9 rounded-xl gap-2"
+              onClick={() => {
+                setAssistantOpen((open) => {
+                  const next = !open;
+                  if (next) closeCollaboration();
+                  return next;
+                });
+              }}
+            >
+              <Sparkles className="h-4 w-4" />
+              AI
+            </Button>
+
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button
@@ -381,6 +417,21 @@ export default function Layout({ children }: { children: ReactNode }) {
           <div className="min-w-0 flex-1 w-full">{children}</div>
         </div>
         {collaborationOpen ? <ItineraryCollaborationPanel itineraryId={itineraryIdValue} /> : null}
+        <aside
+          className={`hidden md:block sticky top-0 h-screen shrink-0 border-l border-stroke-200 bg-bg-0 overflow-hidden transition-[width] duration-200 ease-out ${
+            assistantOpen ? "w-[var(--sidebar-width)]" : "w-0"
+          }`}
+          aria-hidden={!assistantOpen}
+        >
+          <div className={`h-full min-h-0 flex flex-col ${!assistantOpen ? "opacity-0 pointer-events-none" : ""}`}>
+            <ItineraryAssistantSidebar
+              itineraryId={itineraryIdValue}
+              destinationId={destinationIdValue}
+              isVisible={assistantOpen}
+              onClose={() => setAssistantOpen(false)}
+            />
+          </div>
+        </aside>
       </main>
     </>
   );

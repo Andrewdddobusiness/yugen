@@ -2,7 +2,7 @@
 
 import React, { useMemo, useState, useEffect } from 'react';
 import { InfoWindow } from '@vis.gl/react-google-maps';
-import Circle from './Circle';
+import Circle from './circle';
 import { 
   Clock, 
   Car, 

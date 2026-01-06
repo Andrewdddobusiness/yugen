@@ -399,7 +399,7 @@ export default function Builder() {
     return (
     <div className="w-full flex flex-col bg-bg-50 dark:bg-ink-900 h-[calc(100svh-56px)] min-h-0">
       {/* Enhanced Toolbar with ViewToggle */}
-      <div className="shrink-0 z-40 flex items-center justify-between p-4 border-b bg-bg-0/90 dark:bg-ink-900/90 backdrop-blur-xl shadow-sm">
+	    <div className="shrink-0 z-40 flex items-center justify-between p-4 border-b bg-bg-0/90 dark:bg-ink-900/90 backdrop-blur-xl shadow-sm">
         <ViewToggle 
           className="flex-1"
           showMapToggle={!isMobile}
@@ -422,16 +422,17 @@ export default function Builder() {
             {showMap ? 'Hide' : 'Map'}
           </Button>
         )}
-      </div>
+	      </div>
 
-      {/* Main Content */}
-      <div className="flex-1 min-h-0 w-full">
-            {showMap ? (
-              <ResizablePanelGroup direction="horizontal" className="h-full w-full">
-                {/* Main Content */}
-                <ResizablePanel defaultSize={60} className="min-w-0">
-                  <div className="h-full min-h-0 bg-bg-50 dark:bg-ink-900">
-                    <ViewTransition 
+	      {/* Main Content */}
+	      <div className="flex-1 min-h-0 w-full flex">
+	        <div className="flex-1 min-w-0">
+	          {showMap ? (
+	            <ResizablePanelGroup direction="horizontal" className="h-full w-full">
+	                {/* Main Content */}
+	                <ResizablePanel defaultSize={60} className="min-w-0">
+	                  <div className="h-full min-h-0 bg-bg-50 dark:bg-ink-900">
+	                    <ViewTransition 
                       viewKey={effectiveView}
                       className="h-full w-full"
                     >
@@ -505,35 +506,36 @@ export default function Builder() {
                       );
                     })()}
                   </div>
-                </ResizablePanel>
-              </ResizablePanelGroup>
-            ) : (
-              <div className="h-full w-full bg-bg-50 dark:bg-ink-900">
-                <ViewTransition 
-                  viewKey={effectiveView}
-                  className="h-full w-full"
-                >
-                  <Suspense fallback={<BuilderViewSkeleton view={effectiveView} />}>
-                    {effectiveView === 'calendar' ? (
-                          <div ref={calendarRef} className="h-full w-full overflow-hidden">
-                            <GoogleCalendarView
-                              isLoading={false}
-                              className="h-full w-full"
-                              selectedDate={currentDate ?? undefined}
-                              onSelectedDateChange={(date) => navigateToDate(date)}
-                              useExternalDndContext={sharedDndActive}
-                            />
-                          </div>
-                    ) : (
-                      <div ref={tableRef} className="h-full w-full min-w-0 min-h-0 overflow-hidden">
-                        <ItineraryTableView showMap={false} onToggleMap={toggleMap} />
-                      </div>
-                    )}
-                  </Suspense>
-                </ViewTransition>
-              </div>
-            )}
-      </div>
+	                </ResizablePanel>
+	              </ResizablePanelGroup>
+	          ) : (
+	            <div className="h-full w-full bg-bg-50 dark:bg-ink-900">
+	              <ViewTransition 
+	                viewKey={effectiveView}
+	                className="h-full w-full"
+	              >
+	                <Suspense fallback={<BuilderViewSkeleton view={effectiveView} />}>
+	                  {effectiveView === 'calendar' ? (
+	                        <div ref={calendarRef} className="h-full w-full overflow-hidden">
+	                          <GoogleCalendarView
+	                            isLoading={false}
+	                            className="h-full w-full"
+	                            selectedDate={currentDate ?? undefined}
+	                            onSelectedDateChange={(date) => navigateToDate(date)}
+	                            useExternalDndContext={sharedDndActive}
+	                          />
+	                        </div>
+	                  ) : (
+	                    <div ref={tableRef} className="h-full w-full min-w-0 min-h-0 overflow-hidden">
+	                      <ItineraryTableView showMap={false} onToggleMap={toggleMap} />
+	                    </div>
+	                  )}
+	                </Suspense>
+	              </ViewTransition>
+	            </div>
+	          )}
+	        </div>
+	      </div>
       
     </div>
   );

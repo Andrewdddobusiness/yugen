@@ -41,6 +41,10 @@
     ".next",
     "out",
     "dist",
-    "supabase"
+    "supabase",
+    "**/__tests__/**",
+    "**/__mocks__/**",
+    "**/*.test.*",
+    "**/*.spec.*"
   ]
 }

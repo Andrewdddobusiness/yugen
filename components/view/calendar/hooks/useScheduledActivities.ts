@@ -20,6 +20,7 @@ export interface ScheduledActivity {
     name: string;
     address?: string;
     coordinates?: [number, number];
+    types?: string[];
   };
 }
 

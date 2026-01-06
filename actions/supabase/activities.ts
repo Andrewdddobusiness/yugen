@@ -17,6 +17,248 @@ import type {
   ItineraryActivityWithActivity,
   DatabaseResponse 
 } from "@/types/database";
+import { fetchPlaceDetails } from "@/actions/google/actions";
+
+type AddPlaceToItineraryInput = {
+  itineraryId: string;
+  destinationId: string;
+  placeId: string;
+  date?: string | null;
+  startTime?: string | null;
+  endTime?: string | null;
+  notes?: string | null;
+};
+
+type AddPlaceToItineraryResult = {
+  activity: Activity;
+  itineraryActivity: ItineraryActivity;
+};
+
+const normalizeTimeToHHmmss = (value: string | null | undefined): string | null => {
+  if (value == null) return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+
+  const match = trimmed.match(/^(\d{2}):(\d{2})(?::(\d{2}))?$/);
+  if (!match) return null;
+
+  const hh = Number(match[1]);
+  const mm = Number(match[2]);
+  const ss = Number(match[3] ?? 0);
+
+  if (hh < 0 || hh > 23) return null;
+  if (mm < 0 || mm > 59) return null;
+  if (ss < 0 || ss > 59) return null;
+
+  return `${String(hh).padStart(2, "0")}:${String(mm).padStart(2, "0")}:${String(ss).padStart(2, "0")}`;
+};
+
+const normalizePlaceId = (value: string) => {
+  const trimmed = value.trim();
+  return trimmed.startsWith("places/") ? trimmed.slice("places/".length) : trimmed;
+};
+
+/**
+ * Adds a Google place to an itinerary (creates/updates activity + creates/updates itinerary_activity).
+ * This is the server-side equivalent of the client store insert logic, for AI/tooling workflows.
+ */
+export async function addPlaceToItinerary(
+  input: AddPlaceToItineraryInput
+): Promise<DatabaseResponse<AddPlaceToItineraryResult>> {
+  const supabase = createClient();
+
+  try {
+    const itineraryIdValue = String(input.itineraryId ?? "").trim();
+    const destinationIdValue = String(input.destinationId ?? "").trim();
+    if (!/^\d+$/.test(itineraryIdValue) || !/^\d+$/.test(destinationIdValue)) {
+      return {
+        success: false,
+        error: { message: "Invalid itinerary or destination id" },
+      };
+    }
+
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    if (userError || !user) {
+      return {
+        success: false,
+        error: { message: "User not authenticated" },
+      };
+    }
+
+    const placeId = normalizePlaceId(String(input.placeId ?? ""));
+    if (!placeId) {
+      return { success: false, error: { message: "Place id is required" } };
+    }
+
+    const place = await fetchPlaceDetails(placeId);
+    const [lng, lat] = Array.isArray((place as any).coordinates) ? (place as any).coordinates : [null, null];
+
+    const activityPayload: CreateActivityData = createActivitySchema.parse({
+      place_id: (place as any).place_id ?? placeId,
+      name: (place as any).name ?? "",
+      coordinates: Number.isFinite(lat) && Number.isFinite(lng) ? { lat, lng } : undefined,
+      types: Array.isArray((place as any).types) ? (place as any).types : [],
+      price_level: (place as any).price_level || undefined,
+      address: (place as any).address || undefined,
+      rating: (place as any).rating ?? undefined,
+      description: (place as any).description || undefined,
+      google_maps_url: (place as any).google_maps_url || undefined,
+      website_url: (place as any).website_url || undefined,
+      photo_names: Array.isArray((place as any).photo_names) ? (place as any).photo_names : [],
+      duration: typeof (place as any).duration === "number" ? (place as any).duration : undefined,
+      phone_number: (place as any).phone_number || undefined,
+    });
+
+    const upserted = await createOrUpdateActivity(activityPayload);
+    if (!upserted.success || !upserted.data) {
+      return {
+        success: false,
+        error: upserted.error ?? { message: "Failed to create activity" },
+      };
+    }
+
+    const activity = upserted.data;
+    const itineraryId = Number(itineraryIdValue);
+    const destinationId = Number(destinationIdValue);
+
+    const normalizedStart = input.startTime === undefined ? undefined : normalizeTimeToHHmmss(input.startTime);
+    const normalizedEnd = input.endTime === undefined ? undefined : normalizeTimeToHHmmss(input.endTime);
+    const touchesTime = input.startTime !== undefined || input.endTime !== undefined;
+    if (touchesTime && (input.startTime === undefined || input.endTime === undefined)) {
+      return {
+        success: false,
+        error: { message: "When setting time, provide both startTime and endTime (or set both to null)." },
+      };
+    }
+    if (input.startTime != null && normalizedStart == null) {
+      return { success: false, error: { message: "Invalid start time format" } };
+    }
+    if (input.endTime != null && normalizedEnd == null) {
+      return { success: false, error: { message: "Invalid end time format" } };
+    }
+    if (typeof normalizedStart === "string" && typeof normalizedEnd === "string" && normalizedStart >= normalizedEnd) {
+      return { success: false, error: { message: "Start time must be before end time" } };
+    }
+
+    const desiredDate = input.date === undefined ? undefined : input.date;
+    const desiredNotes = input.notes === undefined ? undefined : input.notes;
+
+    const { data: existingRows, error: existingError } = await supabase
+      .from("itinerary_activity")
+      .select("*")
+      .eq("itinerary_id", itineraryId)
+      .eq("activity_id", activity.activity_id)
+      .order("itinerary_activity_id", { ascending: false })
+      .limit(1);
+
+    if (existingError) {
+      return {
+        success: false,
+        error: { message: "Failed to check existing itinerary activity", code: existingError.code, details: existingError },
+      };
+    }
+
+    const existing = Array.isArray(existingRows) ? (existingRows[0] as any) : null;
+
+    const buildUpdate = () => {
+      const effectiveDate = desiredDate !== undefined ? desiredDate : (existing?.date ?? null);
+      const update: Record<string, any> = {
+        deleted_at: null,
+        itinerary_destination_id: destinationId,
+      };
+
+      if (desiredDate !== undefined) {
+        update.date = desiredDate;
+        if (desiredDate === null) {
+          update.start_time = null;
+          update.end_time = null;
+        }
+      }
+
+      const allowTimes = effectiveDate !== null && desiredDate !== null;
+      if (allowTimes) {
+        if (normalizedStart !== undefined) update.start_time = normalizedStart;
+        if (normalizedEnd !== undefined) update.end_time = normalizedEnd;
+      }
+
+      if (desiredNotes !== undefined) update.notes = desiredNotes;
+
+      return update;
+    };
+
+    let itineraryActivity: ItineraryActivity;
+
+    if (existing?.itinerary_activity_id != null) {
+      const update = buildUpdate();
+      const { data: updated, error: updateError } = await supabase
+        .from("itinerary_activity")
+        .update(update)
+        .eq("itinerary_activity_id", existing.itinerary_activity_id)
+        .select()
+        .single();
+
+      if (updateError || !updated) {
+        return {
+          success: false,
+          error: { message: "Failed to update itinerary activity", code: updateError?.code, details: updateError },
+        };
+      }
+
+      itineraryActivity = updated as ItineraryActivity;
+    } else {
+      const insert: Record<string, any> = {
+        itinerary_id: itineraryId,
+        itinerary_destination_id: destinationId,
+        activity_id: activity.activity_id,
+        deleted_at: null,
+        date: desiredDate ?? null,
+        start_time: null,
+        end_time: null,
+        notes: desiredNotes ?? null,
+      };
+
+      if (insert.date !== null) {
+        if (normalizedStart !== undefined) insert.start_time = normalizedStart;
+        if (normalizedEnd !== undefined) insert.end_time = normalizedEnd;
+      }
+
+      const { data: inserted, error: insertError } = await supabase
+        .from("itinerary_activity")
+        .insert(insert)
+        .select()
+        .single();
+
+      if (insertError || !inserted) {
+        return {
+          success: false,
+          error: { message: "Failed to create itinerary activity", code: insertError?.code, details: insertError },
+        };
+      }
+
+      itineraryActivity = inserted as ItineraryActivity;
+    }
+
+    revalidatePath(`/itinerary/${itineraryId}`);
+
+    return {
+      success: true,
+      data: {
+        activity,
+        itineraryActivity,
+      },
+    };
+  } catch (error: any) {
+    console.error("Error in addPlaceToItinerary:", error);
+    const isZodError = error?.name === "ZodError";
+    return {
+      success: false,
+      error: {
+        message: isZodError ? "Failed to add place. Please try again." : error.message || "An unexpected error occurred",
+        details: error,
+      },
+    };
+  }
+}
 
 /**
  * Creates or updates an activity (place) in the database
@@ -65,10 +307,11 @@ export async function createOrUpdateActivity(data: CreateActivityData): Promise<
 
   } catch (error: any) {
     console.error("Error in createOrUpdateActivity:", error);
+    const isZodError = error?.name === "ZodError";
     return {
       success: false,
       error: { 
-        message: error.message || "An unexpected error occurred",
+        message: isZodError ? "Invalid activity data" : error.message || "An unexpected error occurred",
         details: error
       }
     };

@@ -7,9 +7,9 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { Bike, Car, MapPin, PersonStanding, Train } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-import CustomMarker from './CustomMarker';
-import GoogleMarkers from './GoogleMarkers';
-import { ActivityOverlay } from './ActivityOverlay';
+import CustomMarker from './customMarker';
+import GoogleMarkers from './googleMarkers';
+import { ActivityOverlay } from './activityOverlay';
 import { MapExport } from './MapExport';
 import { Polyline } from './Polyline';
 import { Switch } from '@/components/ui/switch';

@@ -6,11 +6,11 @@ import { useMapStore } from "@/store/mapStore";
 import { useActivitiesStore } from "@/store/activityStore";
 
 import { getRadiusForZoom } from "./zoomRadiusMap";
-import GoogleMarkers from "./GoogleMarkers";
+import GoogleMarkers from "./googleMarkers";
 import SearchField from "../search/SearchField";
-import GoogleMapController from "./GoogleMapController";
+import GoogleMapController from "./googleMapController";
 
-import { ActivityOverlay } from "./ActivityOverlay";
+import { ActivityOverlay } from "./activityOverlay";
 
 export default function GoogleMapComponent() {
   const { centerCoordinates, initialZoom, setRadius, setCenterCoordinates } = useMapStore();

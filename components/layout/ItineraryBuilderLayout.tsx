@@ -11,7 +11,7 @@ import ItinerarySidebar from '@/components/layout/sidebar/ItinerarySidebar';
 import { useItineraryLayoutStore } from '@/store/itineraryLayoutStore';
 import { fetchItineraryDestination, fetchItineraryDestinationDateRange } from '@/actions/supabase/actions';
 import ErrorPage from '@/app/error/page';
-const GoogleMapView = lazy(() => import('@/components/map/GoogleMapView'));
+const GoogleMapView = lazy(() => import('@/components/map/googleMapView'));
 import { useItineraryActivityStore } from '@/store/itineraryActivityStore';
 import { Skeleton } from '@/components/ui/skeleton';
 
