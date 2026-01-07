@@ -6,6 +6,7 @@ import { addPlaceToItinerary } from "@/actions/supabase/activities";
 import { fetchCityCoordinates, fetchPlaceDetails, searchPlacesByText } from "@/actions/google/actions";
 import { planItineraryEdits } from "@/lib/ai/itinerary/planner";
 import { openaiEmbed } from "@/lib/ai/itinerary/openai";
+import { getAiAssistantAccessMode } from "@/lib/featureFlags";
 import {
   DestinationIdSchema,
   ItineraryAssistantRequestSchema,
@@ -45,6 +46,51 @@ const jsonError = (status: number, code: string, message: string, details?: unkn
   );
 };
 
+const isActiveProSubscriber = async (supabase: ReturnType<typeof createClient>, userId: string) => {
+  try {
+    const { data, error } = await supabase
+      .rpc("get_user_subscription", {
+        user_uuid: userId,
+      })
+      .single();
+
+    if (error || !data) return false;
+    const subscriptionId = (data as any)?.out_subscription_id;
+    const periodEndRaw = (data as any)?.out_current_period_end;
+    if (!subscriptionId || !periodEndRaw) return false;
+
+    const periodEnd = new Date(periodEndRaw);
+    if (Number.isNaN(periodEnd.getTime())) return false;
+    return new Date() < periodEnd;
+  } catch {
+    return false;
+  }
+};
+
+const requireAiAssistantAccess = async (supabase: ReturnType<typeof createClient>, userId: string) => {
+  const mode = getAiAssistantAccessMode();
+  if (mode === "off") {
+    return {
+      ok: false as const,
+      response: jsonError(403, "ai_disabled", "AI features are currently unavailable."),
+    };
+  }
+
+  if (mode === "all") {
+    return { ok: true as const };
+  }
+
+  const isPro = await isActiveProSubscriber(supabase, userId);
+  if (!isPro) {
+    return {
+      ok: false as const,
+      response: jsonError(403, "upgrade_required", "Upgrade to Pro to use the AI assistant."),
+    };
+  }
+
+  return { ok: true as const };
+};
+
 export async function GET(request: NextRequest) {
   const itineraryId = request.nextUrl.searchParams.get("itineraryId") ?? "";
   const destinationId = request.nextUrl.searchParams.get("destinationId") ?? "";
@@ -60,6 +106,9 @@ export async function GET(request: NextRequest) {
   if (!auth?.user) {
     return jsonError(401, "unauthorized", "You must be signed in to use the AI assistant.");
   }
+
+  const access = await requireAiAssistantAccess(supabase, auth.user.id);
+  if (!access.ok) return access.response;
 
   let thread: { ai_itinerary_thread_id: string; summary: string | null; draft: unknown | null } | null = null;
   try {
@@ -126,6 +175,9 @@ export async function DELETE(request: NextRequest) {
   if (!auth?.user) {
     return jsonError(401, "unauthorized", "You must be signed in to use the AI assistant.");
   }
+
+  const access = await requireAiAssistantAccess(supabase, auth.user.id);
+  if (!access.ok) return access.response;
 
   await supabase
     .from("ai_itinerary_thread")
@@ -533,6 +585,9 @@ export async function POST(request: NextRequest) {
   if (!auth?.user) {
     return jsonError(401, "unauthorized", "You must be signed in to use the AI assistant.");
   }
+
+  const access = await requireAiAssistantAccess(supabase, auth.user.id);
+  if (!access.ok) return access.response;
 
   const { itineraryId, destinationId } = parsed.data;
 

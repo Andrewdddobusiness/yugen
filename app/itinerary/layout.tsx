@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState, type ComponentType, type CSSProperties, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { useParams, usePathname } from "next/navigation";
+import { useParams, usePathname, useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
@@ -31,9 +31,10 @@ import { useItineraryActivityStore } from "@/store/itineraryActivityStore";
 import { useItineraryCollaborationPanelStore } from "@/store/itineraryCollaborationPanelStore";
 
 import { Button } from "@/components/ui/button";
-import { Download, Share, Sparkles, Users } from "lucide-react";
+import { Download, Lock, Share, Sparkles, Users } from "lucide-react";
 import Loading from "@/components/loading/Loading";
 import { ItineraryAssistantSheet, ItineraryAssistantSidebar } from "@/components/ai/ItineraryAssistantSheet";
+import { getAiAssistantAccessMode, getAiAssistantUpgradeHref } from "@/lib/featureFlags";
 
 const ShareExportDialog = dynamic(
   () => import("@/components/dialog/export/ShareExportDialog").then((mod) => mod.ShareExportDialog),
@@ -75,6 +76,7 @@ const ItineraryCollaborationPanel = dynamic(
 export default function Layout({ children }: { children: ReactNode }) {
   const { itineraryId, destinationId } = useParams();
   const pathname = usePathname();
+  const router = useRouter();
 
   const itineraryIdValue = Array.isArray(itineraryId) ? itineraryId[0] : String(itineraryId ?? "");
   const destinationIdValue = Array.isArray(destinationId) ? destinationId[0] : String(destinationId ?? "");
@@ -270,6 +272,16 @@ export default function Layout({ children }: { children: ReactNode }) {
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
   const [assistantOpen, setAssistantOpen] = useState(false);
 
+  const aiAccessMode = getAiAssistantAccessMode();
+  const isAiEnabledFlag = aiAccessMode !== "off";
+  const isProSubscriber = (subscription as any)?.status === "active";
+  const canUseAiAssistant = aiAccessMode === "all" || (aiAccessMode === "pro" && isProSubscriber);
+  const aiUpgradeHref = getAiAssistantUpgradeHref();
+
+  useEffect(() => {
+    if (!canUseAiAssistant) setAssistantOpen(false);
+  }, [canUseAiAssistant]);
+
   useEffect(() => {
     if (!collaborationOpen) return;
     setAssistantOpen(false);
@@ -358,32 +370,61 @@ export default function Layout({ children }: { children: ReactNode }) {
             <ItineraryCollaborationTrigger itineraryId={itineraryIdValue} />
 
             <div className="md:hidden">
-              <ItineraryAssistantSheet
-                itineraryId={itineraryIdValue}
-                destinationId={destinationIdValue}
-                className="ml-0"
-                onOpenChange={(open) => {
-                  if (!open) return;
-                  closeCollaboration();
-                }}
-              />
+              {isAiEnabledFlag && canUseAiAssistant ? (
+                <ItineraryAssistantSheet
+                  itineraryId={itineraryIdValue}
+                  destinationId={destinationIdValue}
+                  className="ml-0"
+                  onOpenChange={(open) => {
+                    if (!open) return;
+                    closeCollaboration();
+                  }}
+                />
+              ) : isAiEnabledFlag ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="ml-0 h-9 rounded-xl gap-2"
+                  onClick={() => router.push(aiUpgradeHref)}
+                >
+                  <Lock className="h-4 w-4" />
+                  AI
+                </Button>
+              ) : null}
             </div>
-            <Button
-              type="button"
-              variant={assistantOpen ? "default" : "outline"}
-              size="sm"
-              className="hidden md:inline-flex h-9 rounded-xl gap-2"
-              onClick={() => {
-                setAssistantOpen((open) => {
-                  const next = !open;
-                  if (next) closeCollaboration();
-                  return next;
-                });
-              }}
-            >
-              <Sparkles className="h-4 w-4" />
-              AI
-            </Button>
+            {isAiEnabledFlag ? (
+              canUseAiAssistant ? (
+                <Button
+                  type="button"
+                  variant={assistantOpen ? "default" : "outline"}
+                  size="sm"
+                  className="hidden md:inline-flex h-9 rounded-xl gap-2"
+                  onClick={() => {
+                    setAssistantOpen((open) => {
+                      const next = !open;
+                      if (next) closeCollaboration();
+                      return next;
+                    });
+                  }}
+                >
+                  <Sparkles className="h-4 w-4" />
+                  AI
+                </Button>
+              ) : (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="hidden md:inline-flex h-9 rounded-xl gap-2"
+                  onClick={() => router.push(aiUpgradeHref)}
+                  title="Upgrade to Pro to use AI"
+                >
+                  <Lock className="h-4 w-4" />
+                  AI
+                </Button>
+              )
+            ) : null}
 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -417,21 +458,23 @@ export default function Layout({ children }: { children: ReactNode }) {
           <div className="min-w-0 flex-1 w-full">{children}</div>
         </div>
         {collaborationOpen ? <ItineraryCollaborationPanel itineraryId={itineraryIdValue} /> : null}
-        <aside
-          className={`hidden md:block sticky top-0 h-screen shrink-0 border-l border-stroke-200 bg-bg-0 overflow-hidden transition-[width] duration-200 ease-out ${
-            assistantOpen ? "w-[var(--sidebar-width)]" : "w-0"
-          }`}
-          aria-hidden={!assistantOpen}
-        >
-          <div className={`h-full min-h-0 flex flex-col ${!assistantOpen ? "opacity-0 pointer-events-none" : ""}`}>
-            <ItineraryAssistantSidebar
-              itineraryId={itineraryIdValue}
-              destinationId={destinationIdValue}
-              isVisible={assistantOpen}
-              onClose={() => setAssistantOpen(false)}
-            />
-          </div>
-        </aside>
+        {isAiEnabledFlag ? (
+          <aside
+            className={`hidden md:block sticky top-0 h-screen shrink-0 border-l border-stroke-200 bg-bg-0 overflow-hidden transition-[width] duration-200 ease-out ${
+              assistantOpen ? "w-[var(--sidebar-width)]" : "w-0"
+            }`}
+            aria-hidden={!assistantOpen}
+          >
+            <div className={`h-full min-h-0 flex flex-col ${!assistantOpen ? "opacity-0 pointer-events-none" : ""}`}>
+              <ItineraryAssistantSidebar
+                itineraryId={itineraryIdValue}
+                destinationId={destinationIdValue}
+                isVisible={assistantOpen}
+                onClose={() => setAssistantOpen(false)}
+              />
+            </div>
+          </aside>
+        ) : null}
       </main>
     </>
   );
