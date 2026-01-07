@@ -1,6 +1,5 @@
 "use client";
-import { useState } from "react";
-import Image from "next/image";
+import { useEffect, useMemo, useState } from "react";
 
 import HomeLayout from "@/components/layout/HomeLayout";
 import { Input } from "@/components/ui/input";
@@ -11,25 +10,33 @@ import { createClient } from "@/utils/supabase/client";
 import { toast } from "@/components/ui/use-toast";
 import { Separator } from "@/components/ui/separator";
 import { Loader2 } from "lucide-react";
+import { useUserStore } from "@/store/userStore";
 
 export default function ResetPage() {
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
+  const { user } = useUserStore();
   const [success, setSuccess] = useState(false);
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
 
+  useEffect(() => {
+    if (!email && user?.email) setEmail(user.email);
+  }, [email, user?.email]);
+
   const handleEmailReset = async () => {
     setLoading(true);
     try {
-      const { auth } = supabase;
-      const { data: user } = await auth.getUser();
-
-      if (!user.user) {
-        throw new Error("User not authenticated");
+      if (!email) {
+        toast({
+          title: "Email required",
+          description: "Please enter your email to reset your password.",
+        });
+        return;
       }
 
+      const redirectTo = `${window.location.origin}/login/updatePassword`;
       const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/login/updatePassword`,
+        redirectTo,
       });
 
       if (data && !error) {
@@ -48,7 +55,6 @@ export default function ResetPage() {
         description: "Something went wrong! Please try again later.",
       });
     } finally {
-      setEmail("");
       setLoading(false);
     }
   };
@@ -61,10 +67,7 @@ export default function ResetPage() {
 
   return (
     <HomeLayout>
-      <div className="flex flex-col w-full h-screen justify-center items-center relative">
-        <div className="absolute inset-0 -z-50 blur-sm">
-          <Image src="/map.jpg" alt="Background Image" layout="fill" objectFit="cover" />
-        </div>
+      <div className="flex flex-col w-full h-screen justify-center items-center bg-white">
         <div className="flex flex-col justify-start p-8 bg-white rounded-md shadow-md gap-2">
           {success ? (
             <>

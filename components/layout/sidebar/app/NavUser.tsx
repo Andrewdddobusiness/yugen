@@ -27,6 +27,7 @@ export function NavUser() {
   const { user, isUserLoading, profileUrl, isProfileUrlLoading } = useUserStore();
   const { subscription, isSubscriptionLoading } = useStripeSubscriptionStore();
   const { isMobile } = useSidebar();
+  const billingHref = "/settings?tab=billing";
 
   const userDisplayName = user?.user_metadata?.first_name
     ? `${user.user_metadata.first_name} ${user.user_metadata.last_name || ""}`
@@ -110,7 +111,7 @@ export function NavUser() {
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
-              <Link href={subscription?.status === "active" ? "/settings" : "/pricing"}>
+              <Link href={billingHref}>
                 <DropdownMenuItem
                   className={cn(
                     "cursor-pointer",

@@ -60,10 +60,16 @@ export async function updateSession(request: NextRequest) {
 
   const pathname = request.nextUrl.pathname;
   const isProtectedRoute = protectedRoutes.some((route: string) => pathname.startsWith(route));
-  const isAuthRoute = pathname.startsWith('/login') || pathname.startsWith('/signUp') || pathname.startsWith('/auth');
+  const isAuthRoute = pathname.startsWith("/login") || pathname.startsWith("/signUp");
+  const allowAuthedAuthRoutes =
+    pathname.startsWith("/login/reset") ||
+    pathname.startsWith("/login/updatePassword") ||
+    pathname.startsWith("/auth/verify-email") ||
+    pathname.startsWith("/auth/confirm") ||
+    pathname.startsWith("/auth/callback");
 
   // Redirect authenticated users away from auth pages
-  if (user && isAuthRoute && !pathname.startsWith('/auth/verify-email')) {
+  if (user && isAuthRoute && !allowAuthedAuthRoutes) {
     return NextResponse.redirect(new URL("/itineraries", request.url));
   }
 

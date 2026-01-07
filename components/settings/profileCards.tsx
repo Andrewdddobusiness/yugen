@@ -1,26 +1,12 @@
 "use client";
-import React, { Suspense, useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useDropzone } from "react-dropzone";
-import Image from "next/image";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle, CardFooter, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { toast } from "@/components/ui/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
 
 import LoadingSpinner from "@/components/loading/LoadingSpinner";
 
@@ -33,9 +19,8 @@ import { useUserStore } from "@/store/userStore";
 export default function ProfileCards() {
   const supabase = createClient();
 
-  const { profileUrl, isProfileUrlLoading } = useUserStore();
+  const { user, isUserLoading, profileUrl, isProfileUrlLoading } = useUserStore();
 
-  const [user, setUser] = useState<any>(null);
   const [isEditingProfilePhoto, setIsEditingProfilePhoto] = useState(false);
   const [isEditingName, setIsEditingName] = useState(false);
   const [isEditingEmail, setIsEditingEmail] = useState(false);
@@ -48,9 +33,6 @@ export default function ProfileCards() {
   const [loadingName, setNameLoading] = useState<any>(false);
   const [loadingEmail, setEmailLoading] = useState<any>(false);
 
-  const [isDeleting, setIsDeleting] = useState(false);
-  const router = useRouter();
-
   const onDrop = (acceptedFiles: any) => {
     const uploadedFile = acceptedFiles[0];
     setFile(uploadedFile);
@@ -61,8 +43,8 @@ export default function ProfileCards() {
   });
 
   const handleProfileSave = async () => {
-    setProfileLoading(true);
     if (!file) return;
+    setProfileLoading(true);
 
     try {
       const { auth } = supabase;
@@ -77,7 +59,7 @@ export default function ProfileCards() {
 
       const { data, error } = await supabase.storage.from("avatars").upload(user.user.id + "/profile", file, {
         cacheControl: "3600",
-        upsert: false,
+        upsert: true,
       });
 
       if (data && !error) {
@@ -169,76 +151,52 @@ export default function ProfileCards() {
   };
 
   const toggleEditingName = () => {
-    setIsEditingName((prevState) => !prevState);
+    setIsEditingName((prevState) => {
+      const next = !prevState;
+      if (next && user) {
+        setFirstName(user.user_metadata?.first_name ?? "");
+        setLastName(user.user_metadata?.last_name ?? "");
+      }
+      return next;
+    });
   };
 
   const toggleEditingEmail = () => {
-    setIsEditingEmail((prevState) => !prevState);
+    setIsEditingEmail((prevState) => {
+      const next = !prevState;
+      if (next && user) {
+        setEmail(user.email ?? "");
+      }
+      return next;
+    });
   };
 
   useEffect(() => {
-    const fetchUserData = async () => {
-      try {
-        const { auth } = supabase;
-        const { data: user } = await auth.getUser();
+    if (!user) return;
 
-        if (!user.user) {
-          throw new Error("User not authenticated");
-        }
-        setUser(user.user);
-
-        if (user?.user?.user_metadata?.first_name) {
-          setFirstName(user.user.user_metadata.first_name);
-        }
-
-        if (user?.user?.user_metadata?.last_name) {
-          setLastName(user.user.user_metadata.last_name);
-        }
-
-        if (user?.user?.user_metadata?.email) {
-          setEmail(user.user.user_metadata.email);
-        }
-      } catch (error) {
-        console.error("Error fetching user data:", error);
-      }
-    };
-
-    fetchUserData();
-  }, [supabase]);
-
-  const handleDeleteAccount = async () => {
-    setIsDeleting(true);
-    try {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-
-      const { data, error } = await supabase.functions.invoke("soft-delete-user", {
-        body: { userId: user.id },
-        headers: {
-          Authorization: `Bearer ${session?.access_token}`,
-        },
-      });
-
-      if (error || !data.success) throw error || new Error("Failed to delete account");
-
-      await supabase.auth.signOut();
-      router.push("/");
-      toast({
-        title: "Account Scheduled for Deletion",
-        description: "Your account will be permanently deleted in 30 days. Sign in again to cancel deletion.",
-      });
-    } catch (error) {
-      console.error("Error deleting account:", error);
-      toast({
-        title: "Error",
-        description: "Failed to delete account. Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsDeleting(false);
+    if (!isEditingName) {
+      setFirstName(user.user_metadata?.first_name ?? "");
+      setLastName(user.user_metadata?.last_name ?? "");
     }
-  };
+
+    if (!isEditingEmail) {
+      setEmail(user.email ?? "");
+    }
+  }, [user, isEditingEmail, isEditingName]);
+
+  const userDisplayName = user?.user_metadata?.first_name
+    ? `${user.user_metadata.first_name} ${user.user_metadata.last_name || ""}`.trim()
+    : user?.email?.split("@")[0] || "User";
+
+  const effectiveDisplayName = `${firstName} ${lastName}`.trim() || userDisplayName;
+
+  const userInitials = effectiveDisplayName
+    .split(" ")
+    .filter(Boolean)
+    .map((n: string) => n[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 2);
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 3xl:grid-cols-4 5xl:grid-cols-5 gap-4">
@@ -251,17 +209,12 @@ export default function ProfileCards() {
           {!isEditingProfilePhoto ? (
             <div className="grid grid-cols-4 gap-4">
               <Avatar className="h-16 w-16 rounded-lg p-1 border border-gray-200">
-                {isProfileUrlLoading ? (
+                {isUserLoading || isProfileUrlLoading ? (
                   <Skeleton className="h-full w-full" />
                 ) : profileUrl ? (
                   <AvatarImage src={profileUrl} className="rounded-md" />
-                ) : user ? (
-                  <AvatarFallback className="rounded-md bg-muted">
-                    {user.user_metadata.first_name?.[0]}
-                    {user.user_metadata.last_name?.[0]}
-                  </AvatarFallback>
                 ) : (
-                  <Skeleton className="h-full w-full" />
+                  <AvatarFallback className="rounded-md bg-muted">{userInitials}</AvatarFallback>
                 )}
               </Avatar>
             </div>
@@ -269,17 +222,12 @@ export default function ProfileCards() {
             <div className="grid grid-cols-4 gap-4">
               <div className="col-span-1">
                 <Avatar className="h-16 w-16 rounded-lg p-1 border border-gray-200">
-                  {isProfileUrlLoading ? (
+                  {isUserLoading || isProfileUrlLoading ? (
                     <Skeleton className="h-full w-full" />
                   ) : profileUrl ? (
                     <AvatarImage src={profileUrl} className="rounded-md" />
-                  ) : user ? (
-                    <AvatarFallback className="rounded-md bg-muted">
-                      {user.user_metadata.first_name?.[0]}
-                      {user.user_metadata.last_name?.[0]}
-                    </AvatarFallback>
                   ) : (
-                    <Skeleton className="h-full w-full" />
+                    <AvatarFallback className="rounded-md bg-muted">{userInitials}</AvatarFallback>
                   )}
                 </Avatar>
               </div>
@@ -343,11 +291,13 @@ export default function ProfileCards() {
         <CardContent className="flex flex-row justify-between min-h-[100px]">
           {!isEditingName ? (
             <>
-              {user ? (
+              {isUserLoading ? (
+                <Skeleton className="h-10 w-full rounded-lg" />
+              ) : user ? (
                 <Input
                   disabled={!isEditingName}
                   placeholder="Enter your name"
-                  value={user.user_metadata.first_name + " " + user.user_metadata.last_name}
+                  value={effectiveDisplayName}
                 />
               ) : (
                 <Skeleton className="h-10 w-full rounded-lg" />
@@ -360,13 +310,13 @@ export default function ProfileCards() {
                   <Input
                     disabled={!isEditingName}
                     placeholder="Enter your first name"
-                    value={!isEditingName ? user.user_metadata.first_name : firstName}
+                    value={firstName}
                     onChange={(e) => setFirstName(e.target.value)}
                   />
                   <Input
                     disabled={!isEditingName}
                     placeholder="Enter your last name"
-                    value={!isEditingName ? user.user_metadata.last_name : lastName}
+                    value={lastName}
                     onChange={(e) => setLastName(e.target.value)}
                   />
                 </div>
@@ -410,12 +360,14 @@ export default function ProfileCards() {
           <CardTitle className="text-gray-800">Email</CardTitle>
         </CardHeader>
         <CardContent className="flex flex-row justify-between min-h-[100px]">
-          {user ? (
+          {isUserLoading ? (
+            <Skeleton className="h-10 w-full rounded-lg" />
+          ) : user ? (
             <Input
               type="email"
               disabled={!isEditingEmail}
               placeholder="Enter your email"
-              value={!isEditingEmail ? user.user_metadata.email : email}
+              value={email}
               onChange={(e) => setEmail(e.target.value)}
             />
           ) : (
@@ -456,61 +408,6 @@ export default function ProfileCards() {
         </CardFooter>
       </Card>
 
-      {/* Password Section */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-gray-800">Password</CardTitle>
-        </CardHeader>
-
-        <CardContent className="flex flex-row justify-between min-h-[100px]">
-          <Input disabled type="password" placeholder="************" />
-        </CardContent>
-
-        <CardFooter className="border-t py-4">
-          <Link href="/login/reset">
-            <Button className="bg-[#3F5FA3] rounded-xl shadow-lg text-white hover:bg-[#3F5FA3]/90 active:scale-95 transition-all duration-300">
-              Reset Password
-            </Button>
-          </Link>
-        </CardFooter>
-      </Card>
-
-      {/* Delete Account Section */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-gray-800">Delete Your Account</CardTitle>
-          <CardDescription>Permanently delete your account and all associated data.</CardDescription>
-        </CardHeader>
-
-        <CardContent className="flex flex-row justify-between min-h-[70px]">
-          <AlertDialog>
-            <AlertDialogTrigger asChild>
-              <Button variant="destructive" className="rounded-xl shadow-xl">
-                Delete Account
-              </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-                <AlertDialogDescription>
-                  This action cannot be undone. This will permanently delete your account and remove all of your data
-                  from our servers.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel className="rounded-xl shadow-xl">Cancel</AlertDialogCancel>
-                <AlertDialogAction
-                  onClick={handleDeleteAccount}
-                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90 rounded-xl shadow-xl"
-                  disabled={isDeleting}
-                >
-                  {isDeleting ? "Deleting..." : "Delete Account"}
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
-        </CardContent>
-      </Card>
     </div>
   );
 }

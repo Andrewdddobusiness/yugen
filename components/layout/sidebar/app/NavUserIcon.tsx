@@ -16,11 +16,14 @@ import LogoutButton from "@/components/button/auth/LogoutButton";
 import { useSidebar } from "@/components/ui/sidebar";
 import { cn } from "@/lib/utils";
 import { useUserStore } from "@/store/userStore";
-import { LogOut, Settings } from "lucide-react";
+import { useStripeSubscriptionStore } from "@/store/stripeSubscriptionStore";
+import { BadgeCheck, LogOut, Settings, Sparkles } from "lucide-react";
 
 export function NavUserIcon() {
   const { user, isUserLoading, profileUrl, isProfileUrlLoading } = useUserStore();
+  const { subscription, isSubscriptionLoading } = useStripeSubscriptionStore();
   const { isMobile } = useSidebar();
+  const billingHref = "/settings?tab=billing";
 
   const userDisplayName = user?.user_metadata?.first_name
     ? `${user.user_metadata.first_name} ${user.user_metadata.last_name || ""}`
@@ -34,7 +37,7 @@ export function NavUserIcon() {
     .toUpperCase()
     .slice(0, 2);
 
-  const loading = isUserLoading || isProfileUrlLoading;
+  const loading = isUserLoading || isProfileUrlLoading || isSubscriptionLoading;
 
   return (
     <DropdownMenu>
@@ -81,6 +84,34 @@ export function NavUserIcon() {
             </div>
           </div>
         </DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        <Link href={billingHref}>
+          <DropdownMenuItem
+            className={cn(
+              "cursor-pointer",
+              subscription?.status === "active" && "bg-yellow-50 dark:bg-yellow-900/20"
+            )}
+          >
+            {loading ? (
+              <Skeleton className="h-4 w-32" />
+            ) : subscription?.status === "active" ? (
+              <div className="flex items-center gap-2 w-full">
+                <Sparkles className="h-4 w-4 text-yellow-500" />
+                <span className="font-medium text-yellow-700 dark:text-yellow-400">Pro Traveler</span>
+                <span className="ml-auto flex items-center text-xs text-yellow-600 dark:text-yellow-500">
+                  <BadgeCheck className="h-3.5 w-3.5 mr-1" />
+                  {subscription?.attrs?.plan?.interval === "month" ? "Monthly" : "Yearly"}
+                </span>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors w-full">
+                <Sparkles className="h-4 w-4" />
+                <span>Upgrade to Pro</span>
+                <span className="ml-auto text-xs px-1.5 py-0.5 rounded-full bg-muted">Free</span>
+              </div>
+            )}
+          </DropdownMenuItem>
+        </Link>
         <DropdownMenuSeparator />
         <Link href="/settings">
           <DropdownMenuItem className="cursor-pointer">

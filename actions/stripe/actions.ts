@@ -90,6 +90,8 @@ export async function createCheckoutSession(priceId: string) {
 
     console.log("profile", profile);
 
+    const billingReturnUrl = `${process.env.NEXT_PUBLIC_APP_URL}/settings?tab=billing`;
+
     const session = await stripe.checkout.sessions.create({
       mode: "subscription",
       payment_method_types: ["card"],
@@ -101,8 +103,8 @@ export async function createCheckoutSession(priceId: string) {
           quantity: 1,
         },
       ],
-      success_url: `${process.env.NEXT_PUBLIC_APP_URL}/settings`,
-      cancel_url: `${process.env.NEXT_PUBLIC_APP_URL}/settings?canceled=true`,
+      success_url: `${billingReturnUrl}&success=true`,
+      cancel_url: `${billingReturnUrl}&canceled=true`,
     });
 
     return { sessionId: session.id };
@@ -190,7 +192,7 @@ export async function createCustomerPortalSession() {
 
     const portalSession = await stripe.billingPortal.sessions.create({
       customer: profile.stripe_customer_id,
-      return_url: `${process.env.NEXT_PUBLIC_APP_URL}/settings`,
+      return_url: `${process.env.NEXT_PUBLIC_APP_URL}/settings?tab=billing`,
     });
 
     return { url: portalSession.url };
