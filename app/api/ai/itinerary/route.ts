@@ -7,6 +7,8 @@ import { fetchCityCoordinates, fetchPlaceDetails, searchPlacesByText } from "@/a
 import { planItineraryEdits } from "@/lib/ai/itinerary/planner";
 import { openaiEmbed } from "@/lib/ai/itinerary/openai";
 import { getAiAssistantAccessMode } from "@/lib/featureFlags";
+import { rateLimit, rateLimitHeaders } from "@/lib/security/rateLimit";
+import { getClientIp, isSameOrigin } from "@/lib/security/requestGuards";
 import {
   DestinationIdSchema,
   ItineraryAssistantRequestSchema,
@@ -36,13 +38,13 @@ import { summarizeItineraryChat } from "@/lib/ai/itinerary/summarizer";
 const MAX_OPERATIONS = 25;
 const CONFIRMATION_BATCH_THRESHOLD = 10;
 
-const jsonError = (status: number, code: string, message: string, details?: unknown) => {
+const jsonError = (status: number, code: string, message: string, details?: unknown, headers?: HeadersInit) => {
   return NextResponse.json(
     {
       ok: false,
       error: { code, message, details },
     },
-    { status }
+    { status, headers }
   );
 };
 
@@ -105,6 +107,12 @@ export async function GET(request: NextRequest) {
   const { data: auth } = await supabase.auth.getUser();
   if (!auth?.user) {
     return jsonError(401, "unauthorized", "You must be signed in to use the AI assistant.");
+  }
+
+  const ip = getClientIp(request);
+  const limiter = rateLimit(`ai_itinerary:get:${auth.user.id}:${ip}`, { windowMs: 60_000, max: 60 });
+  if (!limiter.allowed) {
+    return jsonError(429, "rate_limited", "Too many requests. Please slow down.", undefined, rateLimitHeaders(limiter));
   }
 
   const access = await requireAiAssistantAccess(supabase, auth.user.id);
@@ -174,6 +182,16 @@ export async function DELETE(request: NextRequest) {
   const { data: auth } = await supabase.auth.getUser();
   if (!auth?.user) {
     return jsonError(401, "unauthorized", "You must be signed in to use the AI assistant.");
+  }
+
+  if (!isSameOrigin(request)) {
+    return jsonError(403, "forbidden", "Invalid request origin.");
+  }
+
+  const ip = getClientIp(request);
+  const limiter = rateLimit(`ai_itinerary:delete:${auth.user.id}:${ip}`, { windowMs: 60_000, max: 30 });
+  if (!limiter.allowed) {
+    return jsonError(429, "rate_limited", "Too many requests. Please slow down.", undefined, rateLimitHeaders(limiter));
   }
 
   const access = await requireAiAssistantAccess(supabase, auth.user.id);
@@ -568,6 +586,10 @@ const buildPreviewLines = (
 };
 
 export async function POST(request: NextRequest) {
+  if (!isSameOrigin(request)) {
+    return jsonError(403, "forbidden", "Invalid request origin.");
+  }
+
   let body: unknown;
   try {
     body = await request.json();
@@ -584,6 +606,15 @@ export async function POST(request: NextRequest) {
   const { data: auth } = await supabase.auth.getUser();
   if (!auth?.user) {
     return jsonError(401, "unauthorized", "You must be signed in to use the AI assistant.");
+  }
+
+  const ip = getClientIp(request);
+  const limiter = rateLimit(`ai_itinerary:post:${parsed.data.mode}:${auth.user.id}:${ip}`, {
+    windowMs: 60_000,
+    max: parsed.data.mode === "apply" ? 10 : 20,
+  });
+  if (!limiter.allowed) {
+    return jsonError(429, "rate_limited", "Too many requests. Please slow down.", undefined, rateLimitHeaders(limiter));
   }
 
   const access = await requireAiAssistantAccess(supabase, auth.user.id);

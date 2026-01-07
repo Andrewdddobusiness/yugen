@@ -2,10 +2,20 @@
 import { IItineraryCard } from "@/components/card/itinerary/ItineraryCard";
 import { createClient } from "@/utils/supabase/server";
 
+const SAFE_IDENTIFIER = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
+const ensureSafeIdentifiers = (values: string[]) => values.every((value) => SAFE_IDENTIFIER.test(value));
+
+const INSERT_TABLE_ALLOWLIST = new Set(["activity", "itinerary_activity"]);
+const UPSERT_TABLE_ALLOWLIST = new Set(["itinerary_activity", "itinerary_destination"]);
+const SOFT_DELETE_TABLE_ALLOWLIST = new Set(["itinerary_activity"]);
+
 /*
   INSERT
 */
 export async function insertTableData(tableName: string, tableData: any) {
+  if (!INSERT_TABLE_ALLOWLIST.has(tableName)) {
+    return { success: false, message: "Invalid table", error: { tableName } };
+  }
   const supabase = createClient();
 
   const { data, error } = await supabase.from(tableName).insert(tableData).select();
@@ -78,6 +88,12 @@ export async function createNewItinerary(
   SET
 */
 export async function setTableData(tableName: string, tableData: any, uniqueColumns: string[]) {
+  if (!UPSERT_TABLE_ALLOWLIST.has(tableName)) {
+    return { success: false, message: "Invalid table", error: { tableName } };
+  }
+  if (!Array.isArray(uniqueColumns) || uniqueColumns.length === 0 || !ensureSafeIdentifiers(uniqueColumns)) {
+    return { success: false, message: "Invalid unique columns", error: { uniqueColumns } };
+  }
   const supabase = createClient();
 
   const { data, error } = await supabase
@@ -97,6 +113,12 @@ export async function setTableData(tableName: string, tableData: any, uniqueColu
 }
 
 export async function setTableDataWithCheck(tableName: string, tableData: any, uniqueColumns: string[]) {
+  if (!UPSERT_TABLE_ALLOWLIST.has(tableName)) {
+    return { success: false, message: "Invalid table", error: { tableName } };
+  }
+  if (!Array.isArray(uniqueColumns) || uniqueColumns.length === 0 || !ensureSafeIdentifiers(uniqueColumns)) {
+    return { success: false, message: "Invalid unique columns", error: { uniqueColumns } };
+  }
   const supabase = createClient();
 
   const identifyingData = {};
@@ -319,6 +341,9 @@ export async function deleteTableData(tableName: string, matchConditions: Record
 }
 
 export async function softDeleteTableData(tableName: string, matchConditions: Record<string, any>) {
+  if (!SOFT_DELETE_TABLE_ALLOWLIST.has(tableName)) {
+    return { success: false, message: "Invalid table", error: { tableName } };
+  }
   const supabase = createClient();
 
   const { data, error } = await supabase
@@ -337,6 +362,9 @@ export async function softDeleteTableData(tableName: string, matchConditions: Re
 }
 
 export async function softDeleteTableData2(tableName: string, matchConditions: Record<string, any>) {
+  if (!SOFT_DELETE_TABLE_ALLOWLIST.has(tableName)) {
+    return { success: false, message: "Invalid table", error: { tableName } };
+  }
   const supabase = createClient();
 
   const { data, error } = await supabase

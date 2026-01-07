@@ -1,19 +1,53 @@
 "use server";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { headers } from "next/headers";
+import { z } from "zod";
 
 import { createClient } from "@/utils/supabase/server";
 import { handleUserSignup } from "../stripe/actions";
+import { rateLimit } from "@/lib/security/rateLimit";
+import { safeRedirectPath } from "@/lib/security/safeRedirect";
+
+const getClientIpFromHeaders = () => {
+  const forwardedFor = headers().get("x-forwarded-for") ?? "";
+  const first = forwardedFor.split(",")[0]?.trim();
+  return first || headers().get("x-real-ip") || "unknown";
+};
+
+const EmailSchema = z.string().trim().toLowerCase().email().max(320);
+const PasswordSchema = z.string().min(6).max(200);
+const NameSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(80)
+  .regex(/^[\p{L}\p{M}' -]+$/u, "Invalid characters");
 
 export async function login(formData: FormData, redirectTo?: string) {
   const supabase = createClient();
+  const ip = getClientIpFromHeaders();
 
-  const loginFormData = {
-    email: formData.get("email") as string,
-    password: formData.get("password") as string,
-  };
+  const parsed = z
+    .object({
+      email: EmailSchema,
+      password: PasswordSchema,
+    })
+    .safeParse({
+      email: formData.get("email"),
+      password: formData.get("password"),
+    });
 
-  const { data, error } = await supabase.auth.signInWithPassword(loginFormData);
+  if (!parsed.success) {
+    return { success: false, message: "Invalid email or password." };
+  }
+
+  const limiter = rateLimit(`auth:login:${ip}:${parsed.data.email}`, { windowMs: 10 * 60_000, max: 15 });
+  if (!limiter.allowed) {
+    return { success: false, message: "Too many login attempts. Please try again later." };
+  }
+
+  const { data, error } = await supabase.auth.signInWithPassword(parsed.data);
 
   if (error) {
     console.log(error);
@@ -41,8 +75,9 @@ export async function login(formData: FormData, redirectTo?: string) {
   
   revalidatePath("/", "layout");
   
-  if (redirectTo) {
-    redirect(redirectTo);
+  const safeRedirect = safeRedirectPath(redirectTo, "");
+  if (safeRedirect) {
+    redirect(safeRedirect);
   }
   
   return { success: true, message: "Login successful" };
@@ -63,14 +98,36 @@ export async function logout() {
 
 export async function signup(formData: FormData) {
   const supabase = createClient();
+  const ip = getClientIpFromHeaders();
 
-  const firstName = formData.get("first_name") as string;
-  const lastName = formData.get("last_name") as string;
-  const email = formData.get("email") as string;
+  const limiter = rateLimit(`auth:signup:${ip}`, { windowMs: 60 * 60_000, max: 10 });
+  if (!limiter.allowed) {
+    return { success: false, message: "Too many sign up attempts. Please try again later." };
+  }
+
+  const parsed = z
+    .object({
+      first_name: NameSchema,
+      last_name: NameSchema,
+      email: EmailSchema,
+      password: PasswordSchema,
+    })
+    .safeParse({
+      first_name: formData.get("first_name"),
+      last_name: formData.get("last_name"),
+      email: formData.get("email"),
+      password: formData.get("password"),
+    });
+
+  if (!parsed.success) {
+    return { success: false, message: "Invalid sign up details." };
+  }
+
+  const { first_name: firstName, last_name: lastName, email } = parsed.data;
 
   const signUpFormData = {
     email,
-    password: formData.get("password") as string,
+    password: parsed.data.password,
     options: {
       data: {
         first_name: firstName,
@@ -104,13 +161,19 @@ export async function signup(formData: FormData) {
 
 export async function resetPassword(formData: FormData) {
   const supabase = createClient();
-  const email = formData.get("email") as string;
+  const ip = getClientIpFromHeaders();
 
-  if (!email) {
+  const parsed = z.object({ email: EmailSchema }).safeParse({ email: formData.get("email") });
+  if (!parsed.success) {
     return { success: false, message: "Email is required" };
   }
 
-  const { error } = await supabase.auth.resetPasswordForEmail(email, {
+  const limiter = rateLimit(`auth:reset_password:${ip}:${parsed.data.email}`, { windowMs: 30 * 60_000, max: 5 });
+  if (!limiter.allowed) {
+    return { success: false, message: "Too many requests. Please try again later." };
+  }
+
+  const { error } = await supabase.auth.resetPasswordForEmail(parsed.data.email, {
     redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/login/updatePassword`,
   });
 
@@ -124,14 +187,13 @@ export async function resetPassword(formData: FormData) {
 
 export async function updatePassword(formData: FormData) {
   const supabase = createClient();
-  const password = formData.get("password") as string;
-
-  if (!password) {
+  const parsed = z.object({ password: PasswordSchema }).safeParse({ password: formData.get("password") });
+  if (!parsed.success) {
     return { success: false, message: "Password is required" };
   }
 
   const { error } = await supabase.auth.updateUser({
-    password,
+    password: parsed.data.password,
   });
 
   if (error) {
@@ -146,7 +208,7 @@ export async function updatePassword(formData: FormData) {
 export async function signInWithGoogle(next?: string) {
   const supabase = createClient();
 
-  const safeNext = next && next.startsWith("/") ? next : "/";
+  const safeNext = safeRedirectPath(next, "/");
 
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: "google",
@@ -203,9 +265,9 @@ export async function updateProfile(formData: FormData) {
   }
 
   const updates = {
-    display_name: formData.get("display_name") as string,
-    avatar_url: formData.get("avatar_url") as string,
-    timezone: formData.get("timezone") as string,
+    display_name: formData.get("display_name"),
+    avatar_url: formData.get("avatar_url"),
+    timezone: formData.get("timezone"),
   };
 
   // Filter out empty values
@@ -217,11 +279,21 @@ export async function updateProfile(formData: FormData) {
     return { success: false, message: "No updates provided" };
   }
 
+  const UpdateProfileSchema = z.object({
+    display_name: z.string().trim().min(1).max(80).optional(),
+    avatar_url: z.string().trim().url().max(2048).optional(),
+    timezone: z.string().trim().min(1).max(64).optional(),
+  });
+  const parsed = UpdateProfileSchema.safeParse(filteredUpdates);
+  if (!parsed.success) {
+    return { success: false, message: "Invalid updates provided" };
+  }
+
   const { error } = await supabase
     .from("profiles")
     .upsert({
       user_id: user.id,
-      ...filteredUpdates,
+      ...parsed.data,
       updated_at: new Date().toISOString(),
     });
 
@@ -237,9 +309,20 @@ export async function updateProfile(formData: FormData) {
 export async function resendConfirmation(email: string) {
   const supabase = createClient();
 
+  const ip = getClientIpFromHeaders();
+  const parsed = EmailSchema.safeParse(email);
+  if (!parsed.success) {
+    return { success: false, message: "Invalid email address" };
+  }
+
+  const limiter = rateLimit(`auth:resend_confirmation:${ip}:${parsed.data}`, { windowMs: 30 * 60_000, max: 5 });
+  if (!limiter.allowed) {
+    return { success: false, message: "Too many requests. Please try again later." };
+  }
+
   const { error } = await supabase.auth.resend({
     type: "signup",
-    email,
+    email: parsed.data,
   });
 
   if (error) {

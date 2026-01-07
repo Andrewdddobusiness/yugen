@@ -1,6 +1,9 @@
 "use server";
 import Stripe from "stripe";
 import { createClient } from "@/utils/supabase/server";
+import { headers } from "next/headers";
+import { rateLimit } from "@/lib/security/rateLimit";
+import { z } from "zod";
 
 // Initialize Stripe only if the secret key is properly configured
 const getStripe = () => {
@@ -12,6 +15,14 @@ const getStripe = () => {
     apiVersion: "2025-02-24.acacia",
   });
 };
+
+const getClientIpFromHeaders = () => {
+  const forwardedFor = headers().get("x-forwarded-for") ?? "";
+  const first = forwardedFor.split(",")[0]?.trim();
+  return first || headers().get("x-real-ip") || "unknown";
+};
+
+const AllowedPriceIdSchema = z.string().trim().min(1).max(200);
 
 export async function handleUserSignup(userId: string, email: string, firstName: string, lastName: string) {
   const supabase = createClient();
@@ -68,6 +79,11 @@ export async function createCheckoutSession(priceId: string) {
   }
   
   try {
+    const parsedPriceId = AllowedPriceIdSchema.safeParse(priceId);
+    if (!parsedPriceId.success) {
+      throw new Error("Invalid price id");
+    }
+
     const supabase = createClient();
     const {
       data: { user },
@@ -75,6 +91,21 @@ export async function createCheckoutSession(priceId: string) {
 
     if (!user) {
       throw new Error("User not authenticated");
+    }
+
+    const ip = getClientIpFromHeaders();
+    const limiter = rateLimit(`stripe:checkout:${ip}:${user.id}`, { windowMs: 60 * 60_000, max: 10 });
+    if (!limiter.allowed) {
+      throw new Error("Too many requests");
+    }
+
+    const allowed = new Set(
+      [process.env.NEXT_PUBLIC_STRIPE_MONTHLY_PRO_PLAN_ID, process.env.NEXT_PUBLIC_STRIPE_YEARLY_PRO_PLAN_ID].filter(
+        Boolean
+      ) as string[]
+    );
+    if (!allowed.has(parsedPriceId.data)) {
+      throw new Error("Invalid price id");
     }
 
     // Get the user's Stripe customer ID from profile
@@ -87,8 +118,6 @@ export async function createCheckoutSession(priceId: string) {
     if (!profile?.stripe_customer_id) {
       throw new Error("No Stripe customer found");
     }
-
-    console.log("profile", profile);
 
     const billingReturnUrl = `${process.env.NEXT_PUBLIC_APP_URL}/settings?tab=billing`;
 
@@ -179,6 +208,12 @@ export async function createCustomerPortalSession() {
     } = await supabase.auth.getUser();
 
     if (!user) throw new Error("User not authenticated");
+
+    const ip = getClientIpFromHeaders();
+    const limiter = rateLimit(`stripe:portal:${ip}:${user.id}`, { windowMs: 10 * 60_000, max: 10 });
+    if (!limiter.allowed) {
+      throw new Error("Too many requests");
+    }
 
     const { data: profile } = await supabase
       .from("profiles")

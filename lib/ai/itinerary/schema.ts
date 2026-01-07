@@ -3,7 +3,7 @@ import { z } from "zod";
 export const ItineraryIdSchema = z.string().regex(/^\d+$/, "Expected a numeric itinerary id");
 export const DestinationIdSchema = z.string().regex(/^\d+$/, "Expected a numeric destination id");
 export const ItineraryActivityIdSchema = z.string().regex(/^\d+$/, "Expected a numeric itinerary activity id");
-export const PlaceIdSchema = z.string().trim().min(1, "Expected a place id");
+export const PlaceIdSchema = z.string().trim().min(1, "Expected a place id").max(256);
 
 export const IsoDateSchema = z
   .string()
@@ -41,7 +41,7 @@ const UpdateActivityOperationSchema = z.object({
   date: IsoDateSchema.nullable().optional(),
   startTime: TimeSchema.nullable().optional(),
   endTime: TimeSchema.nullable().optional(),
-  notes: z.string().nullable().optional(),
+  notes: z.string().max(2000).nullable().optional(),
 });
 
 const RemoveActivityOperationSchema = z.object({
@@ -52,24 +52,24 @@ const RemoveActivityOperationSchema = z.object({
 const ProposedAddPlaceOperationSchema = z.object({
   op: z.literal("add_place"),
   // New additions can be specified with a query; existing draft additions can include a resolved placeId.
-  query: z.string().trim().min(1).optional(),
+  query: z.string().trim().min(1).max(200).optional(),
   placeId: PlaceIdSchema.optional(),
-  name: z.string().trim().optional(),
+  name: z.string().trim().max(120).optional(),
   date: IsoDateSchema.nullable().optional(),
   startTime: TimeSchema.nullable().optional(),
   endTime: TimeSchema.nullable().optional(),
-  notes: z.string().nullable().optional(),
+  notes: z.string().max(2000).nullable().optional(),
 });
 
 const ResolvedAddPlaceOperationSchema = z.object({
   op: z.literal("add_place"),
   placeId: PlaceIdSchema,
-  query: z.string().trim().optional(),
-  name: z.string().trim().optional(),
+  query: z.string().trim().max(200).optional(),
+  name: z.string().trim().max(120).optional(),
   date: IsoDateSchema.nullable().optional(),
   startTime: TimeSchema.nullable().optional(),
   endTime: TimeSchema.nullable().optional(),
-  notes: z.string().nullable().optional(),
+  notes: z.string().max(2000).nullable().optional(),
   });
 
 export const ProposedOperationSchema = z
@@ -144,7 +144,7 @@ export const PlanRequestSchema = z.object({
   mode: z.literal("plan"),
   itineraryId: ItineraryIdSchema,
   destinationId: DestinationIdSchema,
-  message: z.string().trim().min(1, "Message is required"),
+  message: z.string().trim().min(1, "Message is required").max(2000, "Message is too long"),
   chatHistory: z.array(ChatMessageSchema).max(30).optional(),
   draftOperations: z.array(OperationSchema).max(25).optional(),
 });

@@ -1,30 +1,59 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { rateLimit, rateLimitHeaders } from "@/lib/security/rateLimit";
+import { getClientIp } from "@/lib/security/requestGuards";
 
 export async function GET(
   request: NextRequest,
   { params }: { params: { path: string[] } }
 ) {
   try {
-    const photoPath = params.path.join('/');
+    const ip = getClientIp(request);
+    const limiter = rateLimit(`photos:get:${ip}`, { windowMs: 60_000, max: 120 });
+    if (!limiter.allowed) {
+      return NextResponse.json(
+        { ok: false, error: { code: "rate_limited", message: "Too many requests. Please slow down." } },
+        { status: 429, headers: rateLimitHeaders(limiter) }
+      );
+    }
+
+    const photoPath = params.path.join("/");
+    if (!photoPath || photoPath.length > 512) {
+      return new NextResponse("Photo not available", { status: 404 });
+    }
     const { searchParams } = new URL(request.url);
     
     // Extract query parameters
-    const maxHeightPx = searchParams.get('maxHeightPx') || '1000';
-    const maxWidthPx = searchParams.get('maxWidthPx') || '1000';
+    const clampInt = (value: string | null, fallback: number, min: number, max: number) => {
+      const parsed = Number.parseInt(value ?? "", 10);
+      if (!Number.isFinite(parsed)) return fallback;
+      return Math.min(max, Math.max(min, parsed));
+    };
+
+    const maxHeightPx = clampInt(searchParams.get("maxHeightPx"), 1000, 1, 2000);
+    const maxWidthPx = clampInt(searchParams.get("maxWidthPx"), 1000, 1, 2000);
+
+    const apiKey =
+      process.env.GOOGLE_PLACES_API_KEY ||
+      process.env.GOOGLE_MAPS_API_KEY ||
+      process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+
+    if (!apiKey) {
+      return new NextResponse("Internal server error", { status: 500 });
+    }
     
     // Construct the Google Places API URL
     const apiUrl = `https://places.googleapis.com/v1/${photoPath}/media`;
     const apiParams = new URLSearchParams({
-      maxHeightPx,
-      maxWidthPx,
-      key: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY!
+      maxHeightPx: String(maxHeightPx),
+      maxWidthPx: String(maxWidthPx),
+      key: apiKey,
     });
 
     // Fetch from Google Places API with proper headers
     const response = await fetch(`${apiUrl}?${apiParams}`, {
       headers: {
-        'X-Goog-Api-Key': process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY!,
-        'Referer': process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000',
+        "X-Goog-Api-Key": apiKey,
+        Referer: process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000",
       },
     });
 
