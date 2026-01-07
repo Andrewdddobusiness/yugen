@@ -1,7 +1,7 @@
 "use client";
 
 import { motion, useInView } from "framer-motion";
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import { Star, Quote } from "lucide-react";
 import Image from "next/image";
 
@@ -11,7 +11,7 @@ const testimonials = [
     name: "Sarah Chen",
     role: "Travel Blogger",
     location: "San Francisco, CA",
-    avatar: "/testimonials/sarah.jpg",
+    avatar: "/assets/yugi-mascot-1.png",
     rating: 5,
     text: "Yugi completely transformed how I plan my trips. The drag-and-drop calendar is so intuitive - it's like having Google Calendar for travel planning. I saved 10+ hours on my last Europe trip.",
     trip: "3-week Europe Adventure",
@@ -22,7 +22,7 @@ const testimonials = [
     name: "Michael Rodriguez",
     role: "Software Engineer",
     location: "Austin, TX",
-    avatar: "/testimonials/michael.jpg", 
+    avatar: "/assets/yugi-mascot-2.png",
     rating: 5,
     text: "As someone who loves detailed planning, Yugi is perfect. The area search helped me discover hidden gems in Tokyo that I never would have found otherwise. The export features are incredibly useful.",
     trip: "2-week Japan Discovery",
@@ -33,7 +33,7 @@ const testimonials = [
     name: "Emma Thompson",
     role: "Marketing Manager",
     location: "London, UK",
-    avatar: "/testimonials/emma.jpg",
+    avatar: "/assets/yugi-mascot-3.png",
     rating: 5,
     text: "Planning our family vacation used to be stressful, but Yugi made it enjoyable. The wishlist feature let everyone contribute ideas, and organizing everything was so smooth.",
     trip: "Family Trip to Thailand",
@@ -51,6 +51,7 @@ const stats = [
 export default function TestimonialsSection() {
   const sectionRef = useRef(null);
   const isInView = useInView(sectionRef, { once: true, margin: "-100px" });
+  const [avatarErrored, setAvatarErrored] = useState<Record<number, boolean>>({});
 
   return (
     <section className="py-24 bg-bg-50" ref={sectionRef}>
@@ -138,19 +139,24 @@ export default function TestimonialsSection() {
               {/* Author */}
               <div className="flex items-center">
                 <div className="relative w-12 h-12 rounded-full bg-gray-200 mr-4 overflow-hidden">
-                  <Image
-                    src={testimonial.avatar}
-                    alt={testimonial.name}
-                    fill
-                    className="object-cover"
-                    onError={() => {
-                      // Fallback to initials if image fails
-                    }}
-                  />
-                  {/* Fallback initials */}
-                  <div className="absolute inset-0 flex items-center justify-center bg-brand-500 text-white font-semibold">
-                    {testimonial.name.split(' ').map(n => n[0]).join('')}
-                  </div>
+                  {!avatarErrored[testimonial.id] ? (
+                    <Image
+                      src={testimonial.avatar}
+                      alt={testimonial.name}
+                      fill
+                      className="object-cover"
+                      sizes="48px"
+                      onError={() => setAvatarErrored((prev) => ({ ...prev, [testimonial.id]: true }))}
+                    />
+                  ) : (
+                    <div className="absolute inset-0 flex items-center justify-center bg-brand-500 text-white font-semibold">
+                      {testimonial.name
+                        .split(" ")
+                        .filter(Boolean)
+                        .map((part) => part[0])
+                        .join("")}
+                    </div>
+                  )}
                 </div>
                 <div>
                   <div className="font-semibold text-ink-900">{testimonial.name}</div>

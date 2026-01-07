@@ -151,24 +151,35 @@
 
   @keyframes textShimmer {
     0% {
-      background-position: 0% 50%;
+      background-position: 100% 50%;
     }
     100% {
-      background-position: 200% 50%;
+      background-position: 0% 50%;
     }
   }
 
   .text-shimmer {
-    background-image: linear-gradient(90deg, #55607A 0%, #3F5FA3 50%, #55607A 100%);
-    background-size: 200% 100%;
+    display: inline-block;
+    background-image: linear-gradient(90deg, #55607A 0%, #55607A 40%, #8FA8E6 50%, #55607A 60%, #55607A 100%);
+    background-size: 250% 100%;
+    background-position: 100% 50%;
+    background-repeat: no-repeat;
     -webkit-background-clip: text;
     background-clip: text;
     color: transparent;
-    animation: textShimmer 1.4s linear infinite;
+    will-change: background-position;
+    animation: textShimmer 1.2s ease-in-out infinite;
   }
 
   .dark .text-shimmer {
-    background-image: linear-gradient(90deg, #8FA8E6 0%, #FFFFFF 50%, #8FA8E6 100%);
+    background-image: linear-gradient(90deg, #8FA8E6 0%, #8FA8E6 40%, #FFFFFF 50%, #8FA8E6 60%, #8FA8E6 100%);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .text-shimmer {
+      animation: none;
+      background-position: 50% 50%;
+    }
   }
 }
 

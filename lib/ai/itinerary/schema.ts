@@ -51,7 +51,10 @@ const RemoveActivityOperationSchema = z.object({
 
 const ProposedAddPlaceOperationSchema = z.object({
   op: z.literal("add_place"),
-  query: z.string().trim().min(1, "Place query is required"),
+  // New additions can be specified with a query; existing draft additions can include a resolved placeId.
+  query: z.string().trim().min(1).optional(),
+  placeId: PlaceIdSchema.optional(),
+  name: z.string().trim().optional(),
   date: IsoDateSchema.nullable().optional(),
   startTime: TimeSchema.nullable().optional(),
   endTime: TimeSchema.nullable().optional(),
@@ -67,7 +70,7 @@ const ResolvedAddPlaceOperationSchema = z.object({
   startTime: TimeSchema.nullable().optional(),
   endTime: TimeSchema.nullable().optional(),
   notes: z.string().nullable().optional(),
-});
+  });
 
 export const ProposedOperationSchema = z
   .discriminatedUnion("op", [UpdateActivityOperationSchema, RemoveActivityOperationSchema, ProposedAddPlaceOperationSchema])
@@ -91,6 +94,14 @@ export const ProposedOperationSchema = z
     }
 
     if (value.op === "add_place") {
+      const hasQuery = typeof (value as any).query === "string" && String((value as any).query).trim().length > 0;
+      const hasPlaceId = typeof (value as any).placeId === "string" && String((value as any).placeId).trim().length > 0;
+      if (!hasQuery && !hasPlaceId) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "add_place requires either query or placeId",
+        });
+      }
       validateTimePair(value, ctx);
     }
   });
@@ -135,6 +146,7 @@ export const PlanRequestSchema = z.object({
   destinationId: DestinationIdSchema,
   message: z.string().trim().min(1, "Message is required"),
   chatHistory: z.array(ChatMessageSchema).max(30).optional(),
+  draftOperations: z.array(OperationSchema).max(25).optional(),
 });
 
 export const ApplyRequestSchema = z.object({

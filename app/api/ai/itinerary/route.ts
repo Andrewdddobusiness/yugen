@@ -5,13 +5,32 @@ import { softDeleteTableData2 } from "@/actions/supabase/actions";
 import { addPlaceToItinerary } from "@/actions/supabase/activities";
 import { fetchCityCoordinates, fetchPlaceDetails, searchPlacesByText } from "@/actions/google/actions";
 import { planItineraryEdits } from "@/lib/ai/itinerary/planner";
+import { openaiEmbed } from "@/lib/ai/itinerary/openai";
 import {
+  DestinationIdSchema,
   ItineraryAssistantRequestSchema,
+  ItineraryIdSchema,
+  OperationSchema,
   type ProposedOperation,
   type Operation,
   type PlanResponsePayload,
   type ApplyResponsePayload,
 } from "@/lib/ai/itinerary/schema";
+import {
+  finishAiItineraryRun,
+  finishAiItineraryRunStep,
+  getOrCreateAiItineraryThread,
+  insertAiItineraryMessage,
+  insertAiItineraryToolInvocation,
+  listAiItineraryMessages,
+  matchAiItineraryMessages,
+  mergeChatContext,
+  startAiItineraryRun,
+  startAiItineraryRunStep,
+  updateAiItineraryThreadDraft,
+  updateAiItineraryThreadSummary,
+} from "@/lib/ai/itinerary/chatStore";
+import { summarizeItineraryChat } from "@/lib/ai/itinerary/summarizer";
 
 const MAX_OPERATIONS = 25;
 const CONFIRMATION_BATCH_THRESHOLD = 10;
@@ -25,6 +44,97 @@ const jsonError = (status: number, code: string, message: string, details?: unkn
     { status }
   );
 };
+
+export async function GET(request: NextRequest) {
+  const itineraryId = request.nextUrl.searchParams.get("itineraryId") ?? "";
+  const destinationId = request.nextUrl.searchParams.get("destinationId") ?? "";
+
+  const parsedItineraryId = ItineraryIdSchema.safeParse(itineraryId);
+  const parsedDestinationId = DestinationIdSchema.safeParse(destinationId);
+  if (!parsedItineraryId.success || !parsedDestinationId.success) {
+    return jsonError(400, "invalid_request", "Invalid itinerary or destination id");
+  }
+
+  const supabase = createClient();
+  const { data: auth } = await supabase.auth.getUser();
+  if (!auth?.user) {
+    return jsonError(401, "unauthorized", "You must be signed in to use the AI assistant.");
+  }
+
+  let thread: { ai_itinerary_thread_id: string; summary: string | null; draft: unknown | null } | null = null;
+  try {
+    const { data } = await supabase
+      .from("ai_itinerary_thread")
+      .select("ai_itinerary_thread_id,summary,draft")
+      .eq("itinerary_id", Number(itineraryId))
+      .eq("itinerary_destination_id", Number(destinationId))
+      .maybeSingle();
+
+    if (data?.ai_itinerary_thread_id) {
+      thread = {
+        ai_itinerary_thread_id: String((data as any).ai_itinerary_thread_id),
+        summary: (data as any).summary ?? null,
+        draft: (data as any).draft ?? null,
+      };
+    }
+  } catch {
+    // ignore
+  }
+
+  if (!thread) {
+    return NextResponse.json({ ok: true, messages: [], summary: null });
+  }
+
+  try {
+    const rows = await listAiItineraryMessages({
+      supabase,
+      threadId: thread.ai_itinerary_thread_id,
+      limit: 80,
+    });
+
+    const messages = rows
+      .filter((row) => row.role === "user" || row.role === "assistant")
+      .map((row) => ({ role: row.role, content: row.content }));
+
+    const draftParsed = OperationSchema.array().max(25).safeParse(thread.draft);
+
+    return NextResponse.json({
+      ok: true,
+      threadId: thread.ai_itinerary_thread_id,
+      summary: thread.summary ?? null,
+      messages,
+      draftOperations: draftParsed.success ? draftParsed.data : null,
+    });
+  } catch (error) {
+    console.error("Failed to load AI chat history:", error);
+    return NextResponse.json({ ok: true, messages: [], summary: thread.summary ?? null });
+  }
+}
+
+export async function DELETE(request: NextRequest) {
+  const itineraryId = request.nextUrl.searchParams.get("itineraryId") ?? "";
+  const destinationId = request.nextUrl.searchParams.get("destinationId") ?? "";
+
+  const parsedItineraryId = ItineraryIdSchema.safeParse(itineraryId);
+  const parsedDestinationId = DestinationIdSchema.safeParse(destinationId);
+  if (!parsedItineraryId.success || !parsedDestinationId.success) {
+    return jsonError(400, "invalid_request", "Invalid itinerary or destination id");
+  }
+
+  const supabase = createClient();
+  const { data: auth } = await supabase.auth.getUser();
+  if (!auth?.user) {
+    return jsonError(401, "unauthorized", "You must be signed in to use the AI assistant.");
+  }
+
+  await supabase
+    .from("ai_itinerary_thread")
+    .update({ draft: null })
+    .eq("itinerary_id", Number(itineraryId))
+    .eq("itinerary_destination_id", Number(destinationId));
+
+  return NextResponse.json({ ok: true });
+}
 
 const normalizeTimeToHHmmss = (value: string | null): string | null => {
   if (value == null) return null;
@@ -168,8 +278,15 @@ const resolveAddPlaceOperation = async (args: {
   proposed: Extract<ProposedOperation, { op: "add_place" }>;
   destination: any;
 }): Promise<{ resolved?: Operation; clarification?: string }> => {
-  const query = args.proposed.query.trim();
-  const displayQuery = extractTextQueryFromGoogleMapsUrl(query) || query;
+  const proposedPlaceId =
+    typeof (args.proposed as any).placeId === "string" ? normalizePlaceId((args.proposed as any).placeId) : "";
+  const rawQuery = typeof (args.proposed as any).query === "string" ? String((args.proposed as any).query) : "";
+  const query = rawQuery.trim();
+  const displayQuery =
+    extractTextQueryFromGoogleMapsUrl(query) ||
+    (typeof (args.proposed as any).name === "string" ? String((args.proposed as any).name).trim() : "") ||
+    query ||
+    proposedPlaceId;
   const touchesTime = args.proposed.startTime !== undefined || args.proposed.endTime !== undefined;
   if (touchesTime && args.proposed.date === undefined) {
     return { clarification: `What date should I schedule “${displayQuery}” for?` };
@@ -186,6 +303,31 @@ const resolveAddPlaceOperation = async (args: {
   const city = typeof args.destination?.city === "string" ? args.destination.city : "";
   const country = typeof args.destination?.country === "string" ? args.destination.country : "";
   const cityLabel = city && country ? `${city}, ${country}` : city || country || "this destination";
+
+  if (proposedPlaceId) {
+    let placeName: string | undefined = typeof (args.proposed as any).name === "string" ? (args.proposed as any).name : undefined;
+    try {
+      if (!placeName) {
+        const place = await fetchPlaceDetails(proposedPlaceId);
+        placeName = (place as any)?.name || undefined;
+      }
+    } catch {
+      // ignore, still allow using placeId
+    }
+
+    return {
+      resolved: {
+        op: "add_place",
+        placeId: proposedPlaceId,
+        query: query ? displayQuery : undefined,
+        name: placeName,
+        date: args.proposed.date,
+        startTime: args.proposed.startTime,
+        endTime: args.proposed.endTime,
+        notes: args.proposed.notes,
+      },
+    };
+  }
 
   const extractedPlaceId = extractPlaceIdFromText(query);
   if (extractedPlaceId) {
@@ -208,6 +350,12 @@ const resolveAddPlaceOperation = async (args: {
         clarification: makeAddPlaceClarification(displayQuery, cityLabel, []),
       };
     }
+  }
+
+  if (!query) {
+    return {
+      clarification: makeAddPlaceClarification(displayQuery || "that place", cityLabel, []),
+    };
   }
 
   if (!city || !country) {
@@ -393,6 +541,38 @@ export async function POST(request: NextRequest) {
     return jsonError(500, "bootstrap_failed", "Failed to load itinerary context", bootstrap.error ?? bootstrap.message);
   }
 
+  let threadId: string;
+  let threadSummary: string | null = null;
+  let threadDraft: Operation[] = [];
+  try {
+    const thread = await getOrCreateAiItineraryThread({
+      supabase,
+      itineraryId,
+      destinationId,
+      userId: auth.user.id,
+    });
+    threadId = thread.ai_itinerary_thread_id;
+    threadSummary = thread.summary ?? null;
+    threadDraft = OperationSchema.array().max(25).safeParse(thread.draft).success
+      ? (OperationSchema.array().max(25).parse(thread.draft) as any)
+      : [];
+  } catch (error) {
+    console.error("Failed to create AI chat thread:", error);
+    return jsonError(500, "chat_store_failed", "Something went wrong. Please try again.");
+  }
+
+  let runId: string | null = null;
+  try {
+    const run = await startAiItineraryRun({
+      supabase,
+      threadId,
+      mode: parsed.data.mode,
+    });
+    runId = run.ai_itinerary_run_id;
+  } catch (error) {
+    console.error("Failed to start AI run:", error);
+  }
+
   const destination = (bootstrap.data as any)?.destination ?? null;
   const itinerary = (bootstrap.data as any)?.itinerary ?? null;
   const fromDate = isIsoDate(destination?.from_date) ? destination.from_date : null;
@@ -408,16 +588,91 @@ export async function POST(request: NextRequest) {
   }
 
   if (parsed.data.mode === "plan") {
+    const embeddingModel = process.env.OPENAI_EMBEDDING_MODEL ?? "text-embedding-3-small";
+    const userText = parsed.data.message.trim();
+
+    let planStepId: number | null = null;
+    if (runId) {
+      try {
+        const step = await startAiItineraryRunStep({
+          supabase,
+          runId,
+          kind: "plan",
+          input: { itineraryId, destinationId },
+        });
+        planStepId = step.ai_itinerary_run_step_id;
+      } catch {
+        // best-effort telemetry only
+      }
+    }
+
     try {
-      let chatHistory = parsed.data.chatHistory?.slice(-20);
-      const last = chatHistory?.[chatHistory.length - 1];
-      if (last?.role === "user" && last.content.trim() === parsed.data.message.trim()) {
-        chatHistory = chatHistory?.slice(0, -1);
+      let userEmbedding: number[] | null = null;
+      try {
+        userEmbedding = await openaiEmbed({ input: userText, model: embeddingModel });
+      } catch (error) {
+        console.warn("Failed to create embedding (continuing without semantic retrieval):", error);
       }
 
+      let userMessageId: number | null = null;
+      try {
+        userMessageId = await insertAiItineraryMessage({
+          supabase,
+          threadId,
+          role: "user",
+          content: userText,
+          embedding: userEmbedding,
+          embeddingModel,
+        });
+      } catch (error) {
+        console.error("Failed to persist user chat message:", error);
+      }
+
+      const contextStep =
+        runId
+          ? await startAiItineraryRunStep({
+              supabase,
+              runId,
+              kind: "context",
+              input: { userMessageId, hasEmbedding: !!userEmbedding },
+            }).catch(() => null)
+          : null;
+
+      const recentRows = await listAiItineraryMessages({ supabase, threadId, limit: 30 }).catch(() => []);
+      const recentWithoutCurrent = userMessageId
+        ? recentRows.filter((row) => Number(row.ai_itinerary_message_id) !== userMessageId)
+        : recentRows;
+
+      const matched =
+        userEmbedding
+          ? await matchAiItineraryMessages({
+              supabase,
+              threadId,
+              queryEmbedding: userEmbedding,
+              matchCount: 10,
+            }).catch(() => [])
+          : [];
+
+      const matchedWithoutCurrent = userMessageId
+        ? matched.filter((row) => Number(row.ai_itinerary_message_id) !== userMessageId)
+        : matched;
+
+      const { chatHistory, retrievedHistory } = mergeChatContext({
+        recent: recentWithoutCurrent as any,
+        retrieved: matchedWithoutCurrent as any,
+      });
+
+      const draftOperations =
+        Array.isArray((parsed.data as any)?.draftOperations) && (parsed.data as any).draftOperations.length > 0
+          ? ((parsed.data as any).draftOperations as Operation[])
+          : threadDraft;
+
       const plan = await planItineraryEdits({
-        message: parsed.data.message,
+        message: userText,
         chatHistory,
+        retrievedHistory,
+        summary: threadSummary,
+        draftOperations,
         itinerary,
         destination,
         activities: activeActivities,
@@ -456,51 +711,132 @@ export async function POST(request: NextRequest) {
         clarificationCount: clarifications.length,
       });
 
+      let payload: PlanResponsePayload;
+
       if (resolvedOperations.length > MAX_OPERATIONS) {
-        const payload: PlanResponsePayload = {
+        const previewLines = buildPreviewLines(draftOperations, activityById);
+        payload = {
           assistantMessage: `${plan.assistantMessage}\n\nThat request would change ${resolvedOperations.length} items, which exceeds the limit of ${MAX_OPERATIONS} changes per request. Please narrow it down (for example, one day or one activity at a time).`,
-          operations: [],
+          operations: draftOperations,
           previewLines: [
             `Too many changes (${resolvedOperations.length}). Please narrow the request (max ${MAX_OPERATIONS} per request).`,
+            ...(previewLines.length > 0 ? ["Draft unchanged:"] : []),
+            ...previewLines,
           ],
           requiresConfirmation: true,
         };
+      } else {
+        const draftToReturn =
+          resolvedOperations.length > 0 ? resolvedOperations : draftOperations;
 
-        return NextResponse.json({ ok: true, mode: "plan", ...payload });
+        const requiresConfirmation =
+          draftToReturn.some((op) => op.op === "remove_activity") ||
+          draftToReturn.length > CONFIRMATION_BATCH_THRESHOLD ||
+          draftToReturn.some(
+            (op) =>
+              op.op === "update_activity" &&
+              typeof op.date === "string" &&
+              isDateOutsideRange(op.date, fromDate, toDate)
+          ) ||
+          draftToReturn.some(
+            (op) =>
+              op.op === "add_place" &&
+              typeof op.date === "string" &&
+              isDateOutsideRange(op.date, fromDate, toDate)
+          );
+
+        const previewLines = buildPreviewLines(draftToReturn, activityById);
+
+        const messageParts = [plan.assistantMessage];
+        if (dropped > 0) {
+          messageParts.push(`Note: I ignored ${dropped} edit(s) because I couldn't find the referenced activity.`);
+        }
+        if (clarifications.length > 0) {
+          messageParts.push(...clarifications);
+        }
+
+        payload = {
+          assistantMessage: messageParts.join("\n\n"),
+          operations: draftToReturn,
+          previewLines,
+          requiresConfirmation,
+        };
       }
 
-      const requiresConfirmation =
-        resolvedOperations.some((op) => op.op === "remove_activity") ||
-        resolvedOperations.length > CONFIRMATION_BATCH_THRESHOLD ||
-        resolvedOperations.some(
-          (op) =>
-            op.op === "update_activity" &&
-            typeof op.date === "string" &&
-            isDateOutsideRange(op.date, fromDate, toDate)
-        ) ||
-        resolvedOperations.some(
-          (op) =>
-            op.op === "add_place" &&
-            typeof op.date === "string" &&
-            isDateOutsideRange(op.date, fromDate, toDate)
-        );
-
-      const previewLines = buildPreviewLines(resolvedOperations, activityById);
-
-      const messageParts = [plan.assistantMessage];
-      if (dropped > 0) {
-        messageParts.push(`Note: I ignored ${dropped} edit(s) because I couldn't find the referenced activity.`);
-      }
-      if (clarifications.length > 0) {
-        messageParts.push(...clarifications);
+      // Persist the draft only if the model produced a concrete updated plan.
+      if (resolvedOperations.length > 0 && resolvedOperations.length <= MAX_OPERATIONS) {
+        try {
+          await updateAiItineraryThreadDraft({ supabase, threadId, draft: resolvedOperations });
+          threadDraft = resolvedOperations;
+        } catch (error) {
+          console.warn("Failed to persist AI chat draft:", error);
+        }
       }
 
-      const payload: PlanResponsePayload = {
-        assistantMessage: messageParts.join("\n\n"),
-        operations: resolvedOperations,
-        previewLines,
-        requiresConfirmation,
-      };
+      try {
+        const assistantEmbedding = await openaiEmbed({
+          input: payload.assistantMessage,
+          model: embeddingModel,
+        }).catch(() => null);
+
+        await insertAiItineraryMessage({
+          supabase,
+          threadId,
+          role: "assistant",
+          content: payload.assistantMessage,
+          metadata: {
+            mode: "plan",
+            requiresConfirmation: payload.requiresConfirmation,
+            previewLines: payload.previewLines,
+            operationCount: payload.operations.length,
+          },
+          embedding: assistantEmbedding,
+          embeddingModel,
+        });
+      } catch (error) {
+        console.error("Failed to persist assistant chat message:", error);
+      }
+
+      // Best-effort rolling summary (non-blocking).
+      try {
+        const summarySource = [
+          ...chatHistory,
+          { role: "user" as const, content: userText },
+          { role: "assistant" as const, content: payload.assistantMessage },
+        ];
+        const newSummary = await summarizeItineraryChat({
+          previousSummary: threadSummary,
+          messages: summarySource.slice(-20),
+        });
+        threadSummary = newSummary;
+        await updateAiItineraryThreadSummary({ supabase, threadId, summary: newSummary });
+      } catch (error) {
+        console.warn("Failed to update AI chat summary:", error);
+      }
+
+      if (contextStep?.ai_itinerary_run_step_id) {
+        await finishAiItineraryRunStep({
+          supabase,
+          stepId: contextStep.ai_itinerary_run_step_id,
+          status: "succeeded",
+          output: {
+            recentCount: recentWithoutCurrent.length,
+            retrievedCount: matchedWithoutCurrent.length,
+            summaryPresent: !!threadSummary,
+          },
+        });
+      }
+      if (planStepId) {
+        await finishAiItineraryRunStep({
+          supabase,
+          stepId: planStepId,
+          status: "succeeded",
+          output: { resolvedCount: payload.operations.length, requiresConfirmation: payload.requiresConfirmation },
+        });
+      }
+      if (runId) {
+        await finishAiItineraryRun({ supabase, runId, status: "succeeded" });
+      }
 
       return NextResponse.json({ ok: true, mode: "plan", ...payload });
     } catch (error) {
@@ -508,6 +844,19 @@ export async function POST(request: NextRequest) {
       const isMissingApiKey = /OPENAI_API_KEY/i.test(message);
       const code = isMissingApiKey ? "missing_api_key" : "plan_failed";
       const safeMessage = "Something went wrong. Please try again.";
+
+      if (planStepId) {
+        await finishAiItineraryRunStep({
+          supabase,
+          stepId: planStepId,
+          status: "failed",
+          error: { message: safeMessage },
+        });
+      }
+      if (runId) {
+        await finishAiItineraryRun({ supabase, runId, status: "failed", error: { code } });
+      }
+
       return jsonError(500, code, safeMessage);
     }
   }
@@ -531,6 +880,14 @@ export async function POST(request: NextRequest) {
     );
 
   if (applyRequiresConfirmation && parsed.data.confirmed !== true) {
+    if (runId) {
+      await finishAiItineraryRun({
+        supabase,
+        runId,
+        status: "failed",
+        error: { code: "confirmation_required" },
+      });
+    }
     return jsonError(
       409,
       "confirmation_required",
@@ -548,6 +905,16 @@ export async function POST(request: NextRequest) {
 
   const applied: ApplyResponsePayload["applied"] = [];
   let halted = false;
+
+  const executeStep =
+    runId
+      ? await startAiItineraryRunStep({
+          supabase,
+          runId,
+          kind: "execute",
+          input: { operationCount: operations.length },
+        }).catch(() => null)
+      : null;
 
   for (const operation of operations) {
     if (halted) {
@@ -576,6 +943,16 @@ export async function POST(request: NextRequest) {
         }
 
         applied.push({ ok: true, operation });
+
+        if (executeStep?.ai_itinerary_run_step_id) {
+          await insertAiItineraryToolInvocation({
+            supabase,
+            stepId: executeStep.ai_itinerary_run_step_id,
+            toolName: operation.op,
+            status: "succeeded",
+            toolArgs: operation,
+          });
+        }
         continue;
       }
 
@@ -586,6 +963,17 @@ export async function POST(request: NextRequest) {
           error: "Activity not found (or already removed).",
         });
         halted = true;
+
+        if (executeStep?.ai_itinerary_run_step_id) {
+          await insertAiItineraryToolInvocation({
+            supabase,
+            stepId: executeStep.ai_itinerary_run_step_id,
+            toolName: operation.op,
+            status: "failed",
+            toolArgs: operation,
+            result: { error: "Activity not found (or already removed)." },
+          });
+        }
         continue;
       }
 
@@ -597,6 +985,16 @@ export async function POST(request: NextRequest) {
           throw new Error(result.message || "Failed to remove activity");
         }
         applied.push({ ok: true, operation });
+
+        if (executeStep?.ai_itinerary_run_step_id) {
+          await insertAiItineraryToolInvocation({
+            supabase,
+            stepId: executeStep.ai_itinerary_run_step_id,
+            toolName: operation.op,
+            status: "succeeded",
+            toolArgs: operation,
+          });
+        }
         continue;
       }
 
@@ -653,6 +1051,16 @@ export async function POST(request: NextRequest) {
         }
 
         applied.push({ ok: true, operation });
+
+        if (executeStep?.ai_itinerary_run_step_id) {
+          await insertAiItineraryToolInvocation({
+            supabase,
+            stepId: executeStep.ai_itinerary_run_step_id,
+            toolName: operation.op,
+            status: "succeeded",
+            toolArgs: operation,
+          });
+        }
       }
     } catch (error) {
       applied.push({
@@ -661,6 +1069,17 @@ export async function POST(request: NextRequest) {
         error: error instanceof Error ? error.message : "Operation failed",
       });
       halted = true;
+
+      if (executeStep?.ai_itinerary_run_step_id) {
+        await insertAiItineraryToolInvocation({
+          supabase,
+          stepId: executeStep.ai_itinerary_run_step_id,
+          toolName: operation.op,
+          status: "failed",
+          toolArgs: operation,
+          result: { error: error instanceof Error ? error.message : "Operation failed" },
+        });
+      }
     }
   }
 
@@ -685,6 +1104,48 @@ export async function POST(request: NextRequest) {
     failedCount: applied.length - okCount,
     skippedCount,
   });
+
+  try {
+    const embeddingModel = process.env.OPENAI_EMBEDDING_MODEL ?? "text-embedding-3-small";
+    const assistantEmbedding = await openaiEmbed({ input: payload.assistantMessage, model: embeddingModel }).catch(() => null);
+    await insertAiItineraryMessage({
+      supabase,
+      threadId,
+      role: "assistant",
+      content: payload.assistantMessage,
+      metadata: { mode: "apply", okCount, failedCount: applied.length - okCount },
+      embedding: assistantEmbedding,
+      embeddingModel,
+    });
+  } catch (error) {
+    console.error("Failed to persist assistant apply message:", error);
+  }
+
+  // Clear the saved draft only if everything applied successfully.
+  if (!anyFailed) {
+    try {
+      await updateAiItineraryThreadDraft({ supabase, threadId, draft: null });
+    } catch (error) {
+      console.warn("Failed to clear AI chat draft after apply:", error);
+    }
+  }
+
+  if (executeStep?.ai_itinerary_run_step_id) {
+    await finishAiItineraryRunStep({
+      supabase,
+      stepId: executeStep.ai_itinerary_run_step_id,
+      status: anyFailed ? "failed" : "succeeded",
+      output: { okCount, failedCount: applied.length - okCount, skippedCount },
+    });
+  }
+  if (runId) {
+    await finishAiItineraryRun({
+      supabase,
+      runId,
+      status: anyFailed ? "failed" : "succeeded",
+      error: anyFailed ? { failedCount: applied.length - okCount } : null,
+    });
+  }
 
   return NextResponse.json({ ok: true, mode: "apply", ...payload });
 }

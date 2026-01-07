@@ -13,6 +13,17 @@ type OpenAIChatCompletionResponse = {
   };
 };
 
+type OpenAIEmbeddingResponse = {
+  data?: Array<{
+    embedding?: number[];
+  }>;
+  error?: {
+    message?: string;
+    type?: string;
+    code?: string;
+  };
+};
+
 const OpenAIChatCompletionResponseSchema = z.object({
   choices: z
     .array(
@@ -20,6 +31,16 @@ const OpenAIChatCompletionResponseSchema = z.object({
         message: z.object({
           content: z.string().nullable().optional(),
         }),
+      })
+    )
+    .min(1),
+});
+
+const OpenAIEmbeddingResponseSchema = z.object({
+  data: z
+    .array(
+      z.object({
+        embedding: z.array(z.number()),
       })
     )
     .min(1),
@@ -117,3 +138,47 @@ export async function openaiChatJSON<TSchema extends z.ZodTypeAny>(args: {
   }
 }
 
+export async function openaiEmbed(args: { input: string; model?: string }) {
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) {
+    throw new OpenAIError("Missing OPENAI_API_KEY", 500);
+  }
+
+  const baseUrl = process.env.OPENAI_BASE_URL ?? "https://api.openai.com/v1";
+  const model = args.model ?? process.env.OPENAI_EMBEDDING_MODEL ?? "text-embedding-3-small";
+  const input = args.input.trim();
+  if (!input) {
+    throw new OpenAIError("Embedding input was empty", 400);
+  }
+
+  const response = await fetch(`${baseUrl}/embeddings`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model,
+      input,
+    }),
+  });
+
+  const data = (await response.json().catch(() => ({}))) as OpenAIEmbeddingResponse;
+
+  if (!response.ok) {
+    const message = data?.error?.message ?? `OpenAI embedding request failed (${response.status})`;
+    throw new OpenAIError(message, response.status);
+  }
+
+  const parsed = OpenAIEmbeddingResponseSchema.safeParse(data);
+  if (!parsed.success) {
+    throw new OpenAIError("OpenAI embedding response missing data", 502);
+  }
+
+  const embedding = parsed.data.data[0]?.embedding ?? null;
+  if (!embedding || embedding.length === 0) {
+    throw new OpenAIError("OpenAI embedding response was empty", 502);
+  }
+
+  return embedding;
+}

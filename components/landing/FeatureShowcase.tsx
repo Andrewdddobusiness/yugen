@@ -104,6 +104,18 @@ const features = [
   }
 ];
 
+const featureImageSrcByKey: Record<string, string> = {
+  "map-search": "/map2.jpg",
+  "smart-recommendations": "/popup-explore-activities.jpg",
+  "area-search": "/map.jpg",
+  "drag-drop": "/popup-itinerary-builder.jpg",
+  "time-management": "/popup-itinerary-builder.jpg",
+  "multiple-views": "/demo-screenshot.png",
+  "pdf-export": "/demo-screenshot.png",
+  "mobile-sync": "/demo-screenshot.png",
+  collaboration: "/popup-share.jpg",
+};
+
 const colorClasses = {
   brand: {
     bg: "bg-brand-300/10",
@@ -136,7 +148,9 @@ export default function FeatureShowcase() {
   const isInView = useInView(sectionRef, { once: true, margin: "-100px" });
 
   const currentFeature = features.find(f => f.id === activeFeature);
+  const activeItem = currentFeature?.items.find((item) => item.image === activeImage) ?? null;
   const colors = colorClasses[currentFeature?.color as keyof typeof colorClasses];
+  const featureImageSrc = featureImageSrcByKey[activeImage] ?? "/demo-screenshot.png";
 
   return (
     <section className="py-24 bg-bg-50" ref={sectionRef}>
@@ -285,13 +299,11 @@ export default function FeatureShowcase() {
               {/* Feature Image */}
               <div className="relative aspect-video bg-gradient-to-br from-bg-100 to-bg-0">
                 <Image
-                  src={`/features/${activeImage}.png`}
-                  alt={`${currentFeature.title} Feature`}
+                  src={featureImageSrc}
+                  alt={activeItem?.title ? `${activeItem.title} screenshot` : `${currentFeature.title} screenshot`}
                   fill
                   className="object-cover transition-all duration-500"
-                    onError={() => {
-                      // Fallback to placeholder if image doesn't exist
-                    }}
+                  sizes="(max-width: 1024px) 100vw, 50vw"
                   />
                   
                   {/* Overlay gradient */}

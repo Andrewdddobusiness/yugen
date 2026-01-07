@@ -1,4 +1,4 @@
-import { PlanResultSchema, type PlanResult } from "@/lib/ai/itinerary/schema";
+import { PlanResultSchema, type Operation, type PlanResult } from "@/lib/ai/itinerary/schema";
 import { openaiChatJSON } from "@/lib/ai/itinerary/openai";
 import type { ChatMessage } from "@/lib/ai/itinerary/schema";
 
@@ -93,9 +93,39 @@ const formatActivityLine = (row: ActivitySnapshotRow) => {
   return `- ${id}: ${name} | date: ${date} | time: ${time || "none"} | types: ${types || "n/a"} | address: ${address}`;
 };
 
+const formatDraftOperationLine = (operation: Operation, index: number) => {
+  const number = index + 1;
+
+  if (operation.op === "add_place") {
+    const nameOrQuery = operation.name || operation.query || operation.placeId;
+    const date = operation.date === undefined ? "unspecified" : operation.date ?? "unscheduled";
+    const start = operation.startTime ? String(operation.startTime).slice(0, 5) : "";
+    const end = operation.endTime ? String(operation.endTime).slice(0, 5) : "";
+    const time = start && end ? `${start}-${end}` : start || end ? `${start}${end ? `-${end}` : ""}` : "none";
+    const notes = typeof operation.notes === "string" && operation.notes.trim() ? ` | notes: ${operation.notes.trim()}` : "";
+    return `- #${number} add_place: ${nameOrQuery} | placeId: ${operation.placeId} | date: ${date} | time: ${time}${notes}`;
+  }
+
+  if (operation.op === "remove_activity") {
+    return `- #${number} remove_activity: itineraryActivityId=${operation.itineraryActivityId}`;
+  }
+
+  const date = operation.date === undefined ? "unchanged" : operation.date ?? "unscheduled";
+  const touchesTime = operation.startTime !== undefined || operation.endTime !== undefined;
+  const time = touchesTime
+    ? `${operation.startTime == null ? "null" : String(operation.startTime).slice(0, 5)}-${operation.endTime == null ? "null" : String(operation.endTime).slice(0, 5)}`
+    : "unchanged";
+  const notes =
+    operation.notes === undefined ? "unchanged" : operation.notes === null ? "cleared" : `set`;
+  return `- #${number} update_activity: itineraryActivityId=${operation.itineraryActivityId} | date: ${date} | time: ${time} | notes: ${notes}`;
+};
+
 export async function planItineraryEdits(args: {
   message: string;
   chatHistory?: ChatMessage[];
+  retrievedHistory?: ChatMessage[];
+  summary?: string | null;
+  draftOperations?: Operation[];
   itinerary?: ItinerarySnapshot | null;
   destination: DestinationSnapshot | null;
   activities: ActivitySnapshotRow[];
@@ -145,33 +175,54 @@ export async function planItineraryEdits(args: {
     "",
     "Your task:",
     "- Read the user's request.",
-    "- Propose a list of operations to modify existing itinerary activities.",
+    "- If there is an existing draft plan, iteratively amend it (do not throw it away unless the user explicitly asks to start over).",
+    "- Propose a list of operations to modify existing itinerary activities (and/or draft additions).",
     "",
     "Rules:",
     "- Only use these operations:",
     '  1) {"op":"update_activity","itineraryActivityId":"<id>","date"?: "YYYY-MM-DD"|null,"startTime"?: "HH:MM"|null,"endTime"?: "HH:MM"|null,"notes"?: string|null}',
     '  2) {"op":"remove_activity","itineraryActivityId":"<id>"}',
-    '  3) {"op":"add_place","query":"<place name or google maps link>","date"?: "YYYY-MM-DD"|null,"startTime"?: "HH:MM"|null,"endTime"?: "HH:MM"|null,"notes"?: string|null}',
+    '  3) {"op":"add_place","query"?: "<place name or google maps link>","placeId"?: "<google place id>","name"?: string,"date"?: "YYYY-MM-DD"|null,"startTime"?: "HH:MM"|null,"endTime"?: "HH:MM"|null,"notes"?: string|null}',
     "- The id MUST be one of the itineraryActivityId values in the provided activities list.",
-    "- Use 24-hour time (HH:MM).",
+    "- Use 24-hour time (HH:MM) in operations.",
     "- Use dates as YYYY-MM-DD.",
     "- If you change time, ALWAYS provide both startTime and endTime (or set both to null to clear).",
     "- If you set date to null (unschedule), ALSO set startTime and endTime to null.",
     "- If you set startTime and endTime as strings, startTime MUST be before endTime.",
-    "- For add_place: query MUST be a specific place name or a Google Maps link. If the user asks you to recommend/suggest a place, pick ONE specific real place name for the query.",
+    "- For add_place: provide either query or placeId. If the user asks you to recommend/suggest a place, pick ONE specific real place name for query.",
+    "- If a draft add_place already has a placeId, keep that placeId stable unless the user asks to change the place.",
     "- If key info is missing (e.g., user says 'at 7' but no duration/end time), ask a clarifying question and return operations: [].",
     "- If the user request is ambiguous (multiple activities could match), ask a clarifying question and return operations: [].",
     "- NEVER return more than 25 operations. If the request affects many items, ask the user to narrow it down and return operations: [].",
+    "- In assistantMessage, use friendly 12-hour times with AM/PM when referencing times (e.g., 7:00 PM).",
+    "- If a draft plan exists, your operations output MUST represent the full updated draft (include unchanged draft operations unless you are intentionally removing them).",
     "",
     "Return JSON with this shape:",
     '{ "assistantMessage": string, "operations": Operation[] }',
   ].join("\n");
 
   const user = [
+    ...(args.summary
+      ? ["Conversation summary:", args.summary.trim(), ""]
+      : []),
+    ...(args.retrievedHistory && args.retrievedHistory.length > 0
+      ? [
+          "Relevant past messages:",
+          ...args.retrievedHistory.slice(-8).map((m) => `- ${m.role}: ${m.content}`),
+          "",
+        ]
+      : []),
     ...(args.chatHistory && args.chatHistory.length > 0
       ? [
           "Conversation so far (most recent last):",
           ...args.chatHistory.slice(-12).map((m) => `- ${m.role}: ${m.content}`),
+          "",
+        ]
+      : []),
+    ...(args.draftOperations && args.draftOperations.length > 0
+      ? [
+          "Current draft changes (not yet applied). The user may refer to items by number (#1, #2, ...):",
+          ...args.draftOperations.slice(0, 25).map(formatDraftOperationLine),
           "",
         ]
       : []),

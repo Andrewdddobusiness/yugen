@@ -50,6 +50,13 @@ type ApplyResponse = {
   bootstrap?: any;
 };
 
+type HistoryResponse = {
+  ok: true;
+  messages: ChatMessage[];
+  summary?: string | null;
+  draftOperations?: Operation[] | null;
+};
+
 type ErrorResponse = {
   ok: false;
   error?: { message?: string; code?: string };
@@ -60,21 +67,99 @@ type ChatMessage = {
   content: string;
 };
 
-const toChatHistoryPayload = (messages: ChatMessage[]) => {
-  const cleaned = messages
-    .map((m) => ({ role: m.role, content: m.content.trim() }))
-    .filter((m) => m.content.length > 0);
-
-  return cleaned.slice(-20);
-};
-
 const examples = [
-  "Move McDonald's to Tuesday at 19:00–20:00 and add note “quick dinner”.",
-  "Add Roscioli to Tuesday at 12:30–13:30.",
+  "Move McDonald's to Tuesday at 7:00–8:00 PM and add note “quick dinner”.",
+  "Add Roscioli to Tuesday at 12:30–1:30 PM.",
   "Unschedule everything on Friday.",
   "Clear the notes for the bakery on Monday.",
   "Remove the sandwich shop from the itinerary.",
 ];
+
+const formatTime12h = (value: string | null | undefined) => {
+  if (!value) return null;
+  const match = value.trim().match(/^(\d{2}):(\d{2})/);
+  if (!match) return value;
+
+  const hour24 = Number(match[1]);
+  const minute = match[2];
+  if (!Number.isFinite(hour24)) return value;
+
+  const period = hour24 >= 12 ? "PM" : "AM";
+  const hour12 = hour24 % 12 === 0 ? 12 : hour24 % 12;
+  return `${hour12}:${minute} ${period}`;
+};
+
+const formatTimeRange12h = (start: string | null | undefined, end: string | null | undefined) => {
+  const startLabel = formatTime12h(start);
+  const endLabel = formatTime12h(end);
+  if (!startLabel && !endLabel) return null;
+  if (startLabel && endLabel) return `${startLabel}–${endLabel}`;
+  return startLabel ?? endLabel;
+};
+
+const parseTimeToMinutes = (value: string | null | undefined) => {
+  if (!value) return null;
+  const match = value.trim().match(/^(\d{1,2}):(\d{2})/);
+  if (!match) return null;
+
+  const hour = Number(match[1]);
+  const minute = Number(match[2]);
+  if (!Number.isFinite(hour) || !Number.isFinite(minute)) return null;
+  if (hour < 0 || hour > 23) return null;
+  if (minute < 0 || minute > 59) return null;
+
+  return hour * 60 + minute;
+};
+
+const getOperationEffectiveDateKey = (op: Operation, activityById: Map<string, any>) => {
+  if (op.op === "add_place") {
+    if (op.date === undefined) return "unscheduled";
+    return op.date ?? "unscheduled";
+  }
+
+  const before = activityById.get(op.itineraryActivityId);
+  const beforeDate = typeof before?.date === "string" ? before.date : null;
+
+  if (op.op === "update_activity") {
+    if (op.date === undefined) return beforeDate ?? "unscheduled";
+    return op.date ?? "unscheduled";
+  }
+
+  return beforeDate ?? "unscheduled";
+};
+
+const getOperationEffectiveStartMinutes = (op: Operation, activityById: Map<string, any>) => {
+  if (op.op === "add_place") {
+    return parseTimeToMinutes(op.startTime) ?? parseTimeToMinutes(op.endTime);
+  }
+
+  const before = activityById.get(op.itineraryActivityId);
+  const beforeStart = typeof before?.start_time === "string" ? before.start_time : null;
+  const beforeEnd = typeof before?.end_time === "string" ? before.end_time : null;
+
+  if (op.op === "remove_activity") {
+    return parseTimeToMinutes(beforeStart) ?? parseTimeToMinutes(beforeEnd);
+  }
+
+  const effectiveStart = op.startTime !== undefined ? op.startTime : beforeStart;
+  const effectiveEnd = op.endTime !== undefined ? op.endTime : beforeEnd;
+  return parseTimeToMinutes(effectiveStart) ?? parseTimeToMinutes(effectiveEnd);
+};
+
+const formatDateLabel = (isoDate: string) => {
+  try {
+    const date = new Date(`${isoDate}T00:00:00Z`);
+    return new Intl.DateTimeFormat("en-US", {
+      weekday: "short",
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+      timeZone: "UTC",
+    }).format(date);
+  } catch {
+    return isoDate;
+  }
+};
 
 function ItineraryAssistantChat(props: {
   itineraryId: string;
@@ -86,85 +171,87 @@ function ItineraryAssistantChat(props: {
   const { itineraryId, destinationId, className, isVisible, onClose } = props;
   const queryClient = useQueryClient();
   const setItineraryActivities = useItineraryActivityStore((s) => s.setItineraryActivities);
+  const itineraryActivities = useItineraryActivityStore((s) => s.itineraryActivities);
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
-  const [pendingPlan, setPendingPlan] = useState<PlanResponse | null>(null);
+  const [draftPlan, setDraftPlan] = useState<{ operations: Operation[]; requiresConfirmation: boolean } | null>(null);
   const [planning, setPlanning] = useState(false);
   const [applying, setApplying] = useState(false);
+  const [dismissing, setDismissing] = useState(false);
+  const [historyLoading, setHistoryLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const scrollRef = useRef<HTMLDivElement | null>(null);
-  const storageKey = useMemo(
-    () => `ai_itinerary_chat:${itineraryId}:${destinationId}`,
-    [destinationId, itineraryId]
-  );
-  const hasLoadedFromStorageRef = useRef(false);
+  const historyKey = useMemo(() => `${itineraryId}:${destinationId}`, [destinationId, itineraryId]);
+  const lastLoadedHistoryKeyRef = useRef<string | null>(null);
 
-  const hasPendingOps = (pendingPlan?.operations?.length ?? 0) > 0;
+  const hasPendingOps = (draftPlan?.operations?.length ?? 0) > 0;
 
   const canSubmit = useMemo(() => {
-    if (planning || applying) return false;
+    if (planning || applying || dismissing) return false;
     return input.trim().length > 0;
-  }, [applying, input, planning]);
+  }, [applying, dismissing, input, planning]);
+
+  useEffect(() => {
+    setMessages([]);
+    setDraftPlan(null);
+    setError(null);
+    setInput("");
+    lastLoadedHistoryKeyRef.current = null;
+  }, [historyKey]);
 
   useEffect(() => {
     if (!isVisible) return;
     setTimeout(() => {
       scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
     }, 0);
-  }, [isVisible, messages, pendingPlan, planning, applying]);
+  }, [isVisible, messages, draftPlan, planning, applying]);
 
   useEffect(() => {
-    hasLoadedFromStorageRef.current = false;
-    try {
-      const raw = localStorage.getItem(storageKey);
-      if (!raw) {
-        hasLoadedFromStorageRef.current = true;
-        return;
-      }
+    if (!isVisible) return;
+    if (!itineraryId || !destinationId) return;
+    if (lastLoadedHistoryKeyRef.current === historyKey) return;
 
-      const parsed = JSON.parse(raw) as unknown;
-      if (!Array.isArray(parsed)) {
-        hasLoadedFromStorageRef.current = true;
-        return;
-      }
+    lastLoadedHistoryKeyRef.current = historyKey;
+    setHistoryLoading(true);
+    setError(null);
 
-      const restored = parsed
-        .filter(
-          (value): value is ChatMessage =>
-            !!value &&
-            typeof (value as any).content === "string" &&
-            ((value as any).role === "user" || (value as any).role === "assistant")
-        )
-        .map((value) => ({ role: value.role, content: value.content }))
-        .slice(-50);
+    fetch(`/api/ai/itinerary?itineraryId=${encodeURIComponent(itineraryId)}&destinationId=${encodeURIComponent(destinationId)}`)
+      .then((res) => res.json())
+      .then((data) => {
+        const payload = data as HistoryResponse;
+        if (!payload || payload.ok !== true) return;
+        if (!data || data.ok !== true || !Array.isArray(data.messages)) return;
+        const restored = payload.messages
+          .filter(
+            (value: any): value is ChatMessage =>
+              !!value && typeof value.content === "string" && (value.role === "user" || value.role === "assistant")
+          )
+          .map((value: ChatMessage) => ({ role: value.role, content: value.content }))
+          .slice(-50);
+        setMessages(restored);
 
-      if (restored.length > 0) setMessages(restored);
-    } catch {
-      // ignore local storage errors
-    } finally {
-      hasLoadedFromStorageRef.current = true;
-    }
-  }, [storageKey]);
-
-  useEffect(() => {
-    if (!hasLoadedFromStorageRef.current) return;
-    try {
-      localStorage.setItem(storageKey, JSON.stringify(messages.slice(-50)));
-    } catch {
-      // ignore local storage errors
-    }
-  }, [messages, storageKey]);
+        const draftOps = Array.isArray(payload.draftOperations) ? payload.draftOperations : [];
+        if (draftOps.length > 0) {
+          const requiresConfirmation =
+            draftOps.some((op) => op.op === "remove_activity") || draftOps.length > 10;
+          setDraftPlan({ operations: draftOps, requiresConfirmation });
+        }
+      })
+      .catch(() => {
+        // ignore history load errors
+      })
+      .finally(() => setHistoryLoading(false));
+  }, [destinationId, historyKey, isVisible, itineraryId]);
 
   const pushMessage = (message: ChatMessage) => {
     setMessages((prev) => [...prev, message]);
   };
 
-  const requestPlan = async (text: string, chatHistory: ChatMessage[]) => {
+  const requestPlan = async (text: string) => {
     setPlanning(true);
     setError(null);
-    setPendingPlan(null);
 
     try {
       const res = await fetch("/api/ai/itinerary", {
@@ -175,7 +262,7 @@ function ItineraryAssistantChat(props: {
           itineraryId,
           destinationId,
           message: text,
-          chatHistory: toChatHistoryPayload(chatHistory),
+          draftOperations: sortedDraftOperations.length > 0 ? sortedDraftOperations : undefined,
         }),
       });
 
@@ -186,7 +273,11 @@ function ItineraryAssistantChat(props: {
       }
 
       pushMessage({ role: "assistant", content: data.assistantMessage });
-      setPendingPlan(data);
+      if (Array.isArray(data.operations) && data.operations.length > 0) {
+        setDraftPlan({ operations: data.operations, requiresConfirmation: data.requiresConfirmation });
+      } else {
+        setDraftPlan(null);
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to plan changes.");
     } finally {
@@ -195,7 +286,7 @@ function ItineraryAssistantChat(props: {
   };
 
   const applyPlan = async () => {
-    if (!pendingPlan || pendingPlan.operations.length === 0) return;
+    if (!draftPlan || draftPlan.operations.length === 0) return;
     setApplying(true);
     setError(null);
 
@@ -208,7 +299,7 @@ function ItineraryAssistantChat(props: {
           itineraryId,
           destinationId,
           confirmed: true,
-          operations: pendingPlan.operations,
+          operations: sortedDraftOperations,
         }),
       });
 
@@ -244,11 +335,30 @@ function ItineraryAssistantChat(props: {
       }
 
       await queryClient.invalidateQueries({ queryKey: ["builderBootstrap", itineraryId, destinationId] });
-      setPendingPlan(null);
+      if (failures.length === 0) {
+        setDraftPlan(null);
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to apply changes.");
     } finally {
       setApplying(false);
+    }
+  };
+
+  const dismissDraft = async () => {
+    setDismissing(true);
+    setError(null);
+
+    try {
+      await fetch(
+        `/api/ai/itinerary?itineraryId=${encodeURIComponent(itineraryId)}&destinationId=${encodeURIComponent(destinationId)}`,
+        { method: "DELETE" }
+      );
+      setDraftPlan(null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to dismiss draft changes.");
+    } finally {
+      setDismissing(false);
     }
   };
 
@@ -259,8 +369,142 @@ function ItineraryAssistantChat(props: {
     const nextHistory = [...messages, { role: "user", content: text } satisfies ChatMessage];
     setMessages(nextHistory);
     setInput("");
-    await requestPlan(text, nextHistory);
+    await requestPlan(text);
   };
+
+  const activityById = useMemo(() => {
+    const map = new Map<string, any>();
+    for (const row of itineraryActivities) {
+      const id = String((row as any)?.itinerary_activity_id ?? "");
+      if (!id) continue;
+      map.set(id, row);
+    }
+    return map;
+  }, [itineraryActivities]);
+
+  const sortedDraftOperations = useMemo(() => {
+    const ops = draftPlan?.operations ?? [];
+    if (ops.length <= 1) return ops;
+
+    return ops
+      .map((operation, idx) => ({
+        operation,
+        idx,
+        dateKey: getOperationEffectiveDateKey(operation, activityById),
+        startMinutes: getOperationEffectiveStartMinutes(operation, activityById),
+      }))
+      .sort((a, b) => {
+        if (a.dateKey === "unscheduled" && b.dateKey !== "unscheduled") return 1;
+        if (b.dateKey === "unscheduled" && a.dateKey !== "unscheduled") return -1;
+
+        const dateCmp = a.dateKey.localeCompare(b.dateKey);
+        if (dateCmp !== 0) return dateCmp;
+
+        if (a.startMinutes === null && b.startMinutes !== null) return 1;
+        if (b.startMinutes === null && a.startMinutes !== null) return -1;
+        if (a.startMinutes !== null && b.startMinutes !== null && a.startMinutes !== b.startMinutes) {
+          return a.startMinutes - b.startMinutes;
+        }
+
+        return a.idx - b.idx;
+      })
+      .map((entry) => entry.operation);
+  }, [activityById, draftPlan?.operations]);
+
+  const draftGroups = useMemo(() => {
+    const ops = sortedDraftOperations ?? [];
+    if (ops.length === 0) return [];
+
+    type ChangeRow = {
+      number: number;
+      kind: "add" | "update" | "remove";
+      title: string;
+      timeLabel: string | null;
+      details: Array<{ label: string; before?: string; after?: string }>;
+      operation: Operation;
+    };
+
+    const rows: Array<{ dateKey: string; row: ChangeRow }> = ops.map((op, idx) => {
+      const number = idx + 1;
+      const dateKey = getOperationEffectiveDateKey(op, activityById);
+
+      if (op.op === "add_place") {
+        const title = op.name ?? op.query ?? op.placeId;
+        const timeLabel = formatTimeRange12h(op.startTime ?? null, op.endTime ?? null);
+        const details: ChangeRow["details"] = [];
+        if (op.notes) details.push({ label: "Notes", after: op.notes });
+        return {
+          dateKey,
+          row: { number, kind: "add", title, timeLabel, details, operation: op },
+        };
+      }
+
+      const before = activityById.get(op.itineraryActivityId);
+      const name = String(before?.activity?.name ?? `Activity ${op.itineraryActivityId}`);
+
+      if (op.op === "remove_activity") {
+        const timeLabel = formatTimeRange12h(before?.start_time ?? null, before?.end_time ?? null);
+        return {
+          dateKey,
+          row: { number, kind: "remove", title: name, timeLabel, details: [], operation: op },
+        };
+      }
+
+      const details: ChangeRow["details"] = [];
+      const beforeDate = typeof before?.date === "string" ? before.date : null;
+      if (op.date !== undefined) {
+        details.push({
+          label: "Date",
+          before: beforeDate ? formatDateLabel(beforeDate) : "Unscheduled",
+          after: op.date ? formatDateLabel(op.date) : "Unscheduled",
+        });
+      }
+
+      const timeTouched = op.startTime !== undefined || op.endTime !== undefined;
+      const beforeTime = formatTimeRange12h(before?.start_time ?? null, before?.end_time ?? null);
+      const afterTime = timeTouched ? formatTimeRange12h(op.startTime ?? null, op.endTime ?? null) : beforeTime;
+      if (timeTouched) {
+        details.push({
+          label: "Time",
+          before: beforeTime ?? "None",
+          after: afterTime ?? "None",
+        });
+      }
+
+      if (op.notes !== undefined) {
+        const beforeNotes = typeof before?.notes === "string" ? before.notes : null;
+        details.push({
+          label: "Notes",
+          before: beforeNotes && beforeNotes.trim() ? beforeNotes : "None",
+          after: op.notes && op.notes.trim() ? op.notes : "None",
+        });
+      }
+
+      return {
+        dateKey,
+        row: { number, kind: "update", title: name, timeLabel: afterTime, details, operation: op },
+      };
+    });
+
+    const groups = new Map<string, ChangeRow[]>();
+    for (const entry of rows) {
+      const list = groups.get(entry.dateKey) ?? [];
+      list.push(entry.row);
+      groups.set(entry.dateKey, list);
+    }
+
+    const sortedKeys = Array.from(groups.keys()).sort((a, b) => {
+      if (a === "unscheduled") return 1;
+      if (b === "unscheduled") return -1;
+      return a.localeCompare(b);
+    });
+
+    return sortedKeys.map((dateKey) => ({
+      dateKey,
+      label: dateKey === "unscheduled" ? "Unscheduled" : formatDateLabel(dateKey),
+      rows: groups.get(dateKey) ?? [],
+    }));
+  }, [activityById, draftPlan?.operations]);
 
   return (
     <div className={cn("h-full flex flex-col", className)}>
@@ -278,6 +522,12 @@ function ItineraryAssistantChat(props: {
       </div>
 
       <div ref={scrollRef} className="flex-1 min-h-0 overflow-auto px-5 py-4 space-y-3 bg-bg-50">
+        {historyLoading && messages.length === 0 ? (
+          <div className="max-w-[92%] rounded-2xl px-3 py-2 text-sm leading-relaxed bg-bg-0 border border-stroke-200">
+            <span className="text-shimmer">Loading chat…</span>
+          </div>
+        ) : null}
+
         {messages.length === 0 ? (
           <div className="space-y-3">
             <div className="text-sm text-ink-700">
@@ -320,24 +570,86 @@ function ItineraryAssistantChat(props: {
           </div>
         ) : null}
 
-        {pendingPlan && pendingPlan.previewLines.length > 0 ? (
+        {draftPlan && draftPlan.operations.length > 0 ? (
           <div className="rounded-2xl border border-stroke-200 bg-bg-0 p-3">
             <div className="flex items-center justify-between">
-              <div className="text-sm font-semibold text-ink-900">Proposed changes</div>
-              {pendingPlan.requiresConfirmation ? (
+              <div className="text-sm font-semibold text-ink-900">Draft changes</div>
+              {draftPlan.requiresConfirmation ? (
                 <span className="text-[11px] font-semibold text-coral-600 bg-coral-500/10 rounded-full px-2 py-0.5">
                   Confirm
                 </span>
               ) : null}
-            </div>
-            <ul className="mt-2 space-y-1 text-sm text-ink-700">
-              {pendingPlan.previewLines.map((line, i) => (
-                <li key={`${line}-${i}`} className="flex gap-2">
-                  <span className="mt-[7px] h-1.5 w-1.5 rounded-full bg-ink-400 shrink-0" />
-                  <span>{line}</span>
-                </li>
+	            </div>
+	
+	            <div className="mt-3 space-y-4">
+	              {draftGroups.map((group) => (
+	                <div key={group.dateKey} className="rounded-xl border border-stroke-200/70 bg-bg-50 p-3">
+                  <div className="flex items-center justify-between">
+                    <div className="text-xs font-semibold text-ink-900">{group.label}</div>
+                    <div className="text-[11px] text-ink-500">{group.rows.length} change(s)</div>
+                  </div>
+
+                  <div className="mt-2 space-y-2">
+                    {group.rows.map((row) => {
+                      const badge =
+                        row.kind === "add"
+                          ? { label: "Add", cls: "bg-teal-500/10 text-teal-700 border-teal-500/20", bar: "bg-teal-500" }
+                          : row.kind === "remove"
+                          ? { label: "Remove", cls: "bg-coral-500/10 text-coral-700 border-coral-500/20", bar: "bg-coral-500" }
+                          : { label: "Update", cls: "bg-brand-500/10 text-brand-700 border-brand-500/20", bar: "bg-brand-500" };
+
+                      return (
+                        <div
+                          key={`${row.kind}-${row.number}`}
+                          className="flex gap-3 rounded-xl bg-bg-0 border border-stroke-200/70 p-3"
+                        >
+                          <div className={cn("w-1 rounded-full shrink-0", badge.bar)} />
+
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-2">
+                                  <span className={cn("text-[11px] font-semibold border rounded-full px-2 py-0.5", badge.cls)}>
+                                    {badge.label}
+                                  </span>
+                                  <span className="text-[11px] text-ink-500">#{row.number}</span>
+                                </div>
+                                <div className="mt-1 text-sm font-semibold text-ink-900 truncate">
+                                  {row.title}
+                                </div>
+                              </div>
+
+                              {row.timeLabel ? (
+                                <div className="text-xs text-ink-600 whitespace-nowrap">{row.timeLabel}</div>
+                              ) : null}
+                            </div>
+
+                            {row.details.length > 0 ? (
+                              <div className="mt-2 space-y-1 text-xs text-ink-600">
+                                {row.details.map((detail, idx) => (
+                                  <div key={`${detail.label}-${idx}`} className="flex flex-wrap gap-x-2 gap-y-1">
+                                    <span className="font-semibold text-ink-700">{detail.label}:</span>
+                                    {detail.before !== undefined ? (
+                                      <span className="text-ink-500">{detail.before}</span>
+                                    ) : null}
+                                    {detail.before !== undefined && detail.after !== undefined ? (
+                                      <span className="text-ink-400">→</span>
+                                    ) : null}
+                                    {detail.after !== undefined ? (
+                                      <span className="text-ink-700">{detail.after}</span>
+                                    ) : null}
+                                  </div>
+                                ))}
+                              </div>
+                            ) : null}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
               ))}
-            </ul>
+            </div>
 
             {hasPendingOps ? (
               <div className="mt-3 flex items-center justify-end gap-2">
@@ -346,10 +658,10 @@ function ItineraryAssistantChat(props: {
                   variant="ghost"
                   size="sm"
                   className="h-9 rounded-xl"
-                  onClick={() => setPendingPlan(null)}
-                  disabled={applying}
+                  onClick={dismissDraft}
+                  disabled={applying || dismissing}
                 >
-                  Dismiss
+                  {dismissing ? "Dismissing…" : "Dismiss"}
                 </Button>
                 <Button
                   type="button"
@@ -364,7 +676,7 @@ function ItineraryAssistantChat(props: {
                       Applying
                     </>
                   ) : (
-                    (pendingPlan.requiresConfirmation ? "Confirm & Apply" : "Apply")
+                    (draftPlan.requiresConfirmation ? "Confirm & Apply" : "Apply")
                   )}
                 </Button>
               </div>
