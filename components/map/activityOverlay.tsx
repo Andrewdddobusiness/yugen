@@ -20,6 +20,7 @@ import { formatOpenHours } from "@/utils/formatting/datetime";
 import { useItineraryActivityStore } from "@/store/itineraryActivityStore";
 import { IActivityWithLocation, useActivitiesStore } from "@/store/activityStore";
 import { useMapStore } from "@/store/mapStore";
+import { fetchPlaceDetails } from "@/actions/google/actions";
 
 interface ActivityOverlayProps {
   onClose: () => void;
@@ -32,40 +33,90 @@ const getDayName = (dayNumber: number) => {
 
 export function ActivityOverlay({ onClose }: ActivityOverlayProps) {
   let { itineraryId, destinationId } = useParams();
-  const { selectedActivity } = useActivitiesStore();
+  const { selectedActivity, setSelectedActivity } = useActivitiesStore();
   const { insertItineraryActivity, addItineraryActivityInstance, removeItineraryActivity, isActivityAdded } =
     useItineraryActivityStore();
   const [loading, setLoading] = useState<boolean>(false);
+  const [detailsLoading, setDetailsLoading] = useState(false);
 
   const isAdded = isActivityAdded(selectedActivity?.place_id || "");
+  const isBusy = loading || detailsLoading;
+
+  useEffect(() => {
+    if (!selectedActivity?.place_id) return;
+
+    // Some activity sources (e.g. itinerary markers) may only provide partial fields.
+    // Hydrate with full Google place details for the overlay card.
+    const selectedAny = selectedActivity as any;
+    const needsHydration =
+      !Array.isArray(selectedAny.photo_names) ||
+      typeof selectedAny.google_maps_url !== "string" ||
+      typeof selectedAny.website_url !== "string" ||
+      typeof selectedAny.phone_number !== "string" ||
+      typeof selectedAny.description !== "string";
+
+    if (!needsHydration) return;
+
+    const rawPlaceId = String(selectedActivity.place_id);
+    const placeId = rawPlaceId.startsWith("places/") ? rawPlaceId.slice("places/".length) : rawPlaceId;
+
+    let cancelled = false;
+    setDetailsLoading(true);
+
+    fetchPlaceDetails(placeId)
+      .then((details) => {
+        if (cancelled) return;
+        setSelectedActivity(details);
+      })
+      .catch((error) => {
+        console.error("Failed to hydrate place details:", error);
+      })
+      .finally(() => {
+        if (cancelled) return;
+        setDetailsLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedActivity, setSelectedActivity]);
 
   const handleAddToItinerary = async () => {
-    setLoading(true);
     if (!selectedActivity || !itineraryId || !destinationId) return;
-    await insertItineraryActivity(
-      selectedActivity as IActivityWithLocation,
-      itineraryId.toString(),
-      destinationId.toString()
-    );
-    setLoading(false);
+    setLoading(true);
+    try {
+      await insertItineraryActivity(
+        selectedActivity as IActivityWithLocation,
+        itineraryId.toString(),
+        destinationId.toString()
+      );
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleRemoveToItinerary = async () => {
-    setLoading(true);
     if (!selectedActivity || !itineraryId) return;
-    await removeItineraryActivity(selectedActivity.place_id, itineraryId.toString());
-    setLoading(false);
+    setLoading(true);
+    try {
+      await removeItineraryActivity(selectedActivity.place_id, itineraryId.toString());
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleAddAnotherInstance = async () => {
-    setLoading(true);
     if (!selectedActivity || !itineraryId || !destinationId) return;
-    await addItineraryActivityInstance(
-      selectedActivity as IActivityWithLocation,
-      itineraryId.toString(),
-      destinationId.toString()
-    );
-    setLoading(false);
+    setLoading(true);
+    try {
+      await addItineraryActivityInstance(
+        selectedActivity as IActivityWithLocation,
+        itineraryId.toString(),
+        destinationId.toString()
+      );
+    } finally {
+      setLoading(false);
+    }
   };
 
   const renderOpeningHours = () => {
@@ -261,23 +312,23 @@ export function ActivityOverlay({ onClose }: ActivityOverlayProps) {
 
         {/* Footer with action button */}
         <div className="absolute bottom-0 left-0 right-0 p-4 border-t bg-white rounded-b-3xl">
-          {loading ? (
+          {isBusy ? (
             <Button disabled className="w-full rounded-xl bg-[#3F5FA3] text-white shadow-lg hover:bg-[#3F5FA3]/80">
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Please wait
+              {loading ? "Please wait" : "Loading details"}
             </Button>
           ) : isAdded ? (
             <div className="flex gap-2">
               <Button
                 variant="default"
-                className="flex-1 rounded-xl bg-[#3F5FA3] text-white shadow-lg hover:bg-[#3F5FA3]/80"
+                className="flex-1 min-w-0 rounded-xl bg-[#3F5FA3] text-white shadow-lg hover:bg-[#3F5FA3]/80 whitespace-normal leading-tight"
                 onClick={handleAddAnotherInstance}
               >
                 Add another time
               </Button>
               <Button
                 variant="secondary"
-                className="flex-1 rounded-xl text-gray-500"
+                className="flex-1 min-w-0 rounded-xl text-gray-500 whitespace-normal leading-tight"
                 onClick={handleRemoveToItinerary}
               >
                 Remove all

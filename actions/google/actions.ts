@@ -1,12 +1,82 @@
 "use server";
 
-import { IActivity } from "@/store/activityStore";
+import { IActivity, type IOpenHours, type IReview } from "@/store/activityStore";
 import { foodTypes, shoppingTypes, historicalTypes, SearchType, includedTypes } from "@/lib/googleMaps/includedTypes";
 
 const GOOGLE_MAPS_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
 
+const dayOfWeekToNumber = (value: unknown): number | null => {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    if (value >= 0 && value <= 6) return value;
+    if (value >= 1 && value <= 7) return value % 7;
+    return null;
+  }
+
+  if (typeof value !== "string") return null;
+  const normalized = value.trim().toUpperCase();
+  const map: Record<string, number> = {
+    SUNDAY: 0,
+    MONDAY: 1,
+    TUESDAY: 2,
+    WEDNESDAY: 3,
+    THURSDAY: 4,
+    FRIDAY: 5,
+    SATURDAY: 6,
+  };
+  return Object.prototype.hasOwnProperty.call(map, normalized) ? map[normalized]! : null;
+};
+
 // Simple mapping function for Google Places to our activity format
 function mapGooglePlaceToActivity(place: any): IActivity {
+  const reviews: IReview[] = Array.isArray(place?.reviews)
+    ? place.reviews
+        .filter(Boolean)
+        .slice(0, 20)
+        .map((review: any) => {
+          const text =
+            review?.text?.text ??
+            review?.originalText?.text ??
+            review?.text ??
+            "";
+          return {
+            description: String(text ?? ""),
+            rating: Number(review?.rating ?? 0),
+            author: String(review?.authorAttribution?.displayName ?? review?.authorAttribution?.name ?? ""),
+            uri: String(review?.authorAttribution?.uri ?? review?.googleMapsUri ?? ""),
+            publish_date_time: String(review?.publishTime ?? review?.relativePublishTimeDescription ?? ""),
+          } satisfies IReview;
+        })
+    : [];
+
+  const open_hours: IOpenHours[] = Array.isArray(place?.regularOpeningHours?.periods)
+    ? place.regularOpeningHours.periods
+        .filter(Boolean)
+        .map((period: any) => {
+          const open = period?.open ?? null;
+          const close = period?.close ?? null;
+          const day = dayOfWeekToNumber(open?.day ?? close?.day);
+          if (day == null) return null;
+
+          const openHour = Number(open?.hour ?? 0);
+          const openMinute = Number(open?.minute ?? 0);
+          const closeHour = Number(close?.hour ?? 23);
+          const closeMinute = Number(close?.minute ?? 59);
+
+          if (!Number.isFinite(openHour) || !Number.isFinite(openMinute) || !Number.isFinite(closeHour) || !Number.isFinite(closeMinute)) {
+            return null;
+          }
+
+          return {
+            day,
+            open_hour: openHour,
+            open_minute: openMinute,
+            close_hour: closeHour,
+            close_minute: closeMinute,
+          } satisfies IOpenHours;
+        })
+        .filter(Boolean) as IOpenHours[]
+    : [];
+
   return {
     place_id: place.id,
     name: place.displayName?.text || "",
@@ -21,8 +91,8 @@ function mapGooglePlaceToActivity(place: any): IActivity {
     photo_names: place.photos ? place.photos.map((photo: any) => photo.name) : [],
     duration: null,
     phone_number: place.nationalPhoneNumber || "",
-    reviews: [],
-    open_hours: [],
+    reviews,
+    open_hours,
   };
 }
 
@@ -220,7 +290,7 @@ export const fetchPlaceDetails = async (placeId: string): Promise<IActivity> => 
   const response = await fetch(`https://places.googleapis.com/v1/places/${placeId}`, {
     headers: {
       "X-Goog-Api-Key": GOOGLE_MAPS_API_KEY!,
-      "X-Goog-FieldMask": "id,displayName,formattedAddress,location,types,priceLevel,rating,editorialSummary,websiteUri,nationalPhoneNumber,photos",
+      "X-Goog-FieldMask": "id,displayName,formattedAddress,location,types,priceLevel,rating,editorialSummary,websiteUri,nationalPhoneNumber,photos,regularOpeningHours,reviews",
     },
   });
 
