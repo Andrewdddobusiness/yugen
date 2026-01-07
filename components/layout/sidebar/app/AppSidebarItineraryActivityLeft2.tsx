@@ -23,7 +23,7 @@ import {
   SidebarRail,
 } from "@/components/ui/sidebar";
 
-import { NavUser } from "./NavUser";
+import { NavUserIcon } from "./NavUserIcon";
 import { DateRange } from "react-day-picker";
 import { Skeleton } from "@/components/ui/skeleton";
 import { DatePickerWithRangePopover3 } from "@/components/form/date/DateRangePickerPopover3";
@@ -137,7 +137,10 @@ export function AppSidebarItineraryActivityLeft({
   return (
     <Sidebar collapsible="icon" className="overflow-hidden [&>[data-sidebar=sidebar]]:flex-row">
       {/* Icon Sidebar */}
-      <Sidebar collapsible="none" className="!w-[calc(var(--sidebar-width-icon)_+_1px)] border-r">
+      <Sidebar
+        collapsible="none"
+        className="!w-[--sidebar-width-icon] border-r group-data-[collapsible=icon]:border-r-0"
+      >
         <SidebarHeader>
           <SidebarMenu>
             <SidebarMenuItem>
@@ -185,8 +188,8 @@ export function AppSidebarItineraryActivityLeft({
           </SidebarGroup>
         </SidebarContent>
 
-        <SidebarFooter>
-          <NavUser />
+        <SidebarFooter className="pb-6">
+          <NavUserIcon />
         </SidebarFooter>
       </Sidebar>
 
