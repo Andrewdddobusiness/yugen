@@ -1,11 +1,24 @@
 import { z } from "zod";
 
+export type OpenAiUsage = {
+  kind: "chat" | "embedding";
+  model: string;
+  promptTokens: number;
+  completionTokens: number;
+  totalTokens: number;
+};
+
 type OpenAIChatCompletionResponse = {
   choices?: Array<{
     message?: {
       content?: string | null;
     };
   }>;
+  usage?: {
+    prompt_tokens?: number;
+    completion_tokens?: number;
+    total_tokens?: number;
+  };
   error?: {
     message?: string;
     type?: string;
@@ -17,6 +30,10 @@ type OpenAIEmbeddingResponse = {
   data?: Array<{
     embedding?: number[];
   }>;
+  usage?: {
+    prompt_tokens?: number;
+    total_tokens?: number;
+  };
   error?: {
     message?: string;
     type?: string;
@@ -122,7 +139,21 @@ export async function openaiChatJSON<TSchema extends z.ZodTypeAny>(args: {
       throw new OpenAIError(`AI output failed validation: ${validated.error.message}`, 422);
     }
 
-    return validated.data as z.infer<TSchema>;
+    const promptTokens = Number(data?.usage?.prompt_tokens ?? 0) || 0;
+    const completionTokens = Number(data?.usage?.completion_tokens ?? 0) || 0;
+    const totalTokens =
+      Number(data?.usage?.total_tokens ?? 0) || Math.max(0, promptTokens + completionTokens);
+
+    return {
+      data: validated.data as z.infer<TSchema>,
+      usage: {
+        kind: "chat",
+        model,
+        promptTokens: Math.max(0, promptTokens),
+        completionTokens: Math.max(0, completionTokens),
+        totalTokens: Math.max(0, totalTokens),
+      } satisfies OpenAiUsage,
+    };
   };
 
   try {
@@ -180,5 +211,17 @@ export async function openaiEmbed(args: { input: string; model?: string }) {
     throw new OpenAIError("OpenAI embedding response was empty", 502);
   }
 
-  return embedding;
+  const promptTokens = Number(data?.usage?.prompt_tokens ?? data?.usage?.total_tokens ?? 0) || 0;
+  const totalTokens = Number(data?.usage?.total_tokens ?? promptTokens) || promptTokens;
+
+  return {
+    embedding,
+    usage: {
+      kind: "embedding",
+      model,
+      promptTokens: Math.max(0, promptTokens),
+      completionTokens: 0,
+      totalTokens: Math.max(0, totalTokens),
+    } satisfies OpenAiUsage,
+  };
 }

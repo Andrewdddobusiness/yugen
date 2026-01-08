@@ -1,11 +1,9 @@
 "use server";
-import { createClient } from "@/utils/supabase/client";
+import { createAdminClient } from "@/utils/supabase/admin";
 import axios from "axios";
 import { IActivity } from "@/store/activityStore";
 
 const GOOGLE_MAPS_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
-
-const supabase = createClient();
 
 interface TopPlace {
   city: string;
@@ -14,6 +12,8 @@ interface TopPlace {
 }
 
 export async function insertTopPlaces(topPlaces: TopPlace[]) {
+  const supabase = createAdminClient();
+
   for (const place of topPlaces) {
     const { city, country, activityName } = place;
 

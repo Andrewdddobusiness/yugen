@@ -5,15 +5,16 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import ProfileCards from "@/components/settings/ProfileCards";
 import SecurityCards from "@/components/settings/SecurityCards";
 import BillingCards from "@/components/settings/BillingCards";
+import AiUsageCards from "@/components/settings/AiUsageCards";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { CreditCard, Shield, User } from "lucide-react";
+import { CreditCard, Shield, Sparkles, User } from "lucide-react";
 
 export default function Settings() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
-  const allowedTabs = useMemo(() => ["account", "billing", "security"] as const, []);
+  const allowedTabs = useMemo(() => ["account", "billing", "security", "ai"] as const, []);
   type SettingsTab = (typeof allowedTabs)[number];
 
   const tabFromUrl = useMemo(() => {
@@ -46,7 +47,7 @@ export default function Settings() {
       </div>
 
       <Tabs value={tab} onValueChange={handleTabChange} className="w-full">
-        <TabsList className="grid w-full max-w-xl grid-cols-3">
+        <TabsList className="grid w-full max-w-2xl grid-cols-4">
           <TabsTrigger value="account" className="gap-2">
             <User className="h-4 w-4" />
             Account
@@ -59,6 +60,10 @@ export default function Settings() {
             <Shield className="h-4 w-4" />
             Security
           </TabsTrigger>
+          <TabsTrigger value="ai" className="gap-2">
+            <Sparkles className="h-4 w-4" />
+            AI Usage
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="account" className="mt-6">
@@ -69,6 +74,9 @@ export default function Settings() {
         </TabsContent>
         <TabsContent value="security" className="mt-6">
           <SecurityCards />
+        </TabsContent>
+        <TabsContent value="ai" className="mt-6">
+          <AiUsageCards />
         </TabsContent>
       </Tabs>
     </div>

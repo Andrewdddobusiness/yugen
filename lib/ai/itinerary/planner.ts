@@ -1,5 +1,5 @@
 import { PlanResultSchema, type Operation, type PlanResult } from "@/lib/ai/itinerary/schema";
-import { openaiChatJSON } from "@/lib/ai/itinerary/openai";
+import { openaiChatJSON, type OpenAiUsage } from "@/lib/ai/itinerary/openai";
 import type { ChatMessage } from "@/lib/ai/itinerary/schema";
 
 type ActivitySnapshotRow = {
@@ -126,10 +126,11 @@ export async function planItineraryEdits(args: {
   retrievedHistory?: ChatMessage[];
   summary?: string | null;
   draftOperations?: Operation[];
+  maxTokens?: number;
   itinerary?: ItinerarySnapshot | null;
   destination: DestinationSnapshot | null;
   activities: ActivitySnapshotRow[];
-}): Promise<PlanResult> {
+}): Promise<{ data: PlanResult; usage: OpenAiUsage }> {
   const recentUserContext = (args.chatHistory ?? [])
     .filter((m) => m.role === "user")
     .map((m) => m.content)
@@ -250,5 +251,6 @@ export async function planItineraryEdits(args: {
     system,
     user,
     schema: PlanResultSchema,
+    maxTokens: args.maxTokens,
   });
 }

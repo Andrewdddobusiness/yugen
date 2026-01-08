@@ -3,7 +3,7 @@ import "./globals.css";
 import LayoutWrapper from "./layoutWrapper";
 
 export const metadata: Metadata = {
-  title: "Yugi — Soft Navigator for Confident Travel Planning",
+  title: "Yugi - Travel Planner",
   description:
     "Yugi is your calm, glassy travel copilot with wolf-level focus. Discover, organize, and schedule trips with tactile buttons, smart maps, and premium clarity.",
   keywords: [
@@ -28,7 +28,7 @@ export const metadata: Metadata = {
     canonical: "/",
   },
   openGraph: {
-    title: "Yugi — Soft Navigator for Confident Travel Planning",
+    title: "Yugi - Travel Planner",
     description:
       "Yugi blends calm guidance, glassmorphic polish, and tactile controls to make travel planning feel premium and precise.",
     url: "https://yugi.app",
@@ -46,7 +46,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "Yugi — Soft Navigator for Confident Travel Planning",
+    title: "Yugi - Travel Planner",
     description:
       "A glassy, modern travel planner with wolf-inspired focus, tactile buttons, and map-first clarity.",
     images: ["/yugi-og.svg"],
@@ -65,6 +65,10 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   return <LayoutWrapper>{children}</LayoutWrapper>;
 }

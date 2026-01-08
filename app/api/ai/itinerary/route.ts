@@ -6,6 +6,7 @@ import { addPlaceToItinerary } from "@/actions/supabase/activities";
 import { fetchCityCoordinates, fetchPlaceDetails, searchPlacesByText } from "@/actions/google/actions";
 import { planItineraryEdits } from "@/lib/ai/itinerary/planner";
 import { openaiEmbed } from "@/lib/ai/itinerary/openai";
+import { checkAiQuota, recordAiUsage } from "@/lib/ai/usage";
 import { getAiAssistantAccessMode } from "@/lib/featureFlags";
 import { rateLimit, rateLimitHeaders } from "@/lib/security/rateLimit";
 import { getClientIp, isSameOrigin } from "@/lib/security/requestGuards";
@@ -78,19 +79,15 @@ const requireAiAssistantAccess = async (supabase: ReturnType<typeof createClient
     };
   }
 
-  if (mode === "all") {
-    return { ok: true as const };
-  }
-
   const isPro = await isActiveProSubscriber(supabase, userId);
-  if (!isPro) {
+  if (mode === "pro" && !isPro) {
     return {
       ok: false as const,
       response: jsonError(403, "upgrade_required", "Upgrade to Pro to use the AI assistant."),
     };
   }
 
-  return { ok: true as const };
+  return { ok: true as const, tier: (isPro ? "pro" : "free") as "pro" | "free" };
 };
 
 export async function GET(request: NextRequest) {
@@ -621,6 +618,7 @@ export async function POST(request: NextRequest) {
   if (!access.ok) return access.response;
 
   const { itineraryId, destinationId } = parsed.data;
+  const quota = await checkAiQuota({ supabase, userId: auth.user.id, tier: access.tier });
 
   const bootstrap = await fetchBuilderBootstrap(itineraryId, destinationId);
   if (!bootstrap.success) {
@@ -677,6 +675,24 @@ export async function POST(request: NextRequest) {
     const embeddingModel = process.env.OPENAI_EMBEDDING_MODEL ?? "text-embedding-3-small";
     const userText = parsed.data.message.trim();
 
+    if (!quota.allowed) {
+      if (runId) {
+        await finishAiItineraryRun({
+          supabase,
+          runId,
+          status: "failed",
+          error: { code: "quota_exceeded" },
+        });
+      }
+
+      return jsonError(429, "ai_quota_exceeded", "You’ve reached your monthly AI usage limit.", {
+        periodStart: quota.periodStart,
+        periodEnd: quota.periodEnd,
+        limit: quota.limit,
+        used: quota.used,
+      });
+    }
+
     let planStepId: number | null = null;
     if (runId) {
       try {
@@ -695,7 +711,9 @@ export async function POST(request: NextRequest) {
     try {
       let userEmbedding: number[] | null = null;
       try {
-        userEmbedding = await openaiEmbed({ input: userText, model: embeddingModel });
+        const embedded = await openaiEmbed({ input: userText, model: embeddingModel });
+        userEmbedding = embedded.embedding;
+        await recordAiUsage({ userId: auth.user.id, feature: "itinerary_assistant", usage: embedded.usage });
       } catch (error) {
         console.warn("Failed to create embedding (continuing without semantic retrieval):", error);
       }
@@ -753,16 +771,20 @@ export async function POST(request: NextRequest) {
           ? ((parsed.data as any).draftOperations as Operation[])
           : threadDraft;
 
-      const plan = await planItineraryEdits({
+      const planResult = await planItineraryEdits({
         message: userText,
         chatHistory,
         retrievedHistory,
         summary: threadSummary,
         draftOperations,
+        maxTokens: Math.max(1, Math.min(800, quota.remaining)),
         itinerary,
         destination,
         activities: activeActivities,
       });
+
+      await recordAiUsage({ userId: auth.user.id, feature: "itinerary_assistant", usage: planResult.usage });
+      const plan = planResult.data;
 
       const resolvedOperations: Operation[] = [];
       let dropped = 0;
@@ -860,10 +882,14 @@ export async function POST(request: NextRequest) {
       }
 
       try {
-        const assistantEmbedding = await openaiEmbed({
-          input: payload.assistantMessage,
-          model: embeddingModel,
-        }).catch(() => null);
+        let assistantEmbedding: number[] | null = null;
+        try {
+          const embedded = await openaiEmbed({ input: payload.assistantMessage, model: embeddingModel });
+          assistantEmbedding = embedded.embedding;
+          await recordAiUsage({ userId: auth.user.id, feature: "itinerary_assistant", usage: embedded.usage });
+        } catch {
+          assistantEmbedding = null;
+        }
 
         await insertAiItineraryMessage({
           supabase,
@@ -890,12 +916,14 @@ export async function POST(request: NextRequest) {
           { role: "user" as const, content: userText },
           { role: "assistant" as const, content: payload.assistantMessage },
         ];
-        const newSummary = await summarizeItineraryChat({
+        const summaryResult = await summarizeItineraryChat({
           previousSummary: threadSummary,
           messages: summarySource.slice(-20),
         });
-        threadSummary = newSummary;
-        await updateAiItineraryThreadSummary({ supabase, threadId, summary: newSummary });
+        await recordAiUsage({ userId: auth.user.id, feature: "itinerary_assistant", usage: summaryResult.usage });
+
+        threadSummary = summaryResult.summary;
+        await updateAiItineraryThreadSummary({ supabase, threadId, summary: summaryResult.summary });
       } catch (error) {
         console.warn("Failed to update AI chat summary:", error);
       }
@@ -1193,7 +1221,16 @@ export async function POST(request: NextRequest) {
 
   try {
     const embeddingModel = process.env.OPENAI_EMBEDDING_MODEL ?? "text-embedding-3-small";
-    const assistantEmbedding = await openaiEmbed({ input: payload.assistantMessage, model: embeddingModel }).catch(() => null);
+    let assistantEmbedding: number[] | null = null;
+    if (quota.allowed) {
+      try {
+        const embedded = await openaiEmbed({ input: payload.assistantMessage, model: embeddingModel });
+        assistantEmbedding = embedded.embedding;
+        await recordAiUsage({ userId: auth.user.id, feature: "itinerary_assistant", usage: embedded.usage });
+      } catch {
+        assistantEmbedding = null;
+      }
+    }
     await insertAiItineraryMessage({
       supabase,
       threadId,

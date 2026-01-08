@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { openaiChatJSON } from "@/lib/ai/itinerary/openai";
+import { openaiChatJSON, type OpenAiUsage } from "@/lib/ai/itinerary/openai";
 import type { ChatMessage } from "@/lib/ai/itinerary/schema";
 
 const SummarySchema = z.object({
@@ -44,6 +44,8 @@ export async function summarizeItineraryChat(args: {
     maxTokens: 300,
   });
 
-  return result.summary.trim();
+  return {
+    summary: result.data.summary.trim(),
+    usage: result.usage satisfies OpenAiUsage,
+  };
 }
-

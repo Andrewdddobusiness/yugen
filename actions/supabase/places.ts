@@ -1,6 +1,7 @@
 "use server";
 
 import { createClient } from "@/utils/supabase/server";
+import { createAdminClient } from "@/utils/supabase/admin";
 import { 
   createActivitySchema,
   type CreateActivityData
@@ -24,6 +25,11 @@ export async function createPlace(data: CreatePlaceData): Promise<DatabaseRespon
   const supabase = createClient();
 
   try {
+    const { data: auth, error: userError } = await supabase.auth.getUser();
+    if (userError || !auth?.user) {
+      return { success: false, error: { message: "User not authenticated" } };
+    }
+
     // Validate input data
     const validatedData = createActivitySchema.parse(data);
 
@@ -36,7 +42,8 @@ export async function createPlace(data: CreatePlaceData): Promise<DatabaseRespon
       duration: validatedData.duration ? `${validatedData.duration} minutes` : null,
     };
 
-    const { data: place, error } = await supabase
+    const admin = createAdminClient();
+    const { data: place, error } = await admin
       .from("activity")
       .insert(placeData)
       .select()
@@ -122,6 +129,11 @@ export async function updatePlace(id: string, data: UpdatePlaceData): Promise<Da
   const supabase = createClient();
 
   try {
+    const { data: auth, error: userError } = await supabase.auth.getUser();
+    if (userError || !auth?.user) {
+      return { success: false, error: { message: "User not authenticated" } };
+    }
+
     // Convert coordinates if provided
     const updateData = {
       ...data,
@@ -136,7 +148,8 @@ export async function updatePlace(id: string, data: UpdatePlaceData): Promise<Da
       Object.entries(updateData).filter(([_, value]) => value !== undefined)
     );
 
-    const { data: place, error } = await supabase
+    const admin = createAdminClient();
+    const { data: place, error } = await admin
       .from("activity")
       .update(cleanData)
       .eq("place_id", id)

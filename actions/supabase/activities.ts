@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/utils/supabase/server";
+import { createAdminClient } from "@/utils/supabase/admin";
 import { 
   createActivitySchema,
   scheduleActivitySchema,
@@ -267,6 +268,14 @@ export async function createOrUpdateActivity(data: CreateActivityData): Promise<
   const supabase = createClient();
 
   try {
+    const { data: auth, error: userError } = await supabase.auth.getUser();
+    if (userError || !auth?.user) {
+      return {
+        success: false,
+        error: { message: "User not authenticated" },
+      };
+    }
+
     // Validate input data
     const validatedData = createActivitySchema.parse(data);
 
@@ -280,7 +289,8 @@ export async function createOrUpdateActivity(data: CreateActivityData): Promise<
     };
 
     // Use upsert to create or update based on place_id
-    const { data: activity, error } = await supabase
+    const admin = createAdminClient();
+    const { data: activity, error } = await admin
       .from("activity")
       .upsert(activityData, {
         onConflict: "place_id",

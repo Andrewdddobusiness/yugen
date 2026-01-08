@@ -1,5 +1,7 @@
 "use server";
 import { IItineraryCard } from "@/components/card/itinerary/ItineraryCard";
+import { createActivitySchema } from "@/schemas/activitySchema";
+import { createAdminClient } from "@/utils/supabase/admin";
 import { createClient } from "@/utils/supabase/server";
 
 const SAFE_IDENTIFIER = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
@@ -9,6 +11,32 @@ const INSERT_TABLE_ALLOWLIST = new Set(["activity", "itinerary_activity"]);
 const UPSERT_TABLE_ALLOWLIST = new Set(["itinerary_activity", "itinerary_destination"]);
 const SOFT_DELETE_TABLE_ALLOWLIST = new Set(["itinerary_activity"]);
 
+const parsePointString = (value: unknown): { lat: number; lng: number } | undefined => {
+  if (typeof value !== "string") return undefined;
+  const match = value.trim().match(/^\(\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*\)$/);
+  if (!match) return undefined;
+
+  const lat = Number(match[1]);
+  const lng = Number(match[2]);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return undefined;
+
+  return { lat, lng };
+};
+
+const parseDurationMinutes = (value: unknown): number | undefined => {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value !== "string") return undefined;
+
+  const trimmed = value.trim();
+  if (!trimmed) return undefined;
+
+  const match = trimmed.match(/^(\d+(?:\.\d+)?)\s*(?:m|min|mins|minute|minutes)?$/i);
+  if (!match) return undefined;
+
+  const minutes = Number(match[1]);
+  return Number.isFinite(minutes) ? minutes : undefined;
+};
+
 /*
   INSERT
 */
@@ -17,6 +45,77 @@ export async function insertTableData(tableName: string, tableData: any) {
     return { success: false, message: "Invalid table", error: { tableName } };
   }
   const supabase = createClient();
+
+  if (tableName === "activity") {
+    const { data: auth, error: userError } = await supabase.auth.getUser();
+    if (userError || !auth?.user) {
+      return { success: false, message: "Unauthorized" };
+    }
+
+    let validated: ReturnType<typeof createActivitySchema.parse>;
+    try {
+      const point = parsePointString(tableData?.coordinates);
+      const duration = parseDurationMinutes(tableData?.duration);
+      validated = createActivitySchema.parse({
+        place_id: tableData?.place_id,
+        name: tableData?.name,
+        coordinates: point,
+        types: Array.isArray(tableData?.types) ? tableData.types : [],
+        price_level: tableData?.price_level ?? undefined,
+        address: tableData?.address ?? undefined,
+        rating: tableData?.rating ?? undefined,
+        description: tableData?.description ?? undefined,
+        google_maps_url: tableData?.google_maps_url ?? undefined,
+        website_url: tableData?.website_url ?? undefined,
+        photo_names: Array.isArray(tableData?.photo_names) ? tableData.photo_names : [],
+        duration: duration ?? undefined,
+        phone_number: tableData?.phone_number ?? undefined,
+      });
+    } catch (error) {
+      console.error("Invalid activity payload:", error);
+      return { success: false, message: "Invalid activity data" };
+    }
+
+    const payload = {
+      place_id: validated.place_id,
+      name: validated.name,
+      types: validated.types,
+      price_level: validated.price_level ?? null,
+      address: validated.address ?? null,
+      rating: validated.rating ?? null,
+      description: validated.description ?? null,
+      google_maps_url: validated.google_maps_url ?? null,
+      website_url: validated.website_url ?? null,
+      photo_names: validated.photo_names,
+      duration: typeof validated.duration === "number" ? `${validated.duration} minutes` : null,
+      phone_number: validated.phone_number ?? null,
+      coordinates: validated.coordinates ? `(${validated.coordinates.lat},${validated.coordinates.lng})` : null,
+    };
+
+    try {
+      const admin = createAdminClient();
+      const { error: upsertError } = await admin.from("activity").upsert(payload, {
+        onConflict: "place_id",
+        ignoreDuplicates: true,
+      });
+
+      if (upsertError) {
+        console.error("Failed to insert activity:", upsertError);
+        return { success: false, message: "Insert failed" };
+      }
+    } catch (error) {
+      console.error("Failed to insert activity:", error);
+      return { success: false, message: "Insert failed" };
+    }
+
+    const { data: row, error } = await supabase.from("activity").select("*").eq("place_id", validated.place_id).single();
+    if (error || !row) {
+      console.error("Failed to fetch inserted activity:", error);
+      return { success: false, message: "Insert failed" };
+    }
+
+    return { success: true, message: "Insert successful", data: [row] };
+  }
 
   const { data, error } = await supabase.from(tableName).insert(tableData).select();
 
@@ -788,6 +887,11 @@ export const insertActivity = async (placeDetails: any): Promise<any> => {
   const supabase = createClient();
 
   try {
+    const { data: auth, error: userError } = await supabase.auth.getUser();
+    if (userError || !auth?.user) {
+      throw new Error("User not authenticated");
+    }
+
     // Check if activity exists by place_id
     const { data: existingActivity, error: checkError } = await supabase
       .from("activity")
@@ -810,12 +914,21 @@ export const insertActivity = async (placeDetails: any): Promise<any> => {
     }
 
     // If activity doesn't exist, insert it
-    const { data: activity, error: activityError } = await supabase
+    const durationMinutes = parseDurationMinutes(placeDetails?.duration);
+    const coords =
+      Array.isArray(placeDetails?.coordinates) && placeDetails.coordinates.length === 2
+        ? `(${Number(placeDetails.coordinates[1])},${Number(placeDetails.coordinates[0])})`
+        : typeof placeDetails?.coordinates === "string"
+          ? placeDetails.coordinates
+          : null;
+
+    const admin = createAdminClient();
+    const { data: activity, error: activityError } = await admin
       .from("activity")
       .insert({
         place_id: placeDetails.place_id,
         name: placeDetails.name,
-        coordinates: placeDetails.coordinates,
+        coordinates: coords,
         types: placeDetails.types || [],
         price_level: placeDetails.price_level || "",
         address: placeDetails.address,
@@ -824,7 +937,7 @@ export const insertActivity = async (placeDetails: any): Promise<any> => {
         google_maps_url: placeDetails.google_maps_url || "",
         website_url: placeDetails.website_url || "",
         photo_names: placeDetails.photo_names || [],
-        duration: placeDetails.duration || null,
+        duration: typeof durationMinutes === "number" ? `${durationMinutes} minutes` : null,
         phone_number: placeDetails.phone_number || "",
       })
       .select()
@@ -835,7 +948,7 @@ export const insertActivity = async (placeDetails: any): Promise<any> => {
     // Insert reviews if they exist
     let reviews: any[] = [];
     if (placeDetails.reviews && placeDetails.reviews.length > 0) {
-      const { data: reviewsData, error: reviewError } = await supabase
+      const { data: reviewsData, error: reviewError } = await admin
         .from("review")
         .insert(
           placeDetails.reviews.map((review: any) => ({
@@ -857,7 +970,7 @@ export const insertActivity = async (placeDetails: any): Promise<any> => {
     // Insert open hours if they exist
     let openHours: any[] = [];
     if (placeDetails.open_hours && placeDetails.open_hours.length > 0) {
-      const { data: openHoursData, error: openHoursError } = await supabase
+      const { data: openHoursData, error: openHoursError } = await admin
         .from("open_hours")
         .insert(
           placeDetails.open_hours.map((hours: any) => ({
