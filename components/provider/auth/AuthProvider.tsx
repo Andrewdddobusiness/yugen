@@ -3,6 +3,7 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import { User, Session } from "@supabase/supabase-js";
 import { createClient } from "@/utils/supabase/client";
+import { useUserStore } from "@/store/userStore";
 
 interface AuthContextType {
   user: User | null;
@@ -21,12 +22,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const supabase = createClient();
 
   useEffect(() => {
+    const userStore = useUserStore.getState();
+    userStore.setUserLoading(true);
+
     // Get initial session
     const getInitialSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       setSession(session);
       setUser(session?.user ?? null);
       setLoading(false);
+
+      userStore.setUser(session?.user ?? null);
+      userStore.setUserLoading(false);
     };
 
     getInitialSession();
@@ -37,6 +44,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setSession(session);
         setUser(session?.user ?? null);
         setLoading(false);
+
+        userStore.setUser(session?.user ?? null);
+        userStore.setUserLoading(false);
 
         // Handle sign in event
         if (event === 'SIGNED_IN' && session?.user) {
@@ -73,15 +83,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signOut = async () => {
     setLoading(true);
+    useUserStore.getState().setUserLoading(true);
     await supabase.auth.signOut();
     setUser(null);
     setSession(null);
     setLoading(false);
+    const userStore = useUserStore.getState();
+    userStore.setUser(null);
+    userStore.setUserLoading(false);
   };
 
   const refreshUser = async () => {
     const { data: { user } } = await supabase.auth.getUser();
     setUser(user);
+    useUserStore.getState().setUser(user);
   };
 
   const value = {
