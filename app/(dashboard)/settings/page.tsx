@@ -3,20 +3,19 @@ import { Suspense, lazy, useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { CreditCard, Gauge, Shield, Sparkles, User } from "lucide-react";
+import { CreditCard, Shield, Sparkles, User } from "lucide-react";
 
 const ProfileCards = lazy(() => import("@/components/settings/ProfileCards"));
 const BillingCards = lazy(() => import("@/components/settings/BillingCards"));
 const SecurityCards = lazy(() => import("@/components/settings/SecurityCards"));
 const AiUsageCards = lazy(() => import("@/components/settings/AiUsageCards"));
-const PerformanceCards = lazy(() => import("@/components/settings/PerformanceCards"));
 
 function SettingsContent() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
-  const allowedTabs = useMemo(() => ["account", "billing", "security", "ai", "performance"] as const, []);
+  const allowedTabs = useMemo(() => ["account", "billing", "security", "ai"] as const, []);
   type SettingsTab = (typeof allowedTabs)[number];
 
   const tabFromUrl = useMemo(() => {
@@ -49,7 +48,7 @@ function SettingsContent() {
       </div>
 
       <Tabs value={tab} onValueChange={handleTabChange} className="w-full">
-        <TabsList className="grid w-full max-w-3xl grid-cols-5">
+        <TabsList className="grid w-full max-w-2xl grid-cols-4">
           <TabsTrigger value="account" className="gap-2">
             <User className="h-4 w-4" />
             Account
@@ -65,10 +64,6 @@ function SettingsContent() {
           <TabsTrigger value="ai" className="gap-2">
             <Sparkles className="h-4 w-4" />
             AI Usage
-          </TabsTrigger>
-          <TabsTrigger value="performance" className="gap-2">
-            <Gauge className="h-4 w-4" />
-            Performance
           </TabsTrigger>
         </TabsList>
 
@@ -90,11 +85,6 @@ function SettingsContent() {
         <TabsContent value="ai" className="mt-6">
           <Suspense fallback={<div className="text-sm text-muted-foreground">Loading…</div>}>
             <AiUsageCards />
-          </Suspense>
-        </TabsContent>
-        <TabsContent value="performance" className="mt-6">
-          <Suspense fallback={<div className="text-sm text-muted-foreground">Loading…</div>}>
-            <PerformanceCards />
           </Suspense>
         </TabsContent>
       </Tabs>

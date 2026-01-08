@@ -5,6 +5,9 @@ import { createClient } from "@/utils/supabase/server";
 import { getClientIp, isSameOrigin } from "@/lib/security/requestGuards";
 import { rateLimit, rateLimitHeaders } from "@/lib/security/rateLimit";
 
+const isTelemetryDashboardEnabled =
+  process.env.NODE_ENV !== "production" || process.env.INTERNAL_TELEMETRY_DASHBOARD === "1";
+
 const QuerySchema = z.object({
   windowDays: z.coerce.number().int().min(1).max(30).default(7),
 });
@@ -34,6 +37,10 @@ const percentile = (values: number[], p: number) => {
 };
 
 export async function GET(request: NextRequest) {
+  if (!isTelemetryDashboardEnabled) {
+    return new NextResponse(null, { status: 404 });
+  }
+
   if (!isSameOrigin(request)) {
     return NextResponse.json({ ok: false, error: { code: "forbidden", message: "Invalid request origin." } }, { status: 403 });
   }
@@ -151,4 +158,3 @@ export async function GET(request: NextRequest) {
     { headers: rateLimitHeaders(limiter) }
   );
 }
-
