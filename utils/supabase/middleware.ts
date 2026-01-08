@@ -10,6 +10,21 @@ export async function updateSession(request: NextRequest) {
     },
   });
 
+  const pathname = request.nextUrl.pathname;
+  const isProtectedRoute = protectedRoutes.some((route: string) => pathname.startsWith(route));
+  const isAuthRoute = pathname.startsWith("/login") || pathname.startsWith("/signUp");
+  const allowAuthedAuthRoutes =
+    pathname.startsWith("/login/reset") ||
+    pathname.startsWith("/login/updatePassword") ||
+    pathname.startsWith("/auth/verify-email") ||
+    pathname.startsWith("/auth/confirm") ||
+    pathname.startsWith("/auth/callback");
+
+  // Avoid a Supabase auth roundtrip for routes that don't need it.
+  // This keeps middleware overhead low for public pages and most auth flows.
+  const shouldCheckAuth = isProtectedRoute || (isAuthRoute && !allowAuthedAuthRoutes);
+  if (!shouldCheckAuth) return response;
+
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -57,16 +72,6 @@ export async function updateSession(request: NextRequest) {
   );
 
   const { data: { user }, error } = await supabase.auth.getUser();
-
-  const pathname = request.nextUrl.pathname;
-  const isProtectedRoute = protectedRoutes.some((route: string) => pathname.startsWith(route));
-  const isAuthRoute = pathname.startsWith("/login") || pathname.startsWith("/signUp");
-  const allowAuthedAuthRoutes =
-    pathname.startsWith("/login/reset") ||
-    pathname.startsWith("/login/updatePassword") ||
-    pathname.startsWith("/auth/verify-email") ||
-    pathname.startsWith("/auth/confirm") ||
-    pathname.startsWith("/auth/callback");
 
   // Redirect authenticated users away from auth pages
   if (user && isAuthRoute && !allowAuthedAuthRoutes) {
