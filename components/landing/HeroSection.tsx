@@ -1,11 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import dynamic from "next/dynamic";
 import { Button } from "@/components/ui/button";
 import { Plane, Plus, Play, Loader2, ArrowRight, MapPin, Calendar, Heart } from "lucide-react";
-import PopUpCreateItinerary from "@/components/dialog/itinerary/CreateItineraryDialog";
 import { motion } from "framer-motion";
 
 interface HeroSectionProps {
@@ -13,8 +13,37 @@ interface HeroSectionProps {
   isUserLoading: boolean;
 }
 
+const PopUpCreateItinerary = dynamic(() => import("@/components/dialog/itinerary/CreateItineraryDialog"), {
+  ssr: false,
+  loading: () => (
+    <Button size="lg" className="text-lg px-8 py-4 shadow-pressable" disabled>
+      <Loader2 className="h-5 w-5 animate-spin mr-2" />
+      Loading...
+    </Button>
+  ),
+});
+
 export default function HeroSection({ user, isUserLoading }: HeroSectionProps) {
+  const SHOW_DEMO_VIDEO = false;
   const [isVideoPlaying, setIsVideoPlaying] = useState(false);
+
+  useEffect(() => {
+    if (!user) return;
+
+    // Prefetch the create-itinerary dialog chunk so the CTA feels instant.
+    const preload = () => {
+      void import("@/components/dialog/itinerary/CreateItineraryDialog");
+    };
+
+    if (typeof window === "undefined") return;
+    if ("requestIdleCallback" in window) {
+      const id = (window as any).requestIdleCallback(preload, { timeout: 1000 });
+      return () => (window as any).cancelIdleCallback?.(id);
+    }
+
+    const id: ReturnType<typeof setTimeout> = setTimeout(preload, 0);
+    return () => clearTimeout(id);
+  }, [user]);
 
   return (
     <section className="relative min-h-screen flex flex-col items-center justify-center overflow-hidden">
@@ -119,15 +148,17 @@ export default function HeroSection({ user, isUserLoading }: HeroSectionProps) {
             </Link>
           )}
 
-          <Button
-            variant="secondary"
-            size="lg"
-            className="text-lg px-8 py-4 border border-stroke-200 text-brand-700 hover:bg-white/80"
-            onClick={() => setIsVideoPlaying(true)}
-          >
-            <Play className="h-5 w-5 mr-2" />
-            See how it works
-          </Button>
+          {SHOW_DEMO_VIDEO && (
+            <Button
+              variant="secondary"
+              size="lg"
+              className="text-lg px-8 py-4 border border-stroke-200 text-brand-700 hover:bg-white/80"
+              onClick={() => setIsVideoPlaying(true)}
+            >
+              <Play className="h-5 w-5 mr-2" />
+              See how it works
+            </Button>
+          )}
         </motion.div>
 
         {/* Hero Image/Demo */}
@@ -161,7 +192,7 @@ export default function HeroSection({ user, isUserLoading }: HeroSectionProps) {
               />
 
               {/* Play Button Overlay */}
-              {!isVideoPlaying && (
+              {SHOW_DEMO_VIDEO && !isVideoPlaying && (
                 <div className="absolute inset-0 flex items-center justify-center bg-black/20">
                   <button
                     onClick={() => setIsVideoPlaying(true)}
@@ -198,7 +229,7 @@ export default function HeroSection({ user, isUserLoading }: HeroSectionProps) {
       </div>
 
       {/* Video Modal */}
-      {isVideoPlaying && (
+      {SHOW_DEMO_VIDEO && isVideoPlaying && (
         <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4">
           <div className="relative max-w-4xl w-full aspect-video bg-black rounded-xl overflow-hidden">
             <button

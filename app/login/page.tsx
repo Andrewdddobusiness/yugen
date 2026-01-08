@@ -1,6 +1,6 @@
 "use client";
 import Link from "next/link";
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import { useForm } from "react-hook-form";
 import { useRouter, useSearchParams } from "next/navigation";
 
@@ -19,7 +19,7 @@ import { GoogleSignInButton } from "@/components/form/auth/GoogleSignInButton";
 import { login } from "@/actions/auth/actions";
 import { loginSchema } from "@/schemas/loginSchema";
 
-export default function LoginPage() {
+function LoginContent() {
   const [loading, setLoading] = useState<any>(false);
 
   const { toast } = useToast();
@@ -173,5 +173,13 @@ export default function LoginPage() {
 
       <LoadingOverlay show={loading} message="Signing you in..." />
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div className="flex min-h-screen items-center justify-center text-sm text-muted-foreground">Loading…</div>}>
+      <LoginContent />
+    </Suspense>
   );
 }

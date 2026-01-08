@@ -1,5 +1,19 @@
 import { Plus } from "lucide-react";
-import PopUpCreateItinerary from "@/components/dialog/itinerary/CreateItineraryDialog";
+import dynamic from "next/dynamic";
+import { Button } from "@/components/ui/button";
+import LoadingSpinner from "@/components/loading/LoadingSpinner";
+
+const PopUpCreateItinerary = dynamic(() => import("@/components/dialog/itinerary/CreateItineraryDialog"), {
+  ssr: false,
+  loading: () => (
+    <Button
+      disabled
+      className="flex items-center justify-center rounded-xl shadow-lg backdrop-blur-lg border h-60 w-full sm:w-60 min-w-60 min-h-60"
+    >
+      <LoadingSpinner />
+    </Button>
+  ),
+});
 
 export default function ItineraryCardCreate() {
   return (

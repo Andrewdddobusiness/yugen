@@ -1,7 +1,6 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
 
-import HomeLayout from "@/components/layout/HomeLayout";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 
@@ -10,18 +9,23 @@ import { createClient } from "@/utils/supabase/client";
 import { toast } from "@/components/ui/use-toast";
 import { Separator } from "@/components/ui/separator";
 import { Loader2 } from "lucide-react";
-import { useUserStore } from "@/store/userStore";
+import Link from "next/link";
 
 export default function ResetPage() {
   const supabase = useMemo(() => createClient(), []);
-  const { user } = useUserStore();
   const [success, setSuccess] = useState(false);
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (!email && user?.email) setEmail(user.email);
-  }, [email, user?.email]);
+    // Best-effort prefill when the user is already signed in.
+    supabase.auth
+      .getUser()
+      .then(({ data }) => {
+        if (!email && data?.user?.email) setEmail(data.user.email);
+      })
+      .catch(() => {});
+  }, [email, supabase]);
 
   const handleEmailReset = async () => {
     setLoading(true);
@@ -66,54 +70,61 @@ export default function ResetPage() {
   };
 
   return (
-    <HomeLayout>
-      <div className="flex flex-col w-full h-screen justify-center items-center bg-white">
-        <div className="flex flex-col justify-start p-8 bg-white rounded-md shadow-md gap-2">
-          {success ? (
-            <>
-              <div className="text-2xl font-bold">You&apos;re on your way!</div>
-              <div className="text-sm mb-2">Please check your email to reset your password.</div>
-              <Separator />
-              <div className="flex flex-row items-center text-zinc-500">
-                <div className="text-sm">Didn&apos;t get an email?</div>
-                <Button variant={"link"} className={"underline"} onClick={handleTryAgain}>
-                  Try again.
-                </Button>
-              </div>
-            </>
-          ) : (
-            <>
-              <div className="text-2xl font-bold">
-                Forgotten your <br />
-                password?
-              </div>
-              <div className="text-sm">
-                Please enter your current email linked to your account. <br /> Don’t worry, we’ll send you a message to
-                help you <br /> reset your password.
-              </div>
-              <div>
-                <Input
-                  type="email"
-                  disabled={loading}
-                  placeholder="Enter your email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                />
-              </div>
-              <div>
-                {loading ? (
-                  <Button disabled>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Please wait
-                  </Button>
-                ) : (
-                  <Button onClick={handleEmailReset}>Confirm</Button>
-                )}
-              </div>
-            </>
-          )}
-        </div>
+    <div className="flex min-h-screen w-full items-center justify-center bg-white px-4">
+      <div className="absolute left-4 top-4">
+        <Link href="/login">
+          <Button variant="outline" className="rounded-xl shadow-lg hover:scale-105 transition-all duration-300">
+            Back
+          </Button>
+        </Link>
       </div>
-    </HomeLayout>
+
+      <div className="flex w-full max-w-md flex-col gap-3 rounded-2xl bg-white p-8 shadow-md">
+        {success ? (
+          <>
+            <div className="text-2xl font-bold">You&apos;re on your way!</div>
+            <div className="text-sm text-muted-foreground">Please check your email to reset your password.</div>
+            <Separator />
+            <div className="flex flex-row items-center text-zinc-500">
+              <div className="text-sm">Didn&apos;t get an email?</div>
+              <Button variant={"link"} className={"underline"} onClick={handleTryAgain}>
+                Try again.
+              </Button>
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="text-2xl font-bold">
+              Forgotten your <br />
+              password?
+            </div>
+            <div className="text-sm text-muted-foreground">
+              Please enter the email linked to your account. We&apos;ll send you a reset link.
+            </div>
+            <div>
+              <Input
+                type="email"
+                disabled={loading}
+                placeholder="Enter your email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+              />
+            </div>
+            <div>
+              {loading ? (
+                <Button disabled className="w-full">
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Please wait
+                </Button>
+              ) : (
+                <Button onClick={handleEmailReset} className="w-full">
+                  Confirm
+                </Button>
+              )}
+            </div>
+          </>
+        )}
+      </div>
+    </div>
   );
 }

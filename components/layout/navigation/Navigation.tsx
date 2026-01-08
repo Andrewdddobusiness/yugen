@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import dynamic from "next/dynamic";
 import { useQuery } from "@tanstack/react-query";
 
 import {
@@ -35,9 +36,8 @@ import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 import LogoutButton from "@/components/button/auth/LogoutButton";
-import PopUpCreateItinerary from "@/components/dialog/itinerary/CreateItineraryDialog";
 
-import { Menu, Plus } from "lucide-react";
+import { Loader2, Menu, Plus } from "lucide-react";
 
 import { useUserStore } from "@/store/userStore";
 import { ISubscriptionDetails, useStripeSubscriptionStore } from "@/store/stripeSubscriptionStore";
@@ -45,6 +45,22 @@ import { ISubscriptionDetails, useStripeSubscriptionStore } from "@/store/stripe
 import { getSubscriptionDetails } from "@/actions/stripe/actions";
 import { createClient } from "@/utils/supabase/client";
 import { cn } from "@/lib/utils";
+
+const PopUpCreateItinerary = dynamic(() => import("@/components/dialog/itinerary/CreateItineraryDialog"), {
+  ssr: false,
+  loading: () => (
+    <Button
+      className={cn(
+        "w-full h-10 shadow-pressable",
+        "bg-brand-500 text-white hover:bg-brand-600 active:shadow-pressable-pressed"
+      )}
+      disabled
+    >
+      <Loader2 className="size-3.5 mr-2 animate-spin" />
+      <span>Loading...</span>
+    </Button>
+  ),
+});
 
 export default function Navigation() {
   //***** STORES *****//
@@ -93,6 +109,24 @@ export default function Navigation() {
     }
   }, [user, setUser]);
 
+  useEffect(() => {
+    if (!user) return;
+
+    // Prefetch the create-itinerary dialog so the CTA opens instantly.
+    const preload = () => {
+      void import("@/components/dialog/itinerary/CreateItineraryDialog");
+    };
+
+    if (typeof window === "undefined") return;
+    if ("requestIdleCallback" in window) {
+      const id = (window as any).requestIdleCallback(preload, { timeout: 1000 });
+      return () => (window as any).cancelIdleCallback?.(id);
+    }
+
+    const id: ReturnType<typeof setTimeout> = setTimeout(preload, 0);
+    return () => clearTimeout(id);
+  }, [user]);
+
   //***** GET PROFILE URL *****//
   const { data: profileUrl, isLoading: isProfileUrlLoading } = useQuery({
     queryKey: ["profileUrl", user?.id],
@@ -126,7 +160,7 @@ export default function Navigation() {
   useEffect(() => {
     setProfileUrl(profileUrl || "");
     setIsProfileUrlLoading(false);
-  }, [profileUrl]);
+  }, [profileUrl, setIsProfileUrlLoading, setProfileUrl]);
 
   //***** GET SUBSCRIPTION DETAILS *****//
   const { data: subscription, isLoading: isSubscriptionLoading } = useQuery({
@@ -142,7 +176,7 @@ export default function Navigation() {
   useEffect(() => {
     setSubscription(subscription as ISubscriptionDetails);
     setIsSubscriptionLoading(false);
-  }, [subscription]);
+  }, [setIsSubscriptionLoading, setSubscription, subscription]);
 
   const renderAuthSection = () => {
     if (isUserLoading || isProfileUrlLoading || isSubscriptionLoading) {

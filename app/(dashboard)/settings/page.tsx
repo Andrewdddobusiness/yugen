@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 import ProfileCards from "@/components/settings/ProfileCards";
@@ -9,7 +9,7 @@ import AiUsageCards from "@/components/settings/AiUsageCards";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CreditCard, Shield, Sparkles, User } from "lucide-react";
 
-export default function Settings() {
+function SettingsContent() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -80,5 +80,13 @@ export default function Settings() {
         </TabsContent>
       </Tabs>
     </div>
+  );
+}
+
+export default function Settings() {
+  return (
+    <Suspense fallback={<div className="mx-auto w-full max-w-6xl px-4 py-10 text-sm text-muted-foreground">Loading settings…</div>}>
+      <SettingsContent />
+    </Suspense>
   );
 }

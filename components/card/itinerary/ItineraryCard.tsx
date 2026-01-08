@@ -43,10 +43,12 @@ export default function ItineraryCard({ itinerary, onDelete }: ItineraryCardProp
   const [isDeleting, setIsDeleting] = useState(false);
   const [useLocalFallback, setUseLocalFallback] = useState(false);
   const [isImageLoading, setIsImageLoading] = useState(true);
+  const [didPrefetch, setDidPrefetch] = useState(false);
 
   useEffect(() => {
     setUseLocalFallback(false);
     setIsImageLoading(true);
+    setDidPrefetch(false);
   }, [itinerary.itinerary_id, itinerary.city, itinerary.country]);
 
   const stockImageSrc = getDestinationStockImageUrl(
@@ -88,7 +90,10 @@ export default function ItineraryCard({ itinerary, onDelete }: ItineraryCardProp
         className="h-60 w-full sm:w-60 cursor-pointer relative backdrop-blur-lg sm:shadow-lg sm:hover:scale-105 transition-all duration-300 sm:active:scale-95 rounded-xl"
         onMouseEnter={() => {
           setIsHovered(true);
-          router.prefetch(builderHref);
+          if (!didPrefetch) {
+            router.prefetch(builderHref);
+            setDidPrefetch(true);
+          }
         }}
         onMouseLeave={() => setIsHovered(false)}
       >
@@ -103,7 +108,6 @@ export default function ItineraryCard({ itinerary, onDelete }: ItineraryCardProp
             alt={`${itinerary.city ? `${itinerary.city}, ` : ""}${itinerary.country} cover`}
             fill
             sizes="(max-width: 640px) 100vw, 240px"
-            priority={true}
             className="object-cover"
             onLoadingComplete={() => setIsImageLoading(false)}
             onError={() => {

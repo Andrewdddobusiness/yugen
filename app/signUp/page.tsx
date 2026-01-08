@@ -1,7 +1,7 @@
 "use client";
 import Image from "next/image";
 import Link from "next/link";
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import { useForm } from "react-hook-form";
 import { useSearchParams } from "next/navigation";
 
@@ -19,7 +19,7 @@ import { GoogleSignInButton } from "@/components/form/auth/GoogleSignInButton";
 import { signup, logout, resendConfirmation } from "@/actions/auth/actions";
 import { signUpSchema } from "@/schemas/loginSchema";
 
-export default function SignUpPage() {
+function SignUpContent() {
   const [user, setUser] = useState<any>();
   const [loading, setLoading] = useState<any>(false);
 
@@ -252,5 +252,13 @@ export default function SignUpPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function SignUpPage() {
+  return (
+    <Suspense fallback={<div className="flex min-h-screen items-center justify-center text-sm text-muted-foreground">Loading…</div>}>
+      <SignUpContent />
+    </Suspense>
   );
 }

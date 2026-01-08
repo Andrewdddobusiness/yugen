@@ -26,7 +26,6 @@ import { ViewToggle } from "@/components/view/toggle/ViewToggle";
 import { ViewTransition } from "@/components/view/toggle/ViewTransition";
 import { useViewRouter } from "@/hooks/useViewRouter";
 import { useViewStatePreservation } from "@/hooks/useViewStatePreservation";
-import { getDestination } from "@/actions/supabase/destinations";
 import { geocodeAddress } from "@/actions/google/maps";
 import { BuilderViewSkeleton } from "@/components/loading/BuilderViewSkeleton";
 
@@ -197,7 +196,7 @@ export default function Builder() {
     error,
     data: bootstrap,
   } = useQuery({
-    queryKey: ["builderBootstrap", itineraryId, destinationId],
+    queryKey: ["builderBootstrap", itinId, destId],
     queryFn: async () => {
       const result = await fetchBuilderBootstrap(itinId!, destId!);
       if (!result.success) {
@@ -353,27 +352,81 @@ export default function Builder() {
 
   // Geocode destination and set map coordinates
   useEffect(() => {
-    const geocodeDestination = async () => {
-      const destination = bootstrap?.destination;
-      if (destination?.city && destination?.country) {
-        const address = `${destination.city}, ${destination.country}`;
-        
-        try {
-          const result = await geocodeAddress(address);
-          
-          if (result.success && result.data?.coordinates) {
-            const { lat, lng } = result.data.coordinates;
-            setItineraryCoordinates([lat, lng]);
-          } else {
-            console.warn("Failed to geocode destination:", result.error?.message || "Unknown error");
+    const destination = bootstrap?.destination;
+    if (!destination?.city || !destination?.country) return;
+
+    const address = `${destination.city}, ${destination.country}`;
+
+    // Prefer centering the map from existing activity coordinates to avoid extra API calls.
+    const activities = (bootstrap?.activities ?? []) as IItineraryActivity[];
+    const coordinates = activities
+      .map((activity) => activity.activity?.coordinates)
+      .filter(
+        (coords): coords is [number, number] =>
+          Array.isArray(coords) &&
+          coords.length === 2 &&
+          Number.isFinite(coords[0]) &&
+          Number.isFinite(coords[1])
+      );
+
+    if (coordinates.length > 0) {
+      const sum = coordinates.reduce(
+        (acc, coords) => {
+          acc.lat += coords[0];
+          acc.lng += coords[1];
+          return acc;
+        },
+        { lat: 0, lng: 0 }
+      );
+      setItineraryCoordinates([sum.lat / coordinates.length, sum.lng / coordinates.length]);
+      return;
+    }
+
+    const cacheKey = `yugi:geocode:${address}`;
+    if (typeof window !== "undefined") {
+      try {
+        const cached = window.localStorage.getItem(cacheKey);
+        if (cached) {
+          const parsed = JSON.parse(cached) as { lat?: number; lng?: number };
+          if (Number.isFinite(parsed.lat) && Number.isFinite(parsed.lng)) {
+            setItineraryCoordinates([parsed.lat as number, parsed.lng as number]);
+            return;
           }
-        } catch (error) {
+        }
+      } catch {
+        // Ignore cache parse errors.
+      }
+    }
+
+    let cancelled = false;
+    const geocodeDestination = async () => {
+      try {
+        const result = await geocodeAddress(address);
+        if (cancelled) return;
+
+        if (result.success && result.data?.coordinates) {
+          const { lat, lng } = result.data.coordinates;
+          setItineraryCoordinates([lat, lng]);
+          try {
+            window.localStorage.setItem(cacheKey, JSON.stringify({ lat, lng }));
+          } catch {
+            // Ignore storage quota / private-mode issues.
+          }
+          return;
+        }
+
+        console.warn("Failed to geocode destination:", result.error?.message || "Unknown error");
+      } catch (error) {
+        if (!cancelled) {
           console.error("Error geocoding destination:", error);
         }
       }
     };
 
-    geocodeDestination();
+    void geocodeDestination();
+    return () => {
+      cancelled = true;
+    };
   }, [bootstrap, setItineraryCoordinates]);
 
   if (!itineraryId || !destinationId) {

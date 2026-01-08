@@ -1,16 +1,16 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
 import { useSearchParams } from "next/navigation";
-import HomeLayout from "@/components/layout/HomeLayout";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 
 import { createClient } from "@/utils/supabase/client";
 
 import { toast } from "@/components/ui/use-toast";
+import Link from "next/link";
 
-export default function UpdatePasswordPage() {
+function UpdatePasswordContent() {
   const supabase = useMemo(() => createClient(), []);
   const searchParams = useSearchParams();
 
@@ -65,43 +65,60 @@ export default function UpdatePasswordPage() {
   };
 
   return (
-    <HomeLayout>
-      <div className="flex flex-col w-full h-screen justify-center items-center bg-white">
-        <div className="flex flex-col justify-start p-8 bg-white rounded-md shadow-md gap-2">
-          <div className="text-2xl font-bold">
-            Forgotten your <br />
-            password?
-          </div>
-          <div className="text-sm">
-            Last step! Please enter a newly secure password.
-          </div>
-          <div className="relative">
-            <Input
-              type={showPassword ? "text" : "password"}
-              disabled={loading}
-              placeholder="Enter as new password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-            />
-            <button
-              className="absolute inset-y-0 right-0 flex items-center px-3"
-              onClick={() => setShowPassword((prev) => !prev)}
-            >
-              {showPassword ? <EyeOff /> : <Eye />}
-            </button>
-          </div>
-          <div>
-            {loading ? (
-              <Button disabled>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Please wait
-              </Button>
-            ) : (
-              <Button onClick={handlePasswordUpdate}>Confirm</Button>
-            )}
-          </div>
+    <div className="flex min-h-screen w-full items-center justify-center bg-white px-4">
+      <div className="absolute left-4 top-4">
+        <Link href="/login">
+          <Button variant="outline" className="rounded-xl shadow-lg hover:scale-105 transition-all duration-300">
+            Back
+          </Button>
+        </Link>
+      </div>
+
+      <div className="flex w-full max-w-md flex-col gap-3 rounded-2xl bg-white p-8 shadow-md">
+        <div className="text-2xl font-bold">
+          Update your <br />
+          password
+        </div>
+        <div className="text-sm text-muted-foreground">
+          Enter a new secure password for your account.
+        </div>
+        <div className="relative">
+          <Input
+            type={showPassword ? "text" : "password"}
+            disabled={loading}
+            placeholder="Enter a new password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+          />
+          <button
+            type="button"
+            className="absolute inset-y-0 right-0 flex items-center px-3"
+            onClick={() => setShowPassword((prev) => !prev)}
+          >
+            {showPassword ? <EyeOff /> : <Eye />}
+          </button>
+        </div>
+        <div>
+          {loading ? (
+            <Button disabled className="w-full">
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Please wait
+            </Button>
+          ) : (
+            <Button onClick={handlePasswordUpdate} className="w-full">
+              Confirm
+            </Button>
+          )}
         </div>
       </div>
-    </HomeLayout>
+    </div>
+  );
+}
+
+export default function UpdatePasswordPage() {
+  return (
+    <Suspense fallback={<div className="flex min-h-screen items-center justify-center text-sm text-muted-foreground">Loading…</div>}>
+      <UpdatePasswordContent />
+    </Suspense>
   );
 }

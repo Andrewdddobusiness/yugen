@@ -77,7 +77,8 @@ export async function updateSession(request: NextRequest) {
   if (isProtectedRoute && (error || !user)) {
     const loginUrl = new URL("/login", request.url);
     // Store the original URL to redirect back after login
-    loginUrl.searchParams.set('redirectTo', pathname);
+    const original = `${pathname}${request.nextUrl.search || ""}`;
+    loginUrl.searchParams.set("next", original);
     return NextResponse.redirect(loginUrl);
   }
 

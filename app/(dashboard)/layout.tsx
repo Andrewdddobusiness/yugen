@@ -28,6 +28,10 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       if (error || !user) throw error;
       return user;
     },
+    staleTime: Infinity,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
   });
 
   useEffect(() => {
@@ -64,24 +68,32 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       return null;
     },
     enabled: !!user,
+    staleTime: Infinity,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
   });
 
   useEffect(() => {
     setProfileUrl(profileUrl || "");
     setIsProfileUrlLoading(false);
-  }, [profileUrl]);
+  }, [profileUrl, setIsProfileUrlLoading, setProfileUrl]);
 
   //***** GET SUBSCRIPTION DETAILS *****//
   const { data: subscription, isLoading: isSubscriptionLoading } = useQuery({
     queryKey: ["subscription", user?.id],
     queryFn: getSubscriptionDetails,
     enabled: !!user,
+    staleTime: Infinity,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
   });
 
   useEffect(() => {
     setSubscription(subscription as ISubscriptionDetails);
     setIsSubscriptionLoading(false);
-  }, [subscription]);
+  }, [setIsSubscriptionLoading, setSubscription, subscription]);
 
   return (
     <SidebarProvider>
