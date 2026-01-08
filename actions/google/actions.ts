@@ -294,38 +294,66 @@ export const getGoogleMapsAutocomplete = async (
 
 // 4. Place details - get detailed information about a specific place
 export const fetchPlaceDetails = async (placeId: string): Promise<IActivity> => {
-  const response = await fetch(`https://places.googleapis.com/v1/places/${placeId}`, {
-    headers: {
-      "X-Goog-Api-Key": GOOGLE_MAPS_API_KEY!,
-      "X-Goog-FieldMask": "id,displayName,formattedAddress,location,types,priceLevel,rating,editorialSummary,websiteUri,nationalPhoneNumber,photos,regularOpeningHours,reviews",
-    },
-  });
-
-  if (!response.ok) {
-    throw new Error(`Failed to fetch place details: ${response.status} ${response.statusText}`);
+  if (!placeId || placeId.trim().length < 3) {
+    throw new Error("Invalid place id");
   }
 
-  const place = await response.json();
-  return mapGooglePlaceToActivity(place);
+  const normalized = placeId.trim();
+  const { cachedSearch } = await import("@/lib/cache/searchCache");
+  const cacheKey = `place:${normalized}`;
+
+  return await cachedSearch(
+    cacheKey,
+    async () => {
+      const response = await fetch(`https://places.googleapis.com/v1/places/${normalized}`, {
+        headers: {
+          "X-Goog-Api-Key": GOOGLE_MAPS_API_KEY!,
+          "X-Goog-FieldMask":
+            "id,displayName,formattedAddress,location,types,priceLevel,rating,editorialSummary,websiteUri,nationalPhoneNumber,photos,regularOpeningHours,reviews",
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch place details: ${response.status} ${response.statusText}`);
+      }
+
+      const place = await response.json();
+      return mapGooglePlaceToActivity(place);
+    },
+    24 * 60 * 60 * 1000
+  );
 };
 
 // 5. Simple geocoding - get coordinates for a city
 export const fetchCityCoordinates = async (cityName: string, countryName: string) => {
   const GEOCODING_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_GEOCODING_API_KEY || GOOGLE_MAPS_API_KEY;
-  const searchQuery = `${cityName}, ${countryName}`;
-  const geocodingUrl = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(
-    searchQuery
-  )}&key=${GEOCODING_API_KEY}`;
-
-  const geocodingResponse = await fetch(geocodingUrl);
-  const geocodingData = await geocodingResponse.json();
-
-  if (!geocodingData.results || geocodingData.results.length === 0) {
-    throw new Error(`No results found for: ${searchQuery}`);
+  const searchQuery = `${String(cityName ?? "").trim()}, ${String(countryName ?? "").trim()}`.trim();
+  if (!searchQuery || searchQuery.length < 2) {
+    throw new Error("Invalid location query");
   }
 
-  const { lng: longitude, lat: latitude } = geocodingData.results[0].geometry.location;
-  return { longitude, latitude };
+  const { cachedSearch } = await import("@/lib/cache/searchCache");
+  const cacheKey = `geocode:${searchQuery.toLowerCase().slice(0, 120)}`;
+
+  return await cachedSearch(
+    cacheKey,
+    async () => {
+      const geocodingUrl = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(
+        searchQuery
+      )}&key=${GEOCODING_API_KEY}`;
+
+      const geocodingResponse = await fetch(geocodingUrl);
+      const geocodingData = await geocodingResponse.json();
+
+      if (!geocodingData.results || geocodingData.results.length === 0) {
+        throw new Error(`No results found for: ${searchQuery}`);
+      }
+
+      const { lng: longitude, lat: latitude } = geocodingData.results[0].geometry.location;
+      return { longitude, latitude };
+    },
+    24 * 60 * 60 * 1000
+  );
 };
 
 // 6. Photo fetching - get place photos from Google Places API

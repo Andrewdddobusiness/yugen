@@ -1,20 +1,22 @@
 "use client";
-import { Suspense, useEffect, useMemo, useState } from "react";
+import { Suspense, lazy, useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
-import ProfileCards from "@/components/settings/ProfileCards";
-import SecurityCards from "@/components/settings/SecurityCards";
-import BillingCards from "@/components/settings/BillingCards";
-import AiUsageCards from "@/components/settings/AiUsageCards";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { CreditCard, Shield, Sparkles, User } from "lucide-react";
+import { CreditCard, Gauge, Shield, Sparkles, User } from "lucide-react";
+
+const ProfileCards = lazy(() => import("@/components/settings/ProfileCards"));
+const BillingCards = lazy(() => import("@/components/settings/BillingCards"));
+const SecurityCards = lazy(() => import("@/components/settings/SecurityCards"));
+const AiUsageCards = lazy(() => import("@/components/settings/AiUsageCards"));
+const PerformanceCards = lazy(() => import("@/components/settings/PerformanceCards"));
 
 function SettingsContent() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
-  const allowedTabs = useMemo(() => ["account", "billing", "security", "ai"] as const, []);
+  const allowedTabs = useMemo(() => ["account", "billing", "security", "ai", "performance"] as const, []);
   type SettingsTab = (typeof allowedTabs)[number];
 
   const tabFromUrl = useMemo(() => {
@@ -47,7 +49,7 @@ function SettingsContent() {
       </div>
 
       <Tabs value={tab} onValueChange={handleTabChange} className="w-full">
-        <TabsList className="grid w-full max-w-2xl grid-cols-4">
+        <TabsList className="grid w-full max-w-3xl grid-cols-5">
           <TabsTrigger value="account" className="gap-2">
             <User className="h-4 w-4" />
             Account
@@ -64,19 +66,36 @@ function SettingsContent() {
             <Sparkles className="h-4 w-4" />
             AI Usage
           </TabsTrigger>
+          <TabsTrigger value="performance" className="gap-2">
+            <Gauge className="h-4 w-4" />
+            Performance
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="account" className="mt-6">
-          <ProfileCards />
+          <Suspense fallback={<div className="text-sm text-muted-foreground">Loading…</div>}>
+            <ProfileCards />
+          </Suspense>
         </TabsContent>
         <TabsContent value="billing" className="mt-6">
-          <BillingCards />
+          <Suspense fallback={<div className="text-sm text-muted-foreground">Loading…</div>}>
+            <BillingCards />
+          </Suspense>
         </TabsContent>
         <TabsContent value="security" className="mt-6">
-          <SecurityCards />
+          <Suspense fallback={<div className="text-sm text-muted-foreground">Loading…</div>}>
+            <SecurityCards />
+          </Suspense>
         </TabsContent>
         <TabsContent value="ai" className="mt-6">
-          <AiUsageCards />
+          <Suspense fallback={<div className="text-sm text-muted-foreground">Loading…</div>}>
+            <AiUsageCards />
+          </Suspense>
+        </TabsContent>
+        <TabsContent value="performance" className="mt-6">
+          <Suspense fallback={<div className="text-sm text-muted-foreground">Loading…</div>}>
+            <PerformanceCards />
+          </Suspense>
         </TabsContent>
       </Tabs>
     </div>
