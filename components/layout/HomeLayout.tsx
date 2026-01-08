@@ -1,5 +1,5 @@
 import React, { ReactNode } from "react";
-import Navigation from "@/components/layout/navigation/Navigation";
+import MarketingNavigation from "@/components/layout/navigation/MarketingNavigation";
 import Footer from "@/components/layout/footer/Footer";
 
 interface PageLayoutProps {
@@ -11,7 +11,7 @@ export default function HomeLayout({
 }: PageLayoutProps): React.ReactElement {
   return (
     <div className="flex flex-col min-h-screen">
-      <Navigation />
+      <MarketingNavigation />
       <div className="flex-grow">{children}</div>
       <Footer />
     </div>

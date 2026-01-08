@@ -159,8 +159,11 @@ export default function Navigation() {
 
   useEffect(() => {
     setProfileUrl(profileUrl || "");
-    setIsProfileUrlLoading(false);
-  }, [profileUrl, setIsProfileUrlLoading, setProfileUrl]);
+  }, [profileUrl, setProfileUrl]);
+
+  useEffect(() => {
+    setIsProfileUrlLoading(isProfileUrlLoading);
+  }, [isProfileUrlLoading, setIsProfileUrlLoading]);
 
   //***** GET SUBSCRIPTION DETAILS *****//
   const { data: subscription, isLoading: isSubscriptionLoading } = useQuery({
@@ -174,9 +177,17 @@ export default function Navigation() {
   });
 
   useEffect(() => {
-    setSubscription(subscription as ISubscriptionDetails);
-    setIsSubscriptionLoading(false);
-  }, [setIsSubscriptionLoading, setSubscription, subscription]);
+    setIsSubscriptionLoading(isSubscriptionLoading);
+  }, [isSubscriptionLoading, setIsSubscriptionLoading]);
+
+  useEffect(() => {
+    const status = (subscription as any)?.status;
+    if (status === "active" || status === "inactive") {
+      setSubscription(subscription as ISubscriptionDetails);
+    } else {
+      setSubscription(null);
+    }
+  }, [setSubscription, subscription]);
 
   const renderAuthSection = () => {
     if (isUserLoading || isProfileUrlLoading || isSubscriptionLoading) {

@@ -210,7 +210,7 @@ export default function Layout({ children }: { children: ReactNode }) {
   }, [destinationIdValue, itineraryIdValue, user?.id]);
 
   //***** GET PROFILE URL *****//
-  const { data: profileUrl } = useQuery({
+  const { data: profileUrl, isLoading: isProfileUrlLoading } = useQuery({
     queryKey: ["profileUrl", user?.id],
     queryFn: async () => {
       const supabase = createClient();
@@ -241,11 +241,14 @@ export default function Layout({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     setProfileUrl(profileUrl || "");
-    setIsProfileUrlLoading(false);
-  }, [profileUrl, setProfileUrl, setIsProfileUrlLoading]);
+  }, [profileUrl, setProfileUrl]);
+
+  useEffect(() => {
+    setIsProfileUrlLoading(isProfileUrlLoading);
+  }, [isProfileUrlLoading, setIsProfileUrlLoading]);
 
   //***** GET SUBSCRIPTION DETAILS *****//
-  const { data: subscription } = useQuery({
+  const { data: subscription, isLoading: isSubscriptionLoading } = useQuery({
     queryKey: ["subscription", user?.id],
     queryFn: getSubscriptionDetails,
     enabled: !!user,
@@ -256,9 +259,17 @@ export default function Layout({ children }: { children: ReactNode }) {
   });
 
   useEffect(() => {
-    setSubscription(subscription as ISubscriptionDetails);
-    setIsSubscriptionLoading(false);
-  }, [subscription, setSubscription, setIsSubscriptionLoading]);
+    setIsSubscriptionLoading(isSubscriptionLoading);
+  }, [isSubscriptionLoading, setIsSubscriptionLoading]);
+
+  useEffect(() => {
+    const status = (subscription as any)?.status;
+    if (status === "active" || status === "inactive") {
+      setSubscription(subscription as ISubscriptionDetails);
+    } else {
+      setSubscription(null);
+    }
+  }, [subscription, setSubscription]);
 
 	  const getBreadcrumbText = () => {
 	    if (pathname.includes("/builder")) {

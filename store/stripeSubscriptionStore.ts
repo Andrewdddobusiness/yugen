@@ -12,7 +12,7 @@ export interface ISubscriptionDetails {
 interface ISubscriptionStore {
   subscription: ISubscriptionDetails | null;
   isSubscriptionLoading: boolean;
-  setSubscription: (subscription: ISubscriptionDetails) => void;
+  setSubscription: (subscription: ISubscriptionDetails | null) => void;
   setIsSubscriptionLoading: (isLoading: boolean) => void;
 }
 

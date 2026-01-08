@@ -1,5 +1,6 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -13,9 +14,12 @@ import { freeFeatures, pricingDetails, proFeatures } from "./data";
 import { useStripeSubscriptionStore } from "@/store/stripeSubscriptionStore";
 import { Skeleton } from "@/components/ui/skeleton";
 import ManageSubscriptionButton from "@/components/button/subscription/ManageSubscriptionButton";
+import { useAuth } from "@/components/provider/auth/AuthProvider";
+import { getSubscriptionDetails } from "@/actions/stripe/actions";
 
 export default function PricingPage() {
-  const { subscription, isSubscriptionLoading } = useStripeSubscriptionStore();
+  const { user, loading: isAuthLoading } = useAuth();
+  const { subscription, isSubscriptionLoading, setIsSubscriptionLoading, setSubscription } = useStripeSubscriptionStore();
 
   const [selectedInterval, setSelectedInterval] = useState("monthly");
   const [isMounted, setIsMounted] = useState(false);
@@ -23,6 +27,33 @@ export default function PricingPage() {
   useEffect(() => {
     setIsMounted(true);
   }, []);
+
+  const { data: subscriptionData, isLoading: isLoadingSubscription } = useQuery({
+    queryKey: ["subscription", user?.id],
+    queryFn: getSubscriptionDetails,
+    enabled: !isAuthLoading && !!user?.id,
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+  });
+
+  useEffect(() => {
+    if (!user?.id) {
+      setSubscription(null);
+      setIsSubscriptionLoading(false);
+      return;
+    }
+    setIsSubscriptionLoading(isLoadingSubscription);
+  }, [isLoadingSubscription, setIsSubscriptionLoading, setSubscription, user?.id]);
+
+  useEffect(() => {
+    const status = (subscriptionData as any)?.status;
+    if (status === "active" || status === "inactive") {
+      setSubscription(subscriptionData as any);
+    } else if (subscriptionData) {
+      setSubscription(null);
+    }
+  }, [setSubscription, subscriptionData]);
 
   if (!isMounted) {
     return null;

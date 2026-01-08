@@ -76,8 +76,11 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     setProfileUrl(profileUrl || "");
-    setIsProfileUrlLoading(false);
-  }, [profileUrl, setIsProfileUrlLoading, setProfileUrl]);
+  }, [profileUrl, setProfileUrl]);
+
+  useEffect(() => {
+    setIsProfileUrlLoading(isProfileUrlLoading);
+  }, [isProfileUrlLoading, setIsProfileUrlLoading]);
 
   //***** GET SUBSCRIPTION DETAILS *****//
   const { data: subscription, isLoading: isSubscriptionLoading } = useQuery({
@@ -91,9 +94,17 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   });
 
   useEffect(() => {
-    setSubscription(subscription as ISubscriptionDetails);
-    setIsSubscriptionLoading(false);
-  }, [setIsSubscriptionLoading, setSubscription, subscription]);
+    setIsSubscriptionLoading(isSubscriptionLoading);
+  }, [isSubscriptionLoading, setIsSubscriptionLoading]);
+
+  useEffect(() => {
+    const status = (subscription as any)?.status;
+    if (status === "active" || status === "inactive") {
+      setSubscription(subscription as ISubscriptionDetails);
+    } else {
+      setSubscription(null);
+    }
+  }, [setSubscription, subscription]);
 
   return (
     <SidebarProvider>
