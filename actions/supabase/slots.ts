@@ -1,6 +1,8 @@
 "use server";
 
+import { revalidatePath, revalidateTag } from "next/cache";
 import { createClient } from "@/utils/supabase/server";
+import { builderBootstrapTag } from "@/lib/cacheTags";
 
 const parseIntId = (value: string) => {
   const trimmed = String(value ?? "").trim();
@@ -81,6 +83,8 @@ export async function addActivitiesAsAlternatives(
   }
 
   const supabase = createClient();
+  const { data: auth } = await supabase.auth.getUser();
+  if (!auth?.user) return { success: false, message: "User not authenticated" };
 
   const { data: target, error: targetError } = await supabase
     .from("itinerary_activity")
@@ -267,6 +271,9 @@ export async function addActivitiesAsAlternatives(
     return { success: false, message: "Failed to load slot options", error: slotOptionsError };
   }
 
+  revalidatePath(`/itinerary/${target.itinerary_id}`);
+  revalidateTag(builderBootstrapTag(auth.user.id, String(target.itinerary_id), String(target.itinerary_destination_id)));
+
   return {
     success: true,
     data: {
@@ -287,6 +294,8 @@ export async function updateItinerarySlotTimeRange(
   if (!slotId) return { success: false, message: "Invalid slot id" };
 
   const supabase = createClient();
+  const { data: auth } = await supabase.auth.getUser();
+  if (!auth?.user) return { success: false, message: "User not authenticated" };
 
   const { data: slot, error: slotError } = await supabase
     .from("itinerary_slot")
@@ -332,6 +341,9 @@ export async function updateItinerarySlotTimeRange(
       return { success: false, message: "Failed to update activities in slot", error: updateActivitiesError };
     }
   }
+
+  revalidatePath(`/itinerary/${slot.itinerary_id}`);
+  revalidateTag(builderBootstrapTag(auth.user.id, String(slot.itinerary_id), String(slot.itinerary_destination_id)));
 
   return { success: true, data: { slot: slot as unknown as SlotRow } };
 }

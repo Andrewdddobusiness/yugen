@@ -1,8 +1,9 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { createClient } from "@/utils/supabase/server";
 import { createAdminClient } from "@/utils/supabase/admin";
+import { builderBootstrapTag } from "@/lib/cacheTags";
 import { 
   createActivitySchema,
   scheduleActivitySchema,
@@ -240,6 +241,7 @@ export async function addPlaceToItinerary(
     }
 
     revalidatePath(`/itinerary/${itineraryId}`);
+    revalidateTag(builderBootstrapTag(user.id, itineraryIdValue, destinationIdValue));
 
     return {
       success: true,
@@ -430,6 +432,7 @@ export async function scheduleActivity(data: ScheduleActivityData): Promise<Data
     }
 
     revalidatePath(`/itinerary/${validatedData.itinerary_id}`);
+    revalidateTag(builderBootstrapTag(user.id, String(validatedData.itinerary_id), String(validatedData.itinerary_destination_id)));
 
     return {
       success: true,
@@ -513,6 +516,7 @@ export async function updateActivitySchedule(
     }
 
     revalidatePath(`/itinerary/${activity.itinerary_id}`);
+    revalidateTag(builderBootstrapTag(user.id, String(activity.itinerary_id), String((activity as any).itinerary_destination_id)));
 
     return {
       success: true,
@@ -552,6 +556,7 @@ export async function removeActivityFromSchedule(activityId: number): Promise<Da
       .from("itinerary_activity")
       .select(`
         itinerary_id,
+        itinerary_destination_id,
         itinerary!inner(user_id)
       `)
       .eq("itinerary_activity_id", activityId)
@@ -587,6 +592,7 @@ export async function removeActivityFromSchedule(activityId: number): Promise<Da
     }
 
     revalidatePath(`/itinerary/${activity.itinerary_id}`);
+    revalidateTag(builderBootstrapTag(user.id, String(activity.itinerary_id), String((activity as any).itinerary_destination_id)));
 
     return {
       success: true,
@@ -711,6 +717,8 @@ export async function reorderActivities(
       .from("itinerary_activity")
       .select(`
         itinerary_activity_id,
+        itinerary_id,
+        itinerary_destination_id,
         itinerary!inner(user_id)
       `)
       .in("itinerary_activity_id", activityIds)
@@ -733,10 +741,23 @@ export async function reorderActivities(
 
     await Promise.all(updatePromises);
 
-    // Get itinerary ID for revalidation
-    const itineraryId = (activities as any)?.[0]?.itinerary?.itinerary_id;
-    if (itineraryId) {
-      revalidatePath(`/itinerary/${itineraryId}`);
+    const pairs = new Set<string>();
+    for (const activity of (activities as any[]) ?? []) {
+      const itineraryId = String(activity?.itinerary_id ?? "");
+      const destinationId = String(activity?.itinerary_destination_id ?? "");
+      if (!itineraryId || !destinationId) continue;
+      pairs.add(`${itineraryId}:${destinationId}`);
+    }
+    if (pairs.size === 0) {
+      // Fallback: at least revalidate the itinerary route if present.
+      const itineraryId = String((activities as any)?.[0]?.itinerary_id ?? "");
+      if (itineraryId) revalidatePath(`/itinerary/${itineraryId}`);
+    } else {
+      for (const pair of pairs) {
+        const [itineraryId, destinationId] = pair.split(":");
+        revalidatePath(`/itinerary/${itineraryId}`);
+        revalidateTag(builderBootstrapTag(user.id, itineraryId, destinationId));
+      }
     }
 
     return {

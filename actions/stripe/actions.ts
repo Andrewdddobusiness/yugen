@@ -168,7 +168,7 @@ export async function getSubscriptionDetails() {
         user_uuid: user.id,
       })
       .single() as { data: ISubscriptionOutput | null; error: any };
-    console.log("subscription", subscription);
+
     if (error) {
       console.error("Subscription query error:", error);
       return { status: "error", error };

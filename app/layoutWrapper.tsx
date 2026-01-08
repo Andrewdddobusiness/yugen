@@ -2,6 +2,7 @@
 import { Londrina_Solid, Londrina_Sketch, Nunito } from "next/font/google";
 import Providers from "./providers";
 import { Toaster } from "@/components/ui/toaster";
+import { WebVitalsReporter } from "@/components/telemetry/WebVitalsReporter";
 
 const nunito = Nunito({
   subsets: ["latin"],
@@ -28,6 +29,7 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
     <html lang="en" className={`${nunito.variable} ${londrinaSolid.variable} ${londrinaSketch.variable}`}>
       <body className={nunito.className}>
         <Providers>
+          <WebVitalsReporter />
           {children}
           <Toaster />
         </Providers>

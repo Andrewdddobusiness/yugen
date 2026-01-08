@@ -35,9 +35,11 @@ import {
   updateAiItineraryThreadSummary,
 } from "@/lib/ai/itinerary/chatStore";
 import { summarizeItineraryChat } from "@/lib/ai/itinerary/summarizer";
+import { recordApiRequestMetric } from "@/lib/telemetry/server";
 
 const MAX_OPERATIONS = 25;
 const CONFIRMATION_BATCH_THRESHOLD = 10;
+const SHOULD_LOG_AI_ITINERARY = process.env.AI_ITINERARY_LOG === "1";
 
 const jsonError = (status: number, code: string, message: string, details?: unknown, headers?: HeadersInit) => {
   return NextResponse.json(
@@ -91,116 +93,176 @@ const requireAiAssistantAccess = async (supabase: ReturnType<typeof createClient
 };
 
 export async function GET(request: NextRequest) {
-  const itineraryId = request.nextUrl.searchParams.get("itineraryId") ?? "";
-  const destinationId = request.nextUrl.searchParams.get("destinationId") ?? "";
+  const startedAt = performance.now();
+  let status = 500;
+  let userId: string | null = null;
 
-  const parsedItineraryId = ItineraryIdSchema.safeParse(itineraryId);
-  const parsedDestinationId = DestinationIdSchema.safeParse(destinationId);
-  if (!parsedItineraryId.success || !parsedDestinationId.success) {
-    return jsonError(400, "invalid_request", "Invalid itinerary or destination id");
-  }
+  const respond = <T extends Response>(response: T) => {
+    status = response.status;
+    return response;
+  };
 
-  const supabase = createClient();
-  const { data: auth } = await supabase.auth.getUser();
-  if (!auth?.user) {
-    return jsonError(401, "unauthorized", "You must be signed in to use the AI assistant.");
-  }
+  const jsonErrorTimed = (code: number, errorCode: string, message: string, details?: unknown, headers?: HeadersInit) =>
+    respond(jsonError(code, errorCode, message, details, headers));
 
-  const ip = getClientIp(request);
-  const limiter = rateLimit(`ai_itinerary:get:${auth.user.id}:${ip}`, { windowMs: 60_000, max: 60 });
-  if (!limiter.allowed) {
-    return jsonError(429, "rate_limited", "Too many requests. Please slow down.", undefined, rateLimitHeaders(limiter));
-  }
-
-  const access = await requireAiAssistantAccess(supabase, auth.user.id);
-  if (!access.ok) return access.response;
-
-  let thread: { ai_itinerary_thread_id: string; summary: string | null; draft: unknown | null } | null = null;
   try {
-    const { data } = await supabase
-      .from("ai_itinerary_thread")
-      .select("ai_itinerary_thread_id,summary,draft")
-      .eq("itinerary_id", Number(itineraryId))
-      .eq("itinerary_destination_id", Number(destinationId))
-      .maybeSingle();
+    const itineraryId = request.nextUrl.searchParams.get("itineraryId") ?? "";
+    const destinationId = request.nextUrl.searchParams.get("destinationId") ?? "";
 
-    if (data?.ai_itinerary_thread_id) {
-      thread = {
-        ai_itinerary_thread_id: String((data as any).ai_itinerary_thread_id),
-        summary: (data as any).summary ?? null,
-        draft: (data as any).draft ?? null,
-      };
+    const parsedItineraryId = ItineraryIdSchema.safeParse(itineraryId);
+    const parsedDestinationId = DestinationIdSchema.safeParse(destinationId);
+    if (!parsedItineraryId.success || !parsedDestinationId.success) {
+      return jsonErrorTimed(400, "invalid_request", "Invalid itinerary or destination id");
     }
-  } catch {
-    // ignore
-  }
 
-  if (!thread) {
-    return NextResponse.json({ ok: true, messages: [], summary: null });
-  }
+    const supabase = createClient();
+    const { data: auth } = await supabase.auth.getUser();
+    if (!auth?.user) {
+      return jsonErrorTimed(401, "unauthorized", "You must be signed in to use the AI assistant.");
+    }
+    userId = auth.user.id;
 
-  try {
-    const rows = await listAiItineraryMessages({
-      supabase,
-      threadId: thread.ai_itinerary_thread_id,
-      limit: 80,
+    const ip = getClientIp(request);
+    const limiter = rateLimit(`ai_itinerary:get:${auth.user.id}:${ip}`, { windowMs: 60_000, max: 60 });
+    if (!limiter.allowed) {
+      return jsonErrorTimed(
+        429,
+        "rate_limited",
+        "Too many requests. Please slow down.",
+        undefined,
+        rateLimitHeaders(limiter)
+      );
+    }
+
+    const access = await requireAiAssistantAccess(supabase, auth.user.id);
+    if (!access.ok) return respond(access.response);
+
+    let thread: { ai_itinerary_thread_id: string; summary: string | null; draft: unknown | null } | null = null;
+    try {
+      const { data } = await supabase
+        .from("ai_itinerary_thread")
+        .select("ai_itinerary_thread_id,summary,draft")
+        .eq("itinerary_id", Number(itineraryId))
+        .eq("itinerary_destination_id", Number(destinationId))
+        .maybeSingle();
+
+      if (data?.ai_itinerary_thread_id) {
+        thread = {
+          ai_itinerary_thread_id: String((data as any).ai_itinerary_thread_id),
+          summary: (data as any).summary ?? null,
+          draft: (data as any).draft ?? null,
+        };
+      }
+    } catch {
+      // ignore
+    }
+
+    if (!thread) {
+      return respond(NextResponse.json({ ok: true, messages: [], summary: null }));
+    }
+
+    try {
+      const rows = await listAiItineraryMessages({
+        supabase,
+        threadId: thread.ai_itinerary_thread_id,
+        limit: 80,
+      });
+
+      const messages = rows
+        .filter((row) => row.role === "user" || row.role === "assistant")
+        .map((row) => ({ role: row.role, content: row.content }));
+
+      const draftParsed = OperationSchema.array().max(25).safeParse(thread.draft);
+
+      return respond(
+        NextResponse.json({
+          ok: true,
+          threadId: thread.ai_itinerary_thread_id,
+          summary: thread.summary ?? null,
+          messages,
+          draftOperations: draftParsed.success ? draftParsed.data : null,
+        })
+      );
+    } catch (error) {
+      console.error("Failed to load AI chat history:", error);
+      return respond(NextResponse.json({ ok: true, messages: [], summary: thread.summary ?? null }));
+    }
+  } finally {
+    void recordApiRequestMetric({
+      userId,
+      route: "/api/ai/itinerary",
+      method: request.method,
+      status,
+      durationMs: performance.now() - startedAt,
     });
-
-    const messages = rows
-      .filter((row) => row.role === "user" || row.role === "assistant")
-      .map((row) => ({ role: row.role, content: row.content }));
-
-    const draftParsed = OperationSchema.array().max(25).safeParse(thread.draft);
-
-    return NextResponse.json({
-      ok: true,
-      threadId: thread.ai_itinerary_thread_id,
-      summary: thread.summary ?? null,
-      messages,
-      draftOperations: draftParsed.success ? draftParsed.data : null,
-    });
-  } catch (error) {
-    console.error("Failed to load AI chat history:", error);
-    return NextResponse.json({ ok: true, messages: [], summary: thread.summary ?? null });
   }
 }
 
 export async function DELETE(request: NextRequest) {
-  const itineraryId = request.nextUrl.searchParams.get("itineraryId") ?? "";
-  const destinationId = request.nextUrl.searchParams.get("destinationId") ?? "";
+  const startedAt = performance.now();
+  let status = 500;
+  let userId: string | null = null;
 
-  const parsedItineraryId = ItineraryIdSchema.safeParse(itineraryId);
-  const parsedDestinationId = DestinationIdSchema.safeParse(destinationId);
-  if (!parsedItineraryId.success || !parsedDestinationId.success) {
-    return jsonError(400, "invalid_request", "Invalid itinerary or destination id");
+  const respond = <T extends Response>(response: T) => {
+    status = response.status;
+    return response;
+  };
+
+  const jsonErrorTimed = (code: number, errorCode: string, message: string, details?: unknown, headers?: HeadersInit) =>
+    respond(jsonError(code, errorCode, message, details, headers));
+
+  try {
+    const itineraryId = request.nextUrl.searchParams.get("itineraryId") ?? "";
+    const destinationId = request.nextUrl.searchParams.get("destinationId") ?? "";
+
+    const parsedItineraryId = ItineraryIdSchema.safeParse(itineraryId);
+    const parsedDestinationId = DestinationIdSchema.safeParse(destinationId);
+    if (!parsedItineraryId.success || !parsedDestinationId.success) {
+      return jsonErrorTimed(400, "invalid_request", "Invalid itinerary or destination id");
+    }
+
+    const supabase = createClient();
+    const { data: auth } = await supabase.auth.getUser();
+    if (!auth?.user) {
+      return jsonErrorTimed(401, "unauthorized", "You must be signed in to use the AI assistant.");
+    }
+    userId = auth.user.id;
+
+    if (!isSameOrigin(request)) {
+      return jsonErrorTimed(403, "forbidden", "Invalid request origin.");
+    }
+
+    const ip = getClientIp(request);
+    const limiter = rateLimit(`ai_itinerary:delete:${auth.user.id}:${ip}`, { windowMs: 60_000, max: 30 });
+    if (!limiter.allowed) {
+      return jsonErrorTimed(
+        429,
+        "rate_limited",
+        "Too many requests. Please slow down.",
+        undefined,
+        rateLimitHeaders(limiter)
+      );
+    }
+
+    const access = await requireAiAssistantAccess(supabase, auth.user.id);
+    if (!access.ok) return respond(access.response);
+
+    await supabase
+      .from("ai_itinerary_thread")
+      .update({ draft: null })
+      .eq("itinerary_id", Number(itineraryId))
+      .eq("itinerary_destination_id", Number(destinationId));
+
+    return respond(NextResponse.json({ ok: true }));
+  } finally {
+    void recordApiRequestMetric({
+      userId,
+      route: "/api/ai/itinerary",
+      method: request.method,
+      status,
+      durationMs: performance.now() - startedAt,
+    });
   }
-
-  const supabase = createClient();
-  const { data: auth } = await supabase.auth.getUser();
-  if (!auth?.user) {
-    return jsonError(401, "unauthorized", "You must be signed in to use the AI assistant.");
-  }
-
-  if (!isSameOrigin(request)) {
-    return jsonError(403, "forbidden", "Invalid request origin.");
-  }
-
-  const ip = getClientIp(request);
-  const limiter = rateLimit(`ai_itinerary:delete:${auth.user.id}:${ip}`, { windowMs: 60_000, max: 30 });
-  if (!limiter.allowed) {
-    return jsonError(429, "rate_limited", "Too many requests. Please slow down.", undefined, rateLimitHeaders(limiter));
-  }
-
-  const access = await requireAiAssistantAccess(supabase, auth.user.id);
-  if (!access.ok) return access.response;
-
-  await supabase
-    .from("ai_itinerary_thread")
-    .update({ draft: null })
-    .eq("itinerary_id", Number(itineraryId))
-    .eq("itinerary_destination_id", Number(destinationId));
-
-  return NextResponse.json({ ok: true });
 }
 
 const normalizeTimeToHHmmss = (value: string | null): string | null => {
@@ -583,115 +645,140 @@ const buildPreviewLines = (
 };
 
 export async function POST(request: NextRequest) {
-  if (!isSameOrigin(request)) {
-    return jsonError(403, "forbidden", "Invalid request origin.");
-  }
+  const startedAt = performance.now();
+  let status = 500;
+  let userId: string | null = null;
 
-  let body: unknown;
+  const respond = <T extends Response>(response: T) => {
+    status = response.status;
+    return response;
+  };
+
+  const jsonErrorTimed = (code: number, errorCode: string, message: string, details?: unknown, headers?: HeadersInit) =>
+    respond(jsonError(code, errorCode, message, details, headers));
+
   try {
-    body = await request.json();
-  } catch {
-    return jsonError(400, "bad_json", "Request body must be valid JSON");
-  }
+    if (!isSameOrigin(request)) {
+      return jsonErrorTimed(403, "forbidden", "Invalid request origin.");
+    }
 
-  const parsed = ItineraryAssistantRequestSchema.safeParse(body);
-  if (!parsed.success) {
-    return jsonError(400, "invalid_request", "Invalid request payload", parsed.error.format());
-  }
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return jsonErrorTimed(400, "bad_json", "Request body must be valid JSON");
+    }
 
-  const supabase = createClient();
-  const { data: auth } = await supabase.auth.getUser();
-  if (!auth?.user) {
-    return jsonError(401, "unauthorized", "You must be signed in to use the AI assistant.");
-  }
+    const parsed = ItineraryAssistantRequestSchema.safeParse(body);
+    if (!parsed.success) {
+      return jsonErrorTimed(400, "invalid_request", "Invalid request payload", parsed.error.format());
+    }
 
-  const ip = getClientIp(request);
-  const limiter = rateLimit(`ai_itinerary:post:${parsed.data.mode}:${auth.user.id}:${ip}`, {
-    windowMs: 60_000,
-    max: parsed.data.mode === "apply" ? 10 : 20,
-  });
-  if (!limiter.allowed) {
-    return jsonError(429, "rate_limited", "Too many requests. Please slow down.", undefined, rateLimitHeaders(limiter));
-  }
+    const supabase = createClient();
+    const { data: auth } = await supabase.auth.getUser();
+    if (!auth?.user) {
+      return jsonErrorTimed(401, "unauthorized", "You must be signed in to use the AI assistant.");
+    }
+    userId = auth.user.id;
 
-  const access = await requireAiAssistantAccess(supabase, auth.user.id);
-  if (!access.ok) return access.response;
-
-  const { itineraryId, destinationId } = parsed.data;
-  const quota = await checkAiQuota({ supabase, userId: auth.user.id, tier: access.tier });
-
-  const bootstrap = await fetchBuilderBootstrap(itineraryId, destinationId);
-  if (!bootstrap.success) {
-    return jsonError(500, "bootstrap_failed", "Failed to load itinerary context", bootstrap.error ?? bootstrap.message);
-  }
-
-  let threadId: string;
-  let threadSummary: string | null = null;
-  let threadDraft: Operation[] = [];
-  try {
-    const thread = await getOrCreateAiItineraryThread({
-      supabase,
-      itineraryId,
-      destinationId,
-      userId: auth.user.id,
+    const ip = getClientIp(request);
+    const limiter = rateLimit(`ai_itinerary:post:${parsed.data.mode}:${auth.user.id}:${ip}`, {
+      windowMs: 60_000,
+      max: parsed.data.mode === "apply" ? 10 : 20,
     });
-    threadId = thread.ai_itinerary_thread_id;
-    threadSummary = thread.summary ?? null;
-    threadDraft = OperationSchema.array().max(25).safeParse(thread.draft).success
-      ? (OperationSchema.array().max(25).parse(thread.draft) as any)
-      : [];
-  } catch (error) {
-    console.error("Failed to create AI chat thread:", error);
-    return jsonError(500, "chat_store_failed", "Something went wrong. Please try again.");
-  }
+    if (!limiter.allowed) {
+      return jsonErrorTimed(
+        429,
+        "rate_limited",
+        "Too many requests. Please slow down.",
+        undefined,
+        rateLimitHeaders(limiter)
+      );
+    }
 
-  let runId: string | null = null;
-  try {
-    const run = await startAiItineraryRun({
-      supabase,
-      threadId,
-      mode: parsed.data.mode,
-    });
-    runId = run.ai_itinerary_run_id;
-  } catch (error) {
-    console.error("Failed to start AI run:", error);
-  }
+    const access = await requireAiAssistantAccess(supabase, auth.user.id);
+    if (!access.ok) return respond(access.response);
 
-  const destination = (bootstrap.data as any)?.destination ?? null;
-  const itinerary = (bootstrap.data as any)?.itinerary ?? null;
-  const fromDate = isIsoDate(destination?.from_date) ? destination.from_date : null;
-  const toDate = isIsoDate(destination?.to_date) ? destination.to_date : null;
-  const rawActivities = Array.isArray((bootstrap.data as any)?.activities) ? (bootstrap.data as any).activities : [];
-  const activeActivities = rawActivities.filter((row: any) => row?.deleted_at == null);
+    const { itineraryId, destinationId } = parsed.data;
+    const quota = await checkAiQuota({ supabase, userId: auth.user.id, tier: access.tier });
 
-  const activityById = new Map<string, any>();
-  for (const row of activeActivities) {
-    const id = String(row?.itinerary_activity_id ?? "");
-    if (!id) continue;
-    activityById.set(id, row);
-  }
+    const bootstrap = await fetchBuilderBootstrap(itineraryId, destinationId);
+    if (!bootstrap.success) {
+      return jsonErrorTimed(
+        500,
+        "bootstrap_failed",
+        "Failed to load itinerary context",
+        bootstrap.error ?? bootstrap.message
+      );
+    }
 
-  if (parsed.data.mode === "plan") {
-    const embeddingModel = process.env.OPENAI_EMBEDDING_MODEL ?? "text-embedding-3-small";
-    const userText = parsed.data.message.trim();
+    let threadId: string;
+    let threadSummary: string | null = null;
+    let threadDraft: Operation[] = [];
+    try {
+      const thread = await getOrCreateAiItineraryThread({
+        supabase,
+        itineraryId,
+        destinationId,
+        userId: auth.user.id,
+      });
+      threadId = thread.ai_itinerary_thread_id;
+      threadSummary = thread.summary ?? null;
+      threadDraft = OperationSchema.array().max(25).safeParse(thread.draft).success
+        ? (OperationSchema.array().max(25).parse(thread.draft) as any)
+        : [];
+    } catch (error) {
+      console.error("Failed to create AI chat thread:", error);
+      return jsonErrorTimed(500, "chat_store_failed", "Something went wrong. Please try again.");
+    }
 
-    if (!quota.allowed) {
-      if (runId) {
-        await finishAiItineraryRun({
-          supabase,
-          runId,
-          status: "failed",
-          error: { code: "quota_exceeded" },
+    let runId: string | null = null;
+    try {
+      const run = await startAiItineraryRun({
+        supabase,
+        threadId,
+        mode: parsed.data.mode,
+      });
+      runId = run.ai_itinerary_run_id;
+    } catch (error) {
+      console.error("Failed to start AI run:", error);
+    }
+
+    const destination = (bootstrap.data as any)?.destination ?? null;
+    const itinerary = (bootstrap.data as any)?.itinerary ?? null;
+    const fromDate = isIsoDate(destination?.from_date) ? destination.from_date : null;
+    const toDate = isIsoDate(destination?.to_date) ? destination.to_date : null;
+    const rawActivities = Array.isArray((bootstrap.data as any)?.activities) ? (bootstrap.data as any).activities : [];
+    const activeActivities = rawActivities.filter((row: any) => row?.deleted_at == null);
+
+    const activityById = new Map<string, any>();
+    for (const row of activeActivities) {
+      const id = String(row?.itinerary_activity_id ?? "");
+      if (!id) continue;
+      activityById.set(id, row);
+    }
+
+    if (parsed.data.mode === "plan") {
+      const embeddingModel = process.env.OPENAI_EMBEDDING_MODEL ?? "text-embedding-3-small";
+      const userText = parsed.data.message.trim();
+
+      if (!quota.allowed) {
+        if (runId) {
+          await finishAiItineraryRun({
+            supabase,
+            runId,
+            status: "failed",
+            error: { code: "quota_exceeded" },
+          });
+        }
+
+        return jsonErrorTimed(429, "ai_quota_exceeded", "You’ve reached your monthly AI usage limit.", {
+          periodStart: quota.periodStart,
+          periodEnd: quota.periodEnd,
+          limit: quota.limit,
+          used: quota.used,
         });
       }
-
-      return jsonError(429, "ai_quota_exceeded", "You’ve reached your monthly AI usage limit.", {
-        periodStart: quota.periodStart,
-        periodEnd: quota.periodEnd,
-        limit: quota.limit,
-        used: quota.used,
-      });
-    }
 
     let planStepId: number | null = null;
     if (runId) {
@@ -809,15 +896,17 @@ export async function POST(request: NextRequest) {
         resolvedOperations.push(operation as Operation);
       }
 
-      console.info("[ai-itinerary] plan", {
-        itineraryId,
-        destinationId,
-        userId: auth.user.id,
-        proposedCount: plan.operations.length,
-        resolvedCount: resolvedOperations.length,
-        droppedCount: dropped,
-        clarificationCount: clarifications.length,
-      });
+      if (SHOULD_LOG_AI_ITINERARY) {
+        console.info("[ai-itinerary] plan", {
+          itineraryId,
+          destinationId,
+          userId: auth.user.id,
+          proposedCount: plan.operations.length,
+          resolvedCount: resolvedOperations.length,
+          droppedCount: dropped,
+          clarificationCount: clarifications.length,
+        });
+      }
 
       let payload: PlanResponsePayload;
 
@@ -952,7 +1041,7 @@ export async function POST(request: NextRequest) {
         await finishAiItineraryRun({ supabase, runId, status: "succeeded" });
       }
 
-      return NextResponse.json({ ok: true, mode: "plan", ...payload });
+      return respond(NextResponse.json({ ok: true, mode: "plan", ...payload }));
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to plan edits";
       const isMissingApiKey = /OPENAI_API_KEY/i.test(message);
@@ -971,7 +1060,7 @@ export async function POST(request: NextRequest) {
         await finishAiItineraryRun({ supabase, runId, status: "failed", error: { code } });
       }
 
-      return jsonError(500, code, safeMessage);
+      return jsonErrorTimed(500, code, safeMessage);
     }
   }
 
@@ -1002,20 +1091,18 @@ export async function POST(request: NextRequest) {
         error: { code: "confirmation_required" },
       });
     }
-    return jsonError(
-      409,
-      "confirmation_required",
-      "These changes require confirmation. Please confirm and retry."
-    );
+    return jsonErrorTimed(409, "confirmation_required", "These changes require confirmation. Please confirm and retry.");
   }
 
-  console.info("[ai-itinerary] apply", {
-    itineraryId,
-    destinationId,
-    userId: auth.user.id,
-    operationCount: operations.length,
-    confirmed: parsed.data.confirmed === true,
-  });
+  if (SHOULD_LOG_AI_ITINERARY) {
+    console.info("[ai-itinerary] apply", {
+      itineraryId,
+      destinationId,
+      userId: auth.user.id,
+      operationCount: operations.length,
+      confirmed: parsed.data.confirmed === true,
+    });
+  }
 
   const applied: ApplyResponsePayload["applied"] = [];
   let halted = false;
@@ -1210,14 +1297,16 @@ export async function POST(request: NextRequest) {
     bootstrap: refreshed.success ? refreshed.data : undefined,
   };
 
-  console.info("[ai-itinerary] apply_result", {
-    itineraryId,
-    destinationId,
-    userId: auth.user.id,
-    okCount,
-    failedCount: applied.length - okCount,
-    skippedCount,
-  });
+  if (SHOULD_LOG_AI_ITINERARY) {
+    console.info("[ai-itinerary] apply_result", {
+      itineraryId,
+      destinationId,
+      userId: auth.user.id,
+      okCount,
+      failedCount: applied.length - okCount,
+      skippedCount,
+    });
+  }
 
   try {
     const embeddingModel = process.env.OPENAI_EMBEDDING_MODEL ?? "text-embedding-3-small";
@@ -1270,5 +1359,14 @@ export async function POST(request: NextRequest) {
     });
   }
 
-  return NextResponse.json({ ok: true, mode: "apply", ...payload });
+  return respond(NextResponse.json({ ok: true, mode: "apply", ...payload }));
+  } finally {
+    void recordApiRequestMetric({
+      userId,
+      route: "/api/ai/itinerary",
+      method: request.method,
+      status,
+      durationMs: performance.now() - startedAt,
+    });
+  }
 }

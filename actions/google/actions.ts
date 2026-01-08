@@ -125,12 +125,15 @@ export const searchPlacesByText = async (
         },
       };
 
-      console.log("Text Search API request:", { 
-        requestBody, 
-        apiKey: GOOGLE_MAPS_API_KEY ? "present" : "missing",
-        coordinates: { latitude, longitude },
-        validRadius 
-      });
+      const shouldLog = process.env.DEBUG_GOOGLE_PLACES === "1";
+      if (shouldLog) {
+        console.log("Text Search API request:", {
+          requestBody,
+          apiKey: GOOGLE_MAPS_API_KEY ? "present" : "missing",
+          coordinates: { latitude, longitude },
+          validRadius,
+        });
+      }
 
       const response = await fetch("https://places.googleapis.com/v1/places:searchText", {
         method: "POST",
@@ -149,14 +152,18 @@ export const searchPlacesByText = async (
       }
 
       const data = await response.json();
-      console.log("Text Search API response:", { 
-        placesCount: data.places?.length || 0, 
-        firstPlace: data.places?.[0] ? {
-          id: data.places[0].id,
-          displayName: data.places[0].displayName,
-          location: data.places[0].location
-        } : null 
-      });
+      if (shouldLog) {
+        console.log("Text Search API response:", {
+          placesCount: data.places?.length || 0,
+          firstPlace: data.places?.[0]
+            ? {
+                id: data.places[0].id,
+                displayName: data.places[0].displayName,
+                location: data.places[0].location,
+              }
+            : null,
+        });
+      }
       return data.places?.map(mapGooglePlaceToActivity) || [];
     },
     5 * 60 * 1000
