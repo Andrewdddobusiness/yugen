@@ -14,6 +14,11 @@ import type {
   DatabaseResponse 
 } from "@/types/database";
 
+export type ItineraryDestinationSummary = Pick<
+  ItineraryDestination,
+  "itinerary_destination_id" | "city" | "country" | "from_date" | "to_date" | "order_number"
+>;
+
 /**
  * Creates a new destination for an itinerary
  * Note: This is typically handled by createItinerary, but provided for direct destination creation
@@ -473,6 +478,66 @@ export async function searchCities(
         message: error.message || "An unexpected error occurred",
         details: error
       }
+    };
+  }
+}
+
+/**
+ * Lists all destinations for an itinerary (lightweight summary).
+ * Used for timeline UIs like calendar city labels.
+ */
+export async function listItineraryDestinationsSummary(
+  itineraryId: string
+): Promise<DatabaseResponse<ItineraryDestinationSummary[]>> {
+  const supabase = createClient();
+
+  const normalizedItineraryId = String(itineraryId ?? "").trim();
+  if (!/^\d+$/.test(normalizedItineraryId)) {
+    return {
+      success: false,
+      error: { message: "Invalid itinerary id" },
+    };
+  }
+
+  try {
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+
+    if (userError || !user) {
+      return {
+        success: false,
+        error: { message: "User not authenticated" },
+      };
+    }
+
+    const { data, error } = await supabase
+      .from("itinerary_destination")
+      .select("itinerary_destination_id,city,country,from_date,to_date,order_number")
+      .eq("itinerary_id", Number(normalizedItineraryId))
+      .order("order_number", { ascending: true });
+
+    if (error) {
+      return {
+        success: false,
+        error: {
+          message: "Failed to fetch itinerary destinations",
+          code: error.code,
+          details: error,
+        },
+      };
+    }
+
+    return {
+      success: true,
+      data: (data ?? []) as ItineraryDestinationSummary[],
+    };
+  } catch (error: any) {
+    console.error("Error in listItineraryDestinationsSummary:", error);
+    return {
+      success: false,
+      error: {
+        message: error.message || "An unexpected error occurred",
+        details: error,
+      },
     };
   }
 }

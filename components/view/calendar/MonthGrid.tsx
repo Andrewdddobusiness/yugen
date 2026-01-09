@@ -8,11 +8,15 @@ import { useItineraryActivityStore } from "@/store/itineraryActivityStore";
 import { useItineraryLayoutStore } from "@/store/itineraryLayoutStore";
 import { ACTIVITY_ACCENT_DOT_CLASSES, getActivityThemeForTypes } from "@/lib/activityAccent";
 import { colors } from "@/lib/colors/colors";
+import type { ItineraryDestinationSummary } from "@/actions/supabase/destinations";
+import { getCityLabelForDateKey } from "@/lib/itinerary/cityTimeline";
+import { CityLabelPill } from "./CityLabelPill";
 
 interface MonthGridProps {
   monthDate: Date;
   days: Date[];
   scheduledActivities: ScheduledActivity[];
+  destinations?: ItineraryDestinationSummary[];
   onSelectDate?: (date: Date) => void;
   className?: string;
 }
@@ -37,6 +41,7 @@ export function MonthGrid({
   monthDate,
   days,
   scheduledActivities,
+  destinations,
   onSelectDate,
   className,
 }: MonthGridProps) {
@@ -45,6 +50,7 @@ export function MonthGrid({
   const activityCategoryAccents = useItineraryLayoutStore((s) => s.activityCategoryAccents);
   const activityCategoryCustomColors = useItineraryLayoutStore((s) => s.activityCategoryCustomColors);
   const activeDays = useItineraryLayoutStore((s) => s.viewStates.calendar.activeDays ?? []);
+  const showCityLabels = useItineraryLayoutStore((s) => s.viewStates.calendar.showCityLabels);
   const activeDaySet = useMemo(() => new Set(activeDays ?? []), [activeDays]);
 
   const activitiesByDay = useMemo(() => {
@@ -130,6 +136,10 @@ export function MonthGrid({
           const isActiveDay = activeDaySet.has(dayKey);
           const dayColor = getDayColor(day);
           const dayActivities = activitiesByDay.get(dayKey) ?? [];
+          const cityLabel =
+            showCityLabels && destinations?.length
+              ? getCityLabelForDateKey(dayKey, destinations)
+              : null;
 
           const isLastColumn = index % 7 === 6;
           const cellEvents = dayActivities.slice(0, 3);
@@ -170,6 +180,16 @@ export function MonthGrid({
                   {format(day, "d")}
                 </div>
               </div>
+
+              {cityLabel ? (
+                <div className="mt-1 max-w-full">
+                  <CityLabelPill
+                    label={cityLabel}
+                    size="sm"
+                    className={cn(!inMonth && "opacity-80")}
+                  />
+                </div>
+              ) : null}
 
               <div className="mt-1 space-y-1 min-h-0 overflow-hidden">
                 {cellEvents.map((activity) => {

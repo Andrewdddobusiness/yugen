@@ -20,6 +20,9 @@ import { useItineraryActivityStore } from "@/store/itineraryActivityStore";
 import { SidebarActivityDragOverlay } from "./SidebarActivityDragOverlay";
 import { useItineraryLayoutStore } from "@/store/itineraryLayoutStore";
 import { colors } from "@/lib/colors/colors";
+import type { ItineraryDestinationSummary } from "@/actions/supabase/destinations";
+import { getCityLabelForDateKey } from "@/lib/itinerary/cityTimeline";
+import { CityLabelPill } from "./CityLabelPill";
 
 const DAY_OF_WEEK_PALETTE = [
   colors.Blue, // Sun
@@ -32,6 +35,7 @@ const DAY_OF_WEEK_PALETTE = [
 ];
 
 const EMPTY_ACTIVE_DAYS: string[] = [];
+const CITY_HEADER_HEIGHT_PX = 34;
 
 function getDayColor(date: Date) {
   return DAY_OF_WEEK_PALETTE[date.getDay()] ?? colors.Blue;
@@ -59,6 +63,7 @@ interface CalendarLayoutProps {
   days: Date[];
   timeSlots: TimeSlot[];
   scheduledActivities: ScheduledActivity[];
+  destinations?: ItineraryDestinationSummary[];
 
   // Drag & drop handlers
   onDragStart: (event: any) => void;
@@ -125,6 +130,7 @@ export function CalendarLayout({
   days,
   timeSlots,
   scheduledActivities,
+  destinations,
   onDragStart,
   onDragMove,
   onDragOver,
@@ -147,6 +153,7 @@ export function CalendarLayout({
   );
   const { itineraryActivities } = useItineraryActivityStore();
   const activeDays = useItineraryLayoutStore((s) => s.viewStates.calendar.activeDays);
+  const showCityLabels = useItineraryLayoutStore((s) => s.viewStates.calendar.showCityLabels);
   const saveViewState = useItineraryLayoutStore((s) => s.saveViewState);
 
   const visibleDayKeys = useMemo(
@@ -266,6 +273,7 @@ export function CalendarLayout({
             monthDate={selectedDate}
             days={days}
             scheduledActivities={scheduledActivities}
+            destinations={destinations}
             onSelectDate={(date) => {
               toggleActiveDay(date);
               onDateChange?.(date);
@@ -275,92 +283,128 @@ export function CalendarLayout({
       ) : (
         <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden bg-bg-0 dark:bg-ink-900">
           {/* Sticky column headers (Sun/Mon/...) */}
-          <div
-            className="sticky top-0 z-50 flex items-stretch border-b border-stroke-200/70 bg-bg-0/90 backdrop-blur-sm"
-            style={{ height: CALENDAR_HEADER_HEIGHT_PX }}
-          >
-            <div className="w-24 flex-shrink-0 border-r border-stroke-200 bg-bg-0/70" />
-            <div className="flex-1 flex min-w-0">
-              {days.map((day, dayIndex) => {
-                const dayKey = visibleDayKeys[dayIndex] ?? format(day, "yyyy-MM-dd");
-                const isActiveDay = activeDaySet.has(dayKey);
-                const dayColor = getDayColor(day);
-                const isCurrentDay = isToday(day);
-                const isWeekendDay = isWeekend(day);
-                const allDayActivities = allDayActivitiesByDay.get(dayKey) ?? [];
+          <div className="sticky top-0 z-50">
+            {showCityLabels ? (
+              <div
+                className="flex items-stretch border-b border-stroke-200/70 bg-bg-0/90 backdrop-blur-sm"
+                style={{ height: CITY_HEADER_HEIGHT_PX }}
+              >
+                <div className="w-24 flex-shrink-0 border-r border-stroke-200 bg-bg-0/70 flex items-center justify-center">
+                  <div className="text-[10px] text-ink-500 uppercase tracking-wide leading-none">
+                    City
+                  </div>
+                </div>
+                <div className="flex-1 flex min-w-0">
+                  {days.map((day, dayIndex) => {
+                    const dayKey = visibleDayKeys[dayIndex] ?? format(day, "yyyy-MM-dd");
+                    const label =
+                      destinations?.length
+                        ? getCityLabelForDateKey(dayKey, destinations)
+                        : null;
 
-                return (
-                  <div
-                    key={`header:${dayKey}`}
-                    className={cn(
-                      "flex-1 flex flex-col items-center justify-center px-2 py-1 relative",
-                      dayIndex < days.length - 1 && "border-r border-stroke-200/70",
-                      onDateChange && "cursor-pointer hover:bg-bg-50/80",
-                      isCurrentDay && "bg-brand-500/10 border-brand-400/60",
-                      isWeekendDay && "bg-bg-50"
-                    )}
-                    role={onDateChange ? "button" : undefined}
-                    tabIndex={onDateChange ? 0 : undefined}
-                    aria-pressed={onDateChange ? isActiveDay : undefined}
-                    onClick={
-                      onDateChange
-                        ? () => {
-                            toggleActiveDay(day);
-                            onDateChange(day);
-                          }
-                        : undefined
-                    }
-                    onKeyDown={
-                      onDateChange
-                        ? (event) => {
-                            if (event.key === "Enter" || event.key === " ") {
-                              event.preventDefault();
+                    return (
+                      <div
+                        key={`city:${dayKey}`}
+                        className={cn(
+                          "flex-1 flex items-center justify-center px-2",
+                          dayIndex < days.length - 1 && "border-r border-stroke-200/70"
+                        )}
+                      >
+                        {label ? <CityLabelPill label={label} /> : null}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : null}
+
+            <div
+              className="flex items-stretch border-b border-stroke-200/70 bg-bg-0/90 backdrop-blur-sm"
+              style={{ height: CALENDAR_HEADER_HEIGHT_PX }}
+            >
+              <div className="w-24 flex-shrink-0 border-r border-stroke-200 bg-bg-0/70" />
+              <div className="flex-1 flex min-w-0">
+                {days.map((day, dayIndex) => {
+                  const dayKey = visibleDayKeys[dayIndex] ?? format(day, "yyyy-MM-dd");
+                  const isActiveDay = activeDaySet.has(dayKey);
+                  const dayColor = getDayColor(day);
+                  const isCurrentDay = isToday(day);
+                  const isWeekendDay = isWeekend(day);
+                  const allDayActivities = allDayActivitiesByDay.get(dayKey) ?? [];
+
+                  return (
+                    <div
+                      key={`header:${dayKey}`}
+                      className={cn(
+                        "flex-1 flex flex-col items-center justify-center px-2 py-1 relative",
+                        dayIndex < days.length - 1 && "border-r border-stroke-200/70",
+                        onDateChange && "cursor-pointer hover:bg-bg-50/80",
+                        isCurrentDay && "bg-brand-500/10 border-brand-400/60",
+                        isWeekendDay && "bg-bg-50"
+                      )}
+                      role={onDateChange ? "button" : undefined}
+                      tabIndex={onDateChange ? 0 : undefined}
+                      aria-pressed={onDateChange ? isActiveDay : undefined}
+                      onClick={
+                        onDateChange
+                          ? () => {
                               toggleActiveDay(day);
                               onDateChange(day);
                             }
-                          }
-                        : undefined
-                    }
-                  >
-                    {isActiveDay ? (
-                      <div
-                        className="absolute top-0 left-0 right-0 h-1"
-                        style={{ backgroundColor: dayColor }}
-                      />
-                    ) : null}
-                    <div className="text-xs text-ink-500 uppercase tracking-wide leading-none">
-                      {format(day, "EEE")}
-                    </div>
-                    <div
-                      className={cn(
-                        "text-lg font-semibold leading-none",
-                        isCurrentDay ? "text-brand-600" : "text-ink-900"
-                      )}
+                          : undefined
+                      }
+                      onKeyDown={
+                        onDateChange
+                          ? (event) => {
+                              if (event.key === "Enter" || event.key === " ") {
+                                event.preventDefault();
+                                toggleActiveDay(day);
+                                onDateChange(day);
+                              }
+                            }
+                          : undefined
+                      }
                     >
-                      {format(day, "d")}
-                    </div>
-                    {isCurrentDay && (
-                      <div className="w-1 h-1 bg-brand-500 rounded-full mt-1" />
-                    )}
-                    {allDayActivities.length > 0 ? (
-                      <div className="absolute top-1 right-1">
+                      {isActiveDay ? (
                         <div
-                          className={cn(
-                            "min-w-5 h-5 px-1 rounded-full flex items-center justify-center",
-                            "text-[10px] font-semibold",
-                            "bg-brand-500/10 text-brand-700 border border-brand-500/20"
-                          )}
-                          title={`${allDayActivities.length} date-only activit${
-                            allDayActivities.length === 1 ? "y" : "ies"
-                          }`}
-                        >
-                          +{allDayActivities.length}
-                        </div>
+                          className="absolute top-0 left-0 right-0 h-1"
+                          style={{ backgroundColor: dayColor }}
+                        />
+                      ) : null}
+                      <div className="text-xs text-ink-500 uppercase tracking-wide leading-none">
+                        {format(day, "EEE")}
                       </div>
-                    ) : null}
-                  </div>
-                );
-              })}
+                      <div
+                        className={cn(
+                          "text-lg font-semibold leading-none",
+                          isCurrentDay ? "text-brand-600" : "text-ink-900"
+                        )}
+                      >
+                        {format(day, "d")}
+                      </div>
+                      {isCurrentDay && (
+                        <div className="w-1 h-1 bg-brand-500 rounded-full mt-1" />
+                      )}
+                      {allDayActivities.length > 0 ? (
+                        <div className="absolute top-1 right-1">
+                          <div
+                            className={cn(
+                              "min-w-5 h-5 px-1 rounded-full flex items-center justify-center",
+                              "text-[10px] font-semibold",
+                              "bg-brand-500/10 text-brand-700 border border-brand-500/20"
+                            )}
+                            title={`${allDayActivities.length} date-only activit${
+                              allDayActivities.length === 1 ? "y" : "ies"
+                            }`}
+                          >
+                            +{allDayActivities.length}
+                          </div>
+                        </div>
+                      ) : null}
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           </div>
 

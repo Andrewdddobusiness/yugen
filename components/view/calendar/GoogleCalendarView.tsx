@@ -2,8 +2,11 @@
 
 import React, { useState, useEffect } from 'react';
 import { CalendarGrid } from './CalendarGrid';
+import { useQuery } from "@tanstack/react-query";
+import { useParams } from "next/navigation";
 import { useDateRangeStore } from '@/store/dateRangeStore';
 import { useItineraryLayoutStore } from '@/store/itineraryLayoutStore';
+import { listItineraryDestinationsSummary } from "@/actions/supabase/destinations";
 
 interface GoogleCalendarViewProps {
   isLoading?: boolean;
@@ -20,8 +23,27 @@ export function GoogleCalendarView({
   onSelectedDateChange,
   useExternalDndContext = false,
 }: GoogleCalendarViewProps) {
+  const params = useParams();
+  const itineraryParam = (params as any)?.itineraryId;
+  const itineraryId = Array.isArray(itineraryParam) ? itineraryParam[0] : itineraryParam;
+  const itinId = typeof itineraryId === "string" ? itineraryId : null;
+
   const { startDate } = useDateRangeStore();
   const { saveViewState, getViewState } = useItineraryLayoutStore();
+
+  const { data: itineraryDestinations = [] } = useQuery({
+    queryKey: ["itineraryDestinationsSummary", itinId],
+    queryFn: async () => {
+      if (!itinId) return [];
+      const result = await listItineraryDestinationsSummary(itinId);
+      return result.success ? result.data ?? [] : [];
+    },
+    enabled: Boolean(itinId),
+    staleTime: 10 * 60 * 1000,
+    gcTime: 20 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+  });
 
   const controlledSelectedDateTime = controlledSelectedDate?.getTime() ?? null;
   const isControlled = controlledSelectedDateTime !== null;
@@ -107,6 +129,7 @@ export function GoogleCalendarView({
         }
         onSelectedDateChange?.(date);
       }}
+      destinations={itineraryDestinations}
       className={className}
       useExternalDndContext={useExternalDndContext}
     />

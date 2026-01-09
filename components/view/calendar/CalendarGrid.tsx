@@ -18,6 +18,7 @@ import {
   useCalendarDays,
   useDragAndDrop
 } from './hooks';
+import type { ItineraryDestinationSummary } from "@/actions/supabase/destinations";
 
 interface CalendarGridProps {
   selectedDate?: Date;
@@ -26,6 +27,7 @@ interface CalendarGridProps {
   onDateChange?: (date: Date) => void;
   className?: string;
   useExternalDndContext?: boolean;
+  destinations?: ItineraryDestinationSummary[];
 }
 
 /**
@@ -51,6 +53,7 @@ export function CalendarGrid({
   onDateChange,
   className,
   useExternalDndContext = false,
+  destinations,
 }: CalendarGridProps) {
   // Conflict resolution state (could be moved to a hook if it grows)
   const [conflicts, setConflicts] = useState<TimeConflict[]>([]);
@@ -119,6 +122,7 @@ export function CalendarGrid({
         onDateChange={onDateChange}
         className={className}
         useExternalDndContext={useExternalDndContext}
+        destinations={destinations}
         days={days}
         timeSlots={timeSlots}
         scheduledActivities={scheduledActivities}

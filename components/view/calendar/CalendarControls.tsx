@@ -2,9 +2,11 @@
 
 import React from 'react';
 import { format, addDays, subDays, addWeeks, subWeeks, addMonths, subMonths, isToday, startOfWeek } from 'date-fns';
-import { ChevronLeft, ChevronRight, Calendar, Clock } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Calendar, Clock, MapPin } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Switch } from '@/components/ui/switch';
 import { cn } from '@/lib/utils';
+import { useItineraryLayoutStore } from '@/store/itineraryLayoutStore';
 
 interface CalendarControlsProps {
   selectedDate: Date;
@@ -21,6 +23,8 @@ export function CalendarControls({
   onViewModeChange,
   className
 }: CalendarControlsProps) {
+  const showCityLabels = useItineraryLayoutStore((s) => s.viewStates.calendar.showCityLabels);
+  const saveViewState = useItineraryLayoutStore((s) => s.saveViewState);
 
   const handlePrevious = () => {
     if (!onDateChange) return;
@@ -168,6 +172,16 @@ export function CalendarControls({
           >
             Month
           </Button>
+        </div>
+
+        {/* City labels toggle */}
+        <div className="flex items-center space-x-2 ml-4 text-sm text-ink-500">
+          <MapPin className="h-4 w-4 text-brand-500" />
+          <span className="hidden md:inline">Cities</span>
+          <Switch
+            checked={showCityLabels}
+            onCheckedChange={(checked) => saveViewState("calendar", { showCityLabels: checked })}
+          />
         </div>
 
         {/* Time Zone Indicator */}

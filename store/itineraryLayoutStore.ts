@@ -38,6 +38,8 @@ export interface ItineraryLayoutState {
       viewMode: 'day' | '3-day' | 'week' | 'month';
       scrollPosition: number;
       activeDays?: string[];
+      showCityLabels: boolean;
+      cityLabelColors: Record<string, string>;
     };
     table: {
       expandedCards: string[];
@@ -170,6 +172,8 @@ const defaultViewStates = {
     viewMode: 'week' as const,
     scrollPosition: 0,
     activeDays: [],
+    showCityLabels: true,
+    cityLabelColors: {},
   },
   table: {
     expandedCards: [],
