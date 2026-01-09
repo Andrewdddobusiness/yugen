@@ -23,14 +23,47 @@ import type {
  * Creates a new itinerary for the authenticated user
  */
 export async function createItinerary(
-  data: CreateItineraryData & { destination: CreateDestinationData }
-): Promise<DatabaseResponse<{ itinerary: Itinerary; destination: ItineraryDestination }>> {
+  data: CreateItineraryData & { destination?: CreateDestinationData; destinations?: CreateDestinationData[] }
+): Promise<DatabaseResponse<{ itinerary: Itinerary; destinations: ItineraryDestination[] }>> {
   const supabase = createClient();
 
   try {
     // Validate input data
     const validatedItinerary = createItinerarySchema.parse(data);
-    const validatedDestination = createDestinationSchema.parse(data.destination);
+    const rawDestinations =
+      Array.isArray(data.destinations) && data.destinations.length > 0
+        ? data.destinations
+        : data.destination
+          ? [data.destination]
+          : [];
+
+    if (rawDestinations.length === 0) {
+      return {
+        success: false,
+        error: { message: "At least one destination is required" },
+      };
+    }
+
+    const validatedDestinations = rawDestinations
+      .map((destination, index) => {
+        const parsed = createDestinationSchema.parse({
+          ...destination,
+          order_number: destination.order_number ?? index + 1,
+        });
+
+        return parsed;
+      })
+      .sort((a, b) => {
+        // Keep destinations ordered by date, then order_number.
+        const aTime = a.from_date?.getTime?.() ?? 0;
+        const bTime = b.from_date?.getTime?.() ?? 0;
+        if (aTime !== bTime) return aTime - bTime;
+        return (a.order_number ?? 0) - (b.order_number ?? 0);
+      })
+      .map((destination, index) => ({
+        ...destination,
+        order_number: index + 1,
+      }));
 
     // Get the current user
     const { data: { user }, error: userError } = await supabase.auth.getUser();
@@ -63,15 +96,17 @@ export async function createItinerary(
       };
     }
 
-    // Create destination
-    const { data: destinationData, error: destinationError } = await supabase
+    // Create destinations
+    const { data: destinationRows, error: destinationError } = await supabase
       .from("itinerary_destination")
-      .insert({
-        itinerary_id: itineraryData.itinerary_id,
-        ...validatedDestination,
-      })
+      .insert(
+        validatedDestinations.map((destination) => ({
+          itinerary_id: itineraryData.itinerary_id,
+          ...destination,
+        }))
+      )
       .select()
-      .single();
+      .order("order_number", { ascending: true });
 
     if (destinationError) {
       // Rollback: delete the itinerary if destination creation fails
@@ -96,7 +131,7 @@ export async function createItinerary(
       success: true,
       data: {
         itinerary: itineraryData,
-        destination: destinationData
+        destinations: (destinationRows ?? []) as ItineraryDestination[]
       }
     };
 

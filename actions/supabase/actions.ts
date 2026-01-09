@@ -846,37 +846,73 @@ export async function fetchUserItineraries(userId: string): Promise<{ data: IIti
   const supabase = createClient();
 
   try {
+    const normalizedUserId = String(userId ?? "").trim();
+    if (!normalizedUserId) {
+      return { data: [], error: null };
+    }
+
     const { data, error } = await supabase
-      .from("itinerary_destination")
+      .from("itinerary")
       .select(
         `
-        itinerary_destination_id,
         itinerary_id,
-        city,
-        country,
-        from_date,
-        to_date,
-        itinerary!inner (
-          deleted_at,
-          user_id
+        deleted_at,
+        user_id,
+        destinations:itinerary_destination(
+          itinerary_destination_id,
+          city,
+          country,
+          from_date,
+          to_date,
+          order_number
         )
       `
       )
-      .is("itinerary.deleted_at", null);
+      .eq("user_id", normalizedUserId)
+      .is("deleted_at", null)
+      .order("created_at", { ascending: false });
 
     if (error) throw error;
 
-    const mappedData = data.map((item) => ({
-      itinerary_destination_id: item.itinerary_destination_id,
-      itinerary_id: item.itinerary_id,
-      city: item.city,
-      country: item.country,
-      from_date: new Date(item.from_date),
-      to_date: new Date(item.to_date),
-      deleted_at: null,
-    }));
+    const mappedData: Array<IItineraryCard | null> = (data ?? []).map((item) => {
+        const destinations = Array.isArray((item as any).destinations) ? ((item as any).destinations as any[]) : [];
+        if (destinations.length === 0) return null;
 
-    return { data: mappedData, error: null };
+        destinations.sort((a, b) => {
+          const orderDelta = Number(a.order_number ?? 0) - Number(b.order_number ?? 0);
+          if (orderDelta !== 0) return orderDelta;
+          return String(a.from_date ?? "").localeCompare(String(b.from_date ?? ""));
+        });
+
+        const first = destinations[0];
+        const last = destinations[destinations.length - 1] ?? first;
+
+        const fromDate = destinations.reduce<Date>((min, dest) => {
+          const current = new Date(dest.from_date);
+          return current < min ? current : min;
+        }, new Date(first.from_date));
+
+        const toDate = destinations.reduce<Date>((max, dest) => {
+          const current = new Date(dest.to_date);
+          return current > max ? current : max;
+        }, new Date(first.to_date));
+
+        return {
+          itinerary_destination_id: first.itinerary_destination_id,
+          itinerary_id: (item as any).itinerary_id,
+          city: first.city,
+          country: first.country,
+          end_city: last?.city ?? null,
+          from_date: fromDate,
+          to_date: toDate,
+          deleted_at: (item as any).deleted_at ?? null,
+          destination_count: destinations.length,
+        } as IItineraryCard;
+      });
+
+    const filteredData = mappedData.filter((value): value is IItineraryCard => value !== null);
+
+    return { data: filteredData, error: null };
   } catch (error) {
     console.error("Error fetching itineraries:", error);
     return { data: null, error };

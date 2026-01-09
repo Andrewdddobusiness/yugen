@@ -1,7 +1,7 @@
 import { create } from "zustand";
-import { DateRange } from "react-day-picker";
+import type { DateRange } from "react-day-picker";
 
-interface Destination {
+export interface Destination {
   id: string;
   name: string;
   country: string;
@@ -17,29 +17,64 @@ interface Destination {
   description?: string;
 }
 
+export interface CreateItineraryLeg {
+  id: string;
+  destination?: Destination;
+  dateRange?: DateRange;
+}
+
+const createLegId = () => {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+    return (crypto as any).randomUUID() as string;
+  }
+  return `leg_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+};
+
+const createEmptyLeg = (): CreateItineraryLeg => ({
+  id: createLegId(),
+});
+
 interface CreateItineraryStore {
-  destination: string | undefined; // Legacy support
-  destinationData: Destination | undefined;
-  dateRange: DateRange | undefined;
-  setDestination: (destination: string) => void;
-  setDestinationData: (destination: Destination) => void;
-  setDateRange: (dateRange: DateRange | undefined) => void;
+  legs: CreateItineraryLeg[];
+
+  addLeg: () => string;
+  removeLeg: (legId: string) => void;
+  setLegDestination: (legId: string, destination: Destination | undefined) => void;
+  setLegDateRange: (legId: string, dateRange: DateRange | undefined) => void;
   resetStore: () => void;
 }
 
-export const useCreateItineraryStore = create<CreateItineraryStore>((set) => ({
-  destination: undefined,
-  destinationData: undefined,
-  dateRange: undefined,
-  setDestination: (destination) => set({ destination }),
-  setDestinationData: (destinationData) => set({ 
-    destinationData, 
-    destination: destinationData.formatted_address // Keep legacy compatibility
-  }),
-  setDateRange: (dateRange) => set({ dateRange }),
-  resetStore: () => set({ 
-    destination: undefined, 
-    destinationData: undefined, 
-    dateRange: undefined 
-  }),
+export const useCreateItineraryStore = create<CreateItineraryStore>((set, get) => ({
+  legs: [createEmptyLeg()],
+
+  addLeg: () => {
+    const next = createEmptyLeg();
+    set((state) => ({ legs: [...state.legs, next] }));
+    return next.id;
+  },
+
+  removeLeg: (legId) => {
+    set((state) => {
+      const remaining = state.legs.filter((leg) => leg.id !== legId);
+      return { legs: remaining.length > 0 ? remaining : [createEmptyLeg()] };
+    });
+  },
+
+  setLegDestination: (legId, destination) => {
+    set((state) => ({
+      legs: state.legs.map((leg) => (leg.id === legId ? { ...leg, destination } : leg)),
+    }));
+  },
+
+  setLegDateRange: (legId, dateRange) => {
+    set((state) => ({
+      legs: state.legs.map((leg) => (leg.id === legId ? { ...leg, dateRange } : leg)),
+    }));
+  },
+
+  resetStore: () => {
+    // Reset to a single empty leg.
+    set({ legs: [createEmptyLeg()] });
+  },
 }));
+

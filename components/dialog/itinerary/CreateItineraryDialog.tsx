@@ -2,44 +2,23 @@
 import { ReactNode, useEffect, useState } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
 import { useQueryClient } from "@tanstack/react-query";
 import * as VisuallyHidden from "@radix-ui/react-visually-hidden";
 
 import { Button } from "@/components/ui/button";
-import { Plus, Minus, Loader2, MapPin } from "lucide-react";
+import { Plus, Minus, Loader2, MapPin, X } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Form } from "@/components/ui/form";
 
-import { ComboBox } from "@/components/form/ComboBox";
-import { Skeleton } from "@/components/ui/skeleton";
 import DestinationSelector from "@/components/destination/DestinationSelector";
-
-import { whitelistedLocations } from "@/lib/googleMaps/whitelistedLocations";
-import { capitalizeFirstLetterOfEachWord } from "@/utils/formatting/capitalise";
 
 import { createItinerary } from "@/actions/supabase/itinerary";
 import { createClient } from "@/utils/supabase/client";
-import { useCreateItineraryStore } from "@/store/createItineraryStore";
+import { useCreateItineraryStore, type Destination, type CreateItineraryLeg } from "@/store/createItineraryStore";
 import { DatePickerWithRangePopover2 } from "@/components/form/date/DateRangePickerPopover2";
-
-interface Destination {
-  id: string;
-  name: string;
-  country: string;
-  city: string;
-  formatted_address: string;
-  place_id: string;
-  coordinates: {
-    lat: number;
-    lng: number;
-  };
-  timezone: string;
-  photos?: string[];
-  description?: string;
-}
+import { format } from "date-fns";
 
 const formSchema = z.object({
   destination: z.string().min(2, {
@@ -64,32 +43,39 @@ export default function PopUpCreateItinerary({ children, className, ...props }: 
   const supabase = createClient();
 
   // **** STORES ****
-  const { destination, destinationData, setDestination, setDestinationData, dateRange, setDateRange, resetStore } = useCreateItineraryStore();
+  const { legs, addLeg, removeLeg, setLegDestination, setLegDateRange, resetStore } = useCreateItineraryStore();
 
   // **** STATES ****
   const [user, setUser] = useState<any>(null);
   const [open, setOpen] = useState(false);
   const [step, setStep] = useState(0);
-  const [showDestinationSelector, setShowDestinationSelector] = useState(false);
-  const [destinationError, setDestinationError] = useState(false);
-  const [dateRangeError, setDateRangeError] = useState(false);
+  const [destinationSelectorLegId, setDestinationSelectorLegId] = useState<string | null>(null);
   const [adultsCount, setAdultsCount] = useState(1);
   const [kidsCount, setKidsCount] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const showDestinationSelector = destinationSelectorLegId !== null;
+
   const form = useForm<z.infer<typeof formSchema>>({
-    resolver: zodResolver(formSchema),
     defaultValues: {
       destination: "",
       numberOfPeople: "1",
     },
   });
 
-  const locationList = whitelistedLocations.map(
-    (location) =>
-      `${capitalizeFirstLetterOfEachWord(location.city)}, ${capitalizeFirstLetterOfEachWord(location.country)}`
-  );
+  const getValidLegs = (): Array<
+    CreateItineraryLeg & { destination: Destination; dateRange: NonNullable<CreateItineraryLeg["dateRange"]> }
+  > => {
+    return (legs ?? []).filter(
+      (
+        leg
+      ): leg is CreateItineraryLeg & {
+        destination: Destination;
+        dateRange: NonNullable<CreateItineraryLeg["dateRange"]>;
+      } => Boolean(leg.destination && leg.dateRange?.from && leg.dateRange?.to)
+    );
+  };
 
   const steps = [
     {
@@ -97,70 +83,97 @@ export default function PopUpCreateItinerary({ children, className, ...props }: 
       image: "/popup-explore-activities.jpg",
       content: (
         <div className="space-y-4">
-          <FormField
-            control={form.control}
-            name="destination"
-            render={() => (
-              <FormItem className="flex flex-col">
-                <FormLabel>Destination</FormLabel>
-                <FormControl>
-                  {destinationData ? (
-                    <div className="flex items-center justify-between p-3 border border-gray-300 rounded-md bg-blue-50">
-                      <div className="flex items-center space-x-3">
-                        <div className="p-2 bg-blue-600 rounded-lg">
-                          <MapPin className="h-4 w-4 text-white" />
-                        </div>
-                        <div>
-                          <div className="font-medium text-gray-900">{destinationData.name}</div>
-                          <div className="text-sm text-gray-600">{destinationData.country}</div>
-                        </div>
-                      </div>
+          <div className="space-y-3">
+            {legs.map((leg, index) => {
+              const destination = leg.destination;
+              const dateRange = leg.dateRange;
+
+              return (
+                <div key={leg.id} className="rounded-xl border border-stroke-200 bg-white p-3">
+                  <div className="flex items-center justify-between">
+                    <div className="text-sm font-semibold text-ink-900">
+                      Destination {index + 1}
+                    </div>
+                    {legs.length > 1 ? (
                       <Button
                         type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={handleOpenDestinationSelector}
-                        className="text-blue-600 border-blue-600 hover:bg-blue-600 hover:text-white"
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={() => removeLeg(leg.id)}
+                        title="Remove destination"
                       >
-                        Change
+                        <X className="h-4 w-4" />
                       </Button>
-                    </div>
-                  ) : (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={handleOpenDestinationSelector}
-                      className="w-full h-12 justify-start text-gray-500 border-gray-300 hover:border-blue-400 hover:text-blue-600"
-                    >
-                      <MapPin className="h-5 w-5 mr-3" />
-                      Choose your destination...
-                    </Button>
-                  )}
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
-          <FormField
-            control={form.control}
-            name="startDate"
-            render={() => (
-              <FormItem className="flex flex-col">
-                <FormLabel>Travel Dates</FormLabel>
-                <FormControl>
-                  <div className="flex">
-                    <DatePickerWithRangePopover2
-                      selectedDateRange={dateRange}
-                      onDateRangeConfirm={handleDateRangeConfirm}
-                    />
+                    ) : null}
                   </div>
-                </FormControl>
-                {dateRangeError && <div className="text-sm text-red-500 mt-2">Please select a date range.</div>}
-                <FormMessage />
-              </FormItem>
-            )}
-          />
+
+                  <div className="mt-3 space-y-3">
+                    <div className="space-y-2">
+                      <div className="text-xs font-medium text-ink-700">Destination</div>
+                      {destination ? (
+                        <div className="flex items-center justify-between p-3 border border-gray-300 rounded-md bg-blue-50">
+                          <div className="flex items-center space-x-3">
+                            <div className="p-2 bg-blue-600 rounded-lg">
+                              <MapPin className="h-4 w-4 text-white" />
+                            </div>
+                            <div className="min-w-0">
+                              <div className="font-medium text-gray-900 truncate">{destination.name}</div>
+                              <div className="text-sm text-gray-600 truncate">{destination.country}</div>
+                            </div>
+                          </div>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setDestinationSelectorLegId(leg.id)}
+                            className="text-blue-600 border-blue-600 hover:bg-blue-600 hover:text-white"
+                          >
+                            Change
+                          </Button>
+                        </div>
+                      ) : (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => setDestinationSelectorLegId(leg.id)}
+                          className="w-full h-12 justify-start text-gray-500 border-gray-300 hover:border-blue-400 hover:text-blue-600"
+                        >
+                          <MapPin className="h-5 w-5 mr-3" />
+                          Choose your destination...
+                        </Button>
+                      )}
+                    </div>
+
+                    <div className="space-y-2">
+                      <div className="text-xs font-medium text-ink-700">Travel Dates</div>
+                      <DatePickerWithRangePopover2
+                        selectedDateRange={dateRange}
+                        onDateRangeConfirm={(range) => setLegDateRange(leg.id, range)}
+                      />
+                      {dateRange?.from && dateRange?.to ? (
+                        <div className="text-[11px] text-ink-500">
+                          {format(dateRange.from, "MMM d, yyyy")} – {format(dateRange.to, "MMM d, yyyy")}
+                        </div>
+                      ) : null}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          <Button
+            type="button"
+            variant="outline"
+            className="w-full h-11 rounded-xl"
+            onClick={() => addLeg()}
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Add another destination
+          </Button>
+
+          {error ? <div className="text-sm text-red-600">{error}</div> : null}
         </div>
       ),
     },
@@ -224,9 +237,9 @@ export default function PopUpCreateItinerary({ children, className, ...props }: 
   }, [supabase]);
 
   const handleCreateItinerary = async () => {
-    const currentDestination = destinationData || (destination ? { city: destination.split(", ")[0], country: destination.split(", ")[1] || destination } : null);
+    const validLegs = getValidLegs();
     
-    if (!user?.id || !currentDestination || !dateRange?.from || !dateRange?.to) {
+    if (!user?.id || validLegs.length === 0) {
       setError("Missing required information");
       return;
     }
@@ -235,22 +248,33 @@ export default function PopUpCreateItinerary({ children, className, ...props }: 
     setError(null);
 
     try {
-      const city = destinationData?.city || currentDestination.city;
-      const country = destinationData?.country || currentDestination.country;
+      const sorted = [...validLegs].sort((a, b) => {
+        const aTime = a.dateRange.from!.getTime();
+        const bTime = b.dateRange.from!.getTime();
+        return aTime - bTime;
+      });
+      const first = sorted[0]?.destination;
+      const last = sorted[sorted.length - 1]?.destination;
+
+      const titleBase = first?.city || first?.name || "Trip";
+      const title =
+        sorted.length > 1 && first?.city && last?.city && first.city !== last.city
+          ? `Trip: ${first.city} → ${last.city}`
+          : `Trip to ${titleBase}`;
 
       const result = await createItinerary({
-        title: `Trip to ${city}`,
+        title,
         adults: adultsCount,
         kids: kidsCount,
         currency: "USD",
         is_public: false,
-        destination: {
-          city: city,
-          country: country,
-          from_date: dateRange.from,
-          to_date: dateRange.to,
-          order_number: 1,
-        }
+        destinations: sorted.map((leg, index) => ({
+          city: leg.destination.city,
+          country: leg.destination.country,
+          from_date: leg.dateRange.from!,
+          to_date: leg.dateRange.to!,
+          order_number: index + 1,
+        })),
       });
 
       if (result.success) {
@@ -272,7 +296,7 @@ export default function PopUpCreateItinerary({ children, className, ...props }: 
   const isStepValid = () => {
     switch (step) {
       case 0:
-        return (destination && destination.length >= 2 || destinationData) && dateRange?.from && dateRange?.to;
+        return getValidLegs().length === legs.length;
       case 1:
         return adultsCount >= 1;
       default:
@@ -282,27 +306,13 @@ export default function PopUpCreateItinerary({ children, className, ...props }: 
 
   const getStepError = () => {
     if (step === 0) {
-      if (!destination && !destinationData) {
-        return "Please select a destination";
-      }
-      if (!dateRange?.from || !dateRange?.to) {
-        return "Please select travel dates";
-      }
+      if (legs.some((leg) => !leg.destination)) return "Please select a destination";
+      if (legs.some((leg) => !leg.dateRange?.from || !leg.dateRange?.to)) return "Please select travel dates";
     }
     return null;
   };
 
   // ***** HANDLERS *****
-  const handleDestinationChange = (location: string) => {
-    setDestination(location);
-    setDestinationError(false);
-  };
-
-  const handleDateRangeConfirm = (newDate: any | undefined) => {
-    setDateRange(newDate);
-    setDateRangeError(false);
-  };
-
   const handleIncreaseCount = (type: string) => {
     if (type === "adults" && adultsCount < 10) {
       setAdultsCount((prevCount) => prevCount + 1);
@@ -320,17 +330,13 @@ export default function PopUpCreateItinerary({ children, className, ...props }: 
   };
 
   const handleDestinationSelect = (destination: Destination) => {
-    setDestinationData(destination);
-    setShowDestinationSelector(false);
-    setDestinationError(false);
-  };
-
-  const handleOpenDestinationSelector = () => {
-    setShowDestinationSelector(true);
+    if (!destinationSelectorLegId) return;
+    setLegDestination(destinationSelectorLegId, destination);
+    setDestinationSelectorLegId(null);
   };
 
   const handleCloseDestinationSelector = () => {
-    setShowDestinationSelector(false);
+    setDestinationSelectorLegId(null);
   };
 
   function onSubmit(values: z.infer<typeof formSchema>) {
@@ -363,7 +369,7 @@ export default function PopUpCreateItinerary({ children, className, ...props }: 
           <DestinationSelector
             onDestinationSelect={handleDestinationSelect}
             onClose={handleCloseDestinationSelector}
-            initialDestination={destinationData}
+            initialDestination={legs.find((leg) => leg.id === destinationSelectorLegId)?.destination ?? null}
           />
         ) : (
           <>
@@ -378,7 +384,7 @@ export default function PopUpCreateItinerary({ children, className, ...props }: 
 
               <Form {...form}>
                 <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col h-full justify-between">
-                  <div className="flex flex-col gap-1">
+                  <div className="flex flex-col gap-1 min-h-0 overflow-y-auto pr-1">
                     <DialogTitle className="text-2xl sm:text-3xl text-black">
                       Let&apos;s build your next vacation!
                     </DialogTitle>

@@ -27,9 +27,11 @@ export interface IItineraryCard {
   itinerary_destination_id: number;
   city?: string;
   country: string;
+  end_city?: string | null;
   from_date: Date;
   to_date: Date;
   deleted_at: string | null;
+  destination_count: number;
 }
 
 interface ItineraryCardProps {
@@ -58,6 +60,13 @@ export default function ItineraryCard({ itinerary, onDelete }: ItineraryCardProp
 
   const imageSrc = useLocalFallback ? "/map2.jpg" : stockImageSrc;
   const builderHref = `/itinerary/${itinerary.itinerary_id}/${itinerary.itinerary_destination_id}/builder`;
+  const destinationLabel =
+    itinerary.destination_count > 1 && itinerary.city && itinerary.end_city && itinerary.city !== itinerary.end_city
+      ? `${capitalizeFirstLetter(itinerary.city)} → ${capitalizeFirstLetter(itinerary.end_city)}`
+      : itinerary.city
+        ? capitalizeFirstLetter(itinerary.city || "")
+        : null;
+  const additionalDestinations = Math.max(0, (itinerary.destination_count ?? 0) - 1);
 
   const handleDelete = async (e: React.MouseEvent) => {
     e.preventDefault();
@@ -122,13 +131,13 @@ export default function ItineraryCard({ itinerary, onDelete }: ItineraryCardProp
         </div>
         <CardHeader>
           <CardTitle className="text-gray-800">
-            {itinerary.city && (
-              <>
-                {capitalizeFirstLetter(itinerary.city || "")}
-                {", "}
-              </>
-            )}
+            {destinationLabel ? <>{destinationLabel}{", "}</> : null}
             <>{capitalizeFirstLetter(itinerary.country || "")}</>
+            {additionalDestinations > 0 ? (
+              <span className="ml-2 inline-flex items-center rounded-full bg-bg-50 px-2 py-0.5 text-xs font-medium text-ink-600">
+                +{additionalDestinations}
+              </span>
+            ) : null}
           </CardTitle>
           <CardDescription>
             {formatUserFriendlyDate(itinerary.from_date)} - {formatUserFriendlyDate(itinerary.to_date)}

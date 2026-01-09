@@ -73,7 +73,7 @@ export function NavMain() {
                 <CollapsibleContent>
                   <SidebarMenuSub className="flex-col">
                     {itineraryData?.map((itinerary) => (
-                      <SidebarMenuSubItem key={itinerary.city}>
+                      <SidebarMenuSubItem key={itinerary.itinerary_id}>
 	                        <SidebarMenuSubButton asChild>
 	                          <Link
 	                            href={`/itinerary/${itinerary.itinerary_id}/${itinerary.itinerary_destination_id}/builder`}
@@ -84,6 +84,11 @@ export function NavMain() {
                               <div className="flex flex-col min-w-0">
                                 <span className="truncate text-sm">
                                   {itinerary.city}, {itinerary.country}
+                                  {itinerary.destination_count > 1 ? (
+                                    <span className="ml-2 text-xs text-muted-foreground">
+                                      +{itinerary.destination_count - 1}
+                                    </span>
+                                  ) : null}
                                 </span>
                                 <span className="text-xs text-muted-foreground truncate">
                                   {formatDate(itinerary.from_date)} - {formatDate(itinerary.to_date)}

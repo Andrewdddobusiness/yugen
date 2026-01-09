@@ -3,9 +3,9 @@
 import * as React from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { useParams, usePathname } from "next/navigation";
+import { useParams, usePathname, useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
-import { NotebookPen, SquareChevronLeft, TextSearch } from "lucide-react";
+import { NotebookPen, Plus, SquareChevronLeft, TextSearch, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -31,6 +31,10 @@ import { useEffect, useState } from "react";
 import { fetchItineraryDestination, setItineraryDestinationDateRange } from "@/actions/supabase/actions";
 import { Separator } from "@/components/ui/separator";
 import { useDateRangeStore } from '@/store/dateRangeStore';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { listItineraryDestinationsSummary } from "@/actions/supabase/destinations";
+import { AddDestinationDialog } from "@/components/dialog/itinerary/AddDestinationDialog";
+import { addDays, format } from "date-fns";
 
 const SimplifiedItinerarySidebar = dynamic(
   () => import("@/components/layout/sidebar/SimplifiedItinerarySidebar").then((mod) => mod.SimplifiedItinerarySidebar),
@@ -57,18 +61,23 @@ export function AppSidebarItineraryActivityLeft({
 }) {
   const { itineraryId, destinationId } = useParams();
   const pathname = usePathname();
+  const router = useRouter();
 
   const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
+  const [addDestinationOpen, setAddDestinationOpen] = useState(false);
 
   const queryClient = useQueryClient();
   
   // Get the date range store to sync with table components
   const { setDateRange: setStoreDateRange } = useDateRangeStore();
 
+  const itineraryIdValue = Array.isArray(itineraryId) ? itineraryId[0] : String(itineraryId ?? "");
+  const destinationIdValue = Array.isArray(destinationId) ? destinationId[0] : String(destinationId ?? "");
+
   const { data: destinationData } = useQuery({
-    queryKey: ["itineraryDestination", itineraryId, destinationId],
-    queryFn: () => fetchItineraryDestination(itineraryId as string, destinationId as string | undefined),
-    enabled: !!itineraryId,
+    queryKey: ["itineraryDestination", itineraryIdValue, destinationIdValue],
+    queryFn: () => fetchItineraryDestination(itineraryIdValue, destinationIdValue || undefined),
+    enabled: Boolean(itineraryIdValue),
     staleTime: Infinity,
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
@@ -76,15 +85,63 @@ export function AppSidebarItineraryActivityLeft({
 
   const itinerary = destinationData?.data;
 
+  const { data: destinationsSummary = [] } = useQuery({
+    queryKey: ["itineraryDestinationsSummary", itineraryIdValue],
+    queryFn: async () => {
+      const result = await listItineraryDestinationsSummary(itineraryIdValue);
+      return result.success ? result.data ?? [] : [];
+    },
+    enabled: Boolean(itineraryIdValue),
+    staleTime: 10 * 60 * 1000,
+    gcTime: 20 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+  });
+
+  const currentDestinationId = Number(destinationIdValue || 0);
+  const nextOrderNumber =
+    Math.max(0, ...destinationsSummary.map((destination) => Number(destination.order_number ?? 0))) + 1;
+  const lastDestination = destinationsSummary[destinationsSummary.length - 1] ?? null;
+  const defaultNewDestinationRange = lastDestination?.to_date
+    ? (() => {
+        const from = addDays(new Date(lastDestination.to_date), 1);
+        return { from, to: from };
+      })()
+    : undefined;
+
   useEffect(() => {
-    if (itinerary) {
-      const dateRangeValue = { from: itinerary.from_date as Date, to: itinerary.to_date as Date };
-      setDateRange(dateRangeValue);
-      
-      // Also update the date range store so table components can access it
-      setStoreDateRange(dateRangeValue.from, dateRangeValue.to);
-    }
+    if (!itinerary?.from_date || !itinerary?.to_date) return;
+    const from = new Date(itinerary.from_date);
+    const to = new Date(itinerary.to_date);
+    if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime())) return;
+
+    const dateRangeValue = { from, to };
+    setDateRange(dateRangeValue);
+
+    // Also update the date range store so table components can access it
+    setStoreDateRange(from, to);
   }, [itinerary, setStoreDateRange]);
+
+  const formatRange = (fromDate: string, toDate: string) => {
+    try {
+      const from = new Date(fromDate);
+      const to = new Date(toDate);
+      return `${format(from, "MMM d")} – ${format(to, "MMM d, yyyy")}`;
+    } catch {
+      return "";
+    }
+  };
+
+  const navigateToDestination = (nextDestinationId: number) => {
+    if (!itineraryIdValue) return;
+    const nextId = String(nextDestinationId);
+    const currentBase = `/itinerary/${itineraryIdValue}/${destinationIdValue}`;
+    const nextBase = `/itinerary/${itineraryIdValue}/${nextId}`;
+    const nextPath = pathname?.startsWith(currentBase)
+      ? pathname.replace(currentBase, nextBase)
+      : `${nextBase}/builder`;
+    router.push(nextPath);
+  };
 
 	  const navItems = [
 	    {
@@ -95,12 +152,12 @@ export function AppSidebarItineraryActivityLeft({
 	    {
 	      title: "Overview",
 	      icon: TextSearch,
-	      href: `/itinerary/${itineraryId}/${destinationId}/overview`,
+	      href: `/itinerary/${itineraryIdValue}/${destinationIdValue}/overview`,
 	    },
 	    {
 	      title: "Build",
 	      icon: NotebookPen,
-	      href: `/itinerary/${itineraryId}/${destinationId}/builder`,
+	      href: `/itinerary/${itineraryIdValue}/${destinationIdValue}/builder`,
 	    },
 	  ];
 
@@ -114,14 +171,14 @@ export function AppSidebarItineraryActivityLeft({
       if (dateRange && dateRange.from && dateRange.to) {
         setStoreDateRange(dateRange.from, dateRange.to);
         
-        const result = await setItineraryDestinationDateRange(itineraryId as string, destinationId as string, {
+        const result = await setItineraryDestinationDateRange(itineraryIdValue, destinationIdValue, {
           from: dateRange.from,
           to: dateRange.to,
         });
 
         if (result.success) {
-          queryClient.invalidateQueries({ queryKey: ["itineraryDestination", itineraryId] });
-          queryClient.invalidateQueries({ queryKey: ["itineraryDateRange", itineraryId] });
+          queryClient.invalidateQueries({ queryKey: ["itineraryDestination", itineraryIdValue, destinationIdValue] });
+          queryClient.invalidateQueries({ queryKey: ["itineraryDateRange", itineraryIdValue] });
         } else {
           console.error("Error updating date range:", result.message);
         }
@@ -198,9 +255,56 @@ export function AppSidebarItineraryActivityLeft({
         <SidebarHeader className="px-12 pt-8 pb-4">
           {itinerary ? (
             <div className="flex flex-col gap-2">
-              <div className="text-2xl font-semibold">
-                {itinerary.city} {", "} {itinerary.country}
-              </div>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    type="button"
+                    className="flex items-center justify-between gap-3 rounded-xl px-2 py-1 -mx-2 hover:bg-bg-50 transition-colors"
+                    aria-label="Switch destination"
+                  >
+                    <div className="min-w-0">
+                      <div className="text-2xl font-semibold truncate">
+                        {itinerary.city} {", "} {itinerary.country}
+                      </div>
+                      {destinationsSummary.length > 1 ? (
+                        <div className="text-xs text-muted-foreground">
+                          {destinationsSummary.length} destinations
+                        </div>
+                      ) : null}
+                    </div>
+                    <ChevronDown className="h-5 w-5 text-ink-500 flex-shrink-0" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="w-80">
+                  {destinationsSummary.map((dest) => (
+                    <DropdownMenuItem
+                      key={dest.itinerary_destination_id}
+                      className={cn(
+                        "cursor-pointer",
+                        Number(dest.itinerary_destination_id) === currentDestinationId && "bg-bg-50"
+                      )}
+                      onSelect={() => navigateToDestination(dest.itinerary_destination_id)}
+                    >
+                      <div className="flex flex-col min-w-0">
+                        <div className="font-medium truncate">
+                          {dest.city}, {dest.country}
+                        </div>
+                        <div className="text-xs text-muted-foreground truncate">
+                          {formatRange(dest.from_date, dest.to_date)}
+                        </div>
+                      </div>
+                    </DropdownMenuItem>
+                  ))}
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    className="cursor-pointer"
+                    onSelect={() => setAddDestinationOpen(true)}
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add destination
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
               <div className="text-left w-full text-xs text-muted-foreground">
                 <DatePickerWithRangePopover3
                   selectedDateRange={dateRange}
@@ -224,6 +328,19 @@ export function AppSidebarItineraryActivityLeft({
       </Sidebar>
 
       <SidebarRail />
+
+      <AddDestinationDialog
+        open={addDestinationOpen}
+        onOpenChange={setAddDestinationOpen}
+        itineraryId={itineraryIdValue}
+        nextOrderNumber={nextOrderNumber}
+        defaultDateRange={defaultNewDestinationRange}
+        onDestinationCreated={(newDestinationId) => {
+          queryClient.invalidateQueries({ queryKey: ["itineraryDestinationsSummary", itineraryIdValue] });
+          setAddDestinationOpen(false);
+          navigateToDestination(newDestinationId);
+        }}
+      />
     </Sidebar>
   );
 }

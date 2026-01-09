@@ -5,7 +5,7 @@ import { motion } from "framer-motion";
 import { Search, MapPin, Clock, ArrowLeft, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { geocodeAddress, searchPlaces } from "@/actions/google/maps";
+import { geocodeAddress, getPlaceAutocomplete } from "@/actions/google/maps";
 
 interface Destination {
   id: string;
@@ -28,10 +28,18 @@ interface DestinationSearchProps {
   onBack: () => void;
 }
 
+type DestinationSuggestion = {
+  placeId: string;
+  mainText: string;
+  secondaryText: string;
+  types?: string[];
+};
+
 export default function DestinationSearch({ onDestinationSelect, onBack }: DestinationSearchProps) {
   const [query, setQuery] = useState("");
-  const [results, setResults] = useState<any[]>([]);
+  const [results, setResults] = useState<DestinationSuggestion[]>([]);
   const [loading, setLoading] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
   const searchRef = useRef<HTMLInputElement>(null);
 
@@ -58,20 +66,25 @@ export default function DestinationSearch({ onDestinationSelect, onBack }: Desti
     const searchDestinations = async () => {
       if (query.length < 2) {
         setResults([]);
+        setSearchError(null);
         return;
       }
 
       setLoading(true);
+      setSearchError(null);
       try {
-        const response = await searchPlaces(query, "locality");
+        // Use Google Places Autocomplete (via server action) so we can suggest any city worldwide.
+        const response = await getPlaceAutocomplete(query);
         if (response.success && response.data) {
-          setResults(response.data);
+          setResults(response.data as DestinationSuggestion[]);
         } else {
           setResults([]);
+          setSearchError("Search is temporarily unavailable. Please try again.");
         }
       } catch (error) {
         console.error("Search error:", error);
         setResults([]);
+        setSearchError("Search is temporarily unavailable. Please try again.");
       } finally {
         setLoading(false);
       }
@@ -81,29 +94,32 @@ export default function DestinationSearch({ onDestinationSelect, onBack }: Desti
     return () => clearTimeout(debounceTimer);
   }, [query]);
 
-  const handleDestinationSelect = async (place: any) => {
+  const handleDestinationSelect = async (suggestion: DestinationSuggestion) => {
     setLoading(true);
     try {
-      // Geocode to get detailed information
-      const geocodeResponse = await geocodeAddress(place.formatted_address);
+      const lookup = `${suggestion.mainText}, ${suggestion.secondaryText}`.trim();
+
+      // Geocode to get coordinates + canonical formatted address.
+      const geocodeResponse = await geocodeAddress(lookup);
       
       if (geocodeResponse.success && geocodeResponse.data) {
+        const formattedAddress = geocodeResponse.data.formatted_address;
         const destination: Destination = {
-          id: place.place_id,
-          name: place.name,
-          city: place.name,
-          country: extractCountry(place.formatted_address),
-          formatted_address: place.formatted_address,
-          place_id: place.place_id,
+          id: geocodeResponse.data.place_id,
+          name: suggestion.mainText,
+          city: suggestion.mainText,
+          country: extractCountry(formattedAddress),
+          formatted_address: formattedAddress,
+          place_id: geocodeResponse.data.place_id,
           coordinates: geocodeResponse.data.coordinates,
           timezone: "UTC", // TODO: Get timezone from Google Maps API
-          photos: place.photos || [],
+          photos: [],
         };
 
         // Save to recent searches
         const updatedRecent = [
-          place.formatted_address,
-          ...recentSearches.filter(item => item !== place.formatted_address)
+          formattedAddress,
+          ...recentSearches.filter(item => item !== formattedAddress)
         ].slice(0, 5);
         
         setRecentSearches(updatedRecent);
@@ -163,10 +179,15 @@ export default function DestinationSearch({ onDestinationSelect, onBack }: Desti
           <div className="p-6">
             <h3 className="text-sm font-semibold text-gray-900 mb-4">Search Results</h3>
             <div className="space-y-2">
-              {results.length > 0 ? (
+              {searchError && !loading ? (
+                <div className="text-center py-8">
+                  <MapPin className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+                  <p className="text-gray-600">{searchError}</p>
+                </div>
+              ) : results.length > 0 ? (
                 results.map((place, index) => (
                   <motion.button
-                    key={place.place_id}
+                    key={place.placeId}
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.2, delay: index * 0.05 }}
@@ -179,8 +200,8 @@ export default function DestinationSearch({ onDestinationSelect, onBack }: Desti
                         <MapPin className="h-4 w-4 text-gray-600 group-hover:text-blue-600" />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <div className="font-medium text-gray-900 truncate">{place.name}</div>
-                        <div className="text-sm text-gray-500 truncate">{place.formatted_address}</div>
+                        <div className="font-medium text-gray-900 truncate">{place.mainText}</div>
+                        <div className="text-sm text-gray-500 truncate">{place.secondaryText}</div>
                       </div>
                     </div>
                   </motion.button>

@@ -3,27 +3,11 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import DestinationSelector from "@/components/destination/DestinationSelector";
-import { useCreateItineraryStore } from "@/store/createItineraryStore";
-
-interface Destination {
-  id: string;
-  name: string;
-  country: string;
-  city: string;
-  formatted_address: string;
-  place_id: string;
-  coordinates: {
-    lat: number;
-    lng: number;
-  };
-  timezone: string;
-  photos?: string[];
-  description?: string;
-}
+import { useCreateItineraryStore, type Destination } from "@/store/createItineraryStore";
 
 export default function DestinationSelectionPage() {
   const router = useRouter();
-  const { destinationData, setDestinationData } = useCreateItineraryStore();
+  const { legs, addLeg, setLegDestination } = useCreateItineraryStore();
   const [isClient, setIsClient] = useState(false);
 
   useEffect(() => {
@@ -31,7 +15,8 @@ export default function DestinationSelectionPage() {
   }, []);
 
   const handleDestinationSelect = (destination: Destination) => {
-    setDestinationData(destination);
+    const firstLegId = legs[0]?.id ?? addLeg();
+    setLegDestination(firstLegId, destination);
     // Navigate to the next step (date selection or back to popup)
     router.push("/itinerary/create");
   };
@@ -55,7 +40,7 @@ export default function DestinationSelectionPage() {
         <DestinationSelector
           onDestinationSelect={handleDestinationSelect}
           onClose={handleClose}
-          initialDestination={destinationData}
+          initialDestination={legs[0]?.destination ?? null}
         />
       </div>
     </div>
