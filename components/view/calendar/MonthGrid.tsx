@@ -5,6 +5,7 @@ import { format, isSameDay, isSameMonth, isToday, isWeekend, startOfMonth } from
 import { cn } from "@/lib/utils";
 import type { ScheduledActivity } from "./hooks/useScheduledActivities";
 import { useItineraryActivityStore } from "@/store/itineraryActivityStore";
+import { useItineraryCustomEventStore } from "@/store/itineraryCustomEventStore";
 import { useItineraryLayoutStore } from "@/store/itineraryLayoutStore";
 import { ACTIVITY_ACCENT_DOT_CLASSES, getActivityThemeForTypes } from "@/lib/activityAccent";
 import { colors } from "@/lib/colors/colors";
@@ -47,16 +48,36 @@ export function MonthGrid({
 }: MonthGridProps) {
   const monthStart = startOfMonth(monthDate);
   const { itineraryActivities } = useItineraryActivityStore();
+  const customEvents = useItineraryCustomEventStore((s) => s.customEvents);
   const activityCategoryAccents = useItineraryLayoutStore((s) => s.activityCategoryAccents);
   const activityCategoryCustomColors = useItineraryLayoutStore((s) => s.activityCategoryCustomColors);
   const activeDays = useItineraryLayoutStore((s) => s.viewStates.calendar.activeDays ?? []);
   const showCityLabels = useItineraryLayoutStore((s) => s.viewStates.calendar.showCityLabels);
   const activeDaySet = useMemo(() => new Set(activeDays ?? []), [activeDays]);
 
-  const activitiesByDay = useMemo(() => {
+  const itemsByDay = useMemo(() => {
+    type MonthCellItem =
+      | {
+          kind: "activity";
+          id: string;
+          activityId: unknown;
+          dateKey: string;
+          startTime: string | null;
+          name: string;
+          types: string[];
+        }
+      | {
+          kind: "custom-event";
+          id: string;
+          dateKey: string;
+          startTime: string | null;
+          name: string;
+          colorHex: string | null;
+        };
+
     // Prefer source-of-truth itinerary activities so month view can show date-only items too.
     // Fall back to scheduledActivities (already filtered to view range) if store is empty.
-    const source =
+    const activitySource: MonthCellItem[] =
       itineraryActivities && itineraryActivities.length > 0
         ? itineraryActivities
             .filter((a) => a.deleted_at === null && a.date)
@@ -64,6 +85,7 @@ export function MonthGrid({
               const dateKey = (a.date ?? "").slice(0, 10); // YYYY-MM-DD
               const startTime = a.start_time ? a.start_time.slice(0, 5) : null; // HH:mm
               return {
+                kind: "activity",
                 id: String(a.itinerary_activity_id),
                 activityId: a.activity_id || a.itinerary_activity_id,
                 dateKey,
@@ -73,6 +95,7 @@ export function MonthGrid({
               };
             })
         : scheduledActivities.map((a) => ({
+            kind: "activity",
             id: a.id,
             activityId: a.activityId || a.id,
             dateKey: format(a.date, "yyyy-MM-dd"),
@@ -81,23 +104,26 @@ export function MonthGrid({
             types: a.activity?.types ?? [],
           }));
 
-    const map = new Map<
-      string,
-      Array<{ id: string; activityId: unknown; startTime: string | null; name: string; types: string[] }>
-    >();
+    const customSource: MonthCellItem[] = customEvents
+      .filter((event) => event.deleted_at === null && event.date)
+      .map((event) => ({
+        kind: "custom-event",
+        id: `custom-${event.itinerary_custom_event_id}`,
+        dateKey: String(event.date).slice(0, 10),
+        startTime: event.start_time ? String(event.start_time).slice(0, 5) : null,
+        name: event.title,
+        colorHex: event.color_hex,
+      }));
+
+    const source: MonthCellItem[] = [...activitySource, ...customSource];
+
+    const map = new Map<string, MonthCellItem[]>();
 
     for (const item of source) {
       if (!item.dateKey) continue;
       const existing = map.get(item.dateKey);
-      const payload = {
-        id: item.id,
-        activityId: item.activityId,
-        startTime: item.startTime,
-        name: item.name,
-        types: item.types,
-      };
-      if (existing) existing.push(payload);
-      else map.set(item.dateKey, [payload]);
+      if (existing) existing.push(item);
+      else map.set(item.dateKey, [item]);
     }
 
     for (const list of map.values()) {
@@ -111,7 +137,7 @@ export function MonthGrid({
     }
 
     return map;
-  }, [itineraryActivities, scheduledActivities]);
+  }, [customEvents, itineraryActivities, scheduledActivities]);
 
   return (
     <div className={cn("flex flex-col h-full min-h-0", className)}>
@@ -135,15 +161,15 @@ export function MonthGrid({
           const dayKey = format(day, "yyyy-MM-dd");
           const isActiveDay = activeDaySet.has(dayKey);
           const dayColor = getDayColor(day);
-          const dayActivities = activitiesByDay.get(dayKey) ?? [];
+          const dayItems = itemsByDay.get(dayKey) ?? [];
           const cityLabel =
             showCityLabels && destinations?.length
               ? getCityLabelForDateKey(dayKey, destinations)
               : null;
 
           const isLastColumn = index % 7 === 6;
-          const cellEvents = dayActivities.slice(0, 3);
-          const overflowCount = Math.max(0, dayActivities.length - cellEvents.length);
+          const cellEvents = dayItems.slice(0, 3);
+          const overflowCount = Math.max(0, dayItems.length - cellEvents.length);
 
           return (
             <button
@@ -192,38 +218,55 @@ export function MonthGrid({
               ) : null}
 
               <div className="mt-1 space-y-1 min-h-0 overflow-hidden">
-                {cellEvents.map((activity) => {
-                  const theme = getActivityThemeForTypes(
-                    activity.types,
-                    activity.activityId,
-                    activityCategoryAccents,
-                    activityCategoryCustomColors
-                  );
+                {cellEvents.map((item) => {
+                  const isCustomEvent = item.kind === "custom-event";
+                  const theme = !isCustomEvent
+                    ? getActivityThemeForTypes(
+                        item.types,
+                        item.activityId,
+                        activityCategoryAccents,
+                        activityCategoryCustomColors
+                      )
+                    : null;
 
                   return (
                     <div
-                      key={activity.id}
+                      key={item.id}
                       className={cn(
                         "flex items-center gap-1.5 truncate text-[11px] leading-4",
                         !inMonth && "text-ink-400",
                         inMonth && "text-ink-700"
                       )}
-                      title={activity.name}
+                      title={item.name}
                     >
                       <span
                         className={cn(
                           "inline-block w-1.5 h-1.5 rounded-full flex-shrink-0",
                           !inMonth && "opacity-60",
-                          theme.customHex ? "bg-transparent" : ACTIVITY_ACCENT_DOT_CLASSES[theme.accent]
+                          isCustomEvent
+                            ? "bg-transparent"
+                            : theme?.customHex
+                              ? "bg-transparent"
+                              : theme
+                                ? ACTIVITY_ACCENT_DOT_CLASSES[theme.accent]
+                                : "bg-brand-500"
                         )}
-                        style={theme.customHex ? { backgroundColor: theme.customHex } : undefined}
+                        style={
+                          isCustomEvent
+                            ? {
+                                backgroundColor: item.colorHex || "#94a3b8",
+                              }
+                            : theme?.customHex
+                              ? { backgroundColor: theme.customHex }
+                              : undefined
+                        }
                       />
-                      {activity.startTime && (
+                      {item.startTime && (
                         <span className={cn("font-medium flex-shrink-0", !inMonth && "text-ink-400")}>
-                          {activity.startTime}
+                          {item.startTime}
                         </span>
                       )}
-                      <span className="truncate">{activity.name}</span>
+                      <span className="truncate">{item.name}</span>
                     </div>
                   );
                 })}
@@ -234,10 +277,10 @@ export function MonthGrid({
                   </div>
                 )}
 
-                {dayActivities.length > 0 && cellEvents.length === 0 && (
+                {dayItems.length > 0 && cellEvents.length === 0 && (
                   <div className={cn("flex items-center gap-1 text-[11px] px-1", inMonth ? "text-ink-500" : "text-ink-400")}>
                     <span className="inline-block w-1.5 h-1.5 rounded-full bg-brand-500" />
-                    <span>{dayActivities.length} activities</span>
+                    <span>{dayItems.length} items</span>
                   </div>
                 )}
               </div>

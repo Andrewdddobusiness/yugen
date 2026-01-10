@@ -5,18 +5,13 @@ import { useDroppable } from "@dnd-kit/core";
 import { format, isToday, isWeekend } from "date-fns";
 import { cn } from "@/lib/utils";
 import { ActivityBlock } from "./ActivityBlock";
+import { CustomEventBlock } from "./CustomEventBlock";
 import { useSchedulingContext } from "@/store/timeSchedulingStore";
 import {
   CALENDAR_HEADER_HEIGHT_PX,
   getCalendarSlotHeightPx,
 } from "./layoutMetrics";
-
-interface TimeSlot {
-  time: string;
-  hour: number;
-  minute: number;
-  label: string;
-}
+import type { TimeSlot } from "./TimeGrid";
 
 interface ScheduledActivity {
   id: string;
@@ -39,6 +34,17 @@ interface DayColumnProps {
   dayIndex: number;
   timeSlots: TimeSlot[];
   activities: ScheduledActivity[];
+  customEvents?: Array<{
+    id: string;
+    date: Date;
+    startTime: string;
+    endTime: string;
+    duration: number;
+    position: { day: number; startSlot: number; span: number };
+    title: string;
+    notes?: string | null;
+    colorHex?: string | null;
+  }>;
   allDayActivities?: Array<{ id: string; name: string }>;
   highlightActivityId?: string | null;
   onSelectDate?: (date: Date) => void;
@@ -65,6 +71,19 @@ interface DayColumnProps {
     newDuration: number,
     resizeDirection: "top" | "bottom"
   ) => void;
+  onCustomEventResize?: (
+    eventId: string,
+    newDuration: number,
+    resizeDirection: "top" | "bottom"
+  ) => void;
+  onTimeSlotContextMenu?: (args: {
+    date: Date;
+    slot: TimeSlot;
+    dayIndex: number;
+    slotIndex: number;
+    anchorRect: { top: number; left: number; right: number; bottom: number; width: number; height: number };
+  }) => void;
+  highlightedSlot?: { dayIndex: number; slotIndex: number } | null;
 }
 
 interface TimeSlotDropZoneProps {
@@ -72,6 +91,7 @@ interface TimeSlotDropZoneProps {
   slotIndex: number;
   isOver?: boolean;
   className?: string;
+  onContextMenu?: React.MouseEventHandler<HTMLDivElement>;
 }
 
 function TimeSlotDropZone({
@@ -80,6 +100,7 @@ function TimeSlotDropZone({
   isOver,
   hasConflict,
   className,
+  onContextMenu,
 }: TimeSlotDropZoneProps & { hasConflict?: boolean }) {
   const { setNodeRef } = useDroppable({
     id: `slot-${dayIndex}-${slotIndex}`,
@@ -94,6 +115,7 @@ function TimeSlotDropZone({
         isOver && hasConflict && "bg-red-100/40",
         className
       )}
+      onContextMenu={onContextMenu}
     />
   );
 }
@@ -103,12 +125,16 @@ export function DayColumn({
   dayIndex,
   timeSlots,
   activities,
+  customEvents = [],
   allDayActivities = [],
   highlightActivityId,
   onSelectDate,
   dragOverInfo,
   className,
   onResize,
+  onCustomEventResize,
+  onTimeSlotContextMenu,
+  highlightedSlot = null,
   isActive,
   activeColor,
   onToggleActiveDay,
@@ -160,20 +186,18 @@ export function DayColumn({
         ? dragOverInfo.spanSlots
         : null;
 
-    const events: Array<Event & { isPreview: boolean }> = activities
-      .map((activity) => {
-        const position = getDisplayPosition(activity);
+    const events: Array<Event & { isPreview: boolean }> = [...customEvents, ...activities]
+      .map((item) => {
+        const position = getDisplayPosition(item as any);
         if (!position) return null;
         return {
-          id: String(activity.id),
+          id: String((item as any).id),
           start: Math.max(0, position.startSlot),
           end: Math.max(0, position.startSlot + Math.max(1, position.span)),
           isPreview: false,
         };
       })
-      .filter(
-        (event): event is Event & { isPreview: boolean } => event !== null
-      )
+      .filter((event): event is Event & { isPreview: boolean } => event !== null)
       .concat(
         previewStart != null && previewSpan != null
           ? [
@@ -254,7 +278,7 @@ export function DayColumn({
 
     assignCluster(cluster);
     return layout;
-  }, [activities, dayIndex, dragOverInfo, getDisplayPosition]);
+  }, [activities, customEvents, dayIndex, dragOverInfo, getDisplayPosition]);
   const dragPreview =
     dragOverInfo?.dayIndex === dayIndex
       ? {
@@ -342,7 +366,10 @@ export function DayColumn({
             key={`${dayIndex}-${slotIndex}`}
             className={cn(
               "border-b border-stroke-200/60 relative",
-              isWeekendDay ? "bg-bg-50/60" : "bg-bg-0"
+              isWeekendDay ? "bg-bg-50/60" : "bg-bg-0",
+              highlightedSlot?.dayIndex === dayIndex &&
+                highlightedSlot?.slotIndex === slotIndex &&
+                "bg-brand-500/5 ring-2 ring-brand-400/40 ring-inset"
             )}
             style={{ height: `${slotHeightPx}px` }}
           >
@@ -359,6 +386,29 @@ export function DayColumn({
                 dragOverInfo?.slotIndex === slotIndex
                   ? dragOverInfo.hasConflict
                   : false
+              }
+              onContextMenu={
+                onTimeSlotContextMenu
+                  ? (event) => {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      const rect = event.currentTarget.getBoundingClientRect();
+                      onTimeSlotContextMenu({
+                        date,
+                        slot,
+                        dayIndex,
+                        slotIndex,
+                        anchorRect: {
+                          top: rect.top,
+                          left: rect.left,
+                          right: rect.right,
+                          bottom: rect.bottom,
+                          width: rect.width,
+                          height: rect.height,
+                        },
+                      });
+                    }
+                  : undefined
               }
             />
 
@@ -435,6 +485,50 @@ export function DayColumn({
 
         {/* Activity Blocks */}
         <div className="absolute inset-0 pointer-events-none">
+          {customEvents.map((event) => {
+            const displayPosition = getDisplayPosition(event as any);
+            if (!displayPosition) return null;
+
+            const overlap = overlapLayoutById[String(event.id)] ?? {
+              column: 0,
+              columnCount: 1,
+            };
+
+            const columnCount = Math.max(1, overlap.columnCount);
+            const column = Math.max(0, overlap.column);
+
+            const gutterPx = 4; // left+right padding (2px each)
+            const gapPx = columnCount > 1 ? 4 : 0;
+            const totalGapPx = gapPx * (columnCount - 1);
+
+            const columnWidth = `calc((100% - ${gutterPx + totalGapPx}px) / ${columnCount})`;
+            const left =
+              columnCount > 1
+                ? `calc(2px + (${columnWidth} + ${gapPx}px) * ${column})`
+                : "2px";
+
+            return (
+              <div
+                key={`custom-${event.id}`}
+                className="absolute pointer-events-auto"
+                style={{
+                  top: `${displayPosition.startSlot * slotHeightPx}px`,
+                  height: `${displayPosition.span * slotHeightPx}px`,
+                  zIndex: 9 + column,
+                  ...(columnCount > 1
+                    ? { left, width: columnWidth }
+                    : { left: "2px", right: "2px" }),
+                }}
+              >
+                <CustomEventBlock
+                  event={event as any}
+                  className="h-full"
+                  onResize={onCustomEventResize}
+                />
+              </div>
+            );
+          })}
+
           {activities.map((activity) => {
             const displayPosition = getDisplayPosition(activity);
             if (!displayPosition) return null;

@@ -8,7 +8,8 @@ export function formatTime(time: string): string {
   if (!time) return "";
 
   const [hours, minutes] = time.split(":");
-  const hoursNum = parseInt(hours, 10);
+  let hoursNum = parseInt(hours, 10);
+  if (hoursNum === 24) hoursNum = 0;
 
   let period = "AM";
   let formattedHours = hoursNum;

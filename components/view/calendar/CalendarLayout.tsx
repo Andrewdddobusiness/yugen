@@ -4,12 +4,14 @@ import { DndContext, DragOverlay, pointerWithin } from "@dnd-kit/core";
 import { format, isToday, isWeekend } from "date-fns";
 import { DayColumn } from "./DayColumn";
 import { ActivityBlock } from "./ActivityBlock";
+import { CustomEventBlock } from "./CustomEventBlock";
 import { TimeGrid } from "./TimeGrid";
 import { CalendarControls } from "./CalendarControls";
 import { ConflictResolver, TimeConflict } from "./ConflictResolver";
 import { cn } from "@/lib/utils";
 import { useSchedulingContext } from "@/store/timeSchedulingStore";
 import { ScheduledActivity } from "./hooks/useScheduledActivities";
+import type { ScheduledCustomEvent } from "./hooks/useScheduledCustomEvents";
 import { TimeSlot } from "./TimeGrid";
 import {
   CALENDAR_HEADER_HEIGHT_PX,
@@ -23,6 +25,10 @@ import { colors } from "@/lib/colors/colors";
 import type { ItineraryDestinationSummary } from "@/actions/supabase/destinations";
 import { getCityLabelForDateKey } from "@/lib/itinerary/cityTimeline";
 import { CityLabelPill } from "./CityLabelPill";
+import { useItineraryCustomEventStore } from "@/store/itineraryCustomEventStore";
+import { useParams } from "next/navigation";
+import { CustomEventPopover } from "./CustomEventPopover";
+import type { AnchorRect } from "./CustomEventPopover";
 
 const DAY_OF_WEEK_PALETTE = [
   colors.Blue, // Sun
@@ -63,6 +69,7 @@ interface CalendarLayoutProps {
   days: Date[];
   timeSlots: TimeSlot[];
   scheduledActivities: ScheduledActivity[];
+  scheduledCustomEvents: ScheduledCustomEvent[];
   destinations?: ItineraryDestinationSummary[];
 
   // Drag & drop handlers
@@ -76,6 +83,11 @@ interface CalendarLayoutProps {
     newDuration: number,
     resizeDirection: "top" | "bottom"
   ) => void;
+  onCustomEventResize?: (
+    eventId: string,
+    newDuration: number,
+    resizeDirection: "top" | "bottom"
+  ) => void;
 
   // State
   activeId?: string | null;
@@ -83,8 +95,10 @@ interface CalendarLayoutProps {
     | "scheduled-activity"
     | "itinerary-activity"
     | "wishlist-item"
+    | "custom-event"
     | null;
   activeActivity?: ScheduledActivity | null;
+  activeCustomEvent?: ScheduledCustomEvent | null;
   dragOverInfo?: {
     dayIndex: number;
     slotIndex: number;
@@ -130,6 +144,7 @@ export function CalendarLayout({
   days,
   timeSlots,
   scheduledActivities,
+  scheduledCustomEvents,
   destinations,
   onDragStart,
   onDragMove,
@@ -137,9 +152,11 @@ export function CalendarLayout({
   onDragEnd,
   onDragCancel,
   onResize,
+  onCustomEventResize,
   activeId,
   activeType,
   activeActivity,
+  activeCustomEvent,
   dragOverInfo,
   isSaving,
   conflicts = [],
@@ -260,6 +277,65 @@ export function CalendarLayout({
     return map;
   }, [itineraryActivities, days]);
 
+  const upsertCustomEvent = useItineraryCustomEventStore((s) => s.upsertCustomEvent);
+  const { itineraryId } = useParams();
+  const itineraryIdValue = Array.isArray(itineraryId) ? itineraryId[0] : String(itineraryId ?? "");
+  const itineraryIdNumber = /^\d+$/.test(itineraryIdValue) ? Number(itineraryIdValue) : null;
+
+  const [customEventPopoverOpen, setCustomEventPopoverOpen] = useState(false);
+  const [customEventDraft, setCustomEventDraft] = useState<{
+    itineraryId: number;
+    date: Date;
+    startTime: string;
+    endTime: string;
+  } | null>(null);
+  const [customEventAnchorRect, setCustomEventAnchorRect] = useState<AnchorRect | null>(null);
+  const [highlightedSlot, setHighlightedSlot] = useState<{ dayIndex: number; slotIndex: number } | null>(null);
+
+  const minutesToTimeString = React.useCallback((minutes: number) => {
+    const clamped = Math.max(0, Math.min(24 * 60 - 1, minutes));
+    const h = Math.floor(clamped / 60);
+    const m = clamped % 60;
+    return `${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}:00`;
+  }, []);
+
+  const closeCustomEventPopover = React.useCallback(() => {
+    setCustomEventPopoverOpen(false);
+    setCustomEventDraft(null);
+    setCustomEventAnchorRect(null);
+    setHighlightedSlot(null);
+  }, []);
+
+  const handleTimeSlotContextMenu = React.useCallback(
+    ({
+      date,
+      slot,
+      dayIndex,
+      slotIndex,
+      anchorRect,
+    }: {
+      date: Date;
+      slot: TimeSlot;
+      dayIndex: number;
+      slotIndex: number;
+      anchorRect: AnchorRect;
+    }) => {
+      if (!itineraryIdNumber) return;
+      const startMinutes = slot.hour * 60 + slot.minute;
+      const defaultMinutes = Math.max(60, schedulingContext.config.interval);
+      setCustomEventDraft({
+        itineraryId: itineraryIdNumber,
+        date,
+        startTime: minutesToTimeString(startMinutes),
+        endTime: minutesToTimeString(startMinutes + defaultMinutes),
+      });
+      setCustomEventAnchorRect(anchorRect);
+      setHighlightedSlot({ dayIndex, slotIndex });
+      setCustomEventPopoverOpen(true);
+    },
+    [itineraryIdNumber, minutesToTimeString, schedulingContext.config.interval]
+  );
+
   const [canPortal, setCanPortal] = useState(false);
   useEffect(() => {
     setCanPortal(true);
@@ -281,7 +357,12 @@ export function CalendarLayout({
           />
         </div>
       ) : (
-        <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden bg-bg-0 dark:bg-ink-900">
+        <div
+          className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden bg-bg-0 dark:bg-ink-900"
+          onScroll={() => {
+            if (customEventPopoverOpen) closeCustomEventPopover();
+          }}
+        >
           {/* Sticky column headers (Sun/Mon/...) */}
           <div className="sticky top-0 z-50">
             {showCityLabels ? (
@@ -474,6 +555,9 @@ export function CalendarLayout({
                   activities={scheduledActivities.filter(
                     (act) => act.position.day === dayIndex
                   )}
+                  customEvents={scheduledCustomEvents.filter(
+                    (event) => event.position.day === dayIndex
+                  )}
                   highlightActivityId={highlightActivityId}
                   onSelectDate={onDateChange}
                   isActive={isActiveDay}
@@ -486,6 +570,9 @@ export function CalendarLayout({
                   }
                   dragOverInfo={dragOverInfo}
                   onResize={onResize}
+                  onCustomEventResize={onCustomEventResize}
+                  onTimeSlotContextMenu={handleTimeSlotContextMenu}
+                  highlightedSlot={highlightedSlot}
                   className={
                     dayIndex < days.length - 1
                       ? "border-r border-stroke-200/70"
@@ -507,6 +594,12 @@ export function CalendarLayout({
             activeSidebarActivity &&
             !dragOverInfo ? (
               <SidebarActivityDragOverlay activity={activeSidebarActivity} />
+            ) : activeType === "custom-event" && activeCustomEvent ? (
+              <CustomEventBlock
+                event={activeCustomEvent}
+                isOverlay
+                className="opacity-80 rotate-3 shadow-lg"
+              />
             ) : (
               activeActivity && (
               <ActivityBlock
@@ -558,6 +651,20 @@ export function CalendarLayout({
           {calendarContent}
         </DndContext>
       )}
+
+      <CustomEventPopover
+        open={customEventPopoverOpen}
+        onOpenChange={(open) => {
+          if (!open) {
+            closeCustomEventPopover();
+            return;
+          }
+          setCustomEventPopoverOpen(true);
+        }}
+        draft={customEventDraft}
+        anchorRect={customEventAnchorRect}
+        onCreated={(event) => upsertCustomEvent(event)}
+      />
 
       {/* Conflict Resolution Dialog */}
       {onCloseConflictResolver && onResolveConflicts && (

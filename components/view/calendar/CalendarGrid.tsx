@@ -15,6 +15,7 @@ import { ConflictResolver, TimeConflict } from './ConflictResolver';
 import { 
   useTimeSlots,
   useScheduledActivities, 
+  useScheduledCustomEvents,
   useCalendarDays,
   useDragAndDrop
 } from './hooks';
@@ -64,21 +65,24 @@ export function CalendarGrid({
   const days = useCalendarDays(selectedDate, viewMode);
   const timeSlots = useTimeSlots();
   const scheduledActivities = useScheduledActivities(days, timeSlots);
+  const scheduledCustomEvents = useScheduledCustomEvents(days, timeSlots);
 
   // Drag & drop functionality
-  const {
-    handleDragStart,
-    handleDragMove,
-    handleDragOver,
-    handleDragEnd,
-    handleDragCancel,
-    handleResize,
-    activeId,
-    activeType,
-    activeActivity,
-    dragOverInfo,
-    isSaving
-  } = useDragAndDrop(days, timeSlots, scheduledActivities);
+	  const {
+	    handleDragStart,
+	    handleDragMove,
+	    handleDragOver,
+	    handleDragEnd,
+	    handleDragCancel,
+	    handleResize,
+      handleCustomEventResize,
+	    activeId,
+	    activeType,
+	    activeActivity,
+      activeCustomEvent,
+	    dragOverInfo,
+	    isSaving
+	  } = useDragAndDrop(days, timeSlots, scheduledActivities, scheduledCustomEvents);
 
   // Conflict resolution handlers
   const handleCloseConflictResolver = () => setShowConflictResolver(false);
@@ -126,15 +130,18 @@ export function CalendarGrid({
         days={days}
         timeSlots={timeSlots}
         scheduledActivities={scheduledActivities}
+        scheduledCustomEvents={scheduledCustomEvents}
         onDragStart={handleDragStart}
         onDragMove={handleDragMove}
         onDragOver={handleDragOver}
         onDragEnd={handleDragEnd}
         onDragCancel={handleDragCancel}
         onResize={handleResize}
+        onCustomEventResize={handleCustomEventResize}
         activeId={activeId}
         activeType={activeType}
         activeActivity={activeActivity}
+        activeCustomEvent={activeCustomEvent}
         dragOverInfo={dragOverInfo}
         isSaving={isSaving}
         conflicts={conflicts}

@@ -15,9 +15,12 @@ import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { useDateRangeStore } from "@/store/dateRangeStore";
+import { useItineraryCustomEventStore, type ItineraryCustomEvent } from "@/store/itineraryCustomEventStore";
+import { deleteItineraryCustomEvent } from "@/actions/supabase/customEvents";
 
 import { useParams } from "next/navigation";
 import ItineraryTableRow from "@/components/table/itineraryTableRow";
+import ItineraryCustomEventRow from "@/components/table/itineraryCustomEventRow";
 import { ItineraryTableDateHeader } from "@/components/table/itineraryTableDateHeader";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -29,6 +32,7 @@ import {
   getActivityThemeForTypes,
   type ActivityCategory,
 } from "@/lib/activityAccent";
+import { formatTime } from "@/utils/formatting/datetime";
 
 type TableScheduleFilter = "all" | "scheduled" | "unscheduled";
 type TableFilters = {
@@ -36,6 +40,10 @@ type TableFilters = {
   categories: ActivityCategory[];
   schedule: TableScheduleFilter;
 };
+
+type TableItem =
+  | { kind: "activity"; data: any }
+  | { kind: "custom-event"; data: ItineraryCustomEvent };
 
 const TABLE_FILTER_CATEGORIES = Object.keys(ACTIVITY_CATEGORY_LABELS) as ActivityCategory[];
 
@@ -103,6 +111,10 @@ export function ItineraryTableView({ showMap, onToggleMap }: ItineraryTableViewP
 
   /* STORE */
   const { itineraryActivities, removeItineraryActivity } = useItineraryActivityStore();
+  const customEvents = useItineraryCustomEventStore((s) => s.customEvents);
+  const updateCustomEvent = useItineraryCustomEventStore((s) => s.updateCustomEvent);
+  const upsertCustomEvent = useItineraryCustomEventStore((s) => s.upsertCustomEvent);
+  const getCustomEventById = useItineraryCustomEventStore((s) => s.getCustomEventById);
   const { startDate, endDate } = useDateRangeStore();
 
   const debouncedSearchText = useDebounce(filters.searchText, 150);
@@ -161,22 +173,47 @@ export function ItineraryTableView({ showMap, onToggleMap }: ItineraryTableViewP
     }
   };
 
-  const groupActivitiesByDate = (activities: typeof itineraryActivities) => {
-    const groups: { [key: string]: typeof activities } = {
+  const groupItemsByDate = (items: TableItem[]) => {
+    const groups: Record<string, TableItem[]> = {
       unscheduled: [],
     };
 
-    activities.forEach((activity) => {
-      if (!activity.date) {
-        groups.unscheduled.push(activity);
+    const toSortableMinutes = (time: string | null | undefined) => {
+      if (!time) return Number.POSITIVE_INFINITY;
+      const [hour, minute] = time.slice(0, 5).split(":").map(Number);
+      if (!Number.isFinite(hour) || !Number.isFinite(minute)) return Number.POSITIVE_INFINITY;
+      return hour * 60 + minute;
+    };
+
+    const getItemLabel = (item: TableItem) => {
+      if (item.kind === "custom-event") return item.data.title ?? "";
+      return item.data.activity?.name ?? "";
+    };
+
+    items.forEach((item) => {
+      const itemDate = item.data.date;
+      if (!itemDate) {
+        groups.unscheduled.push(item);
       } else {
-        const date = new Date(activity.date).toISOString().split("T")[0];
+        const date = new Date(itemDate).toISOString().split("T")[0];
         if (!groups[date]) {
           groups[date] = [];
         }
-        groups[date].push(activity);
+        groups[date].push(item);
       }
     });
+
+    for (const [dateKey, list] of Object.entries(groups)) {
+      list.sort((a, b) => {
+        const aStart = toSortableMinutes(a.data.start_time);
+        const bStart = toSortableMinutes(b.data.start_time);
+        if (aStart !== bStart) return aStart - bStart;
+        if (a.kind !== b.kind) return a.kind.localeCompare(b.kind);
+        return getItemLabel(a).localeCompare(getItemLabel(b));
+      });
+
+      if (dateKey === "unscheduled") continue;
+    }
 
     if (groups.unscheduled.length === 0) {
       delete groups.unscheduled;
@@ -201,6 +238,11 @@ export function ItineraryTableView({ showMap, onToggleMap }: ItineraryTableViewP
   const itineraryActivitiesOnlyActivities = useMemo(
     () => itineraryActivities.filter((itineraryActivity) => itineraryActivity.deleted_at === null),
     [itineraryActivities]
+  );
+
+  const itineraryCustomEventsOnlyEvents = useMemo(
+    () => customEvents.filter((event) => event.deleted_at === null),
+    [customEvents]
   );
 
   const filteredActivities = useMemo(() => {
@@ -235,8 +277,36 @@ export function ItineraryTableView({ showMap, onToggleMap }: ItineraryTableViewP
     });
   }, [debouncedSearchText, filters.categories, filters.schedule, itineraryActivitiesOnlyActivities]);
 
+  const filteredCustomEvents = useMemo(() => {
+    const search = debouncedSearchText.trim().toLowerCase();
+    const hasSearch = Boolean(search);
+    const schedule = filters.schedule;
+
+    if (!hasSearch && schedule === "all") {
+      return itineraryCustomEventsOnlyEvents;
+    }
+
+    return itineraryCustomEventsOnlyEvents.filter((event) => {
+      if (schedule === "scheduled" && !event.date) return false;
+      if (schedule === "unscheduled" && event.date) return false;
+
+      if (hasSearch) {
+        const title = event.title ?? "";
+        const notes = event.notes ?? "";
+        const haystack = `${title} ${notes}`.toLowerCase();
+        if (!haystack.includes(search)) return false;
+      }
+
+      return true;
+    });
+  }, [debouncedSearchText, filters.schedule, itineraryCustomEventsOnlyEvents]);
+
   const totalActivitiesCount = itineraryActivitiesOnlyActivities.length;
   const filteredActivitiesCount = filteredActivities.length;
+  const totalCustomEventsCount = itineraryCustomEventsOnlyEvents.length;
+  const filteredCustomEventsCount = filteredCustomEvents.length;
+  const totalItemsCount = totalActivitiesCount + totalCustomEventsCount;
+  const filteredItemsCount = filteredActivitiesCount + filteredCustomEventsCount;
 
   const categoryCounts = useMemo(() => {
     const counts = Object.fromEntries(TABLE_FILTER_CATEGORIES.map((category) => [category, 0])) as Record<
@@ -252,7 +322,10 @@ export function ItineraryTableView({ showMap, onToggleMap }: ItineraryTableViewP
     return counts;
   }, [itineraryActivitiesOnlyActivities]);
 
-  const groupedActivities = groupActivitiesByDate(filteredActivities);
+  const groupedItems = groupItemsByDate([
+    ...filteredActivities.map<TableItem>((activity) => ({ kind: "activity", data: activity })),
+    ...filteredCustomEvents.map<TableItem>((event) => ({ kind: "custom-event", data: event })),
+  ]);
 
   const handleRemoveActivity = async (placeId: string) => {
     try {
@@ -263,115 +336,223 @@ export function ItineraryTableView({ showMap, onToggleMap }: ItineraryTableViewP
     }
   };
 
+  const handleRemoveCustomEvent = async (eventId: number) => {
+    const eventIdNumber = Number(eventId);
+    if (!Number.isFinite(eventIdNumber)) return;
+
+    const previous = getCustomEventById(eventIdNumber);
+    if (!previous) return;
+
+    const optimisticDeletedAt = new Date().toISOString();
+    updateCustomEvent(eventIdNumber, { deleted_at: optimisticDeletedAt });
+
+    try {
+      const result = await deleteItineraryCustomEvent(String(eventIdNumber));
+      if (!result.success || !result.data) {
+        throw new Error(result.error?.message ?? "Failed to delete");
+      }
+      upsertCustomEvent(result.data);
+    } catch (error) {
+      console.error("Error removing note:", error);
+      updateCustomEvent(eventIdNumber, { deleted_at: previous.deleted_at });
+    }
+  };
+
   if (isMobile) {
     return (
       <div className="space-y-6 p-4 z-0 ">
-        {groupedActivities.length === 0 ? (
+        {groupedItems.length === 0 ? (
           <div className="rounded-xl border border-stroke-200 bg-bg-0 p-4 text-sm text-ink-500">
-            No activities match your filters.
+            No items match your filters.
           </div>
         ) : (
-          groupedActivities.map(([date, activities]) => (
+          groupedItems.map(([date, items]) => (
             <div key={date} className="space-y-2">
               <h3 className="font-medium text-gray-900">{formatDate(date)}</h3>
 
               <div className="space-y-2">
-                {activities.map((activity, index) => (
-                  <div
-                    key={activity.itinerary_activity_id}
-                    className={cn("bg-white rounded-lg shadow-sm border border-gray-200", index !== 0 && "-mt-[1px]")}
-                  >
-                    <Button
-                      variant="ghost"
-                      className="w-full flex items-center justify-between p-4 hover:bg-gray-50"
-                      onClick={() => toggleCard(activity.itinerary_activity_id)}
-                    >
-                      <div className="flex items-center justify-between w-full">
-                        <div className="flex items-center space-x-2">
-                          <span className="font-medium">{activity.activity?.name}</span>
-                        </div>
-                        <ChevronDown
-                          className={cn(
-                            "h-5 w-5 transition-transform duration-200",
-                            expandedCards[activity.itinerary_activity_id] && "rotate-180"
-                          )}
-                        />
-                      </div>
-                    </Button>
+                {items.map((item, index) => {
+                  if (item.kind === "custom-event") {
+                    const event = item.data;
+                    const cardId = `custom-${event.itinerary_custom_event_id}`;
+                    const isExpanded = expandedCards[cardId];
 
-                    <div
-                      className={cn(
-                        "grid transition-all duration-200 ease-in-out",
-                        expandedCards[activity.itinerary_activity_id]
-                          ? "grid-rows-[1fr] opacity-100"
-                          : "grid-rows-[0fr] opacity-0"
-                      )}
-                    >
-                      <div className="overflow-hidden">
-                        <div className="p-4 pt-0 space-y-3 border-t">
-                          <div className="grid grid-cols-2 gap-2 pt-2">
-                            <div>
-                              <div className="text-xs text-gray-500 mb-1">Date</div>
-                              <DatePickerPopover
-                                itineraryActivityId={activity.itinerary_activity_id}
-                                showText={true}
-                                styled={true}
-                                startDate={startDate || undefined}
-                                endDate={endDate || undefined}
-                              />
+                    return (
+                      <div
+                        key={cardId}
+                        className={cn(
+                          "bg-white rounded-lg shadow-sm border border-gray-200",
+                          index !== 0 && "-mt-[1px]"
+                        )}
+                      >
+                        <Button
+                          variant="ghost"
+                          className="w-full flex items-center justify-between p-4 hover:bg-gray-50"
+                          onClick={() => toggleCard(cardId)}
+                        >
+                          <div className="flex items-center justify-between w-full">
+                            <div className="flex items-center space-x-2 min-w-0">
+                              <span className="font-medium truncate">{event.title}</span>
                             </div>
+                            <ChevronDown
+                              className={cn(
+                                "h-5 w-5 transition-transform duration-200",
+                                isExpanded && "rotate-180"
+                              )}
+                            />
+                          </div>
+                        </Button>
 
-                            <div>
-                              <div className="text-xs text-gray-500 mb-1">Time</div>
-                              <TimePopover
-                                itineraryActivityId={activity.itinerary_activity_id}
-                                storeStartTime={activity.start_time}
-                                storeEndTime={activity.end_time}
-                                showText={true}
-                                styled={true}
-                              />
+                        <div
+                          className={cn(
+                            "grid transition-all duration-200 ease-in-out",
+                            isExpanded ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"
+                          )}
+                        >
+                          <div className="overflow-hidden">
+                            <div className="p-4 pt-0 space-y-3 border-t">
+                              <div className="grid grid-cols-2 gap-2 pt-2">
+                                <div>
+                                  <div className="text-xs text-gray-500 mb-1">Date</div>
+                                  <div className="w-full rounded-xl border border-stroke-200 bg-bg-0 px-3 py-2 text-xs text-muted-foreground">
+                                    {event.date ? formatDate(event.date) : "Unscheduled"}
+                                  </div>
+                                </div>
+
+                                <div>
+                                  <div className="text-xs text-gray-500 mb-1">Time</div>
+                                  <div className="w-full rounded-xl border border-stroke-200 bg-bg-0 px-3 py-2 text-xs text-muted-foreground">
+                                    {event.start_time && event.end_time
+                                      ? `${formatTime(event.start_time)} - ${formatTime(event.end_time)}`
+                                      : "Set time"}
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div>
+                                <div className="text-xs text-gray-500 mb-1">Notes</div>
+                                <div className="text-sm text-gray-600 whitespace-pre-wrap">
+                                  {event.notes || "—"}
+                                </div>
+                              </div>
+
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                className="h-9 w-full justify-center rounded-xl text-red-600 hover:bg-red-50 hover:text-red-700"
+                                onClick={() => handleRemoveCustomEvent(event.itinerary_custom_event_id)}
+                              >
+                                Remove
+                              </Button>
                             </div>
                           </div>
+                        </div>
+                      </div>
+                    );
+                  }
 
-                          {activity.activity?.address && (
-                            <div className="flex items-start space-x-3 text-sm text-gray-600">
-                              <MapPin size={16} />
-                              <span>{activity.activity.address}</span>
+                  const activity = item.data;
+
+                  return (
+                    <div
+                      key={activity.itinerary_activity_id}
+                      className={cn(
+                        "bg-white rounded-lg shadow-sm border border-gray-200",
+                        index !== 0 && "-mt-[1px]"
+                      )}
+                    >
+                      <Button
+                        variant="ghost"
+                        className="w-full flex items-center justify-between p-4 hover:bg-gray-50"
+                        onClick={() => toggleCard(activity.itinerary_activity_id)}
+                      >
+                        <div className="flex items-center justify-between w-full">
+                          <div className="flex items-center space-x-2">
+                            <span className="font-medium">{activity.activity?.name}</span>
+                          </div>
+                          <ChevronDown
+                            className={cn(
+                              "h-5 w-5 transition-transform duration-200",
+                              expandedCards[activity.itinerary_activity_id] && "rotate-180"
+                            )}
+                          />
+                        </div>
+                      </Button>
+
+                      <div
+                        className={cn(
+                          "grid transition-all duration-200 ease-in-out",
+                          expandedCards[activity.itinerary_activity_id]
+                            ? "grid-rows-[1fr] opacity-100"
+                            : "grid-rows-[0fr] opacity-0"
+                        )}
+                      >
+                        <div className="overflow-hidden">
+                          <div className="p-4 pt-0 space-y-3 border-t">
+                            <div className="grid grid-cols-2 gap-2 pt-2">
+                              <div>
+                                <div className="text-xs text-gray-500 mb-1">Date</div>
+                                <DatePickerPopover
+                                  itineraryActivityId={activity.itinerary_activity_id}
+                                  showText={true}
+                                  styled={true}
+                                  startDate={startDate || undefined}
+                                  endDate={endDate || undefined}
+                                />
+                              </div>
+
+                              <div>
+                                <div className="text-xs text-gray-500 mb-1">Time</div>
+                                <TimePopover
+                                  itineraryActivityId={activity.itinerary_activity_id}
+                                  storeStartTime={activity.start_time}
+                                  storeEndTime={activity.end_time}
+                                  showText={true}
+                                  styled={true}
+                                />
+                              </div>
                             </div>
-                          )}
 
-                          {activity.activity?.phone_number && (
-                            <div className="flex items-center space-x-3 text-sm text-gray-600">
-                              <Phone size={16} />
-                              <Link href={`tel:${activity.activity.phone_number}`} className="hover:underline">
-                                {activity.activity.phone_number}
-                              </Link>
+                            {activity.activity?.address && (
+                              <div className="flex items-start space-x-3 text-sm text-gray-600">
+                                <MapPin size={16} />
+                                <span>{activity.activity.address}</span>
+                              </div>
+                            )}
+
+                            {activity.activity?.phone_number && (
+                              <div className="flex items-center space-x-3 text-sm text-gray-600">
+                                <Phone size={16} />
+                                <Link href={`tel:${activity.activity.phone_number}`} className="hover:underline">
+                                  {activity.activity.phone_number}
+                                </Link>
+                              </div>
+                            )}
+
+                            {activity.activity?.website_url && (
+                              <div className="flex items-center space-x-3 text-sm text-gray-600">
+                                <Globe size={16} />
+                                <Link
+                                  href={activity.activity.website_url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="hover:underline truncate text-blue-500"
+                                >
+                                  {activity.activity.website_url}
+                                </Link>
+                              </div>
+                            )}
+
+                            <div>
+                              <div className="text-xs text-gray-500 mb-1">Notes</div>
+                              <NotesPopover itineraryActivityId={activity.itinerary_activity_id} />
                             </div>
-                          )}
-
-                          {activity.activity?.website_url && (
-                            <div className="flex items-center space-x-3 text-sm text-gray-600">
-                              <Globe size={16} />
-                              <Link
-                                href={activity.activity.website_url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="hover:underline truncate text-blue-500"
-                              >
-                                {activity.activity.website_url}
-                              </Link>
-                            </div>
-                          )}
-
-                          <div>
-                            <div className="text-xs text-gray-500 mb-1">Notes</div>
-                            <NotesPopover itineraryActivityId={activity.itinerary_activity_id} />
                           </div>
                         </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           ))
@@ -513,9 +694,9 @@ export function ItineraryTableView({ showMap, onToggleMap }: ItineraryTableViewP
           )}
 
           <span className="ml-auto text-sm text-ink-500">
-            {filteredActivitiesCount === totalActivitiesCount
-              ? `${totalActivitiesCount} activities`
-              : `${filteredActivitiesCount} of ${totalActivitiesCount} activities`}
+            {filteredItemsCount === totalItemsCount
+              ? `${totalItemsCount} items`
+              : `${filteredItemsCount} of ${totalItemsCount} items`}
           </span>
         </div>
       </div>
@@ -533,27 +714,35 @@ export function ItineraryTableView({ showMap, onToggleMap }: ItineraryTableViewP
           </TableRow>
         </TableHeader>
         <TableBody>
-          {groupedActivities.length === 0 ? (
+          {groupedItems.length === 0 ? (
             <TableRow className="flex w-full">
               <TableCell colSpan={7} className="w-full py-12 text-center text-sm text-ink-500">
-                No activities match your filters.
+                No items match your filters.
               </TableCell>
             </TableRow>
           ) : (
-            groupedActivities
-              .map(([date, activities]) => [
+            groupedItems
+              .map(([date, items]) => [
                 <ItineraryTableDateHeader key={`header-${date}`} date={date} formatDate={formatDate} />,
-                ...activities.map((activity) => (
-                  <ItineraryTableRow
-                    key={activity.itinerary_activity_id}
-                    activity={activity}
-                    onRemoveActivity={handleRemoveActivity}
-                    startDate={startDate || undefined}
-                    endDate={endDate || undefined}
-                    showMap={showMap}
-                    onToggleMap={onToggleMap}
-                  />
-                )),
+                ...items.map((item) =>
+                  item.kind === "custom-event" ? (
+                    <ItineraryCustomEventRow
+                      key={`custom-${item.data.itinerary_custom_event_id}`}
+                      event={item.data}
+                      onRemove={handleRemoveCustomEvent}
+                    />
+                  ) : (
+                    <ItineraryTableRow
+                      key={item.data.itinerary_activity_id}
+                      activity={item.data}
+                      onRemoveActivity={handleRemoveActivity}
+                      startDate={startDate || undefined}
+                      endDate={endDate || undefined}
+                      showMap={showMap}
+                      onToggleMap={onToggleMap}
+                    />
+                  )
+                ),
               ])
               .flat()
           )}

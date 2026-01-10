@@ -8,6 +8,7 @@ type BootstrapResult = {
   itinerary: any | null;
   destination: any | null;
   activities: any[];
+  customEvents: any[];
   slots: any[];
   slotOptions: any[];
   collaborators: any[];
@@ -181,6 +182,28 @@ export async function fetchBuilderBootstrap(
         return Array.isArray(slotsWithActors) ? slotsWithActors : [];
       };
 
+      const fetchAllCustomEvents = async () => {
+        const select =
+          "itinerary_custom_event_id,itinerary_id,itinerary_destination_id,title,notes,date,start_time,end_time,color_hex,created_by,updated_by,created_at,updated_at,deleted_at";
+
+        const { data: events, error: eventsError } = await supabase
+          .from("itinerary_custom_event")
+          .select(select)
+          .eq("itinerary_id", itin)
+          .is("deleted_at", null)
+          .order("date", { ascending: true })
+          .order("start_time", { ascending: true })
+          .limit(2000);
+
+        if (eventsError) {
+          const code = String((eventsError as any)?.code ?? "");
+          if (code === "42P01") return [];
+          throw eventsError;
+        }
+
+        return Array.isArray(events) ? events : [];
+      };
+
       const fetchSlotOptionsForSlots = async (slotIds: Array<string | number>) => {
         const normalizedIds = slotIds.map((id) => String(id)).filter(Boolean);
         if (normalizedIds.length === 0) return [];
@@ -275,6 +298,7 @@ export async function fetchBuilderBootstrap(
         const slotOptionsAll = await fetchSlotOptionsForSlots(
           slotsAll.map((slot: any) => slot?.itinerary_slot_id).filter((id: any) => id != null)
         );
+        const customEventsAll = await fetchAllCustomEvents();
 
         return {
           success: true,
@@ -282,6 +306,7 @@ export async function fetchBuilderBootstrap(
             itinerary: data.itinerary ?? null,
             destination: data.destination ?? null,
             activities: normalizedActivities,
+            customEvents: customEventsAll,
             slots: slotsAll,
             slotOptions: slotOptionsAll,
             collaborators: Array.isArray(data.collaborators) ? data.collaborators : [],
@@ -302,6 +327,14 @@ export async function fetchBuilderBootstrap(
           .eq("itinerary_id", itin)
           .eq("itinerary_destination_id", dest)
           .maybeSingle();
+
+        let fallbackCustomEvents: any[] = [];
+        try {
+          fallbackCustomEvents = await fetchAllCustomEvents();
+        } catch (customEventsError) {
+          const code = String((customEventsError as any)?.code ?? "");
+          if (code !== "42P01") throw customEventsError;
+        }
 
         const { data: activitiesWithActors, error: activitiesWithActorsError } = await supabase
           .from("itinerary_activity")
@@ -346,6 +379,7 @@ export async function fetchBuilderBootstrap(
               itinerary: null,
               destination: destinationRow ?? null,
               activities: Array.isArray(activitiesFallback) ? normalizeBootstrapActivities(activitiesFallback) : [],
+              customEvents: fallbackCustomEvents,
               slots: [],
               slotOptions: [],
               collaborators: [],
@@ -360,6 +394,7 @@ export async function fetchBuilderBootstrap(
             itinerary: null,
             destination: destinationRow ?? null,
             activities: Array.isArray(activitiesWithActors) ? normalizeBootstrapActivities(activitiesWithActors) : [],
+            customEvents: fallbackCustomEvents,
             slots: [],
             slotOptions: [],
             collaborators: [],

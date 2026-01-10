@@ -133,6 +133,23 @@ export interface ItinerarySearchHistory {
   searched_at: string;
 }
 
+export interface ItineraryCustomEvent {
+  itinerary_custom_event_id: number;
+  itinerary_id: number;
+  itinerary_destination_id: number | null;
+  title: string;
+  notes: string | null;
+  date: string | null;
+  start_time: string | null;
+  end_time: string | null;
+  color_hex: string | null;
+  created_by: string | null;
+  updated_by: string | null;
+  created_at: string;
+  updated_at: string;
+  deleted_at: string | null;
+}
+
 // Extended types with joins
 export interface ItineraryWithDestinations extends Itinerary {
   destinations: ItineraryDestination[];

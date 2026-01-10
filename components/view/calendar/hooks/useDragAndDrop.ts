@@ -10,12 +10,15 @@ import { format } from 'date-fns';
 import { useParams } from 'next/navigation';
 import { useToast } from '@/components/ui/use-toast';
 import { fetchFilteredTableData2, setItineraryActivityDateTimes, setTableDataWithCheck } from '@/actions/supabase/actions';
+import { setItineraryCustomEventDateTimes } from "@/actions/supabase/customEvents";
 import { addActivitiesAsAlternatives, updateItinerarySlotTimeRange } from '@/actions/supabase/slots';
 import { useItineraryActivityStore } from '@/store/itineraryActivityStore';
+import { useItineraryCustomEventStore } from "@/store/itineraryCustomEventStore";
 import { useItinerarySlotStore } from '@/store/itinerarySlotStore';
 import { useSchedulingContext } from '@/store/timeSchedulingStore';
 import { ActivityScheduler, SchedulerWishlistItem } from '../services/activityScheduler';
 import { ScheduledActivity } from './useScheduledActivities';
+import type { ScheduledCustomEvent } from "./useScheduledCustomEvents";
 import { TimeSlot } from '../TimeGrid';
 import { timeToMinutes } from '@/utils/calendar/collisionDetection';
 
@@ -54,6 +57,11 @@ const getDropOverlapMode = (
   return currentClientX > midpoint ? 'overlap' : 'trim';
 };
 
+const minutesToTimeString = (minutes: number) =>
+  `${Math.floor(minutes / 60)
+    .toString()
+    .padStart(2, "0")}:${(minutes % 60).toString().padStart(2, "0")}:00`;
+
 /**
  * useDragAndDrop - Comprehensive drag and drop logic for calendar grid
  * 
@@ -72,19 +80,25 @@ const getDropOverlapMode = (
 export function useDragAndDrop(
   days: Date[],
   timeSlots: TimeSlot[],
-  scheduledActivities: ScheduledActivity[]
+  scheduledActivities: ScheduledActivity[],
+  scheduledCustomEvents: ScheduledCustomEvent[] = []
 ) {
   const getActivityIdFromDragId = (id: unknown) => {
     const raw = String(id);
     if (raw.startsWith('calendar-overlay:')) return raw.slice('calendar-overlay:'.length);
     if (raw.startsWith('calendar:')) return raw.slice('calendar:'.length);
     if (raw.startsWith('sidebar:')) return raw.slice('sidebar:'.length);
+    if (raw.startsWith('custom-overlay:')) return raw.slice('custom-overlay:'.length);
+    if (raw.startsWith('custom:')) return raw.slice('custom:'.length);
     return raw;
   };
 
   const { destinationId } = useParams();
   const { toast } = useToast();
   const { itineraryActivities, setItineraryActivities } = useItineraryActivityStore();
+  const updateCustomEvent = useItineraryCustomEventStore((s) => s.updateCustomEvent);
+  const upsertCustomEvent = useItineraryCustomEventStore((s) => s.upsertCustomEvent);
+  const getCustomEventById = useItineraryCustomEventStore((s) => s.getCustomEventById);
   const getSlotIdForActivity = useItinerarySlotStore((s) => s.getSlotIdForActivity);
   const getActivityIdsForSlot = useItinerarySlotStore((s) => s.getActivityIdsForSlot);
   const getSlotById = useItinerarySlotStore((s) => s.getSlotById);
@@ -95,7 +109,7 @@ export function useDragAndDrop(
   
 	  // Drag state
 	  const [activeId, setActiveId] = useState<string | null>(null);
-	  const [activeType, setActiveType] = useState<'scheduled-activity' | 'itinerary-activity' | 'wishlist-item' | null>(null);
+	  const [activeType, setActiveType] = useState<'scheduled-activity' | 'itinerary-activity' | 'wishlist-item' | 'custom-event' | null>(null);
 	  const [isSaving, setIsSaving] = useState(false);
 	  const [dragOverInfo, setDragOverInfo] = useState<{
 	    dayIndex: number;
@@ -124,9 +138,10 @@ export function useDragAndDrop(
 		      | 'scheduled-activity'
 		      | 'itinerary-activity'
 		      | 'wishlist-item'
+		      | 'custom-event'
 		      | undefined;
 
-		    if (dragType === 'scheduled-activity' || dragType === 'itinerary-activity') {
+		    if (dragType === 'scheduled-activity' || dragType === 'itinerary-activity' || dragType === 'custom-event') {
 		      // Drive the DragOverlay for cross-component drags (sidebar -> calendar).
 		      setActiveId(getActivityIdFromDragId(event.active.id));
 		      setActiveType(dragType);
@@ -169,16 +184,18 @@ export function useDragAndDrop(
       return;
     }
 
-    const mode = getDropOverlapMode(event);
+    let mode = getDropOverlapMode(event);
 
     // Check if this is a wishlist item being dragged
-    const dragData = active.data?.current;
+    const dragData = active.data?.current as any;
+    const isCustomEventDrag = dragData?.type === "custom-event";
+    if (isCustomEventDrag) mode = "overlap";
     let duration = 60; // Default 1 hour
     let spanSlots = 1;
     let excludeId = null;
     let placeData = null;
     
-    if (dragData?.type === 'wishlist-item') {
+	    if (dragData?.type === 'wishlist-item') {
       // For wishlist items, estimate duration intelligently
       if (dragData.item.activity) {
         duration = scheduler.estimateDuration(dragData.item.activity, targetSlot, targetDate);
@@ -190,7 +207,7 @@ export function useDragAndDrop(
         1,
         Math.ceil(duration / schedulingContext.config.interval)
       );
-    } else if (dragData?.type === 'itinerary-activity') {
+	    } else if (dragData?.type === 'itinerary-activity') {
       const itineraryActivity = dragData.item;
 
       const durationFromTimes =
@@ -215,15 +232,23 @@ export function useDragAndDrop(
 
 	      placeData = itineraryActivity?.activity ?? null;
 	      excludeId = String(itineraryActivity?.itinerary_activity_id ?? activeDragId);
-	      spanSlots = Math.max(
-	        1,
-	        Math.ceil(duration / schedulingContext.config.interval)
-	      );
-	    } else {
-	      // Find the activity being dragged (existing logic)
-	      const draggedActivity = scheduledActivities.find((act) => String(act.id) === activeDragId);
-	      if (!draggedActivity) {
-	        setDragOverInfo(null);
+		      spanSlots = Math.max(
+		        1,
+		        Math.ceil(duration / schedulingContext.config.interval)
+		      );
+		    } else if (dragData?.type === "custom-event") {
+		      const draggedEvent =
+		        dragData?.item ??
+		        scheduledCustomEvents.find((evt) => String(evt.id) === String(activeDragId));
+
+		      duration = Math.max(1, Number(draggedEvent?.duration ?? 60));
+		      spanSlots = Math.max(1, Math.ceil(duration / schedulingContext.config.interval));
+		      excludeId = activeDragId;
+		    } else {
+		      // Find the activity being dragged (existing logic)
+		      const draggedActivity = scheduledActivities.find((act) => String(act.id) === activeDragId);
+		      if (!draggedActivity) {
+		        setDragOverInfo(null);
 	        return;
 	      }
 	      duration = draggedActivity.duration;
@@ -240,18 +265,22 @@ export function useDragAndDrop(
     const proposedDate = format(targetDate, 'yyyy-MM-dd');
     const proposedStartTime = `${boundedTargetSlot.hour.toString().padStart(2, '0')}:${boundedTargetSlot.minute.toString().padStart(2, '0')}:00`;
     
-    const detectedConflicts = scheduler.detectConflicts(
-      proposedDate,
-      proposedStartTime,
-      duration,
-      placeData?.place_id,
-      excludeId || undefined
-    );
-    
-    const hasTimeOverlap = detectedConflicts.some((c) => c.type === 'time_overlap');
-    const hasHighSeverityConflicts = detectedConflicts.some(
-      (c) => c.severity === 'high' && c.type !== 'time_overlap'
-    );
+      let hasTimeOverlap = false;
+      let hasHighSeverityConflicts = false;
+      if (!isCustomEventDrag) {
+        const detectedConflicts = scheduler.detectConflicts(
+          proposedDate,
+          proposedStartTime,
+          duration,
+          placeData?.place_id,
+          excludeId || undefined
+        );
+
+        hasTimeOverlap = detectedConflicts.some((c) => c.type === "time_overlap");
+        hasHighSeverityConflicts = detectedConflicts.some(
+          (c) => c.severity === "high" && c.type !== "time_overlap"
+        );
+      }
 
     const proposedStartSlot = boundedSlotIndex;
     const proposedEndSlot = boundedSlotIndex + spanSlots;
@@ -315,7 +344,7 @@ export function useDragAndDrop(
       hasTimeOverlap,
       trimPreviewById,
     });
-  }, [days, timeSlots, scheduledActivities, scheduler, schedulingContext.config.interval]);
+	  }, [days, timeSlots, scheduledActivities, scheduledCustomEvents, scheduler, schedulingContext.config.interval]);
 
   // DragOver does not always fire when staying over the same slot.
   // Use DragMove to allow live switching between trim/overlap as the cursor crosses the column midpoint.
@@ -338,10 +367,9 @@ export function useDragAndDrop(
       const slotIndex = parseInt(dropZoneData[2]);
       if (isNaN(dayIndex) || isNaN(slotIndex)) return;
 
-      const mode = getDropOverlapMode(event);
-      const activeDragId = getActivityIdFromDragId(active.id);
-
       const dragData = active.data?.current as any;
+      const mode = dragData?.type === "custom-event" ? "overlap" : getDropOverlapMode(event);
+      const activeDragId = getActivityIdFromDragId(active.id);
       const excludeId =
         dragData?.type === 'itinerary-activity'
           ? String(dragData?.item?.itinerary_activity_id ?? activeDragId)
@@ -901,15 +929,93 @@ export function useDragAndDrop(
     if (!targetDate || !targetSlot) return;
 
     // Check if this is a wishlist item being dragged
-    const dragData = active.data?.current;
+    const dragData = active.data?.current as any;
     if (dragData?.type === 'wishlist-item') {
       await handleWishlistItemDrop(dragData.item, targetDate, targetSlot);
       return;
     }
+    if (dragData?.type === 'custom-event') {
+      const eventIdString = String(activeDragId ?? '').trim();
+      if (!/^\d+$/.test(eventIdString)) {
+        toast({
+          title: 'Unable to move note',
+          description: 'Please try again.',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      const eventId = Number(eventIdString);
+      const previous = getCustomEventById(eventId);
+      if (!previous || !previous.date || !previous.start_time || !previous.end_time) return;
+
+      const draggedEvent =
+        dragData?.item ??
+        scheduledCustomEvents.find((evt) => String(evt.id) === String(eventIdString));
+
+      const interval = schedulingContext.config.interval;
+      const dayStartMinutes = schedulingContext.config.startHour * 60;
+      const dayEndMinutes = (schedulingContext.config.endHour + 1) * 60;
+
+      const baseDuration = Math.max(interval, Number(draggedEvent?.duration ?? 60));
+      const alignedDuration = Math.max(interval, Math.ceil(baseDuration / interval) * interval);
+      const spanSlots = Math.max(1, Math.ceil(alignedDuration / interval));
+
+      const boundedSlotIndex = Math.max(0, Math.min(slotIndex, timeSlots.length - spanSlots));
+      const boundedSlot = timeSlots[boundedSlotIndex] ?? targetSlot;
+      const proposedStartMinutes = boundedSlot.hour * 60 + boundedSlot.minute;
+      const boundedStartMinutes = Math.min(
+        Math.max(proposedStartMinutes, dayStartMinutes),
+        Math.max(dayStartMinutes, dayEndMinutes - alignedDuration)
+      );
+
+      const newDate = format(targetDate, 'yyyy-MM-dd');
+      const newStartTime = minutesToTimeString(boundedStartMinutes);
+      const newEndTime = minutesToTimeString(boundedStartMinutes + alignedDuration);
+
+      updateCustomEvent(eventId, {
+        date: newDate,
+        start_time: newStartTime,
+        end_time: newEndTime,
+      });
+
+      setIsSaving(true);
+      try {
+        const result = await setItineraryCustomEventDateTimes(
+          eventIdString,
+          newDate,
+          newStartTime,
+          newEndTime
+        );
+
+        if (!result.success || !result.data) {
+          throw new Error(result.error?.message ?? 'Failed to update');
+        }
+
+        upsertCustomEvent(result.data);
+      } catch (error) {
+        updateCustomEvent(eventId, {
+          date: previous.date,
+          start_time: previous.start_time,
+          end_time: previous.end_time,
+        });
+
+        console.error('Failed to move custom event:', error);
+        toast({
+          title: "Couldn't move note",
+          description: 'Please try again.',
+          variant: 'destructive',
+        });
+      } finally {
+        setIsSaving(false);
+      }
+
+      return;
+    }
 		    if (dragData?.type === 'itinerary-activity') {
-	      const itineraryActivity = dragData.item;
-	      const rawIdFromItem = String(itineraryActivity?.itinerary_activity_id ?? '').trim();
-	      let resolvedItineraryActivityId = String(activeDragId ?? '').trim();
+		      const itineraryActivity = dragData.item;
+		      const rawIdFromItem = String(itineraryActivity?.itinerary_activity_id ?? '').trim();
+		      let resolvedItineraryActivityId = String(activeDragId ?? '').trim();
 	
 	      if (!/^\d+$/.test(resolvedItineraryActivityId) && /^\d+$/.test(rawIdFromItem)) {
 	        resolvedItineraryActivityId = rawIdFromItem;
@@ -1005,19 +1111,138 @@ export function useDragAndDrop(
 	      draggedActivity.duration,
         mode
 	    );
-			  }, [days, timeSlots, scheduledActivities, handleWishlistItemDrop, handleActivityReschedule, scheduler, destinationId, setItineraryActivities, toast]);
+				  }, [
+            days,
+            destinationId,
+            getCustomEventById,
+            handleActivityReschedule,
+            handleWishlistItemDrop,
+            scheduledActivities,
+            scheduledCustomEvents,
+            scheduler,
+            schedulingContext.config.endHour,
+            schedulingContext.config.interval,
+            schedulingContext.config.startHour,
+            setItineraryActivities,
+            timeSlots,
+            toast,
+            updateCustomEvent,
+            upsertCustomEvent,
+          ]);
 
-	  const handleDragCancel = useCallback((_event: DragCancelEvent) => {
-	    setActiveId(null);
-	    setActiveType(null);
-	    setDragOverInfo(null);
-	  }, []);
+		  const handleDragCancel = useCallback((_event: DragCancelEvent) => {
+		    setActiveId(null);
+		    setActiveType(null);
+		    setDragOverInfo(null);
+		  }, []);
 
-  const handleResize = useCallback(async (
-    activityId: string,
-    newDuration: number,
-    resizeDirection: 'top' | 'bottom'
-  ) => {
+      const handleCustomEventResize = useCallback(
+        async (
+          eventId: string,
+          newDuration: number,
+          resizeDirection: 'top' | 'bottom'
+        ) => {
+          const eventIdValue = String(eventId ?? '').trim();
+          if (!/^\d+$/.test(eventIdValue)) return;
+
+          const eventIdNumber = Number(eventIdValue);
+          const current = getCustomEventById(eventIdNumber);
+          if (!current || !current.date || !current.start_time || !current.end_time) return;
+
+          const interval = schedulingContext.config.interval;
+          const minDuration = interval;
+          const alignedDuration = Math.max(
+            minDuration,
+            Math.round(newDuration / interval) * interval
+          );
+
+          const dayStartMinutes = schedulingContext.config.startHour * 60;
+          const dayEndMinutes = (schedulingContext.config.endHour + 1) * 60;
+
+          const startMinutes = timeToMinutes(current.start_time);
+          const endMinutes = timeToMinutes(current.end_time);
+
+          const boundedEndMinutes = Math.min(
+            Math.max(endMinutes, dayStartMinutes + minDuration),
+            dayEndMinutes
+          );
+          const boundedStartMinutes = Math.max(
+            dayStartMinutes,
+            Math.min(startMinutes, boundedEndMinutes - minDuration)
+          );
+
+          const nextEndMinutes =
+            resizeDirection === 'bottom'
+              ? Math.min(boundedStartMinutes + alignedDuration, dayEndMinutes)
+              : boundedEndMinutes;
+          const nextStartMinutes =
+            resizeDirection === 'top'
+              ? Math.max(nextEndMinutes - alignedDuration, dayStartMinutes)
+              : boundedStartMinutes;
+
+          const safeStartMinutes = Math.min(
+            Math.max(nextStartMinutes, dayStartMinutes),
+            Math.max(dayStartMinutes, nextEndMinutes - minDuration)
+          );
+          const safeEndMinutes = Math.max(
+            safeStartMinutes + minDuration,
+            Math.min(nextEndMinutes, dayEndMinutes)
+          );
+
+          const newStartTime = minutesToTimeString(safeStartMinutes);
+          const newEndTime = minutesToTimeString(safeEndMinutes);
+
+          updateCustomEvent(eventIdNumber, {
+            start_time: newStartTime,
+            end_time: newEndTime,
+          });
+
+          setIsSaving(true);
+          try {
+            const result = await setItineraryCustomEventDateTimes(
+              eventIdValue,
+              current.date,
+              newStartTime,
+              newEndTime
+            );
+
+            if (!result.success || !result.data) {
+              throw new Error(result.error?.message ?? 'Failed to update');
+            }
+
+            upsertCustomEvent(result.data);
+          } catch (error) {
+            updateCustomEvent(eventIdNumber, {
+              start_time: current.start_time,
+              end_time: current.end_time,
+            });
+
+            console.error('Failed to resize custom event:', error);
+            toast({
+              title: "Couldn't update note",
+              description: 'Please try again.',
+              variant: 'destructive',
+            });
+          } finally {
+            setIsSaving(false);
+          }
+        },
+        [
+          getCustomEventById,
+          schedulingContext.config.endHour,
+          schedulingContext.config.interval,
+          schedulingContext.config.startHour,
+          toast,
+          updateCustomEvent,
+          upsertCustomEvent,
+        ]
+      );
+
+	  const handleResize = useCallback(async (
+	    activityId: string,
+	    newDuration: number,
+	    resizeDirection: 'top' | 'bottom'
+	  ) => {
     const activityIdString = String(activityId);
     const minutesToTimeString = (minutes: number) =>
       `${Math.floor(minutes / 60).toString().padStart(2, '0')}:${(minutes % 60)
@@ -1331,26 +1556,67 @@ export function useDragAndDrop(
 	        span: spanSlots,
 	      },
 	      activity: itineraryActivity.activity,
-	    } satisfies ScheduledActivity;
-	  })();
+		    } satisfies ScheduledActivity;
+		  })();
 
-	  return {
-	    // Drag handlers
-	    handleDragStart,
-	    handleDragOver,
-      handleDragMove,
-	    handleDragEnd,
-	    handleDragCancel,
-	    handleResize,
+      const activeCustomEvent = (() => {
+        if (!activeId || activeType !== 'custom-event') return null;
+
+        const scheduled = scheduledCustomEvents.find(
+          (evt) => String(evt.id) === String(activeId)
+        );
+        if (!scheduled) return null;
+
+        if (!dragOverInfo) return scheduled;
+
+        const targetDate =
+          dragOverInfo.dayIndex != null ? days[dragOverInfo.dayIndex] : undefined;
+        const targetSlot =
+          dragOverInfo.slotIndex != null ? timeSlots[dragOverInfo.slotIndex] : undefined;
+        if (!targetDate || !targetSlot) return scheduled;
+
+        const interval = schedulingContext.config.interval;
+        const spanSlots =
+          dragOverInfo.spanSlots ?? Math.max(1, Math.ceil(scheduled.duration / interval));
+        const visualDuration = spanSlots * interval;
+
+        const startMinutes = targetSlot.hour * 60 + targetSlot.minute;
+        const startTime = minutesToTimeString(startMinutes);
+        const endTime = minutesToTimeString(startMinutes + visualDuration);
+
+        return {
+          ...scheduled,
+          date: targetDate,
+          startTime,
+          endTime,
+          duration: visualDuration,
+          position: {
+            day: dragOverInfo.dayIndex ?? scheduled.position.day,
+            startSlot: dragOverInfo.slotIndex ?? scheduled.position.startSlot,
+            span: spanSlots,
+          },
+        } satisfies ScheduledCustomEvent;
+      })();
+
+		  return {
+		    // Drag handlers
+		    handleDragStart,
+		    handleDragOver,
+	      handleDragMove,
+		    handleDragEnd,
+		    handleDragCancel,
+		    handleResize,
+        handleCustomEventResize,
+		    
+		    // State
+		    activeId,
+		    activeType,
+		    activeActivity,
+        activeCustomEvent,
+	      dragOverInfo,
+	      isSaving,
 	    
-	    // State
-	    activeId,
-	    activeType,
-	    activeActivity,
-      dragOverInfo,
-      isSaving,
-    
-    // Utilities
-    scheduler
-  };
+	    // Utilities
+	    scheduler
+	  };
 }

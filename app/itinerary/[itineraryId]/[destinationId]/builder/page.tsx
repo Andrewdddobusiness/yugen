@@ -6,6 +6,7 @@ import { useItineraryActivityStore, type IItineraryActivity } from "@/store/itin
 import { useItineraryLayoutStore } from "@/store/itineraryLayoutStore";
 import { useMapStore } from "@/store/mapStore";
 import { useItinerarySlotStore, type IItinerarySlot, type IItinerarySlotOption } from "@/store/itinerarySlotStore";
+import { useItineraryCustomEventStore, type ItineraryCustomEvent } from "@/store/itineraryCustomEventStore";
 import { BuilderPageSkeleton } from "@/components/loading/BuilderPageSkeleton";
 import { useParams } from "next/navigation";
 import { fetchBuilderBootstrap } from "@/actions/supabase/builderBootstrap";
@@ -96,6 +97,7 @@ export default function Builder() {
 
   const { itineraryActivities, setItineraryActivities } = useItineraryActivityStore();
   const { setSlots, setSlotOptions } = useItinerarySlotStore();
+  const { setCustomEvents } = useItineraryCustomEventStore();
   const { 
     currentView, 
     showMap, 
@@ -318,6 +320,41 @@ export default function Builder() {
       setSlotOptions(Array.from(optionsById.values()));
     }
   }, [bootstrap, destId, setSlots, setSlotOptions]);
+
+  useEffect(() => {
+    if (!bootstrap?.customEvents) return;
+
+    const current = useItineraryCustomEventStore.getState().customEvents;
+    const data = bootstrap.customEvents as ItineraryCustomEvent[];
+
+    const lastHydratedItineraryId = lastHydratedItineraryIdRef.current;
+    const isNewItinerary = Boolean(itinId && lastHydratedItineraryId && lastHydratedItineraryId !== itinId);
+    const shouldHydrate = current.length === 0 || isNewItinerary || lastHydratedItineraryId == null;
+
+    if (shouldHydrate) {
+      setCustomEvents(data);
+      lastHydratedItineraryIdRef.current = itinId ?? null;
+      return;
+    }
+
+    const byId = new Map<number, ItineraryCustomEvent>();
+    for (const event of current) {
+      byId.set(Number(event.itinerary_custom_event_id), event);
+    }
+
+    let changed = false;
+    for (const event of data) {
+      const id = Number(event.itinerary_custom_event_id);
+      if (!byId.has(id)) {
+        byId.set(id, event);
+        changed = true;
+      }
+    }
+
+    if (changed) {
+      setCustomEvents(Array.from(byId.values()));
+    }
+  }, [bootstrap, itinId, setCustomEvents]);
 
   // Context data update in separate effect with memoized calculation
   useEffect(() => {
