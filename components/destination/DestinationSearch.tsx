@@ -112,7 +112,7 @@ export default function DestinationSearch({ onDestinationSelect, onBack }: Desti
           formatted_address: formattedAddress,
           place_id: geocodeResponse.data.place_id,
           coordinates: geocodeResponse.data.coordinates,
-          timezone: "UTC", // TODO: Get timezone from Google Maps API
+          timezone: "",
           photos: [],
         };
 

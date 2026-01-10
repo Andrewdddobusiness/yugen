@@ -301,7 +301,7 @@ export function AppSidebarItineraryActivityLeft({
                     onSelect={() => setAddDestinationOpen(true)}
                   >
                     <Plus className="h-4 w-4 mr-2" />
-                    Add destination
+                    Manage destinations
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -333,6 +333,7 @@ export function AppSidebarItineraryActivityLeft({
         open={addDestinationOpen}
         onOpenChange={setAddDestinationOpen}
         itineraryId={itineraryIdValue}
+        currentDestinationId={currentDestinationId}
         nextOrderNumber={nextOrderNumber}
         defaultDateRange={defaultNewDestinationRange}
         onDestinationCreated={(newDestinationId) => {

@@ -40,35 +40,56 @@ export function DatePickerWithRangePopover2({
     setIsOpen(false);
   };
 
+  const handleCancel = () => {
+    // Revert any unconfirmed selections in the popover.
+    setDate(selectedDateRange);
+    setIsOpen(false);
+  };
+
+  const handleOpenChange = (nextOpen: boolean) => {
+    // If the user dismisses the popover (ESC / outside click), revert drafts.
+    if (!nextOpen) {
+      setDate(selectedDateRange);
+    }
+    setIsOpen(nextOpen);
+  };
+
+  const label = React.useMemo(() => {
+    if (!date?.from) return "Pick a date range";
+    if (!date.to) return format(date.from, "MMM d, yyyy");
+
+    const from = date.from;
+    const to = date.to;
+
+    if (from.toDateString() === to.toDateString()) return format(from, "MMM d, yyyy");
+
+    const sameYear = from.getFullYear() === to.getFullYear();
+    const sameMonth = sameYear && from.getMonth() === to.getMonth();
+
+    if (sameMonth) return `${format(from, "MMM d")}–${format(to, "d, yyyy")}`;
+    if (sameYear) return `${format(from, "MMM d")} – ${format(to, "MMM d, yyyy")}`;
+    return `${format(from, "MMM d, yyyy")} – ${format(to, "MMM d, yyyy")}`;
+  }, [date?.from, date?.to]);
+
   const today = new Date();
 
   return (
-    <div className={cn("grid gap-2 relative z-50")}>
-      <Popover modal={true} open={isOpen} onOpenChange={setIsOpen}>
+    <div className={cn("grid gap-2 relative z-50", className)}>
+      <Popover modal={true} open={isOpen} onOpenChange={handleOpenChange}>
         <PopoverTrigger asChild>
           <Button
             id="date"
             variant={"outline"}
             className={cn(
-              "w-full justify-start text-left font-normal min-h-[44px]",
+              "w-full justify-start text-left font-normal min-h-[44px] min-w-0 overflow-hidden",
               "active:scale-95 transition-transform duration-200",
               "touch-manipulation cursor-pointer",
               !date && "text-muted-foreground"
             )}
             onClick={() => setIsOpen(true)}
           >
-            <CalendarIcon className="mr-2 h-4 w-4" />
-            {date?.from ? (
-              date.to ? (
-                <>
-                  {format(date.from, "LLL dd, y")} - {format(date.to, "LLL dd, y")}
-                </>
-              ) : (
-                format(date.from, "LLL dd, y")
-              )
-            ) : (
-              <span>Pick a date range</span>
-            )}
+            <CalendarIcon className="mr-2 h-4 w-4 shrink-0" />
+            <span className="truncate">{label}</span>
           </Button>
         </PopoverTrigger>
         <PopoverContent
@@ -94,7 +115,7 @@ export function DatePickerWithRangePopover2({
             <Button
               variant="outline"
               size="sm"
-              onClick={() => setIsOpen(false)}
+              onClick={handleCancel}
               className="min-h-[36px] rounded-xl shadow-lg text-gray-800"
             >
               Cancel

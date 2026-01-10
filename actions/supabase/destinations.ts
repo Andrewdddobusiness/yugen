@@ -53,11 +53,74 @@ export async function createDestination(data: CreateDestinationData & { itinerar
       };
     }
 
+    // Keep destinations in chronological order (by from_date) by inserting into the correct
+    // order_number slot and shifting existing destinations when needed.
+    const { data: existingDestinations, error: existingError } = await supabase
+      .from("itinerary_destination")
+      .select("itinerary_destination_id, from_date, order_number")
+      .eq("itinerary_id", data.itinerary_id)
+      .order("order_number", { ascending: true });
+
+    if (existingError) {
+      return {
+        success: false,
+        error: {
+          message: "Failed to fetch existing destinations",
+          code: existingError.code,
+          details: existingError,
+        },
+      };
+    }
+
+    const newFromTime = validatedData.from_date.getTime();
+    const normalizedExisting = (existingDestinations ?? [])
+      .map((dest: any) => ({
+        itinerary_destination_id: Number(dest.itinerary_destination_id),
+        order_number: Number(dest.order_number ?? 0),
+        from_time: new Date(dest.from_date).getTime(),
+      }))
+      .filter((dest) => Number.isFinite(dest.itinerary_destination_id) && Number.isFinite(dest.order_number));
+
+    const maxOrder = Math.max(0, ...normalizedExisting.map((dest) => dest.order_number));
+    const insertBefore = normalizedExisting.find((dest) => {
+      if (!Number.isFinite(dest.from_time) || !Number.isFinite(newFromTime)) return false;
+      return dest.from_time > newFromTime;
+    });
+
+    const insertOrderNumber = insertBefore ? Math.max(1, insertBefore.order_number) : maxOrder + 1;
+
+    if (insertOrderNumber <= maxOrder) {
+      // Shift existing destinations down to make room.
+      const toShift = normalizedExisting
+        .filter((dest) => dest.order_number >= insertOrderNumber)
+        .sort((a, b) => b.order_number - a.order_number);
+
+      for (const dest of toShift) {
+        const { error: shiftError } = await supabase
+          .from("itinerary_destination")
+          .update({ order_number: dest.order_number + 1 })
+          .eq("itinerary_destination_id", dest.itinerary_destination_id)
+          .eq("itinerary_id", data.itinerary_id);
+
+        if (shiftError) {
+          return {
+            success: false,
+            error: {
+              message: "Failed to reorder destinations",
+              code: shiftError.code,
+              details: shiftError,
+            },
+          };
+        }
+      }
+    }
+
     const { data: destination, error } = await supabase
       .from("itinerary_destination")
       .insert({
         itinerary_id: data.itinerary_id,
         ...validatedData,
+        order_number: insertOrderNumber,
       })
       .select()
       .single();
@@ -285,6 +348,54 @@ export async function updateDestination(
           details: error
         }
       };
+    }
+
+    // Keep destinations ordered by travel dates when dates change.
+    if (validatedData.from_date || validatedData.to_date) {
+      try {
+        const itineraryId = Number(destination.itinerary_id);
+        if (Number.isFinite(itineraryId)) {
+          const { data: allDestinations, error: listError } = await supabase
+            .from("itinerary_destination")
+            .select("itinerary_destination_id, from_date, to_date, order_number")
+            .eq("itinerary_id", itineraryId);
+
+          if (!listError && Array.isArray(allDestinations)) {
+            const sorted = [...allDestinations].sort((a: any, b: any) => {
+              const aFrom = new Date(a.from_date).getTime();
+              const bFrom = new Date(b.from_date).getTime();
+              if (aFrom !== bFrom) return aFrom - bFrom;
+
+              const aTo = new Date(a.to_date).getTime();
+              const bTo = new Date(b.to_date).getTime();
+              if (aTo !== bTo) return aTo - bTo;
+
+              const aOrder = Number(a.order_number ?? 0);
+              const bOrder = Number(b.order_number ?? 0);
+              if (aOrder !== bOrder) return aOrder - bOrder;
+
+              return Number(a.itinerary_destination_id) - Number(b.itinerary_destination_id);
+            });
+
+            for (let i = 0; i < sorted.length; i += 1) {
+              const destRow = sorted[i] as any;
+              const desiredOrder = i + 1;
+              const currentOrder = Number(destRow.order_number ?? 0);
+              const rowId = String(destRow.itinerary_destination_id ?? "");
+              if (!rowId) continue;
+              if (currentOrder === desiredOrder) continue;
+
+              await supabase
+                .from("itinerary_destination")
+                .update({ order_number: desiredOrder })
+                .eq("itinerary_destination_id", rowId)
+                .eq("itinerary_id", itineraryId);
+            }
+          }
+        }
+      } catch (reorderError) {
+        console.error("Failed to reorder destinations after update:", reorderError);
+      }
     }
 
     return {
