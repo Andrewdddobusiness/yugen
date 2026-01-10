@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 import { ActivityBlock } from "./ActivityBlock";
 import { CustomEventBlock } from "./CustomEventBlock";
 import { useSchedulingContext } from "@/store/timeSchedulingStore";
+import type { AnchorRect } from "./CustomEventPopover";
 import {
   CALENDAR_HEADER_HEIGHT_PX,
   getCalendarSlotHeightPx,
@@ -29,22 +30,24 @@ interface ScheduledActivity {
   };
 }
 
+interface ScheduledCustomEvent {
+  id: string;
+  date: Date;
+  startTime: string;
+  endTime: string;
+  duration: number;
+  position: { day: number; startSlot: number; span: number };
+  title: string;
+  notes?: string | null;
+  colorHex?: string | null;
+}
+
 interface DayColumnProps {
   date: Date;
   dayIndex: number;
   timeSlots: TimeSlot[];
   activities: ScheduledActivity[];
-  customEvents?: Array<{
-    id: string;
-    date: Date;
-    startTime: string;
-    endTime: string;
-    duration: number;
-    position: { day: number; startSlot: number; span: number };
-    title: string;
-    notes?: string | null;
-    colorHex?: string | null;
-  }>;
+  customEvents?: ScheduledCustomEvent[];
   allDayActivities?: Array<{ id: string; name: string }>;
   highlightActivityId?: string | null;
   onSelectDate?: (date: Date) => void;
@@ -83,6 +86,7 @@ interface DayColumnProps {
     slotIndex: number;
     anchorRect: { top: number; left: number; right: number; bottom: number; width: number; height: number };
   }) => void;
+  onCustomEventEdit?: (event: ScheduledCustomEvent, anchorRect: AnchorRect) => void;
   highlightedSlot?: { dayIndex: number; slotIndex: number } | null;
 }
 
@@ -133,6 +137,7 @@ export function DayColumn({
   className,
   onResize,
   onCustomEventResize,
+  onCustomEventEdit,
   onTimeSlotContextMenu,
   highlightedSlot = null,
   isActive,
@@ -524,6 +529,7 @@ export function DayColumn({
                   event={event as any}
                   className="h-full"
                   onResize={onCustomEventResize}
+                  onEdit={onCustomEventEdit}
                 />
               </div>
             );

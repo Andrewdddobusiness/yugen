@@ -11,10 +11,11 @@ import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
-import { createItineraryCustomEvent } from "@/actions/supabase/customEvents";
+import { createItineraryCustomEvent, updateItineraryCustomEvent } from "@/actions/supabase/customEvents";
 import type { ItineraryCustomEvent } from "@/store/itineraryCustomEventStore";
 import { TimeRangePicker } from "./TimePicker";
 import { useSchedulingContext } from "@/store/timeSchedulingStore";
+import { colors } from "@/lib/colors/colors";
 
 export type AnchorRect = {
   top: number;
@@ -25,25 +26,38 @@ export type AnchorRect = {
   height: number;
 };
 
-type CustomEventDraft = {
-  itineraryId: number;
-  date: Date;
-  startTime: string; // HH:MM:SS
-  endTime: string; // HH:MM:SS
-};
+type CustomEventDraft =
+  | {
+      mode: "create";
+      itineraryId: number;
+      date: Date;
+      startTime: string; // HH:MM:SS
+      endTime: string; // HH:MM:SS
+    }
+  | {
+      mode: "edit";
+      itineraryId: number;
+      eventId: number;
+      title: string;
+      notes: string | null;
+      date: Date;
+      startTime: string; // HH:MM:SS
+      endTime: string; // HH:MM:SS
+      colorHex: string | null;
+    };
 
 export function CustomEventPopover({
   open,
   onOpenChange,
   draft,
   anchorRect,
-  onCreated,
+  onSaved,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   draft: CustomEventDraft | null;
   anchorRect: AnchorRect | null;
-  onCreated: (event: ItineraryCustomEvent) => void;
+  onSaved: (event: ItineraryCustomEvent) => void;
 }) {
   const { toast } = useToast();
   const schedulingContext = useSchedulingContext();
@@ -59,12 +73,32 @@ export function CustomEventPopover({
   const [colorHex, setColorHex] = React.useState<string>("#94a3b8"); // slate-400
   const [isSaving, setIsSaving] = React.useState(false);
 
+  const presetColors = React.useMemo(
+    () => [
+      "#94a3b8", // slate-400
+      colors.Blue,
+      colors.Purple,
+      colors.Green,
+      colors.Yellow,
+      colors.Orange,
+      colors.Red,
+    ],
+    []
+  );
+
   React.useEffect(() => {
     if (!open || !draft) return;
-    setTitle("");
-    setNotes("");
-    setColorHex("#94a3b8");
-    setDate(draft.date);
+    if (draft.mode === "edit") {
+      setTitle(draft.title);
+      setNotes(draft.notes ?? "");
+      setColorHex(draft.colorHex ?? "#94a3b8");
+      setDate(draft.date);
+    } else {
+      setTitle("");
+      setNotes("");
+      setColorHex("#94a3b8");
+      setDate(draft.date);
+    }
     const duration = (() => {
       const [sh, sm] = draft.startTime.split(":").map(Number);
       const [eh, em] = draft.endTime.split(":").map(Number);
@@ -83,31 +117,41 @@ export function CustomEventPopover({
     const dateStr = format(date, "yyyy-MM-dd");
 
     try {
-      const result = await createItineraryCustomEvent({
-        itinerary_id: draft.itineraryId,
-        title: title.trim(),
-        notes: notes.trim() ? notes.trim() : null,
-        date: dateStr,
-        start_time: timeRange.startTime,
-        end_time: timeRange.endTime,
-        color_hex: colorHex || null,
-      });
+      const result =
+        draft.mode === "edit"
+          ? await updateItineraryCustomEvent(String(draft.eventId), {
+              title: title.trim(),
+              notes: notes.trim() ? notes.trim() : null,
+              date: dateStr,
+              start_time: timeRange.startTime,
+              end_time: timeRange.endTime,
+              color_hex: colorHex || null,
+            })
+          : await createItineraryCustomEvent({
+              itinerary_id: draft.itineraryId,
+              title: title.trim(),
+              notes: notes.trim() ? notes.trim() : null,
+              date: dateStr,
+              start_time: timeRange.startTime,
+              end_time: timeRange.endTime,
+              color_hex: colorHex || null,
+            });
 
       if (!result.success || !result.data) {
         toast({
-          title: "Could not create event",
+          title: draft.mode === "edit" ? "Could not update event" : "Could not create event",
           description: "Please try again.",
           variant: "destructive",
         });
         return;
       }
 
-      onCreated(result.data as any);
+      onSaved(result.data as any);
       onOpenChange(false);
     } catch (error) {
-      console.error("Failed to create custom event:", error);
+      console.error("Failed to save custom event:", error);
       toast({
-        title: "Could not create event",
+        title: draft.mode === "edit" ? "Could not update event" : "Could not create event",
         description: "Please try again.",
         variant: "destructive",
       });
@@ -142,6 +186,12 @@ export function CustomEventPopover({
           align="center"
           sideOffset={10}
           collisionPadding={12}
+          onInteractOutside={(event) => {
+            const target = event.target as HTMLElement | null;
+            if (target?.closest?.('[data-keep-parent-open="custom-event"]')) {
+              event.preventDefault();
+            }
+          }}
           className={cn(
             "z-[2000] w-[360px] rounded-xl border border-stroke-200 bg-bg-0 p-4 shadow-lg outline-none",
             "data-[state=open]:animate-in data-[state=closed]:animate-out",
@@ -151,7 +201,9 @@ export function CustomEventPopover({
           )}
         >
           <div className="flex items-center justify-between">
-            <div className="text-sm font-semibold text-ink-900">Add custom event</div>
+            <div className="text-sm font-semibold text-ink-900">
+              {draft?.mode === "edit" ? "Edit custom event" : "Add custom event"}
+            </div>
             <Button
               type="button"
               variant="ghost"
@@ -187,7 +239,7 @@ export function CustomEventPopover({
                     {date ? format(date, "EEE, MMM d, yyyy") : "Pick a date"}
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
+                <PopoverContent className="w-auto p-0" align="start" data-keep-parent-open="custom-event">
                   <Calendar
                     mode="single"
                     selected={date ?? undefined}
@@ -205,6 +257,7 @@ export function CustomEventPopover({
                 onChange={(range) => setTimeRange(range)}
                 config={schedulingContext.config}
                 className="w-full"
+                keepParentOpenAttribute="custom-event"
               />
             </div>
 
@@ -212,22 +265,46 @@ export function CustomEventPopover({
               <div className="text-xs font-semibold text-ink-700">Color</div>
               <div className="flex items-center justify-between gap-3 rounded-[12px] border border-stroke-200 p-3">
                 <div className="min-w-0">
-                  <div className="text-sm font-semibold text-ink-900">Customize</div>
-                  <div className="text-xs text-muted-foreground">Defaults to grey.</div>
+                  <div className="text-sm font-semibold text-ink-900">Quick colors</div>
+                  <div className="text-xs text-muted-foreground">Pick a preset or customize.</div>
                 </div>
-                <label
-                  className="h-9 w-9 rounded-full grid place-items-center border cursor-pointer shrink-0"
-                  style={{ borderColor: colorHex, backgroundColor: colorHex }}
-                  aria-label="Pick custom color"
-                  title="Pick custom color"
-                >
-                  <input
-                    type="color"
-                    className="sr-only"
-                    value={colorHex}
-                    onChange={(event) => setColorHex(event.target.value)}
-                  />
-                </label>
+                <div className="flex items-center gap-2 shrink-0">
+                  {presetColors.map((hex) => (
+                    <button
+                      key={hex}
+                      type="button"
+                      className={cn(
+                        "h-7 w-7 rounded-full border border-stroke-200",
+                        "transition-shadow hover:shadow-sm",
+                        colorHex.toLowerCase() === hex.toLowerCase() &&
+                          "ring-2 ring-brand-400 ring-offset-2 ring-offset-bg-0"
+                      )}
+                      style={{ backgroundColor: hex }}
+                      onClick={() => setColorHex(hex)}
+                      aria-label={`Set color to ${hex}`}
+                      title={hex}
+                    />
+                  ))}
+
+                  <label
+                    className={cn(
+                      "h-7 w-7 rounded-full grid place-items-center border cursor-pointer shrink-0",
+                      "transition-shadow hover:shadow-sm",
+                      !presetColors.some((hex) => hex.toLowerCase() === colorHex.toLowerCase()) &&
+                        "ring-2 ring-brand-400 ring-offset-2 ring-offset-bg-0"
+                    )}
+                    style={{ borderColor: colorHex, backgroundColor: colorHex }}
+                    aria-label="Pick custom color"
+                    title="Pick custom color"
+                  >
+                    <input
+                      type="color"
+                      className="sr-only"
+                      value={colorHex}
+                      onChange={(event) => setColorHex(event.target.value)}
+                    />
+                  </label>
+                </div>
               </div>
             </div>
 
@@ -246,7 +323,13 @@ export function CustomEventPopover({
                 Cancel
               </Button>
               <Button type="button" onClick={handleSubmit} disabled={!canSubmit || isSaving}>
-                {isSaving ? "Adding..." : "Add"}
+                {isSaving
+                  ? draft?.mode === "edit"
+                    ? "Saving..."
+                    : "Adding..."
+                  : draft?.mode === "edit"
+                    ? "Save"
+                    : "Add"}
               </Button>
             </div>
           </div>
@@ -255,4 +338,3 @@ export function CustomEventPopover({
     </PopoverPrimitive.Root>
   );
 }
-

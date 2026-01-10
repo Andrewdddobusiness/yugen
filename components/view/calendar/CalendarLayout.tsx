@@ -283,12 +283,27 @@ export function CalendarLayout({
   const itineraryIdNumber = /^\d+$/.test(itineraryIdValue) ? Number(itineraryIdValue) : null;
 
   const [customEventPopoverOpen, setCustomEventPopoverOpen] = useState(false);
-  const [customEventDraft, setCustomEventDraft] = useState<{
-    itineraryId: number;
-    date: Date;
-    startTime: string;
-    endTime: string;
-  } | null>(null);
+  const [customEventDraft, setCustomEventDraft] = useState<
+    | {
+        mode: "create";
+        itineraryId: number;
+        date: Date;
+        startTime: string;
+        endTime: string;
+      }
+    | {
+        mode: "edit";
+        itineraryId: number;
+        eventId: number;
+        title: string;
+        notes: string | null;
+        date: Date;
+        startTime: string;
+        endTime: string;
+        colorHex: string | null;
+      }
+    | null
+  >(null);
   const [customEventAnchorRect, setCustomEventAnchorRect] = useState<AnchorRect | null>(null);
   const [highlightedSlot, setHighlightedSlot] = useState<{ dayIndex: number; slotIndex: number } | null>(null);
 
@@ -324,6 +339,7 @@ export function CalendarLayout({
       const startMinutes = slot.hour * 60 + slot.minute;
       const defaultMinutes = Math.max(60, schedulingContext.config.interval);
       setCustomEventDraft({
+        mode: "create",
         itineraryId: itineraryIdNumber,
         date,
         startTime: minutesToTimeString(startMinutes),
@@ -334,6 +350,27 @@ export function CalendarLayout({
       setCustomEventPopoverOpen(true);
     },
     [itineraryIdNumber, minutesToTimeString, schedulingContext.config.interval]
+  );
+
+  const handleCustomEventEdit = React.useCallback(
+    (event: ScheduledCustomEvent, anchorRect: AnchorRect) => {
+      if (!itineraryIdNumber) return;
+      setCustomEventDraft({
+        mode: "edit",
+        itineraryId: itineraryIdNumber,
+        eventId: Number(event.id),
+        title: event.title,
+        notes: event.notes ?? null,
+        date: event.date,
+        startTime: event.startTime,
+        endTime: event.endTime,
+        colorHex: event.colorHex ?? null,
+      });
+      setCustomEventAnchorRect(anchorRect);
+      setHighlightedSlot(null);
+      setCustomEventPopoverOpen(true);
+    },
+    [itineraryIdNumber]
   );
 
   const [canPortal, setCanPortal] = useState(false);
@@ -571,6 +608,7 @@ export function CalendarLayout({
                   dragOverInfo={dragOverInfo}
                   onResize={onResize}
                   onCustomEventResize={onCustomEventResize}
+                  onCustomEventEdit={handleCustomEventEdit}
                   onTimeSlotContextMenu={handleTimeSlotContextMenu}
                   highlightedSlot={highlightedSlot}
                   className={
@@ -663,7 +701,7 @@ export function CalendarLayout({
         }}
         draft={customEventDraft}
         anchorRect={customEventAnchorRect}
-        onCreated={(event) => upsertCustomEvent(event)}
+        onSaved={(event) => upsertCustomEvent(event)}
       />
 
       {/* Conflict Resolution Dialog */}

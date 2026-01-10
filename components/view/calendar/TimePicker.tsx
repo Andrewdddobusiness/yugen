@@ -16,6 +16,8 @@ interface TimePickerProps {
   onDurationChange?: (minutes: number) => void;
   disabled?: boolean;
   className?: string;
+  portalContainer?: HTMLElement | null;
+  keepParentOpenAttribute?: string;
 }
 
 interface TimeRange {
@@ -30,6 +32,8 @@ interface TimeRangePickerProps {
   config?: TimeGridConfig;
   disabled?: boolean;
   className?: string;
+  portalContainer?: HTMLElement | null;
+  keepParentOpenAttribute?: string;
 }
 
 /**
@@ -43,7 +47,9 @@ export function TimePicker({
   duration = 60,
   onDurationChange,
   disabled = false,
-  className 
+  className,
+  portalContainer,
+  keepParentOpenAttribute,
 }: TimePickerProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [hours, setHours] = useState(9);
@@ -135,7 +141,12 @@ export function TimePicker({
           )}
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-auto p-4" align="start">
+      <PopoverContent
+        className="w-auto p-4"
+        align="start"
+        container={portalContainer}
+        data-keep-parent-open={keepParentOpenAttribute}
+      >
         <div className="space-y-4">
           {/* Time Controls */}
           <div className="flex items-center justify-center space-x-4">
@@ -226,10 +237,18 @@ export function TimeRangePicker({
   onChange, 
   config = { interval: 30, startHour: 6, endHour: 23, showExtendedHours: false },
   disabled = false,
-  className 
+  className,
+  portalContainer,
+  keepParentOpenAttribute,
 }: TimeRangePickerProps) {
   const [startTime, setStartTime] = useState(value?.startTime || "09:00:00");
   const [endTime, setEndTime] = useState(value?.endTime || "10:00:00");
+
+  useEffect(() => {
+    if (!value) return;
+    setStartTime(value.startTime);
+    setEndTime(value.endTime);
+  }, [value?.startTime, value?.endTime]);
 
   // Calculate duration
   const calculateDuration = (start: string, end: string): number => {
@@ -267,6 +286,8 @@ export function TimeRangePicker({
         onChange={handleStartTimeChange}
         config={config}
         disabled={disabled}
+        portalContainer={portalContainer}
+        keepParentOpenAttribute={keepParentOpenAttribute}
       />
       <span className="text-sm text-muted-foreground">to</span>
       <TimePicker
@@ -274,6 +295,8 @@ export function TimeRangePicker({
         onChange={handleEndTimeChange}
         config={config}
         disabled={disabled}
+        portalContainer={portalContainer}
+        keepParentOpenAttribute={keepParentOpenAttribute}
       />
       <span className="text-sm text-muted-foreground ml-2">
         ({Math.floor(Math.abs(duration) / 60)}h {Math.abs(duration) % 60}m)
