@@ -1151,7 +1151,7 @@ export function ItineraryMap({
           onZoomChanged={handleZoomChanged}
           onClick={handleMapClick}
           clickableIcons={true}
-          minZoom={8}
+          minZoom={3}
           maxZoom={18}
         >
           {/* Map Controller for auto-fitting and centering */}

@@ -1,7 +1,7 @@
 "use client";
 import React, { useEffect, useMemo, useState, useRef, lazy, Suspense } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { format as formatDate } from "date-fns";
+import { addDays, eachDayOfInterval, endOfMonth, format as formatDate, startOfMonth, startOfWeek } from "date-fns";
 import { useItineraryActivityStore, type IItineraryActivity } from "@/store/itineraryActivityStore";
 import { useItineraryLayoutStore } from "@/store/itineraryLayoutStore";
 import { useMapStore } from "@/store/mapStore";
@@ -107,7 +107,7 @@ export default function Builder() {
     setCurrentView, 
     toggleMap 
   } = useItineraryLayoutStore();
-  const activeDays = useItineraryLayoutStore((s) => s.viewStates.calendar.activeDays);
+  const calendarViewMode = useItineraryLayoutStore((s) => s.viewStates.calendar.viewMode);
   // List view is temporarily disabled (minimal builder UI).
   const effectiveView = currentView === "list" ? "table" : currentView;
   const { setItineraryCoordinates } = useMapStore();
@@ -146,6 +146,31 @@ export default function Builder() {
       }
     }
   });
+
+  const visibleDaysForMap = useMemo(() => {
+    if (!currentDate) return undefined;
+    const start = currentDate;
+
+    switch (calendarViewMode) {
+      case "day":
+        return [formatDate(start, "yyyy-MM-dd")];
+      case "3-day":
+        return Array.from({ length: 3 }, (_, index) => formatDate(addDays(start, index), "yyyy-MM-dd"));
+      case "week": {
+        const weekStart = startOfWeek(start, { weekStartsOn: 0 });
+        return Array.from({ length: 7 }, (_, index) =>
+          formatDate(addDays(weekStart, index), "yyyy-MM-dd")
+        );
+      }
+      case "month": {
+        const from = startOfMonth(start);
+        const to = endOfMonth(start);
+        return eachDayOfInterval({ start: from, end: to }).map((day) => formatDate(day, "yyyy-MM-dd"));
+      }
+      default:
+        return undefined;
+    }
+  }, [calendarViewMode, currentDate]);
   
   const [isMobile, setIsMobile] = useState(false);
 
@@ -407,8 +432,9 @@ export default function Builder() {
     if (coordinates.length > 0) {
       const sum = coordinates.reduce(
         (acc, coords) => {
-          acc.lat += coords[0];
-          acc.lng += coords[1];
+          // Activity coordinates are stored as [lng, lat].
+          acc.lat += coords[1];
+          acc.lng += coords[0];
           return acc;
         },
         { lat: 0, lng: 0 }
@@ -574,7 +600,7 @@ export default function Builder() {
                             <ItineraryMap
                               activities={filteredActivities}
                               showRoutes={true}
-                              visibleDays={activeDays}
+                              visibleDays={visibleDaysForMap}
                               selectedDate={
                                 currentDate
                                   ? formatDate(currentDate, "yyyy-MM-dd")
