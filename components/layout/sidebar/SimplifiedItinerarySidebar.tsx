@@ -3,20 +3,24 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Calendar, Clock, MapPin, ChevronDown, ChevronUp, GripVertical } from 'lucide-react';
+import { Calendar, Clock, MapPin, ChevronDown, ChevronUp, GripVertical, Filter, X } from 'lucide-react';
 import { useItineraryActivityStore } from '@/store/itineraryActivityStore';
 import { format } from 'date-fns';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Switch } from '@/components/ui/switch';
 import { ActivityCreatedBy } from '@/components/collaboration/ActivityCreatedBy';
 import { useToast } from '@/components/ui/use-toast';
 import { useParams } from 'next/navigation';
-import { useIsFetching } from '@tanstack/react-query';
+import { useIsFetching, useQuery } from '@tanstack/react-query';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ACTIVITY_ACCENT_BORDER_CLASSES, getActivityThemeForTypes } from '@/lib/activityAccent';
 import { useItineraryLayoutStore } from '@/store/itineraryLayoutStore';
+import { listItineraryDestinationsSummary } from '@/actions/supabase/destinations';
 import {
   DndContext,
   closestCenter,
@@ -43,6 +47,98 @@ import {
   useDroppable,
 } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
+
+type SidebarActivityCategory = "food" | "shopping" | "attraction" | "scenery" | "activity";
+
+const SIDEBAR_CATEGORY_OPTIONS: Array<{
+  value: SidebarActivityCategory;
+  label: string;
+  icon: string;
+}> = [
+  { value: "food", label: "Food", icon: "🍽️" },
+  { value: "shopping", label: "Shopping", icon: "🛍️" },
+  { value: "attraction", label: "Attraction", icon: "🎯" },
+  { value: "scenery", label: "Scenery", icon: "🌿" },
+  { value: "activity", label: "Other", icon: "📍" },
+];
+
+const inferSidebarCategory = (types: string[] | undefined): SidebarActivityCategory => {
+  const typeSet = new Set((types ?? []).map((type) => type.toLowerCase()));
+
+  const hasAny = (candidates: string[]) => candidates.some((candidate) => typeSet.has(candidate));
+
+  if (
+    hasAny([
+      "restaurant",
+      "meal_takeaway",
+      "meal_delivery",
+      "cafe",
+      "bakery",
+      "bar",
+      "coffee_shop",
+      "sandwich_shop",
+      "food",
+    ])
+  ) {
+    return "food";
+  }
+
+  if (
+    hasAny([
+      "shopping_mall",
+      "department_store",
+      "clothing_store",
+      "shoe_store",
+      "electronics_store",
+      "jewelry_store",
+      "book_store",
+      "convenience_store",
+      "supermarket",
+      "grocery_or_supermarket",
+      "store",
+      "market",
+    ])
+  ) {
+    return "shopping";
+  }
+
+  if (
+    hasAny([
+      "tourist_attraction",
+      "museum",
+      "art_gallery",
+      "amusement_park",
+      "aquarium",
+      "zoo",
+      "church",
+      "synagogue",
+      "mosque",
+      "hindu_temple",
+      "stadium",
+      "historical_landmark",
+      "landmark",
+    ])
+  ) {
+    return "attraction";
+  }
+
+  if (
+    hasAny([
+      "park",
+      "natural_feature",
+      "beach",
+      "campground",
+      "rv_park",
+      "mountain",
+      "scenic_view",
+      "botanical_garden",
+    ])
+  ) {
+    return "scenery";
+  }
+
+  return "activity";
+};
 
 function SidebarActivitiesSkeleton() {
   return (
@@ -349,6 +445,63 @@ export function SimplifiedItinerarySidebar({
   const activityCategoryCustomColors = useItineraryLayoutStore((s) => s.activityCategoryCustomColors);
   const [collapsedDates, setCollapsedDates] = useState<Set<string>>(new Set());
   const [activeId, setActiveId] = useState<string | null>(null);
+
+  const itineraryIdValue = Array.isArray(itineraryId) ? itineraryId[0] : String(itineraryId ?? "");
+
+  const { data: destinationsSummary = [] } = useQuery({
+    queryKey: ["itineraryDestinationsSummary", itineraryIdValue],
+    queryFn: async () => {
+      const result = await listItineraryDestinationsSummary(itineraryIdValue);
+      return result.success ? result.data ?? [] : [];
+    },
+    enabled: Boolean(itineraryIdValue),
+    staleTime: 10 * 60 * 1000,
+    gcTime: 20 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+  });
+
+  const filterStorageKey = itineraryIdValue ? `sidebar-filters:${itineraryIdValue}` : null;
+  const [onlyUnscheduled, setOnlyUnscheduled] = useState(false);
+  const [categoryFilters, setCategoryFilters] = useState<SidebarActivityCategory[]>([]);
+  const [cityFilters, setCityFilters] = useState<string[]>([]);
+  const hasLoadedFiltersRef = useRef(false);
+
+  useEffect(() => {
+    if (!filterStorageKey) return;
+    if (hasLoadedFiltersRef.current) return;
+    hasLoadedFiltersRef.current = true;
+
+    try {
+      const raw = window.localStorage.getItem(filterStorageKey);
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as {
+        onlyUnscheduled?: boolean;
+        categoryFilters?: SidebarActivityCategory[];
+        cityFilters?: string[];
+      };
+
+      setOnlyUnscheduled(Boolean(parsed.onlyUnscheduled));
+      setCategoryFilters(Array.isArray(parsed.categoryFilters) ? parsed.categoryFilters : []);
+      setCityFilters(Array.isArray(parsed.cityFilters) ? parsed.cityFilters : []);
+    } catch {
+      // ignore corrupted storage
+    }
+  }, [filterStorageKey]);
+
+  useEffect(() => {
+    if (!filterStorageKey) return;
+    if (!hasLoadedFiltersRef.current) return;
+
+    try {
+      window.localStorage.setItem(
+        filterStorageKey,
+        JSON.stringify({ onlyUnscheduled, categoryFilters, cityFilters })
+      );
+    } catch {
+      // ignore write failures (private mode, quota, etc.)
+    }
+  }, [filterStorageKey, onlyUnscheduled, categoryFilters, cityFilters]);
   
   // Filter out deleted activities
   const activeActivities = itineraryActivities.filter(activity => !activity.deleted_at);
@@ -358,6 +511,91 @@ export function SimplifiedItinerarySidebar({
     }) > 0;
   const showSkeleton = isActivitiesFetching && activeActivities.length === 0;
 
+  const getCityKeyForActivity = useCallback(
+    (activity: any) => {
+      if (!activity?.date) return "Unscheduled";
+      const dateValue = String(activity.date);
+      const match = destinationsSummary.find(
+        (destination) =>
+          typeof destination?.from_date === "string" &&
+          typeof destination?.to_date === "string" &&
+          destination.from_date <= dateValue &&
+          destination.to_date >= dateValue
+      );
+      return match?.city ? String(match.city) : "Other";
+    },
+    [destinationsSummary]
+  );
+
+  const categoryFilterSet = new Set(categoryFilters);
+  const cityFilterSet = new Set(cityFilters);
+
+  const cityOptions = (() => {
+    const baseCities = destinationsSummary
+      .map((destination) => String(destination.city ?? "").trim())
+      .filter(Boolean);
+    const uniqueCities = Array.from(new Set(baseCities));
+
+    const hasUnscheduled = activeActivities.some((activity) => !activity.date);
+    const hasOther = activeActivities.some(
+      (activity) => activity.date && getCityKeyForActivity(activity) === "Other"
+    );
+
+    const options: string[] = [...uniqueCities];
+    if (hasUnscheduled) options.unshift("Unscheduled");
+    if (hasOther) options.push("Other");
+    return options;
+  })();
+
+  const isCategoryFiltering =
+    categoryFilterSet.size > 0 && categoryFilterSet.size < SIDEBAR_CATEGORY_OPTIONS.length;
+  const isCityFiltering = cityFilterSet.size > 0 && cityFilterSet.size < cityOptions.length;
+
+  const filteredActivities = activeActivities.filter((activity) => {
+    if (onlyUnscheduled && activity.date) return false;
+
+    if (isCategoryFiltering) {
+      const category = inferSidebarCategory(activity.activity?.types);
+      if (!categoryFilterSet.has(category)) return false;
+    }
+
+    if (isCityFiltering) {
+      const cityKey = getCityKeyForActivity(activity);
+      if (!cityFilterSet.has(cityKey)) return false;
+    }
+
+    return true;
+  });
+
+  const categoryCounts = filteredActivities.reduce(
+    (acc, activity) => {
+      const category = inferSidebarCategory(activity.activity?.types);
+      acc[category] = (acc[category] ?? 0) + 1;
+      return acc;
+    },
+    {} as Record<SidebarActivityCategory, number>
+  );
+
+  const cityCounts = filteredActivities.reduce(
+    (acc, activity) => {
+      const key = getCityKeyForActivity(activity);
+      acc[key] = (acc[key] ?? 0) + 1;
+      return acc;
+    },
+    {} as Record<string, number>
+  );
+
+  const activeFilterCount =
+    (onlyUnscheduled ? 1 : 0) +
+    (isCategoryFiltering ? 1 : 0) +
+    (isCityFiltering ? 1 : 0);
+
+  const clearFilters = () => {
+    setOnlyUnscheduled(false);
+    setCategoryFilters([]);
+    setCityFilters([]);
+  };
+
   const sensors = useSensors(
     useSensor(PointerSensor),
     useSensor(KeyboardSensor, {
@@ -366,7 +604,7 @@ export function SimplifiedItinerarySidebar({
   );
 
   // Group activities by date
-  const activitiesByDate = activeActivities.reduce((acc, activity) => {
+  const activitiesByDateAll = activeActivities.reduce((acc, activity) => {
     const date = activity.date ? format(new Date(activity.date), 'yyyy-MM-dd') : 'Unscheduled';
     if (!acc[date]) {
       acc[date] = [];
@@ -374,6 +612,15 @@ export function SimplifiedItinerarySidebar({
     acc[date].push(activity);
     return acc;
   }, {} as Record<string, typeof activeActivities>);
+
+  const activitiesByDate = filteredActivities.reduce((acc, activity) => {
+    const date = activity.date ? format(new Date(activity.date), 'yyyy-MM-dd') : 'Unscheduled';
+    if (!acc[date]) {
+      acc[date] = [];
+    }
+    acc[date].push(activity);
+    return acc;
+  }, {} as Record<string, typeof filteredActivities>);
 
   // Sort dates
   const sortedDates = Object.keys(activitiesByDate).sort((a, b) => {
@@ -492,7 +739,7 @@ export function SimplifiedItinerarySidebar({
 
     if (activeDate === overDate) {
       // Reordering within same date
-      const dateActivities = activitiesByDate[activeDate];
+      const dateActivities = activitiesByDateAll[activeDate] ?? [];
       const oldIndex = dateActivities.findIndex(
         (activity) => activity.itinerary_activity_id === activeActivityId
       );
@@ -572,9 +819,139 @@ export function SimplifiedItinerarySidebar({
           </div>
         ) : (
           <p className="text-xs text-muted-foreground mt-1">
-            {activeActivities.length} {activeActivities.length === 1 ? 'activity' : 'activities'} added
+            {filteredActivities.length} {filteredActivities.length === 1 ? 'activity' : 'activities'} shown
           </p>
         )}
+
+        <div className="mt-3 flex items-center gap-2">
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                variant="secondary"
+                size="sm"
+                className="h-7 px-2 text-xs justify-start"
+              >
+                <Filter className="h-3.5 w-3.5 mr-1.5" />
+                Filters
+                {activeFilterCount > 0 ? (
+                  <Badge variant="secondary" className="ml-2 h-5 px-1.5 py-0 text-[11px]">
+                    {activeFilterCount}
+                  </Badge>
+                ) : null}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent align="start" className="w-80 p-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-sm font-medium text-ink-900">Unscheduled only</div>
+                  <div className="text-xs text-muted-foreground">Hide scheduled days</div>
+                </div>
+                <Switch checked={onlyUnscheduled} onCheckedChange={setOnlyUnscheduled} />
+              </div>
+
+              <Separator className="my-3" />
+
+              <div>
+                <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  Type
+                </div>
+                <div className="mt-2 space-y-2">
+                  {SIDEBAR_CATEGORY_OPTIONS.map((option) => (
+                    <label
+                      key={option.value}
+                      className="flex items-center gap-2 text-sm cursor-pointer select-none"
+                    >
+                      <Checkbox
+                        checked={categoryFilterSet.has(option.value)}
+                        onCheckedChange={(checked) => {
+                          setCategoryFilters((prev) => {
+                            const next = new Set(prev);
+                            if (checked) next.add(option.value);
+                            else next.delete(option.value);
+                            return Array.from(next);
+                          });
+                        }}
+                      />
+                      <span className="text-base leading-none">{option.icon}</span>
+                      <span className="text-ink-900">{option.label}</span>
+                      <span className="ml-auto text-xs text-muted-foreground tabular-nums">
+                        {categoryCounts[option.value] ?? 0}
+                      </span>
+                    </label>
+                  ))}
+                </div>
+                {categoryFilterSet.size === 0 ? (
+                  <div className="mt-2 text-xs text-muted-foreground">Showing all types</div>
+                ) : null}
+              </div>
+
+              {cityOptions.length > 0 ? (
+                <>
+                  <Separator className="my-3" />
+                  <div>
+                    <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                      City
+                    </div>
+                    <div className="mt-2 max-h-40 overflow-auto pr-1 space-y-2">
+                      {cityOptions.map((city) => (
+                        <label
+                          key={city}
+                          className="flex items-center gap-2 text-sm cursor-pointer select-none"
+                        >
+                          <Checkbox
+                            checked={cityFilterSet.has(city)}
+                            onCheckedChange={(checked) => {
+                              setCityFilters((prev) => {
+                                const next = new Set(prev);
+                                if (checked) next.add(city);
+                                else next.delete(city);
+                                return Array.from(next);
+                              });
+                            }}
+                          />
+                          <span className="text-ink-900">{city}</span>
+                          <span className="ml-auto text-xs text-muted-foreground tabular-nums">
+                            {cityCounts[city] ?? 0}
+                          </span>
+                        </label>
+                      ))}
+                    </div>
+                    {cityFilterSet.size === 0 ? (
+                      <div className="mt-2 text-xs text-muted-foreground">Showing all cities</div>
+                    ) : null}
+                  </div>
+                </>
+              ) : null}
+
+              {activeFilterCount > 0 ? (
+                <>
+                  <Separator className="my-3" />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 w-full justify-start text-xs"
+                    onClick={clearFilters}
+                  >
+                    <X className="h-3.5 w-3.5 mr-2" />
+                    Clear filters
+                  </Button>
+                </>
+              ) : null}
+            </PopoverContent>
+          </Popover>
+
+          {activeFilterCount > 0 ? (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 px-2 text-xs"
+              onClick={clearFilters}
+            >
+              Clear
+            </Button>
+          ) : null}
+        </div>
       </div>
 
       {/* Activities List */}
@@ -584,10 +961,28 @@ export function SimplifiedItinerarySidebar({
             <SidebarActivitiesSkeleton />
           ) : sortedDates.length === 0 ? (
             <div className="text-center py-8">
-              <p className="text-sm text-muted-foreground">No activities added yet</p>
-              <p className="text-xs text-muted-foreground mt-1">
-                Add activities from the explore page
-              </p>
+              {activeActivities.length === 0 ? (
+                <>
+                  <p className="text-sm text-muted-foreground">No activities added yet</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Add activities from the explore page
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p className="text-sm text-muted-foreground">No matching activities</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Try adjusting your filters.
+                  </p>
+                  {activeFilterCount > 0 ? (
+                    <div className="mt-3 flex justify-center">
+                      <Button variant="secondary" size="sm" className="h-8 text-xs" onClick={clearFilters}>
+                        Clear filters
+                      </Button>
+                    </div>
+                  ) : null}
+                </>
+              )}
             </div>
           ) : (
             sortedDates.map((date) => (
