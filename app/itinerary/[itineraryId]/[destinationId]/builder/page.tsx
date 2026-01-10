@@ -112,6 +112,7 @@ export default function Builder() {
   
   const [targetDate, setTargetDate] = useState<Date | null>(null);
   const [mapImportAttempt, setMapImportAttempt] = useState(0);
+  const lastHydratedItineraryIdRef = useRef<string | null>(null);
   const listRef = useRef<any>(null);
   const calendarRef = useRef<HTMLDivElement>(null);
   const tableRef = useRef<HTMLDivElement>(null);
@@ -225,23 +226,20 @@ export default function Builder() {
   // Separate effects to reduce unnecessary re-runs
   useEffect(() => {
     if (!bootstrap?.activities) return;
-    if (!destId) return;
 
     const current = useItineraryActivityStore.getState().itineraryActivities;
 
     const data = bootstrap.activities as IItineraryActivity[];
 
-    // Only hydrate from the bootstrap payload when the store is empty OR when the store
-    // is for a different destination. This avoids view/date URL navigations
-    // re-applying stale cached query data over optimistic store updates.
-    const hasDifferentDestination = current.some(
-      (activity) =>
-        !!activity.itinerary_destination_id &&
-        String(activity.itinerary_destination_id) !== destId
-    );
+    // Only hydrate from the bootstrap payload when switching itineraries or when the
+    // store is empty. Destination switching should NOT wipe the holistic itinerary view.
+    const lastHydratedItineraryId = lastHydratedItineraryIdRef.current;
+    const isNewItinerary = Boolean(itinId && lastHydratedItineraryId && lastHydratedItineraryId !== itinId);
+    const shouldHydrate = current.length === 0 || isNewItinerary || lastHydratedItineraryId == null;
 
-    if (current.length === 0 || hasDifferentDestination) {
+    if (shouldHydrate) {
       setItineraryActivities(data);
+      lastHydratedItineraryIdRef.current = itinId ?? null;
       return;
     }
 
@@ -264,11 +262,10 @@ export default function Builder() {
     if (changed) {
       setItineraryActivities(Array.from(byId.values()));
     }
-  }, [bootstrap, destId, setItineraryActivities]);
+  }, [bootstrap, itinId, setItineraryActivities]);
 
   useEffect(() => {
     if (!bootstrap) return;
-    if (!destId) return;
 
     const incomingSlots = (bootstrap.slots ?? []) as IItinerarySlot[];
     const incomingOptions = (bootstrap.slotOptions ?? []) as IItinerarySlotOption[];
@@ -276,13 +273,14 @@ export default function Builder() {
     const currentSlots = useItinerarySlotStore.getState().slots;
     const currentOptions = useItinerarySlotStore.getState().slotOptions;
 
-    const hasDifferentDestination = currentSlots.some(
-      (slot) => !!slot.itinerary_destination_id && String(slot.itinerary_destination_id) !== destId
-    );
+    const lastHydratedItineraryId = lastHydratedItineraryIdRef.current;
+    const isNewItinerary = Boolean(itinId && lastHydratedItineraryId && lastHydratedItineraryId !== itinId);
+    const shouldHydrate = currentSlots.length === 0 || isNewItinerary || lastHydratedItineraryId == null;
 
-    if (currentSlots.length === 0 || hasDifferentDestination) {
+    if (shouldHydrate) {
       setSlots(incomingSlots);
       setSlotOptions(incomingOptions);
+      lastHydratedItineraryIdRef.current = itinId ?? null;
       return;
     }
 

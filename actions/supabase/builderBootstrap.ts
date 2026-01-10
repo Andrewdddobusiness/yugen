@@ -89,14 +89,141 @@ export async function fetchBuilderBootstrap(
 
   const cached = unstable_cache(
     async () => {
+      const isMissingColumn = (err: any, column: string) => {
+        if (!err) return false;
+        const code = String(err.code ?? "");
+        if (code !== "42703") return false;
+        const message = String(err.message ?? "").toLowerCase();
+        return message.includes(column.toLowerCase());
+      };
+
+      const selectWithActorsWithMode =
+        "itinerary_id,itinerary_activity_id,itinerary_destination_id,activity_id,date,start_time,end_time,notes,travel_mode_to_next,deleted_at,created_by,updated_by,activity:activity(activity_id,place_id,name,coordinates,duration,price_level,rating,types,address)";
+      const selectWithActorsWithoutMode =
+        "itinerary_id,itinerary_activity_id,itinerary_destination_id,activity_id,date,start_time,end_time,notes,deleted_at,created_by,updated_by,activity:activity(activity_id,place_id,name,coordinates,duration,price_level,rating,types,address)";
+      const selectWithoutActorsWithMode =
+        "itinerary_id,itinerary_activity_id,itinerary_destination_id,activity_id,date,start_time,end_time,notes,travel_mode_to_next,deleted_at,activity:activity(activity_id,place_id,name,coordinates,duration,price_level,rating,types,address)";
+      const selectWithoutActorsWithoutMode =
+        "itinerary_id,itinerary_activity_id,itinerary_destination_id,activity_id,date,start_time,end_time,notes,deleted_at,activity:activity(activity_id,place_id,name,coordinates,duration,price_level,rating,types,address)";
+
+      const fetchAllActivities = async () => {
+        const { data: activitiesWithActors, error: activitiesWithActorsError } = await supabase
+          .from("itinerary_activity")
+          .select(selectWithActorsWithMode)
+          .eq("itinerary_id", itin)
+          .is("deleted_at", null)
+          .limit(2000);
+
+        if (activitiesWithActorsError) {
+          const missingActors =
+            isMissingColumn(activitiesWithActorsError, "created_by") ||
+            isMissingColumn(activitiesWithActorsError, "updated_by");
+          const missingMode = isMissingColumn(activitiesWithActorsError, "travel_mode_to_next");
+
+          const retrySelect =
+            missingActors && missingMode
+              ? selectWithoutActorsWithoutMode
+              : missingActors
+                ? selectWithoutActorsWithMode
+                : missingMode
+                  ? selectWithActorsWithoutMode
+                  : null;
+
+          if (!retrySelect) {
+            throw activitiesWithActorsError;
+          }
+
+          const { data: activitiesFallback, error: activitiesFallbackError } = await supabase
+            .from("itinerary_activity")
+            .select(retrySelect)
+            .eq("itinerary_id", itin)
+            .is("deleted_at", null)
+            .limit(2000);
+
+          if (activitiesFallbackError) throw activitiesFallbackError;
+          return Array.isArray(activitiesFallback) ? normalizeBootstrapActivities(activitiesFallback) : [];
+        }
+
+        return Array.isArray(activitiesWithActors) ? normalizeBootstrapActivities(activitiesWithActors) : [];
+      };
+
+      const fetchAllSlots = async () => {
+        const slotSelectWithActors =
+          "itinerary_slot_id,itinerary_id,itinerary_destination_id,date,start_time,end_time,primary_itinerary_activity_id,created_by,updated_by,created_at,updated_at,deleted_at";
+        const slotSelectWithoutActors =
+          "itinerary_slot_id,itinerary_id,itinerary_destination_id,date,start_time,end_time,primary_itinerary_activity_id,created_at,updated_at,deleted_at";
+
+        const { data: slotsWithActors, error: slotsWithActorsError } = await supabase
+          .from("itinerary_slot")
+          .select(slotSelectWithActors)
+          .eq("itinerary_id", itin)
+          .is("deleted_at", null);
+
+        if (slotsWithActorsError) {
+          const code = String((slotsWithActorsError as any)?.code ?? "");
+          if (code === "42P01") return [];
+
+          const missingActors =
+            isMissingColumn(slotsWithActorsError, "created_by") ||
+            isMissingColumn(slotsWithActorsError, "updated_by");
+          if (!missingActors) throw slotsWithActorsError;
+
+          const { data: slotsFallback, error: slotsFallbackError } = await supabase
+            .from("itinerary_slot")
+            .select(slotSelectWithoutActors)
+            .eq("itinerary_id", itin)
+            .is("deleted_at", null);
+
+          if (slotsFallbackError) throw slotsFallbackError;
+          return Array.isArray(slotsFallback) ? slotsFallback : [];
+        }
+
+        return Array.isArray(slotsWithActors) ? slotsWithActors : [];
+      };
+
+      const fetchSlotOptionsForSlots = async (slotIds: Array<string | number>) => {
+        const normalizedIds = slotIds.map((id) => String(id)).filter(Boolean);
+        if (normalizedIds.length === 0) return [];
+
+        const optionSelectWithActors =
+          "itinerary_slot_option_id,itinerary_slot_id,itinerary_activity_id,created_by,created_at";
+        const optionSelectWithoutActors =
+          "itinerary_slot_option_id,itinerary_slot_id,itinerary_activity_id,created_at";
+
+        const { data: optionsWithActors, error: optionsWithActorsError } = await supabase
+          .from("itinerary_slot_option")
+          .select(optionSelectWithActors)
+          .in("itinerary_slot_id", normalizedIds);
+
+        if (optionsWithActorsError) {
+          const code = String((optionsWithActorsError as any)?.code ?? "");
+          if (code === "42P01") return [];
+
+          const missingActors = isMissingColumn(optionsWithActorsError, "created_by");
+          if (!missingActors) throw optionsWithActorsError;
+
+          const { data: optionsFallback, error: optionsFallbackError } = await supabase
+            .from("itinerary_slot_option")
+            .select(optionSelectWithoutActors)
+            .in("itinerary_slot_id", normalizedIds);
+
+          if (optionsFallbackError) throw optionsFallbackError;
+          return Array.isArray(optionsFallback) ? optionsFallback : [];
+        }
+
+        return Array.isArray(optionsWithActors) ? optionsWithActors : [];
+      };
+
       const { data, error } = await supabase.rpc("get_itinerary_builder_bootstrap", {
         _itinerary_id: Number(itin),
         _itinerary_destination_id: Number(dest),
       });
 
       if (!error && data) {
-        const rawActivities = Array.isArray(data.activities) ? data.activities : [];
-        let normalizedActivities = normalizeBootstrapActivities(rawActivities);
+        // Always return a holistic view across ALL destinations in the itinerary.
+        // We keep `destination` as the selected destination (for context + map search),
+        // but activities/slots are itinerary-wide.
+        let normalizedActivities = await fetchAllActivities();
 
         // Backwards-compat: older versions of the RPC did not include `activity.coordinates`.
         // If coordinates are missing, fetch them in one extra query and merge in.
@@ -144,14 +271,19 @@ export async function fetchBuilderBootstrap(
           }
         }
 
+        const slotsAll = await fetchAllSlots();
+        const slotOptionsAll = await fetchSlotOptionsForSlots(
+          slotsAll.map((slot: any) => slot?.itinerary_slot_id).filter((id: any) => id != null)
+        );
+
         return {
           success: true,
           data: {
             itinerary: data.itinerary ?? null,
             destination: data.destination ?? null,
             activities: normalizedActivities,
-            slots: Array.isArray(data.slots) ? data.slots : [],
-            slotOptions: Array.isArray(data.slot_options) ? data.slot_options : [],
+            slots: slotsAll,
+            slotOptions: slotOptionsAll,
             collaborators: Array.isArray(data.collaborators) ? data.collaborators : [],
             history: Array.isArray(data.history) ? data.history : [],
           },
@@ -171,28 +303,11 @@ export async function fetchBuilderBootstrap(
           .eq("itinerary_destination_id", dest)
           .maybeSingle();
 
-        const isMissingColumn = (err: any, column: string) => {
-          if (!err) return false;
-          const code = String(err.code ?? "");
-          if (code !== "42703") return false;
-          const message = String(err.message ?? "").toLowerCase();
-          return message.includes(column.toLowerCase());
-        };
-
-        const selectWithActorsWithMode =
-          "itinerary_id,itinerary_activity_id,itinerary_destination_id,activity_id,date,start_time,end_time,notes,travel_mode_to_next,deleted_at,created_by,updated_by,activity:activity(activity_id,place_id,name,coordinates,duration,price_level,rating,types,address)";
-        const selectWithActorsWithoutMode =
-          "itinerary_id,itinerary_activity_id,itinerary_destination_id,activity_id,date,start_time,end_time,notes,deleted_at,created_by,updated_by,activity:activity(activity_id,place_id,name,coordinates,duration,price_level,rating,types,address)";
-        const selectWithoutActorsWithMode =
-          "itinerary_id,itinerary_activity_id,itinerary_destination_id,activity_id,date,start_time,end_time,notes,travel_mode_to_next,deleted_at,activity:activity(activity_id,place_id,name,coordinates,duration,price_level,rating,types,address)";
-        const selectWithoutActorsWithoutMode =
-          "itinerary_id,itinerary_activity_id,itinerary_destination_id,activity_id,date,start_time,end_time,notes,deleted_at,activity:activity(activity_id,place_id,name,coordinates,duration,price_level,rating,types,address)";
-
         const { data: activitiesWithActors, error: activitiesWithActorsError } = await supabase
           .from("itinerary_activity")
           .select(selectWithActorsWithMode)
           .eq("itinerary_id", itin)
-          .eq("itinerary_destination_id", dest)
+          .is("deleted_at", null)
           .limit(2000);
 
         if (activitiesWithActorsError) {
@@ -218,7 +333,7 @@ export async function fetchBuilderBootstrap(
             .from("itinerary_activity")
             .select(retrySelect)
             .eq("itinerary_id", itin)
-            .eq("itinerary_destination_id", dest)
+            .is("deleted_at", null)
             .limit(2000);
 
           if (activitiesFallbackError) {

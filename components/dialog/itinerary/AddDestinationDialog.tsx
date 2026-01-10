@@ -27,7 +27,7 @@ type AddDestinationDialogProps = {
   currentDestinationId?: number;
   nextOrderNumber: number;
   defaultDateRange?: DateRange;
-  onDestinationCreated?: (destinationId: number) => void;
+  onDestinationCreated?: (destinationId: number, fromDate?: Date) => void;
 };
 
 type DestinationRow = {
@@ -526,7 +526,7 @@ export function AddDestinationDialog({
       onOpenChange(false);
 
       if (createdIds.length > 0) {
-        onDestinationCreated?.(createdIds[0]!);
+        onDestinationCreated?.(createdIds[0]!, newRowsToCreate[0]?.dateRange?.from);
       }
     } catch (err) {
       console.error("Error updating destinations:", err);

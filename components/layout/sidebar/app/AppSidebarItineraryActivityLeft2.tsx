@@ -109,6 +109,28 @@ export function AppSidebarItineraryActivityLeft({
       })()
     : undefined;
 
+  const itineraryWideRange = React.useMemo(() => {
+    const ranges = destinationsSummary
+      .map((dest) => {
+        const from = new Date(dest.from_date);
+        const to = new Date(dest.to_date);
+        if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime())) return null;
+        return { from, to };
+      })
+      .filter((range): range is { from: Date; to: Date } => range != null);
+
+    if (ranges.length === 0) return null;
+
+    const minFrom = new Date(Math.min(...ranges.map((r) => r.from.getTime())));
+    const maxTo = new Date(Math.max(...ranges.map((r) => r.to.getTime())));
+    return { from: minFrom, to: maxTo };
+  }, [destinationsSummary]);
+
+  useEffect(() => {
+    if (!itineraryWideRange?.from || !itineraryWideRange?.to) return;
+    setStoreDateRange(itineraryWideRange.from, itineraryWideRange.to);
+  }, [itineraryWideRange, setStoreDateRange]);
+
   useEffect(() => {
     if (!itinerary?.from_date || !itinerary?.to_date) return;
     const from = new Date(itinerary.from_date);
@@ -117,10 +139,7 @@ export function AppSidebarItineraryActivityLeft({
 
     const dateRangeValue = { from, to };
     setDateRange(dateRangeValue);
-
-    // Also update the date range store so table components can access it
-    setStoreDateRange(from, to);
-  }, [itinerary, setStoreDateRange]);
+  }, [itinerary]);
 
   const formatRange = (fromDate: string, toDate: string) => {
     try {
@@ -132,7 +151,10 @@ export function AppSidebarItineraryActivityLeft({
     }
   };
 
-  const navigateToDestination = (nextDestinationId: number) => {
+  const navigateToDestination = (
+    nextDestinationId: number,
+    jumpToDate?: Date | string | null
+  ) => {
     if (!itineraryIdValue) return;
     const nextId = String(nextDestinationId);
     const currentBase = `/itinerary/${itineraryIdValue}/${destinationIdValue}`;
@@ -140,7 +162,32 @@ export function AppSidebarItineraryActivityLeft({
     const nextPath = pathname?.startsWith(currentBase)
       ? pathname.replace(currentBase, nextBase)
       : `${nextBase}/builder`;
-    router.push(nextPath);
+
+    const params =
+      typeof window !== "undefined"
+        ? new URLSearchParams(window.location.search)
+        : new URLSearchParams();
+
+    const destinationFromDate =
+      jumpToDate ??
+      destinationsSummary.find(
+        (dest) => Number(dest.itinerary_destination_id) === nextDestinationId
+      )?.from_date ??
+      null;
+
+    const jumpDate =
+      destinationFromDate == null
+        ? null
+        : typeof destinationFromDate === "string"
+          ? new Date(destinationFromDate)
+          : destinationFromDate;
+
+    if (jumpDate && !Number.isNaN(jumpDate.getTime())) {
+      params.set("date", format(jumpDate, "yyyy-MM-dd"));
+    }
+
+    const query = params.toString();
+    router.push(`${nextPath}${query ? `?${query}` : ""}`);
   };
 
 	  const navItems = [
@@ -167,10 +214,7 @@ export function AppSidebarItineraryActivityLeft({
     try {
       setDateRange(dateRange);
       
-      // Also update the date range store so table components can access it
       if (dateRange && dateRange.from && dateRange.to) {
-        setStoreDateRange(dateRange.from, dateRange.to);
-        
         const result = await setItineraryDestinationDateRange(itineraryIdValue, destinationIdValue, {
           from: dateRange.from,
           to: dateRange.to,
@@ -179,12 +223,10 @@ export function AppSidebarItineraryActivityLeft({
         if (result.success) {
           queryClient.invalidateQueries({ queryKey: ["itineraryDestination", itineraryIdValue, destinationIdValue] });
           queryClient.invalidateQueries({ queryKey: ["itineraryDateRange", itineraryIdValue] });
+          queryClient.invalidateQueries({ queryKey: ["itineraryDestinationsSummary", itineraryIdValue] });
         } else {
           console.error("Error updating date range:", result.message);
         }
-      } else {
-        // Clear the store if no date range is selected
-        setStoreDateRange(null, null);
       }
     } catch (error) {
       console.error("Error setting date range:", error);
@@ -277,13 +319,15 @@ export function AppSidebarItineraryActivityLeft({
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="start" className="w-80">
                   {destinationsSummary.map((dest) => (
-                    <DropdownMenuItem
-                      key={dest.itinerary_destination_id}
-                      className={cn(
-                        "cursor-pointer",
-                        Number(dest.itinerary_destination_id) === currentDestinationId && "bg-bg-50"
-                      )}
-                      onSelect={() => navigateToDestination(dest.itinerary_destination_id)}
+                      <DropdownMenuItem
+                        key={dest.itinerary_destination_id}
+                        className={cn(
+                          "cursor-pointer",
+                          Number(dest.itinerary_destination_id) === currentDestinationId && "bg-bg-50"
+                        )}
+                      onSelect={() =>
+                        navigateToDestination(dest.itinerary_destination_id, dest.from_date)
+                      }
                     >
                       <div className="flex flex-col min-w-0">
                         <div className="font-medium truncate">
@@ -336,10 +380,10 @@ export function AppSidebarItineraryActivityLeft({
         currentDestinationId={currentDestinationId}
         nextOrderNumber={nextOrderNumber}
         defaultDateRange={defaultNewDestinationRange}
-        onDestinationCreated={(newDestinationId) => {
+        onDestinationCreated={(newDestinationId, fromDate) => {
           queryClient.invalidateQueries({ queryKey: ["itineraryDestinationsSummary", itineraryIdValue] });
           setAddDestinationOpen(false);
-          navigateToDestination(newDestinationId);
+          navigateToDestination(newDestinationId, fromDate);
         }}
       />
     </Sidebar>
