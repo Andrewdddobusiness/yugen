@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen, renderHook } from '@testing-library/react';
+import { render, screen, renderHook, within } from '@testing-library/react';
 import { format } from 'date-fns';
 import { DndContext } from '@dnd-kit/core';
 
@@ -20,6 +20,13 @@ describe('Week calendar', () => {
   it('renders a week range that matches Sunday-starting columns', () => {
     render(<CalendarControls selectedDate={new Date(2026, 0, 26)} viewMode="week" />);
     expect(screen.getByText('Jan 25 - 31, 2026')).toBeInTheDocument();
+  });
+
+  it('disables travel times toggle in month view', () => {
+    render(<CalendarControls selectedDate={new Date(2026, 0, 26)} viewMode="month" />);
+    const container = screen.getByTitle(/Travel times are available/i);
+    const travelSwitch = within(container).getByRole('switch');
+    expect(travelSwitch).toBeDisabled();
   });
 
   it('shows date-only activities in the all-day row', () => {

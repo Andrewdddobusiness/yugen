@@ -230,19 +230,9 @@ export function DayRouteSummary({
 
   // Get travel mode distribution
   const travelModes = route.segments.reduce((acc, segment) => {
-    acc[segment.travelMode] = (acc[segment.travelMode] || 0) + 1;
+    acc[segment.travelMode] = (acc[segment.travelMode] ?? 0) + 1;
     return acc;
-  }, {} as Record<string, number>);
-
-  const getTravelModeIcon = (mode: string) => {
-    switch (mode) {
-      case 'walking': return '🚶';
-      case 'driving': return '🚗';
-      case 'transit': return '🚌';
-      case 'bicycling': return '🚲';
-      default: return '🗺️';
-    }
-  };
+  }, {} as Partial<Record<RouteSegment['travelMode'], number>>);
 
   return (
     <div className={cn("p-3 bg-white dark:bg-gray-800 rounded-lg border shadow-sm", className)}>
@@ -290,9 +280,9 @@ export function DayRouteSummary({
 
         {/* Travel Modes */}
         <div className="flex items-center gap-2">
-          {Object.entries(travelModes).map(([mode, count]) => (
-            <Badge key={mode} variant="outline" className="text-xs">
-              <span className="mr-1">{getTravelModeIcon(mode)}</span>
+          {(Object.entries(travelModes) as Array<[RouteSegment['travelMode'], number]>).map(([mode, count]) => (
+            <Badge key={mode} variant="outline" className="text-xs flex items-center gap-1">
+              {getTravelModeIcon(mode)}
               {count}
             </Badge>
           ))}

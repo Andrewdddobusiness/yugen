@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { MobileActivityCard } from './MobileActivityCard';
 import { processDayActivities, type ActivityTimeBlock } from '@/utils/timeSlots';
+import { TRAVEL_MODE_ICON_BY_MODE } from '@/components/travel/travelModeConfig';
 
 interface MobileTimeSlotsProps {
   date: string;
@@ -165,7 +166,9 @@ export function MobileTimeSlots({
                         {/* Travel Time to Next */}
                         {index < dayData.activities.length - 1 && (
                           <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400 ml-3 mb-2">
-                            <div className="w-4 h-4 text-center">🚶</div>
+                            <div className="w-4 h-4 flex items-center justify-center">
+                              <TRAVEL_MODE_ICON_BY_MODE.walking className="h-4 w-4" aria-hidden="true" />
+                            </div>
                             <span>Travel time to next activity</span>
                           </div>
                         )}

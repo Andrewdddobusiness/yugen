@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { format, addDays, subDays, addWeeks, subWeeks, addMonths, subMonths, isToday, startOfWeek } from 'date-fns';
-import { ChevronLeft, ChevronRight, Calendar, Clock, MapPin } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Calendar, Clock, MapPin, Car } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { cn } from '@/lib/utils';
@@ -24,6 +24,7 @@ export function CalendarControls({
   className
 }: CalendarControlsProps) {
   const showCityLabels = useItineraryLayoutStore((s) => s.viewStates.calendar.showCityLabels);
+  const showTravelTimes = useItineraryLayoutStore((s) => s.viewStates.calendar.showTravelTimes);
   const saveViewState = useItineraryLayoutStore((s) => s.saveViewState);
 
   const handlePrevious = () => {
@@ -181,6 +182,23 @@ export function CalendarControls({
           <Switch
             checked={showCityLabels}
             onCheckedChange={(checked) => saveViewState("calendar", { showCityLabels: checked })}
+          />
+        </div>
+
+        {/* Travel times toggle */}
+        <div
+          className={cn(
+            "flex items-center space-x-2 ml-4 text-sm text-ink-500",
+            viewMode === "month" && "opacity-50"
+          )}
+          title={viewMode === "month" ? "Travel times are available in Day / 3 Days / Week views." : undefined}
+        >
+          <Car className="h-4 w-4 text-brand-500" />
+          <span className="hidden md:inline">Travel times</span>
+          <Switch
+            checked={showTravelTimes}
+            disabled={viewMode === "month"}
+            onCheckedChange={(checked) => saveViewState("calendar", { showTravelTimes: checked })}
           />
         </div>
 

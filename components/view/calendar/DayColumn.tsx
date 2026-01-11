@@ -6,6 +6,7 @@ import { format, isToday, isWeekend } from "date-fns";
 import { cn } from "@/lib/utils";
 import { ActivityBlock } from "./ActivityBlock";
 import { CustomEventBlock } from "./CustomEventBlock";
+import { CommuteBlocks } from "./CommuteBlocks";
 import { useSchedulingContext } from "@/store/timeSchedulingStore";
 import type { AnchorRect } from "./CustomEventPopover";
 import {
@@ -13,6 +14,9 @@ import {
   getCalendarSlotHeightPx,
 } from "./layoutMetrics";
 import type { TimeSlot } from "./TimeGrid";
+import type { TravelMode } from "@/actions/google/travelTime";
+import type { CommuteSegment, CommuteTravelTime } from "./commute";
+import { getCommuteOverlayId, parseTimeToMinutes } from "./commute";
 
 interface ScheduledActivity {
   id: string;
@@ -48,6 +52,9 @@ interface DayColumnProps {
   timeSlots: TimeSlot[];
   activities: ScheduledActivity[];
   customEvents?: ScheduledCustomEvent[];
+  commuteSegments?: CommuteSegment[];
+  commuteTimesByKey?: Record<string, Partial<Record<TravelMode, CommuteTravelTime | null>>>;
+  commuteLoadingByKey?: Record<string, true>;
   allDayActivities?: Array<{ id: string; name: string }>;
   highlightActivityId?: string | null;
   onSelectDate?: (date: Date) => void;
@@ -130,6 +137,9 @@ export function DayColumn({
   timeSlots,
   activities,
   customEvents = [],
+  commuteSegments = [],
+  commuteTimesByKey = {},
+  commuteLoadingByKey = {},
   allDayActivities = [],
   highlightActivityId,
   onSelectDate,
@@ -153,6 +163,9 @@ export function DayColumn({
     schedulingContext.config.interval
   );
   const minutesPerSlot = schedulingContext.config.interval;
+  const gridStartMinutes =
+    timeSlots.length > 0 ? timeSlots[0].hour * 60 + timeSlots[0].minute : 0;
+  const gridHeightPx = timeSlots.length * slotHeightPx;
   const trimPreviewById =
     dragOverInfo?.dayIndex === dayIndex && dragOverInfo?.mode === "trim"
       ? dragOverInfo.trimPreviewById
@@ -179,7 +192,14 @@ export function DayColumn({
   );
 
   const overlapLayoutById = React.useMemo(() => {
-    type Event = { id: string; start: number; end: number };
+    type Event = {
+      id: string;
+      start: number;
+      end: number;
+      kind: "activity" | "custom" | "commute" | "preview";
+    };
+    type BaseEvent = Omit<Event, "kind"> & { kind: "activity" | "custom" };
+    type CommuteEvent = Omit<Event, "kind"> & { kind: "commute" };
     type Layout = { column: number; columnCount: number };
 
     const previewStart =
@@ -191,34 +211,81 @@ export function DayColumn({
         ? dragOverInfo.spanSlots
         : null;
 
-    const events: Array<Event & { isPreview: boolean }> = [...customEvents, ...activities]
-      .map((item) => {
+    const baseEvents: BaseEvent[] = [
+      ...customEvents.map((item) => {
         const position = getDisplayPosition(item as any);
         if (!position) return null;
         return {
           id: String((item as any).id),
           start: Math.max(0, position.startSlot),
           end: Math.max(0, position.startSlot + Math.max(1, position.span)),
-          isPreview: false,
+          kind: "custom" as const,
+        };
+      }),
+      ...activities.map((item) => {
+        const position = getDisplayPosition(item as any);
+        if (!position) return null;
+        return {
+          id: String((item as any).id),
+          start: Math.max(0, position.startSlot),
+          end: Math.max(0, position.startSlot + Math.max(1, position.span)),
+          kind: "activity" as const,
+        };
+      }),
+    ].filter((event): event is BaseEvent => event !== null);
+
+    const commuteEvents: CommuteEvent[] = (commuteSegments ?? [])
+      .map((segment) => {
+        const fromEndMinutes = parseTimeToMinutes(segment.from.endTime);
+        if (fromEndMinutes == null) return null;
+
+        const travel = commuteTimesByKey?.[segment.key]?.[segment.preferredMode] ?? null;
+        const travelMinutes =
+          travel?.durationSeconds != null
+            ? Math.max(1, Math.round(travel.durationSeconds / 60))
+            : minutesPerSlot;
+        const endMinutes = fromEndMinutes + travelMinutes;
+
+        const startSlotIndex = timeSlots.findIndex((slot) => slot.hour * 60 + slot.minute >= fromEndMinutes);
+        if (startSlotIndex === -1) return null;
+
+        const endSlotIndex = timeSlots.findIndex((slot) => slot.hour * 60 + slot.minute >= endMinutes);
+        const endSlot = endSlotIndex === -1 ? timeSlots.length : Math.max(endSlotIndex, startSlotIndex + 1);
+
+        return {
+          id: getCommuteOverlayId(segment.key),
+          start: Math.max(0, startSlotIndex),
+          end: Math.max(0, endSlot),
+          kind: "commute" as const,
         };
       })
-      .filter((event): event is Event & { isPreview: boolean } => event !== null)
-      .concat(
-        previewStart != null && previewSpan != null
-          ? [
-              {
-                id: "__drag_preview__",
-                start: Math.max(0, previewStart),
-                end: Math.max(0, previewStart + Math.max(1, previewSpan)),
-                isPreview: true,
-              },
-            ]
-          : []
-      )
-      .sort((a, b) => {
+      .filter((event): event is CommuteEvent => event !== null);
+
+    const previewEvents: Event[] =
+      previewStart != null && previewSpan != null
+        ? [
+            {
+              id: "__drag_preview__",
+              start: Math.max(0, previewStart),
+              end: Math.max(0, previewStart + Math.max(1, previewSpan)),
+              kind: "preview" as const,
+            },
+          ]
+        : [];
+
+    const events: Event[] = [...baseEvents, ...commuteEvents, ...previewEvents].sort((a, b) => {
         const startSort = a.start - b.start;
         if (startSort !== 0) return startSort;
-        if (a.isPreview !== b.isPreview) return a.isPreview ? 1 : -1;
+
+        // Preview should never influence normal column ordering.
+        if (a.kind !== b.kind) {
+          if (a.kind === "preview") return 1;
+          if (b.kind === "preview") return -1;
+          // Prefer commute blocks in the left-most column when they overlap.
+          if (a.kind === "commute") return -1;
+          if (b.kind === "commute") return 1;
+        }
+
         return a.end - b.end;
       });
 
@@ -283,7 +350,17 @@ export function DayColumn({
 
     assignCluster(cluster);
     return layout;
-  }, [activities, customEvents, dayIndex, dragOverInfo, getDisplayPosition]);
+  }, [
+    activities,
+    commuteSegments,
+    commuteTimesByKey,
+    customEvents,
+    dayIndex,
+    dragOverInfo,
+    getDisplayPosition,
+    minutesPerSlot,
+    timeSlots,
+  ]);
   const dragPreview =
     dragOverInfo?.dayIndex === dayIndex
       ? {
@@ -490,6 +567,21 @@ export function DayColumn({
 
         {/* Activity Blocks */}
         <div className="absolute inset-0 pointer-events-none">
+          {commuteSegments.length > 0 ? (
+            <CommuteBlocks
+              segments={commuteSegments}
+              travelTimesByKey={commuteTimesByKey}
+              loadingByKey={commuteLoadingByKey}
+              overlapLayoutById={overlapLayoutById}
+              gridStartMinutes={gridStartMinutes}
+              minutesPerSlot={minutesPerSlot}
+              slotHeightPx={slotHeightPx}
+              gridHeightPx={gridHeightPx}
+              includeBuffer={schedulingContext.travelSettings.includeBuffer}
+              bufferMinutes={schedulingContext.travelSettings.bufferMinutes}
+            />
+          ) : null}
+
           {customEvents.map((event) => {
             const displayPosition = getDisplayPosition(event as any);
             if (!displayPosition) return null;

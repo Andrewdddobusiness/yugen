@@ -39,6 +39,7 @@ export interface ItineraryLayoutState {
       scrollPosition: number;
       activeDays?: string[];
       showCityLabels: boolean;
+      showTravelTimes: boolean;
       cityLabelColors: Record<string, string>;
     };
     table: {
@@ -173,6 +174,7 @@ const defaultViewStates = {
     scrollPosition: 0,
     activeDays: [],
     showCityLabels: true,
+    showTravelTimes: false,
     cityLabelColors: {},
   },
   table: {

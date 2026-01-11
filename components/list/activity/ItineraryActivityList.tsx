@@ -11,6 +11,7 @@ import type { TravelTimeResult } from '@/utils/travel/travelTimeUtils';
 import type { ItineraryActivity, EditingField } from './types';
 import { TravelModeSelect } from '@/components/travel/TravelModeSelect';
 import type { TravelMode } from '@/actions/google/travelTime';
+import { TRAVEL_MODE_ICON_BY_MODE } from '@/components/travel/travelModeConfig';
 
 interface ItineraryActivityListProps {
   date: string;
@@ -160,10 +161,12 @@ export function ItineraryActivityList({
                 <div className="flex items-center justify-center py-2">
                   <div className="flex items-center gap-2 text-sm text-gray-600 bg-gray-50 rounded-full px-4 py-2 border">
                     <div className="h-4 w-4 text-gray-400">
-                      {currentTravelData.mode === 'walking' && '🚶'}
-                      {currentTravelData.mode === 'driving' && '🚗'}
-                      {currentTravelData.mode === 'transit' && '🚌'}
-                      {currentTravelData.mode === 'bicycling' && '🚲'}
+                      {(() => {
+                        const ModeIcon =
+                          TRAVEL_MODE_ICON_BY_MODE[currentTravelData.mode] ??
+                          TRAVEL_MODE_ICON_BY_MODE.walking;
+                        return <ModeIcon className="h-4 w-4" aria-hidden="true" />;
+                      })()}
                     </div>
                     <span className={cn("font-medium", getTravelTimeColor(currentTravelData.durationValue))}>
                       {currentTravelData.duration}

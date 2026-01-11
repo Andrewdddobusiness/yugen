@@ -203,17 +203,21 @@ export function getTravelTimeColor(durationValue: number): string {
  * Get travel mode icon name for the UI
  */
 export function getTravelModeIcon(mode: TravelMode): string {
+  return getTravelModeLabel(mode);
+}
+
+export function getTravelModeLabel(mode: TravelMode): string {
   switch (mode) {
     case 'walking':
-      return '🚶';
+      return 'Walk';
     case 'driving':
-      return '🚗';
+      return 'Drive';
     case 'transit':
-      return '🚌';
+      return 'Transit';
     case 'bicycling':
-      return '🚲';
+      return 'Bike';
     default:
-      return '🚶';
+      return 'Walk';
   }
 }
 
@@ -221,8 +225,8 @@ export function getTravelModeIcon(mode: TravelMode): string {
  * Format travel time for display
  */
 export function formatTravelTime(duration: string, distance: string, mode: TravelMode): string {
-  const icon = getTravelModeIcon(mode);
-  return `${icon} ${duration} (${distance})`;
+  const label = getTravelModeLabel(mode);
+  return `${label}: ${duration} (${distance})`;
 }
 
 /**

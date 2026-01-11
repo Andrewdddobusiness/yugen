@@ -29,6 +29,9 @@ import { useItineraryCustomEventStore } from "@/store/itineraryCustomEventStore"
 import { useParams } from "next/navigation";
 import { CustomEventPopover } from "./CustomEventPopover";
 import type { AnchorRect } from "./CustomEventPopover";
+import { buildCommuteSegmentKey, parseTimeToMinutes, toCoordinates, type CommuteSegment } from "./commute";
+import type { TravelMode } from "@/actions/google/travelTime";
+import { useCommuteTravelTimes } from "./hooks/useCommuteTravelTimes";
 
 const DAY_OF_WEEK_PALETTE = [
   colors.Blue, // Sun
@@ -171,12 +174,95 @@ export function CalendarLayout({
   const { itineraryActivities } = useItineraryActivityStore();
   const activeDays = useItineraryLayoutStore((s) => s.viewStates.calendar.activeDays);
   const showCityLabels = useItineraryLayoutStore((s) => s.viewStates.calendar.showCityLabels);
+  const showTravelTimes = useItineraryLayoutStore((s) => s.viewStates.calendar.showTravelTimes);
   const saveViewState = useItineraryLayoutStore((s) => s.saveViewState);
 
   const visibleDayKeys = useMemo(
     () => days.map((day) => format(day, "yyyy-MM-dd")),
     [days]
   );
+
+  const commuteSegments = useMemo<CommuteSegment[]>(() => {
+    if (!showTravelTimes) return [];
+    if (viewMode === "month") return [];
+
+    const travelModeByActivityId = new Map<string, TravelMode | null>();
+    for (const activity of itineraryActivities) {
+      travelModeByActivityId.set(
+        String(activity.itinerary_activity_id),
+        (activity.travel_mode_to_next ?? null)
+      );
+    }
+
+    const scheduledByDayIndex = new Map<number, ScheduledActivity[]>();
+    for (const activity of scheduledActivities) {
+      const list = scheduledByDayIndex.get(activity.position.day);
+      if (list) list.push(activity);
+      else scheduledByDayIndex.set(activity.position.day, [activity]);
+    }
+
+    const segments: CommuteSegment[] = [];
+    for (const [dayIndex, activitiesForDay] of scheduledByDayIndex.entries()) {
+      const sorted = [...activitiesForDay].sort((a, b) => {
+        const aStart = parseTimeToMinutes(a.startTime) ?? Number.POSITIVE_INFINITY;
+        const bStart = parseTimeToMinutes(b.startTime) ?? Number.POSITIVE_INFINITY;
+        if (aStart !== bStart) return aStart - bStart;
+        return String(a.id).localeCompare(String(b.id));
+      });
+
+      for (let i = 0; i < sorted.length - 1; i += 1) {
+        const from = sorted[i];
+        const to = sorted[i + 1];
+        const fromCoords = from.activity?.coordinates ?? null;
+        const toCoords = to.activity?.coordinates ?? null;
+        const origin = toCoordinates(fromCoords);
+        const destination = toCoordinates(toCoords);
+        if (!origin || !destination) continue;
+
+        const fromEnd = parseTimeToMinutes(from.endTime);
+        const toStart = parseTimeToMinutes(to.startTime);
+        if (fromEnd == null || toStart == null) continue;
+
+        const preferredMode = travelModeByActivityId.get(String(from.id)) ?? "driving";
+        const key = buildCommuteSegmentKey({
+          fromId: String(from.id),
+          toId: String(to.id),
+          origin,
+          destination,
+        });
+
+        segments.push({
+          key,
+          dayIndex,
+          from: {
+            id: String(from.id),
+            name: from.activity?.name ?? "Activity",
+            startTime: from.startTime,
+            endTime: from.endTime,
+            coordinates: fromCoords as [number, number],
+            travelModeToNext: preferredMode,
+          },
+          to: {
+            id: String(to.id),
+            name: to.activity?.name ?? "Activity",
+            startTime: to.startTime,
+            endTime: to.endTime,
+            coordinates: toCoords as [number, number],
+          },
+          preferredMode,
+          origin,
+          destination,
+          gapMinutes: toStart - fromEnd,
+        });
+      }
+    }
+
+    return segments;
+  }, [itineraryActivities, scheduledActivities, showTravelTimes, viewMode]);
+
+  const commuteEnabled = showTravelTimes && viewMode !== "month";
+  const { travelTimesByKey: commuteTimesByKey, loadingByKey: commuteLoadingByKey } =
+    useCommuteTravelTimes(commuteSegments, commuteEnabled);
 
   const defaultActiveDays = EMPTY_ACTIVE_DAYS;
 
@@ -595,6 +681,11 @@ export function CalendarLayout({
                   customEvents={scheduledCustomEvents.filter(
                     (event) => event.position.day === dayIndex
                   )}
+                  commuteSegments={commuteSegments.filter(
+                    (segment) => segment.dayIndex === dayIndex
+                  )}
+                  commuteTimesByKey={commuteTimesByKey}
+                  commuteLoadingByKey={commuteLoadingByKey}
                   highlightActivityId={highlightActivityId}
                   onSelectDate={onDateChange}
                   isActive={isActiveDay}

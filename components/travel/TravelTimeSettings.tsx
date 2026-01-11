@@ -13,6 +13,7 @@ import { Separator } from '@/components/ui/separator';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { clearTravelTimeCache, getTravelTimeCacheStats } from '@/actions/google/travelTime';
 import type { TravelMode } from '@/actions/google/travelTime';
+import { TRAVEL_MODE_ICON_BY_MODE } from './travelModeConfig';
 
 interface TravelTimeSettingsProps {
   defaultModes?: TravelMode[];
@@ -25,12 +26,32 @@ const AVAILABLE_MODES: Array<{
   mode: TravelMode;
   label: string;
   description: string;
-  icon: string;
+  Icon: React.ComponentType<{ className?: string }>;
 }> = [
-  { mode: 'walking', label: 'Walking', description: 'Walking directions', icon: '🚶' },
-  { mode: 'driving', label: 'Driving', description: 'Driving directions', icon: '🚗' },
-  { mode: 'transit', label: 'Public Transit', description: 'Public transportation', icon: '🚌' },
-  { mode: 'bicycling', label: 'Bicycling', description: 'Bicycle directions', icon: '🚲' },
+  {
+    mode: 'walking',
+    label: 'Walking',
+    description: 'Walking directions',
+    Icon: TRAVEL_MODE_ICON_BY_MODE.walking,
+  },
+  {
+    mode: 'driving',
+    label: 'Driving',
+    description: 'Driving directions',
+    Icon: TRAVEL_MODE_ICON_BY_MODE.driving,
+  },
+  {
+    mode: 'transit',
+    label: 'Public Transit',
+    description: 'Public transportation',
+    Icon: TRAVEL_MODE_ICON_BY_MODE.transit,
+  },
+  {
+    mode: 'bicycling',
+    label: 'Bicycling',
+    description: 'Bicycle directions',
+    Icon: TRAVEL_MODE_ICON_BY_MODE.bicycling,
+  },
 ];
 
 export function TravelTimeSettings({ 
@@ -117,10 +138,10 @@ export function TravelTimeSettings({
           <div className="space-y-3">
             <Label className="text-sm font-medium">Transport Modes</Label>
             <div className="space-y-2">
-              {AVAILABLE_MODES.map(({ mode, label, description, icon }) => (
+              {AVAILABLE_MODES.map(({ mode, label, description, Icon }) => (
                 <div key={mode} className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <span className="text-sm">{icon}</span>
+                    <Icon className="h-4 w-4 text-ink-700" aria-hidden="true" />
                     <div>
                       <Label htmlFor={`mode-${mode}`} className="text-sm font-medium">
                         {label}
