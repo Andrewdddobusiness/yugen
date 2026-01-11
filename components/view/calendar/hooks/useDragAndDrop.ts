@@ -126,11 +126,12 @@ export function useDragAndDrop(
     () =>
       new ActivityScheduler(
         {
+          gridIntervalMinutes: schedulingContext.config.interval,
           travelSettings: schedulingContext.travelSettings,
         },
         itineraryActivities
       ),
-    [itineraryActivities, schedulingContext.travelSettings]
+    [itineraryActivities, schedulingContext.config.interval, schedulingContext.travelSettings]
   );
 
 		  const handleDragStart = useCallback((event: DragStartEvent) => {

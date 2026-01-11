@@ -20,6 +20,7 @@ import { TimeSlot } from '../TimeGrid';
  */
 
 export interface ActivitySchedulingContext {
+  gridIntervalMinutes: number;
   travelSettings: {
     showTravelTime: boolean;
     bufferMinutes: number;
@@ -148,7 +149,8 @@ export class ActivityScheduler {
       currentDuration,
       newDate,
       existingActivities,
-      activityId
+      activityId,
+      this.context.gridIntervalMinutes
     );
     
     if (!validSlot) {

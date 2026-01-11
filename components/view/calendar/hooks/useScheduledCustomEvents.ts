@@ -36,8 +36,23 @@ export function useScheduledCustomEvents(days: Date[], timeSlots: TimeSlot[]): S
         if (!Number.isFinite(startHour) || !Number.isFinite(startMinute)) return null;
         if (!Number.isFinite(endHour) || !Number.isFinite(endMinute)) return null;
 
-        const startSlot = timeSlots.findIndex((slot) => slot.hour === startHour && slot.minute === startMinute);
+        let startSlot = timeSlots.findIndex((slot) => slot.hour === startHour && slot.minute === startMinute);
         let endSlot = timeSlots.findIndex((slot) => slot.hour === endHour && slot.minute === endMinute);
+        if (startSlot === -1 && timeSlots.length > 0) {
+          const startMinutes = startHour * 60 + startMinute;
+          const firstSlot = timeSlots[0];
+          const firstMinutes = firstSlot.hour * 60 + firstSlot.minute;
+          const inferredInterval =
+            timeSlots.length > 1
+              ? timeSlots[1].hour * 60 + timeSlots[1].minute - firstMinutes
+              : 60;
+
+          startSlot = Math.min(
+            Math.max(0, Math.round((startMinutes - firstMinutes) / inferredInterval)),
+            Math.max(0, timeSlots.length - 1)
+          );
+        }
+
         if (startSlot === -1) return null;
 
         if (endSlot === -1 && timeSlots.length > 0) {
@@ -85,4 +100,3 @@ export function useScheduledCustomEvents(days: Date[], timeSlots: TimeSlot[]): S
       .filter(Boolean) as ScheduledCustomEvent[];
   }, [customEvents, days, timeSlots]);
 }
-

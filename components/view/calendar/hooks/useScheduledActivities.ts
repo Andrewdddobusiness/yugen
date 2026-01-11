@@ -106,12 +106,26 @@ export function useScheduledActivities(days: Date[], timeSlots: TimeSlot[]): Sch
         const [startHour, startMinute] = (activity.start_time as string).split(':').map(Number);
         const [endHour, endMinute] = (activity.end_time as string).split(':').map(Number);
         
-        const startSlot = timeSlots.findIndex(slot => 
+        let startSlot = timeSlots.findIndex(slot => 
           slot.hour === startHour && slot.minute === startMinute
         );
         let endSlot = timeSlots.findIndex(slot => 
           slot.hour === endHour && slot.minute === endMinute
         );
+
+        if (startSlot === -1 && timeSlots.length > 0) {
+          const startMinutes = startHour * 60 + startMinute;
+          const firstSlot = timeSlots[0];
+          const firstMinutes = firstSlot.hour * 60 + firstSlot.minute;
+          const inferredInterval =
+            timeSlots.length > 1
+              ? (timeSlots[1].hour * 60 + timeSlots[1].minute) - firstMinutes
+              : 60;
+          startSlot = Math.min(
+            Math.max(0, Math.round((startMinutes - firstMinutes) / inferredInterval)),
+            Math.max(0, timeSlots.length - 1)
+          );
+        }
 
         if (startSlot === -1) return null;
 

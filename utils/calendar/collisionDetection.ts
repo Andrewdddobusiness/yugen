@@ -91,7 +91,8 @@ export function findNearestValidSlot(
   duration: number,
   date: string,
   existingActivities: Activity[],
-  excludeId?: string
+  excludeId?: string,
+  interval: number = 30
 ): { startTime: string; endTime: string } | null {
   const targetMinutes = timeToMinutes(targetTime);
   const endMinutes = targetMinutes + duration;
@@ -119,7 +120,7 @@ export function findNearestValidSlot(
   const dayEnd = 23 * 60; // 11 PM
   
   // Try slots after the target time
-  for (let minutes = targetMinutes; minutes + duration <= dayEnd; minutes += 30) {
+  for (let minutes = targetMinutes; minutes + duration <= dayEnd; minutes += interval) {
     const testStart = `${Math.floor(minutes / 60).toString().padStart(2, '0')}:${(minutes % 60).toString().padStart(2, '0')}:00`;
     const testEnd = `${Math.floor((minutes + duration) / 60).toString().padStart(2, '0')}:${((minutes + duration) % 60).toString().padStart(2, '0')}:00`;
     
@@ -135,7 +136,7 @@ export function findNearestValidSlot(
   }
   
   // Try slots before the target time
-  for (let minutes = targetMinutes - 30; minutes >= dayStart; minutes -= 30) {
+  for (let minutes = targetMinutes - interval; minutes >= dayStart; minutes -= interval) {
     const testStart = `${Math.floor(minutes / 60).toString().padStart(2, '0')}:${(minutes % 60).toString().padStart(2, '0')}:00`;
     const testEnd = `${Math.floor((minutes + duration) / 60).toString().padStart(2, '0')}:${((minutes + duration) % 60).toString().padStart(2, '0')}:00`;
     
@@ -301,14 +302,16 @@ export function findOptimalTimeSlots(
     avoidPeakHours?: boolean;
     businessHours?: BusinessHours;
     travelBuffer?: number;
+    interval?: number;
   },
   maxResults: number = 5
 ): Array<{ startTime: string; endTime: string; score: number }> {
   const slots: Array<{ startTime: string; endTime: string; score: number }> = [];
   const dayStart = 6 * 60; // 6 AM
   const dayEnd = 23 * 60; // 11 PM
+  const interval = preferences.interval ?? 30;
   
-  for (let minutes = dayStart; minutes + duration <= dayEnd; minutes += 30) {
+  for (let minutes = dayStart; minutes + duration <= dayEnd; minutes += interval) {
     const startTime = `${Math.floor(minutes / 60).toString().padStart(2, '0')}:${(minutes % 60).toString().padStart(2, '0')}:00`;
     const endTime = `${Math.floor((minutes + duration) / 60).toString().padStart(2, '0')}:${((minutes + duration) % 60).toString().padStart(2, '0')}:00`;
     
@@ -331,7 +334,7 @@ export function findOptimalTimeSlots(
       if (preferences.preferredStartTime) {
         const preferredMinutes = timeToMinutes(preferences.preferredStartTime);
         const distance = Math.abs(minutes - preferredMinutes);
-        score -= distance / 30; // Reduce score based on distance
+        score -= distance / interval; // Reduce score based on distance
       }
       
       // Avoid peak hours if requested (9-11 AM, 12-1 PM, 5-7 PM)

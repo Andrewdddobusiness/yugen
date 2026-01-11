@@ -2,11 +2,20 @@
 
 import React from 'react';
 import { format, addDays, subDays, addWeeks, subWeeks, addMonths, subMonths, isToday, startOfWeek } from 'date-fns';
-import { ChevronLeft, ChevronRight, Calendar, Clock, MapPin, Car } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Calendar, Clock, MapPin, Car, Timer } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
 import { useItineraryLayoutStore } from '@/store/itineraryLayoutStore';
+import { useTimeSchedulingStore } from '@/store/timeSchedulingStore';
 
 interface CalendarControlsProps {
   selectedDate: Date;
@@ -26,6 +35,8 @@ export function CalendarControls({
   const showCityLabels = useItineraryLayoutStore((s) => s.viewStates.calendar.showCityLabels);
   const showTravelTimes = useItineraryLayoutStore((s) => s.viewStates.calendar.showTravelTimes);
   const saveViewState = useItineraryLayoutStore((s) => s.saveViewState);
+  const timeInterval = useTimeSchedulingStore((s) => s.timeGridConfig.interval);
+  const updateTimeGridConfig = useTimeSchedulingStore((s) => s.updateTimeGridConfig);
 
   const handlePrevious = () => {
     if (!onDateChange) return;
@@ -174,6 +185,29 @@ export function CalendarControls({
             Month
           </Button>
         </div>
+
+        {/* Time interval (15/30/60) */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" size="sm" className="h-8 px-3">
+              <Timer className="h-4 w-4 text-brand-500 mr-1" />
+              {timeInterval}m
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuLabel>Time increments</DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => updateTimeGridConfig({ interval: 15 })}>
+              <span className={cn(timeInterval === 15 && "font-semibold")}>15 minutes</span>
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => updateTimeGridConfig({ interval: 30 })}>
+              <span className={cn(timeInterval === 30 && "font-semibold")}>30 minutes</span>
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => updateTimeGridConfig({ interval: 60 })}>
+              <span className={cn(timeInterval === 60 && "font-semibold")}>1 hour</span>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
 
         {/* City labels toggle */}
         <div className="flex items-center space-x-2 ml-4 text-sm text-ink-500">
