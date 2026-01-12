@@ -118,7 +118,7 @@ export function CommuteBlocks({
 
         const containerClassName = cn(
           "w-full h-full rounded-md border shadow-sm",
-          "flex items-center justify-between px-2 text-[11px] leading-none",
+          "flex items-center justify-between px-2 text-[11px] leading-none min-w-0 overflow-hidden",
           state === "ok" && "bg-blue-50/80 border-blue-200 text-blue-900",
           state === "tight" && "bg-amber-50/80 border-amber-200 text-amber-900",
           state === "conflict" && "bg-red-50/80 border-red-200 text-red-900",
@@ -163,7 +163,7 @@ export function CommuteBlocks({
                 <button type="button" className={containerClassName}>
                   <span className="flex items-center gap-1 min-w-0">
                     {getModeIcon(segment.preferredMode)}
-                    <span className="font-medium whitespace-nowrap text-[10px] tracking-tight">
+                    <span className="font-medium truncate text-[10px] tracking-tight">
                       {label}
                     </span>
                   </span>

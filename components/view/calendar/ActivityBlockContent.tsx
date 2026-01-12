@@ -133,7 +133,7 @@ export function ActivityBlockContent({
   if (blockSize === 'compact') {
     // Compact block for < 1 hour activities
     return (
-      <div className="p-1.5 pr-6 flex items-center space-x-2 min-h-0">
+      <div className="p-1.5 pr-6 flex items-center space-x-2 min-h-0 min-w-0 overflow-hidden">
         <div className="flex-shrink-0 flex items-center gap-1 text-xs">
           {typeof categoryIcon === 'string' ? (
             <span className="text-xs">{categoryIcon}</span>
@@ -163,7 +163,7 @@ export function ActivityBlockContent({
   if (blockSize === 'standard') {
     // Standard block for 1-3 hour activities
     return (
-      <div className="p-2 pr-6">
+      <div className="p-2 pr-6 min-w-0 overflow-hidden">
         {/* Header with name and status indicators */}
         <div className="flex items-start justify-between mb-1">
           <div className="flex-1 min-w-0">
@@ -242,7 +242,7 @@ export function ActivityBlockContent({
 
   // Extended block for 3+ hour activities
   return (
-    <div className="p-3 pr-6">
+    <div className="p-3 pr-6 min-w-0 overflow-hidden">
       {/* Header with name, category, and status */}
       <div className="flex items-start justify-between mb-2">
         <div className="flex-1 min-w-0">
