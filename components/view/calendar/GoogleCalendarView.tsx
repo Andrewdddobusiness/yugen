@@ -31,6 +31,8 @@ export function GoogleCalendarView({
   const { startDate } = useDateRangeStore();
   const { saveViewState, getViewState } = useItineraryLayoutStore();
 
+  const calendarDateStorageKey = itinId ? `calendar:selectedDate:${itinId}` : null;
+
   const { data: itineraryDestinations = [] } = useQuery({
     queryKey: ["itineraryDestinationsSummary", itinId],
     queryFn: async () => {
@@ -50,6 +52,14 @@ export function GoogleCalendarView({
   
   // Initialize state from store or defaults
   const [selectedDate, setSelectedDate] = useState<Date>(() => {
+    if (typeof window !== "undefined" && calendarDateStorageKey) {
+      const stored = window.localStorage.getItem(calendarDateStorageKey);
+      if (stored) {
+        const parsed = new Date(stored);
+        if (!Number.isNaN(parsed.getTime())) return parsed;
+      }
+    }
+
     const viewState = getViewState('calendar');
     if (viewState.selectedDate) {
       return new Date(viewState.selectedDate);
@@ -71,10 +81,14 @@ export function GoogleCalendarView({
 
   // Save state when selectedDate changes
   useEffect(() => {
+    if (typeof window !== "undefined" && calendarDateStorageKey) {
+      window.localStorage.setItem(calendarDateStorageKey, new Date(effectiveSelectedDateTime).toISOString());
+    }
+
     saveViewState('calendar', {
       selectedDate: new Date(effectiveSelectedDateTime).toISOString(),
     });
-  }, [effectiveSelectedDateTime, saveViewState]);
+  }, [calendarDateStorageKey, effectiveSelectedDateTime, saveViewState]);
 
   // Save state when viewMode changes
   useEffect(() => {
@@ -88,15 +102,14 @@ export function GoogleCalendarView({
     if (!startDate) return;
     if (isControlled) return;
 
-    const newStartDate = new Date(startDate);
-    // Only update if it's significantly different (not just a small time difference)
-    if (
-      Math.abs(newStartDate.getTime() - effectiveSelectedDateTime) >
-      24 * 60 * 60 * 1000
-    ) {
-      setSelectedDate(newStartDate);
+    if (typeof window !== "undefined" && calendarDateStorageKey) {
+      const stored = window.localStorage.getItem(calendarDateStorageKey);
+      if (stored) return;
     }
-  }, [startDate, isControlled, effectiveSelectedDateTime]);
+
+    const newStartDate = new Date(startDate);
+    setSelectedDate(newStartDate);
+  }, [startDate, isControlled, calendarDateStorageKey]);
 
   // Sync internal state when controlled date changes (keeps viewState and smooth transitions consistent)
   useEffect(() => {

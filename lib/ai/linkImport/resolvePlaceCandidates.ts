@@ -102,6 +102,7 @@ export async function resolveLinkImportCandidates(args: {
       clarifications: [
         "I can import places from links, but I need the destination city and country to search for matching places.",
       ],
+      pendingClarifications: [],
       dropped: candidates.length,
     };
   }
@@ -119,6 +120,7 @@ export async function resolveLinkImportCandidates(args: {
       clarifications: [
         "I couldn't look up the destination location right now. Please try again, or paste Google Maps links for the specific places you want to add.",
       ],
+      pendingClarifications: [],
       dropped: candidates.length,
     };
   }
