@@ -25,6 +25,54 @@ import { timeToMinutes } from '@/utils/calendar/collisionDetection';
 type DropOverlapMode = 'overlap' | 'trim';
 type TrimPreviewById = Record<string, { startSlot: number; span: number } | null>;
 
+type ItineraryActivityLike = {
+  itinerary_activity_id?: string | number;
+  activity_id?: string | number;
+  date?: string | null;
+  start_time?: string | null;
+  end_time?: string | null;
+  deleted_at?: string | null;
+  activity?: { place_id?: string | null } | null;
+};
+
+const getAlternativeGroupKey = (act: ItineraryActivityLike | null | undefined) => {
+  const placeId = String(act?.activity?.place_id ?? "").trim();
+  if (placeId) return `place:${placeId}`;
+
+  const activityId = String(act?.activity_id ?? "").trim();
+  if (activityId) return `activity:${activityId}`;
+
+  return null;
+};
+
+const getActivityComparisonKeys = (act: ItineraryActivityLike | null | undefined) => {
+  const keys: string[] = [];
+  const placeId = String(act?.activity?.place_id ?? "").trim();
+  if (placeId) keys.push(`place:${placeId}`);
+
+  const activityId = String(act?.activity_id ?? "").trim();
+  if (activityId) keys.push(`activity:${activityId}`);
+
+  return keys;
+};
+
+const isSlotAlternativeGroupValid = (
+  slotActivityIds: string[],
+  activityById: Map<string, ItineraryActivityLike>
+) => {
+  if (slotActivityIds.length <= 1) return true;
+
+  const keys: string[] = [];
+  for (const activityId of slotActivityIds) {
+    const act = activityById.get(String(activityId));
+    const key = getAlternativeGroupKey(act);
+    if (!act || !key) return false;
+    keys.push(key);
+  }
+
+  return new Set(keys).size === keys.length;
+};
+
 const getEventClientX = (event: Event): number | null => {
   if ('clientX' in event && typeof (event as MouseEvent).clientX === 'number') {
     return (event as MouseEvent).clientX;
@@ -501,20 +549,43 @@ export function useDragAndDrop(
 		    );
 		    if (!previousActivity) return;
 
-        const slotId = getSlotIdForActivity(activityIdString);
-        const slotActivityIds = slotId ? getActivityIdsForSlot(slotId) : [];
-        const timeGroupIds =
+        const activityById = new Map<string, ItineraryActivityLike>(
+          currentActivities.map((act) => [String(act.itinerary_activity_id), act] as const)
+        );
+
+        const rawSlotId = getSlotIdForActivity(activityIdString);
+        const rawSlotActivityIds = rawSlotId ? getActivityIdsForSlot(rawSlotId) : [];
+        const slotId =
+          rawSlotId && isSlotAlternativeGroupValid(rawSlotActivityIds, activityById)
+            ? rawSlotId
+            : null;
+        const slotActivityIds = slotId ? rawSlotActivityIds : [];
+        const timeGroupCandidates =
           !slotId && previousActivity.date && previousActivity.start_time && previousActivity.end_time
-            ? currentActivities
-                .filter((act) => {
-                  if (act.deleted_at !== null) return false;
-                  return (
-                    String(act.date ?? "") === String(previousActivity.date) &&
-                    String(act.start_time ?? "") === String(previousActivity.start_time) &&
-                    String(act.end_time ?? "") === String(previousActivity.end_time)
-                  );
-                })
-                .map((act) => String(act.itinerary_activity_id))
+            ? currentActivities.filter((act) => {
+                if (act.deleted_at !== null) return false;
+                return (
+                  String(act.date ?? "") === String(previousActivity.date) &&
+                  String(act.start_time ?? "") === String(previousActivity.start_time) &&
+                  String(act.end_time ?? "") === String(previousActivity.end_time)
+                );
+              })
+            : [];
+
+        // Only treat exact time overlaps as a "slot group" when it looks like true alternatives
+        // (i.e. different activities), otherwise duplicating an activity would unintentionally
+        // cause multiple instances to move/resize together.
+        const timeGroupIds =
+          timeGroupCandidates.length > 1
+            ? (() => {
+                const keys = timeGroupCandidates
+                  .map((act) => getAlternativeGroupKey(act))
+                  .filter(Boolean);
+                if (keys.length !== timeGroupCandidates.length) return [];
+                const unique = new Set(keys);
+                if (unique.size !== timeGroupCandidates.length) return [];
+                return timeGroupCandidates.map((act) => String((act as any).itinerary_activity_id));
+              })()
             : [];
 
         const groupActivityIds = Array.from(
@@ -563,16 +634,13 @@ export function useDragAndDrop(
 	      string,
 	      { date: string | null; start_time: string | null; end_time: string | null }
 	    >();
-      const activityById = new Map(
-        currentActivities.map((act) => [String(act.itinerary_activity_id), act] as const)
-      );
       for (const id of groupActivityIds) {
         const act = activityById.get(String(id));
         if (!act) continue;
         previousById.set(String(id), {
-          date: act.date,
-          start_time: act.start_time,
-          end_time: act.end_time,
+          date: act.date ?? null,
+          start_time: act.start_time ?? null,
+          end_time: act.end_time ?? null,
         });
       }
 
@@ -595,8 +663,18 @@ export function useDragAndDrop(
       // Overlap mode: treat the best overlap as "add as an alternative" by snapping
       // the dragged activity (or slot group) to the target slot time range.
       if (mode === 'overlap') {
+        const groupComparisonKeys = new Set<string>();
+        for (const id of groupActivityIds) {
+          const act = activityById.get(String(id));
+          for (const key of getActivityComparisonKeys(act)) groupComparisonKeys.add(key);
+        }
+
         let best: { act: any; overlap: number } | null = null;
+        let dedupedIdsToAdd: string[] | null = null;
         for (const act of overlaps) {
+          const candidateKeys = getActivityComparisonKeys(act);
+          if (candidateKeys.some((key) => groupComparisonKeys.has(key))) continue;
+
           const start = timeToMinutes(act.start_time as string);
           const end = timeToMinutes(act.end_time as string);
           const overlapMinutes = Math.min(end, boundedEndMinutes) - Math.max(start, boundedStartMinutes);
@@ -607,6 +685,21 @@ export function useDragAndDrop(
         }
 
         if (best) {
+          const targetKeys = new Set(getActivityComparisonKeys(best.act));
+          dedupedIdsToAdd = groupActivityIds.filter((id) => {
+            const act = activityById.get(String(id));
+            const keys = getActivityComparisonKeys(act);
+            return keys.length > 0 && !keys.some((key) => targetKeys.has(key));
+          });
+          if (dedupedIdsToAdd.length === 0) {
+            // Dropping onto the same underlying place shouldn't create "alternatives".
+            // Fall back to normal overlap behavior (two separate events in the same time range).
+            best = null;
+            dedupedIdsToAdd = null;
+          }
+        }
+
+        if (best && dedupedIdsToAdd) {
           const targetId = String(best.act.itinerary_activity_id);
           const targetSlotId = getSlotIdForActivity(targetId);
           const targetSlot = targetSlotId ? getSlotById(targetSlotId) : null;
@@ -630,7 +723,7 @@ export function useDragAndDrop(
           setIsSaving(true);
 
           try {
-            const result = await addActivitiesAsAlternatives(targetId, groupActivityIds);
+            const result = await addActivitiesAsAlternatives(targetId, dedupedIdsToAdd);
             if (!result.success) {
               throw new Error(result.message || 'Failed to add alternative');
             }
@@ -1256,20 +1349,40 @@ export function useDragAndDrop(
     );
     if (!previousActivity || !previousActivity.start_time || !previousActivity.end_time) return;
 
-    const slotId = getSlotIdForActivity(activityIdString);
-    const slotActivityIds = slotId ? getActivityIdsForSlot(slotId) : [];
-    const timeGroupIds =
+    const activityById = new Map<string, ItineraryActivityLike>(
+      currentActivities.map((act) => [String(act.itinerary_activity_id), act] as const)
+    );
+
+    const rawSlotId = getSlotIdForActivity(activityIdString);
+    const rawSlotActivityIds = rawSlotId ? getActivityIdsForSlot(rawSlotId) : [];
+    const slotId =
+      rawSlotId && isSlotAlternativeGroupValid(rawSlotActivityIds, activityById)
+        ? rawSlotId
+        : null;
+    const slotActivityIds = slotId ? rawSlotActivityIds : [];
+    const timeGroupCandidates =
       !slotId && previousActivity.date && previousActivity.start_time && previousActivity.end_time
-        ? currentActivities
-            .filter((act) => {
-              if (act.deleted_at !== null) return false;
-              return (
-                String(act.date ?? "") === String(previousActivity.date) &&
-                String(act.start_time ?? "") === String(previousActivity.start_time) &&
-                String(act.end_time ?? "") === String(previousActivity.end_time)
-              );
-            })
-            .map((act) => String(act.itinerary_activity_id))
+        ? currentActivities.filter((act) => {
+            if (act.deleted_at !== null) return false;
+            return (
+              String(act.date ?? "") === String(previousActivity.date) &&
+              String(act.start_time ?? "") === String(previousActivity.start_time) &&
+              String(act.end_time ?? "") === String(previousActivity.end_time)
+            );
+          })
+        : [];
+
+    const timeGroupIds =
+      timeGroupCandidates.length > 1
+        ? (() => {
+            const keys = timeGroupCandidates
+              .map((act) => getAlternativeGroupKey(act))
+              .filter(Boolean);
+            if (keys.length !== timeGroupCandidates.length) return [];
+            const unique = new Set(keys);
+            if (unique.size !== timeGroupCandidates.length) return [];
+            return timeGroupCandidates.map((act) => String((act as any).itinerary_activity_id));
+          })()
         : [];
 
     const groupActivityIds = Array.from(

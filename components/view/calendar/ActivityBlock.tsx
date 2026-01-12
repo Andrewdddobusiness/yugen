@@ -447,15 +447,25 @@ export function ActivityBlock({
 
       {waypointBadge()}
 
-      {/* Drag Handle - only show on hover and for standard+ blocks */}
-      {blockSize !== 'compact' && !isResizing && (
+      {/* Drag handle (show on hover; always visible on touch) */}
+      {!isOverlay && !isResizing && (
         <div
-          className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity z-20 cursor-move p-1 hover:bg-bg-50 rounded"
+          className={cn(
+            "absolute top-1 right-1 z-20 cursor-move p-1 rounded transition-opacity",
+            "opacity-0 group-hover:opacity-100",
+            "[@media(pointer:coarse)]:opacity-100",
+            "hover:bg-bg-50"
+          )}
           {...listeners}
           {...attributes}
           title="Drag to move activity"
         >
-          <GripVertical className="h-3 w-3 text-ink-500 hover:text-brand-600" />
+          <GripVertical
+            className={cn(
+              "text-ink-500 hover:text-brand-600",
+              blockSize === "compact" ? "h-3.5 w-3.5" : "h-3 w-3"
+            )}
+          />
         </div>
       )}
 
