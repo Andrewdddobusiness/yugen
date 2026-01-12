@@ -19,6 +19,20 @@ interface ISubscriptionStore {
 export const useStripeSubscriptionStore = create<ISubscriptionStore>((set) => ({
   subscription: null,
   isSubscriptionLoading: false,
-  setSubscription: (subscription) => set({ subscription }),
+  setSubscription: (subscription) =>
+    set(() => {
+      if (!subscription) return { subscription: null };
+
+      const currentPeriodEndRaw = (subscription as any)?.currentPeriodEnd;
+      const currentPeriodEnd =
+        currentPeriodEndRaw instanceof Date ? currentPeriodEndRaw : new Date(String(currentPeriodEndRaw));
+
+      return {
+        subscription: {
+          ...subscription,
+          currentPeriodEnd,
+        },
+      };
+    }),
   setIsSubscriptionLoading: (isLoading) => set({ isSubscriptionLoading: isLoading }),
 }));

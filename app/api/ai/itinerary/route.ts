@@ -8,7 +8,7 @@ import { extractPlaceCandidatesFromSources, resolveLinkImportCandidates, LinkImp
 import { planItineraryEdits } from "@/lib/ai/itinerary/planner";
 import { openaiEmbed } from "@/lib/ai/itinerary/openai";
 import { checkAiQuota, recordAiUsage } from "@/lib/ai/usage";
-import { getAiAssistantAccessMode } from "@/lib/featureFlags";
+import { getAiAssistantAccessMode, isDevBillingBypassEnabled } from "@/lib/featureFlags";
 import { ingestUrlsFromMessage } from "@/lib/linkImport/server/providers";
 import { rateLimit, rateLimitHeaders } from "@/lib/security/rateLimit";
 import { getClientIp, isSameOrigin } from "@/lib/security/requestGuards";
@@ -84,7 +84,7 @@ const requireAiAssistantAccess = async (supabase: ReturnType<typeof createClient
     };
   }
 
-  const isPro = await isActiveProSubscriber(supabase, userId);
+  const isPro = isDevBillingBypassEnabled() || (await isActiveProSubscriber(supabase, userId));
   if (mode === "pro" && !isPro) {
     return {
       ok: false as const,

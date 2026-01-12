@@ -34,7 +34,7 @@ import { Button } from "@/components/ui/button";
 import { Download, Lock, Share, Sparkles, Users } from "lucide-react";
 import Loading from "@/components/loading/Loading";
 import { ItineraryAssistantSheet, ItineraryAssistantSidebar } from "@/components/ai/ItineraryAssistantSheet";
-import { getAiAssistantAccessMode, getAiAssistantUpgradeHref } from "@/lib/featureFlags";
+import { getAiAssistantAccessMode, getAiAssistantUpgradeHref, isDevBillingBypassEnabled } from "@/lib/featureFlags";
 
 const ShareExportDialog = dynamic(
   () => import("@/components/dialog/export/ShareExportDialog").then((mod) => mod.ShareExportDialog),
@@ -284,8 +284,9 @@ export default function Layout({ children }: { children: ReactNode }) {
   const [assistantOpen, setAssistantOpen] = useState(false);
 
   const aiAccessMode = getAiAssistantAccessMode();
+  const billingBypassEnabled = isDevBillingBypassEnabled();
   const isAiEnabledFlag = aiAccessMode !== "off";
-  const isProSubscriber = (subscription as any)?.status === "active";
+  const isProSubscriber = billingBypassEnabled || (subscription as any)?.status === "active";
   const canUseAiAssistant = aiAccessMode === "all" || (aiAccessMode === "pro" && isProSubscriber);
   const aiUpgradeHref = getAiAssistantUpgradeHref();
 

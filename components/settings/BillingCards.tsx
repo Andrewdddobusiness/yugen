@@ -11,33 +11,38 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useStripeSubscriptionStore } from "@/store/stripeSubscriptionStore";
 import { useUserStore } from "@/store/userStore";
+import { isDevBillingBypassEnabled } from "@/lib/featureFlags";
 import { Check, Sparkles } from "lucide-react";
 
 export default function BillingCards() {
   const { user, isUserLoading } = useUserStore();
   const { subscription, isSubscriptionLoading } = useStripeSubscriptionStore();
 
-  const isLoading = isUserLoading || isSubscriptionLoading || !user;
-  const isPro = subscription?.status === "active";
+  const billingBypassEnabled = isDevBillingBypassEnabled();
+  const hasActiveSubscription = subscription?.status === "active";
+  const isLoading = (isUserLoading && !user) || isSubscriptionLoading;
+  const isPro = billingBypassEnabled || hasActiveSubscription;
 
   const currentPlanLabel = useMemo(() => {
-    if (subscription?.status === "active") {
+    if (hasActiveSubscription) {
       const interval = subscription?.attrs?.plan?.interval;
       if (interval === "month") return "Pro — Monthly";
       if (interval === "year") return "Pro — Yearly";
       return "Pro";
     }
+    if (billingBypassEnabled) return "Pro — Testing";
     return "Free";
-  }, [subscription?.attrs, subscription?.status]);
+  }, [billingBypassEnabled, hasActiveSubscription, subscription?.attrs]);
 
   const [selectedInterval, setSelectedInterval] = useState<"monthly" | "yearly">("monthly");
 
   const renewalText = useMemo(() => {
     if (!isPro) return null;
+    if (billingBypassEnabled && !hasActiveSubscription) return "Billing bypass is enabled for testing.";
     if (subscription?.attrs?.cancel_at_period_end) return "Cancels at period end";
     if (!subscription?.currentPeriodEnd) return null;
     return `Renews on ${subscription.currentPeriodEnd.toLocaleDateString()}`;
-  }, [isPro, subscription?.attrs, subscription?.currentPeriodEnd]);
+  }, [billingBypassEnabled, hasActiveSubscription, isPro, subscription?.attrs, subscription?.currentPeriodEnd]);
 
   return (
     <div className="space-y-4">
@@ -86,7 +91,9 @@ export default function BillingCards() {
                 <div className="flex items-start gap-3">
                   <Sparkles className="mt-0.5 h-4 w-4 text-yellow-500" />
                   <p>
-                    You’re on Pro. Manage billing, invoices, and cancellations in Stripe using the button below.
+                    {billingBypassEnabled && !hasActiveSubscription
+                      ? "You’re in Pro testing mode. AI and other Pro features are unlocked without billing."
+                      : "You’re on Pro. Manage billing, invoices, and cancellations in Stripe using the button below."}
                   </p>
                 </div>
               ) : (
@@ -103,11 +110,13 @@ export default function BillingCards() {
           <CardFooter className="border-t px-6 py-4">
             {isLoading ? (
               <Skeleton className="h-10 w-full" />
-            ) : isPro ? (
+            ) : hasActiveSubscription ? (
               <ManageSubscriptionButton />
             ) : (
               <div className="w-full text-sm text-muted-foreground">
-                Select an interval on the right, then click “Upgrade to Pro”.
+                {billingBypassEnabled
+                  ? "Billing bypass is enabled for this environment."
+                  : "Select an interval on the right, then click “Upgrade to Pro”."}
               </div>
             )}
           </CardFooter>
@@ -166,7 +175,7 @@ export default function BillingCards() {
           <CardFooter className="border-t px-6 py-4">
             {isLoading ? (
               <Skeleton className="h-10 w-full" />
-            ) : isPro ? (
+            ) : hasActiveSubscription ? (
               <ManageSubscriptionButton />
             ) : (
               <CheckoutButton priceId={pricingDetails[selectedInterval].priceId}>Upgrade to Pro</CheckoutButton>

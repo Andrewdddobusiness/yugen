@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { createClient } from "@/utils/supabase/server";
 import { checkAiQuota, type AiPlanTier } from "@/lib/ai/usage";
-import { getAiAssistantAccessMode } from "@/lib/featureFlags";
+import { getAiAssistantAccessMode, isDevBillingBypassEnabled } from "@/lib/featureFlags";
 import { rateLimit, rateLimitHeaders } from "@/lib/security/rateLimit";
 import { getClientIp, isSameOrigin } from "@/lib/security/requestGuards";
 import { recordApiRequestMetric } from "@/lib/telemetry/server";
@@ -68,7 +68,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const isPro = await isActiveProSubscriber(supabase, auth.user.id);
+    const isPro = isDevBillingBypassEnabled() || (await isActiveProSubscriber(supabase, auth.user.id));
     const tier: AiPlanTier = isPro ? "pro" : "free";
     const quota = await checkAiQuota({ supabase, userId: auth.user.id, tier });
     const accessMode = getAiAssistantAccessMode();

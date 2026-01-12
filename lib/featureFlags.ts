@@ -1,5 +1,11 @@
 export type AiAssistantAccessMode = "off" | "pro" | "all";
 
+const normalizeBoolean = (value: string | undefined | null) => {
+  const raw = (value ?? "").trim().toLowerCase();
+  if (!raw) return false;
+  return raw === "1" || raw === "true" || raw === "yes" || raw === "on" || raw === "enabled";
+};
+
 const normalizeAiAssistantAccessMode = (value: string | undefined | null): AiAssistantAccessMode => {
   const raw = (value ?? "").trim().toLowerCase();
   if (!raw) return "pro";
@@ -14,3 +20,5 @@ export const getAiAssistantAccessMode = (): AiAssistantAccessMode =>
 
 export const getAiAssistantUpgradeHref = () => "/settings?tab=billing";
 
+export const isDevBillingBypassEnabled = () =>
+  process.env.NODE_ENV !== "production" && normalizeBoolean(process.env.NEXT_PUBLIC_DEV_BYPASS_BILLING);
