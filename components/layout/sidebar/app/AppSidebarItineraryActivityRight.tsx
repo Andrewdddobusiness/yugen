@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 
@@ -25,7 +25,7 @@ import ImagesCarousel from "@/components/carousel/ImagesCarousel";
 import Rating from "@/components/rating/Rating";
 import { Skeleton } from "@/components/ui/skeleton";
 
-import { Globe, Clock, Loader2, X, Phone, ImageOff } from "lucide-react";
+import { Globe, Clock, Loader2, X, Phone, ImageOff, Link2 } from "lucide-react";
 
 import { capitalizeFirstLetterOfEachWord } from "@/utils/formatting/capitalise";
 
@@ -48,7 +48,7 @@ export function AppSidebarItineraryActivityRight() {
   // **** STORES ****
   const { setIsSidebarRightOpen } = useSidebarStore();
   const { selectedActivity } = useActivitiesStore();
-  const { insertItineraryActivity, removeItineraryActivity, isActivityAdded } = useItineraryActivityStore();
+  const { insertItineraryActivity, removeItineraryActivity, isActivityAdded, itineraryActivities } = useItineraryActivityStore();
 
   const isAdded = isActivityAdded(selectedActivity?.place_id || "");
 
@@ -58,6 +58,26 @@ export function AppSidebarItineraryActivityRight() {
   const { open, toggleSidebar } = useSidebar();
   const { setTempMarker } = useMapStore();
   const { isSidebarRightOpen } = useSidebarStore();
+
+  const sourceAttributions = useMemo(() => {
+    const placeId = String(selectedActivity?.place_id ?? "").trim();
+    if (!placeId) return [];
+    const rows = Array.isArray(itineraryActivities) ? itineraryActivities : [];
+    const matches = rows.filter((row: any) => row?.deleted_at == null && row?.activity?.place_id === placeId);
+    const flat = matches.flatMap((row: any) => (Array.isArray(row?.sources) ? row.sources : []));
+
+    const seen = new Set<string>();
+    const out: any[] = [];
+    for (const entry of flat) {
+      const src = (entry as any)?.itinerary_source;
+      const key = String(src?.itinerary_source_id ?? src?.canonical_url ?? "");
+      if (!key || seen.has(key)) continue;
+      seen.add(key);
+      out.push(entry);
+    }
+
+    return out;
+  }, [itineraryActivities, selectedActivity?.place_id]);
 
   useEffect(() => {
     if (isSidebarRightOpen && open === false) {
@@ -301,6 +321,60 @@ export function AppSidebarItineraryActivityRight() {
                 </div>
 
                 <Separator />
+
+                {sourceAttributions.length > 0 ? (
+                  <>
+                    <div className="flex flex-row items-center hover:bg-gray-50 text-md">
+                      <div className="p-4">
+                        <Link2 size={20} />
+                      </div>
+                      <Accordion type="single" collapsible className="w-full">
+                        <AccordionItem value="item-source">
+                          <AccordionTrigger>Source</AccordionTrigger>
+                          <AccordionContent className="flex flex-col w-full gap-4">
+                            {sourceAttributions.map((row: any) => {
+                              const source = row?.itinerary_source ?? null;
+                              const url = String(source?.canonical_url ?? source?.url ?? "").trim();
+                              const title = String(source?.title ?? "").trim() || url;
+                              const provider = String(source?.provider ?? "web");
+                              const embedUrl = typeof source?.embed_url === "string" ? source.embed_url : "";
+                              const snippet = typeof row?.snippet === "string" ? row.snippet : "";
+
+                              return (
+                                <div key={String(source?.itinerary_source_id ?? url)} className="flex flex-col gap-1">
+                                  <div className="text-xs font-semibold text-zinc-500">{provider.toUpperCase()}</div>
+                                  {url ? (
+                                    <Link href={url} target="_blank" rel="noopener noreferrer" className="text-sm hover:underline">
+                                      {title}
+                                    </Link>
+                                  ) : (
+                                    <div className="text-sm">{title}</div>
+                                  )}
+                                  {snippet ? <div className="text-xs text-zinc-600">{snippet}</div> : null}
+
+                                  {provider === "youtube" && embedUrl ? (
+                                    <div className="mt-2 overflow-hidden rounded-xl border border-stroke-200/70 bg-bg-50">
+                                      <iframe
+                                        src={embedUrl}
+                                        title={title}
+                                        className="w-full h-[200px]"
+                                        loading="lazy"
+                                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                                        referrerPolicy="strict-origin-when-cross-origin"
+                                        sandbox="allow-scripts allow-same-origin allow-presentation"
+                                      />
+                                    </div>
+                                  ) : null}
+                                </div>
+                              );
+                            })}
+                          </AccordionContent>
+                        </AccordionItem>
+                      </Accordion>
+                    </div>
+                    <Separator />
+                  </>
+                ) : null}
 
                 {loading ? (
                   <div className="mt-4">

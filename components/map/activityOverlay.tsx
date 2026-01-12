@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 
@@ -13,7 +13,7 @@ import ImagesCarousel from "@/components/carousel/ImagesCarousel";
 import Rating from "@/components/rating/Rating";
 import { Skeleton } from "@/components/ui/skeleton";
 
-import { Globe, Clock, Loader2, X, Phone, ImageOff, MapPin } from "lucide-react";
+import { Globe, Clock, Loader2, X, Phone, ImageOff, MapPin, Link2 } from "lucide-react";
 import { capitalizeFirstLetterOfEachWord } from "@/utils/formatting/capitalise";
 import { formatOpenHours } from "@/utils/formatting/datetime";
 
@@ -34,13 +34,33 @@ const getDayName = (dayNumber: number) => {
 export function ActivityOverlay({ onClose }: ActivityOverlayProps) {
   let { itineraryId, destinationId } = useParams();
   const { selectedActivity, setSelectedActivity } = useActivitiesStore();
-  const { insertItineraryActivity, addItineraryActivityInstance, removeItineraryActivity, isActivityAdded } =
+  const { insertItineraryActivity, addItineraryActivityInstance, removeItineraryActivity, isActivityAdded, itineraryActivities } =
     useItineraryActivityStore();
   const [loading, setLoading] = useState<boolean>(false);
   const [detailsLoading, setDetailsLoading] = useState(false);
 
   const isAdded = isActivityAdded(selectedActivity?.place_id || "");
   const isBusy = loading || detailsLoading;
+
+  const sourceAttributions = useMemo(() => {
+    const placeId = String(selectedActivity?.place_id ?? "").trim();
+    if (!placeId) return [];
+    const rows = Array.isArray(itineraryActivities) ? itineraryActivities : [];
+    const matches = rows.filter((row: any) => row?.deleted_at == null && row?.activity?.place_id === placeId);
+    const flat = matches.flatMap((row: any) => (Array.isArray(row?.sources) ? row.sources : []));
+
+    const seen = new Set<string>();
+    const out: any[] = [];
+    for (const entry of flat) {
+      const src = (entry as any)?.itinerary_source;
+      const key = String(src?.itinerary_source_id ?? src?.canonical_url ?? "");
+      if (!key || seen.has(key)) continue;
+      seen.add(key);
+      out.push(entry);
+    }
+
+    return out;
+  }, [itineraryActivities, selectedActivity?.place_id]);
 
   useEffect(() => {
     if (!selectedActivity?.place_id) return;
@@ -277,6 +297,59 @@ export function ActivityOverlay({ onClose }: ActivityOverlayProps) {
                       <AccordionContent className="pl-6 pt-2">{renderOpeningHours()}</AccordionContent>
                     </AccordionItem>
                   </Accordion>
+
+                  {sourceAttributions.length > 0 ? (
+                    <Accordion type="single" collapsible className="w-full">
+                      <AccordionItem value="sources">
+                        <AccordionTrigger className="flex gap-2 text-sm p-0">
+                          <div className="flex items-center gap-2 text-sm">
+                            <Link2 className="h-4 w-4" />
+                            <span className="text-sm font-normal">Source</span>
+                          </div>
+                        </AccordionTrigger>
+                        <AccordionContent className="pl-6 pt-2 space-y-3">
+                          {sourceAttributions.map((row: any) => {
+                            const source = row?.itinerary_source ?? null;
+                            const url = String(source?.canonical_url ?? source?.url ?? "").trim();
+                            const title = String(source?.title ?? "").trim() || url;
+                            const provider = String(source?.provider ?? "web");
+                            const embedUrl = typeof source?.embed_url === "string" ? source.embed_url : "";
+                            const snippet = typeof row?.snippet === "string" ? row.snippet : "";
+
+                            return (
+                              <div key={String(source?.itinerary_source_id ?? url)} className="space-y-1">
+                                <div className="text-xs font-semibold text-gray-600">
+                                  {provider.toUpperCase()}
+                                </div>
+                                {url ? (
+                                  <Link href={url} target="_blank" rel="noopener noreferrer" className="text-sm hover:underline">
+                                    {title}
+                                  </Link>
+                                ) : (
+                                  <div className="text-sm">{title}</div>
+                                )}
+                                {snippet ? <div className="text-xs text-gray-600">{snippet}</div> : null}
+
+                                {provider === "youtube" && embedUrl ? (
+                                  <div className="mt-2 overflow-hidden rounded-xl border border-stroke-200/70 bg-bg-50">
+                                    <iframe
+                                      src={embedUrl}
+                                      title={title}
+                                      className="w-full h-[180px]"
+                                      loading="lazy"
+                                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                                      referrerPolicy="strict-origin-when-cross-origin"
+                                      sandbox="allow-scripts allow-same-origin allow-presentation"
+                                    />
+                                  </div>
+                                ) : null}
+                              </div>
+                            );
+                          })}
+                        </AccordionContent>
+                      </AccordionItem>
+                    </Accordion>
+                  ) : null}
                 </div>
               </div>
 

@@ -149,6 +149,13 @@ export const PlanRequestSchema = z.object({
   draftOperations: z.array(OperationSchema).max(25).optional(),
 });
 
+export const ImportRequestSchema = z.object({
+  mode: z.literal("import"),
+  itineraryId: ItineraryIdSchema,
+  destinationId: DestinationIdSchema,
+  message: z.string().trim().min(1, "Message is required").max(2000, "Message is too long"),
+});
+
 export const ApplyRequestSchema = z.object({
   mode: z.literal("apply"),
   itineraryId: ItineraryIdSchema,
@@ -162,6 +169,7 @@ export const ApplyRequestSchema = z.object({
 
 export const ItineraryAssistantRequestSchema = z.discriminatedUnion("mode", [
   PlanRequestSchema,
+  ImportRequestSchema,
   ApplyRequestSchema,
 ]);
 
@@ -179,6 +187,27 @@ export type PlanResponsePayload = {
   operations: Operation[];
   previewLines: string[];
   requiresConfirmation: boolean;
+};
+
+export type ImportSourcePreview = {
+  provider: "youtube" | "tiktok" | "instagram" | "tripadvisor" | "web";
+  url: string;
+  canonicalUrl: string;
+  externalId?: string;
+  title?: string;
+  thumbnailUrl?: string;
+  embedUrl?: string;
+  blocked?: boolean;
+  blockedReason?: string;
+};
+
+export type ImportResponsePayload = {
+  assistantMessage: string;
+  operations: Array<Extract<Operation, { op: "add_place" }>>;
+  previewLines: string[];
+  requiresConfirmation: boolean;
+  sources: ImportSourcePreview[];
+  pendingClarificationsCount?: number;
 };
 
 export type ApplyResponsePayload = {

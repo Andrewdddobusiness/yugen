@@ -10,10 +10,24 @@ export type LinkImportAttribution = {
   timestampSeconds?: number | null;
 };
 
+export type LinkImportClarificationOption = {
+  placeId: string;
+  name: string;
+  address?: string;
+};
+
+export type LinkImportPendingClarification = {
+  query: string;
+  sourceCanonicalUrl: string;
+  evidence?: string;
+  options: LinkImportClarificationOption[];
+};
+
 export type ResolveCandidatesResult = {
   operations: Array<Extract<Operation, { op: "add_place" }>>;
   attributions: LinkImportAttribution[];
   clarifications: string[];
+  pendingClarifications: LinkImportPendingClarification[];
   dropped: number;
 };
 
@@ -112,6 +126,7 @@ export async function resolveLinkImportCandidates(args: {
   const operations: Array<Extract<Operation, { op: "add_place" }>> = [];
   const attributionsByPlaceId = new Map<string, LinkImportAttribution[]>();
   const clarifications: string[] = [];
+  const pendingClarifications: LinkImportPendingClarification[] = [];
 
   let dropped = 0;
 
@@ -167,6 +182,25 @@ export async function resolveLinkImportCandidates(args: {
         address: typeof (entry.row as any)?.address === "string" ? (entry.row as any).address : undefined,
       }));
       clarifications.push(makeClarification(query, cityLabel, options));
+      if (pendingClarifications.length === 0 && options.length > 0) {
+        pendingClarifications.push({
+          query,
+          sourceCanonicalUrl: candidate.sourceCanonicalUrl,
+          evidence: candidate.evidence,
+          options: ranked.slice(0, 3).flatMap((entry) => {
+            const placeIdRaw = String((entry.row as any)?.place_id ?? "");
+            const placeId = placeIdRaw ? normalizePlaceId(placeIdRaw) : "";
+            if (!placeId) return [];
+            return [
+              {
+                placeId,
+                name: String((entry.row as any)?.name ?? "Unknown"),
+                address: typeof (entry.row as any)?.address === "string" ? (entry.row as any).address : undefined,
+              },
+            ];
+          }),
+        });
+      }
       dropped += 1;
       continue;
     }
@@ -198,7 +232,7 @@ export async function resolveLinkImportCandidates(args: {
     operations,
     attributions,
     clarifications: clarifications.slice(0, 5),
+    pendingClarifications,
     dropped,
   };
 }
-

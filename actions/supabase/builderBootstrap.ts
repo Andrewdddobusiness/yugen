@@ -148,6 +148,59 @@ export async function fetchBuilderBootstrap(
         return Array.isArray(activitiesWithActors) ? normalizeBootstrapActivities(activitiesWithActors) : [];
       };
 
+      const attachActivitySources = async (activities: any[]) => {
+        const activityIds = Array.from(
+          new Set(
+            (activities ?? [])
+              .map((row: any) => row?.itinerary_activity_id)
+              .filter((id: any) => id != null)
+              .map((id: any) => String(id))
+              .filter(Boolean)
+          )
+        );
+
+        if (activityIds.length === 0) return activities;
+
+        try {
+          const { data: rows, error } = await supabase
+            .from("itinerary_activity_source")
+            .select(
+              "itinerary_activity_id,snippet,timestamp_seconds,itinerary_source:itinerary_source(itinerary_source_id,provider,url,canonical_url,external_id,title,thumbnail_url,embed_url)"
+            )
+            .in("itinerary_activity_id", activityIds)
+            .limit(5000);
+
+          if (error) {
+            const code = String((error as any)?.code ?? "");
+            if (code === "42P01") return activities; // table missing (migration not applied yet)
+            console.warn("Failed to load activity source attributions:", error);
+            return activities;
+          }
+
+          const byActivityId = new Map<string, any[]>();
+          for (const row of rows ?? []) {
+            const id = String((row as any)?.itinerary_activity_id ?? "");
+            if (!id) continue;
+            const list = byActivityId.get(id) ?? [];
+            list.push(row);
+            byActivityId.set(id, list);
+          }
+
+          return (activities ?? []).map((row: any) => {
+            const id = String(row?.itinerary_activity_id ?? "");
+            return {
+              ...row,
+              sources: id ? byActivityId.get(id) ?? [] : [],
+            };
+          });
+        } catch (error: any) {
+          const code = String(error?.code ?? "");
+          if (code === "42P01") return activities;
+          console.warn("Failed to load activity source attributions:", error);
+          return activities;
+        }
+      };
+
       const fetchAllSlots = async () => {
         const slotSelectWithActors =
           "itinerary_slot_id,itinerary_id,itinerary_destination_id,date,start_time,end_time,primary_itinerary_activity_id,created_by,updated_by,created_at,updated_at,deleted_at";
@@ -294,6 +347,8 @@ export async function fetchBuilderBootstrap(
           }
         }
 
+        normalizedActivities = await attachActivitySources(normalizedActivities);
+
         const slotsAll = await fetchAllSlots();
         const slotOptionsAll = await fetchSlotOptionsForSlots(
           slotsAll.map((slot: any) => slot?.itinerary_slot_id).filter((id: any) => id != null)
@@ -373,12 +428,16 @@ export async function fetchBuilderBootstrap(
             return { success: false, message: "Failed to load activities", error: activitiesFallbackError };
           }
 
+          const withSources = await attachActivitySources(
+            Array.isArray(activitiesFallback) ? normalizeBootstrapActivities(activitiesFallback) : []
+          );
+
           return {
             success: true,
             data: {
               itinerary: null,
               destination: destinationRow ?? null,
-              activities: Array.isArray(activitiesFallback) ? normalizeBootstrapActivities(activitiesFallback) : [],
+              activities: withSources,
               customEvents: fallbackCustomEvents,
               slots: [],
               slotOptions: [],
@@ -388,12 +447,16 @@ export async function fetchBuilderBootstrap(
           };
         }
 
+        const withSources = await attachActivitySources(
+          Array.isArray(activitiesWithActors) ? normalizeBootstrapActivities(activitiesWithActors) : []
+        );
+
         return {
           success: true,
           data: {
             itinerary: null,
             destination: destinationRow ?? null,
-            activities: Array.isArray(activitiesWithActors) ? normalizeBootstrapActivities(activitiesWithActors) : [],
+            activities: withSources,
             customEvents: fallbackCustomEvents,
             slots: [],
             slotOptions: [],

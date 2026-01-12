@@ -42,6 +42,34 @@ type PlanResponse = {
   requiresConfirmation: boolean;
 };
 
+type ImportSource = {
+  provider: "youtube" | "tiktok" | "instagram" | "tripadvisor" | "web";
+  url: string;
+  canonicalUrl: string;
+  externalId?: string;
+  title?: string;
+  thumbnailUrl?: string;
+  embedUrl?: string;
+  blocked?: boolean;
+  blockedReason?: string;
+};
+
+type DraftSourcesPreview = {
+  sources: ImportSource[];
+  pendingClarificationsCount?: number;
+};
+
+type ImportResponse = {
+  ok: true;
+  mode: "import";
+  assistantMessage: string;
+  operations: Operation[];
+  previewLines: string[];
+  requiresConfirmation: boolean;
+  sources: ImportSource[];
+  pendingClarificationsCount?: number;
+};
+
 type ApplyResponse = {
   ok: true;
   mode: "apply";
@@ -55,6 +83,7 @@ type HistoryResponse = {
   messages: ChatMessage[];
   summary?: string | null;
   draftOperations?: Operation[] | null;
+  draftSources?: DraftSourcesPreview | null;
 };
 
 type ErrorResponse = {
@@ -74,6 +103,47 @@ const examples = [
   "Clear the notes for the bakery on Monday.",
   "Remove the sandwich shop from the itinerary.",
 ];
+
+const URL_REGEX = /\bhttps?:\/\/[^\s<>"']+/gi;
+const TRAILING_PUNCTUATION = new Set([")", "]", "}", ".", ",", "!", "?", ":", ";"]);
+
+const trimTrailingPunctuation = (url: string) => {
+  let value = String(url ?? "").trim();
+  while (value.length > 0) {
+    const last = value[value.length - 1];
+    if (!TRAILING_PUNCTUATION.has(last)) break;
+    value = value.slice(0, -1);
+  }
+  return value;
+};
+
+const extractUrlsFromText = (text: string, max = 3): string[] => {
+  const input = String(text ?? "");
+  const matches = input.match(URL_REGEX) ?? [];
+  const out: string[] = [];
+  const seen = new Set<string>();
+
+  for (const match of matches) {
+    const url = trimTrailingPunctuation(match);
+    if (!url) continue;
+    if (seen.has(url)) continue;
+    seen.add(url);
+    out.push(url);
+    if (out.length >= max) break;
+  }
+
+  return out;
+};
+
+const looksLikeImportClarificationReply = (text: string) => {
+  const trimmed = String(text ?? "").trim();
+  if (!trimmed) return false;
+  if (/^\d{1,2}$/.test(trimmed)) return true;
+  if (/place_id[:=]/i.test(trimmed)) return true;
+  if (/google\.com\/maps/i.test(trimmed)) return true;
+  if (/maps\.app\.goo\.gl/i.test(trimmed)) return true;
+  return false;
+};
 
 const formatTime12h = (value: string | null | undefined) => {
   if (!value) return null;
@@ -161,6 +231,99 @@ const formatDateLabel = (isoDate: string) => {
   }
 };
 
+const getProviderLabel = (provider: ImportSource["provider"]) => {
+  switch (provider) {
+    case "youtube":
+      return "YouTube";
+    case "tiktok":
+      return "TikTok";
+    case "instagram":
+      return "Instagram";
+    case "tripadvisor":
+      return "TripAdvisor";
+    default:
+      return "Web";
+  }
+};
+
+function SourcePreviewCard(props: { source: ImportSource }) {
+  const { source } = props;
+
+  const title = source.title?.trim() || (() => {
+    try {
+      return new URL(source.canonicalUrl).hostname;
+    } catch {
+      return source.canonicalUrl;
+    }
+  })();
+
+  const shouldEmbed =
+    !!source.embedUrl && (source.provider === "youtube" || source.provider === "tiktok" || source.provider === "instagram");
+
+  return (
+    <div className="rounded-xl border border-stroke-200/70 bg-bg-0 p-3">
+      <div className="flex gap-3">
+        {source.thumbnailUrl ? (
+          <img
+            src={source.thumbnailUrl}
+            alt=""
+            className="h-14 w-14 rounded-xl object-cover border border-stroke-200/70 bg-bg-50 shrink-0"
+            loading="lazy"
+            referrerPolicy="no-referrer"
+          />
+        ) : (
+          <div className="h-14 w-14 rounded-xl border border-stroke-200/70 bg-bg-50 shrink-0" />
+        )}
+
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] font-semibold text-ink-700 bg-bg-50 border border-stroke-200/70 rounded-full px-2 py-0.5">
+              {getProviderLabel(source.provider)}
+            </span>
+            {source.blocked ? (
+              <span
+                className="text-[11px] font-semibold text-coral-700 bg-coral-500/10 border border-coral-500/20 rounded-full px-2 py-0.5"
+                title={source.blockedReason ?? "Blocked"}
+              >
+                Blocked
+              </span>
+            ) : null}
+          </div>
+
+          <div className="mt-1 text-sm font-semibold text-ink-900 truncate" title={title}>
+            {title}
+          </div>
+
+          <div className="mt-1">
+            <a
+              href={source.canonicalUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs text-brand-600 hover:underline"
+            >
+              Open source
+            </a>
+          </div>
+        </div>
+      </div>
+
+      {shouldEmbed ? (
+        <div className="mt-3 overflow-hidden rounded-xl border border-stroke-200/70 bg-bg-50">
+          <iframe
+            src={source.embedUrl}
+            title={title}
+            className="w-full h-[220px]"
+            loading="lazy"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+            referrerPolicy="strict-origin-when-cross-origin"
+            sandbox="allow-scripts allow-same-origin allow-presentation"
+          />
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function ItineraryAssistantChat(props: {
   itineraryId: string;
   destinationId: string;
@@ -176,7 +339,9 @@ function ItineraryAssistantChat(props: {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [draftPlan, setDraftPlan] = useState<{ operations: Operation[]; requiresConfirmation: boolean } | null>(null);
+  const [draftSources, setDraftSources] = useState<DraftSourcesPreview | null>(null);
   const [planning, setPlanning] = useState(false);
+  const [importing, setImporting] = useState(false);
   const [applying, setApplying] = useState(false);
   const [dismissing, setDismissing] = useState(false);
   const [historyLoading, setHistoryLoading] = useState(false);
@@ -189,13 +354,14 @@ function ItineraryAssistantChat(props: {
   const hasPendingOps = (draftPlan?.operations?.length ?? 0) > 0;
 
   const canSubmit = useMemo(() => {
-    if (planning || applying || dismissing) return false;
+    if (planning || importing || applying || dismissing) return false;
     return input.trim().length > 0;
-  }, [applying, dismissing, input, planning]);
+  }, [applying, dismissing, importing, input, planning]);
 
   useEffect(() => {
     setMessages([]);
     setDraftPlan(null);
+    setDraftSources(null);
     setError(null);
     setInput("");
     lastLoadedHistoryKeyRef.current = null;
@@ -206,7 +372,7 @@ function ItineraryAssistantChat(props: {
     setTimeout(() => {
       scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
     }, 0);
-  }, [isVisible, messages, draftPlan, planning, applying]);
+  }, [isVisible, messages, draftPlan, draftSources, planning, importing, applying]);
 
   useEffect(() => {
     if (!isVisible) return;
@@ -237,6 +403,16 @@ function ItineraryAssistantChat(props: {
           const requiresConfirmation =
             draftOps.some((op) => op.op === "remove_activity") || draftOps.length > 10;
           setDraftPlan({ operations: draftOps, requiresConfirmation });
+        }
+
+        const draftSourcesPayload = payload.draftSources;
+        if (draftSourcesPayload && Array.isArray(draftSourcesPayload.sources) && draftSourcesPayload.sources.length > 0) {
+          setDraftSources({
+            sources: draftSourcesPayload.sources,
+            pendingClarificationsCount: draftSourcesPayload.pendingClarificationsCount,
+          });
+        } else {
+          setDraftSources(null);
         }
       })
       .catch(() => {
@@ -278,10 +454,57 @@ function ItineraryAssistantChat(props: {
       } else {
         setDraftPlan(null);
       }
+      setDraftSources(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to plan changes.");
     } finally {
       setPlanning(false);
+    }
+  };
+
+  const requestImport = async (text: string) => {
+    setImporting(true);
+    setError(null);
+
+    try {
+      const res = await fetch("/api/ai/itinerary", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          mode: "import",
+          itineraryId,
+          destinationId,
+          message: text,
+        }),
+      });
+
+      const data = (await res.json()) as ImportResponse | ErrorResponse;
+      if (!("ok" in data) || data.ok !== true) {
+        const message = data?.error?.message ?? "Failed to import from link.";
+        throw new Error(message);
+      }
+
+      pushMessage({ role: "assistant", content: data.assistantMessage });
+
+      const sources = Array.isArray(data.sources) ? data.sources : [];
+      if (sources.length > 0) {
+        setDraftSources({
+          sources,
+          pendingClarificationsCount: data.pendingClarificationsCount,
+        });
+      } else {
+        setDraftSources(null);
+      }
+
+      if (Array.isArray(data.operations) && data.operations.length > 0) {
+        setDraftPlan({ operations: data.operations, requiresConfirmation: data.requiresConfirmation });
+      } else {
+        setDraftPlan(null);
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to import from link.");
+    } finally {
+      setImporting(false);
     }
   };
 
@@ -337,6 +560,7 @@ function ItineraryAssistantChat(props: {
       await queryClient.invalidateQueries({ queryKey: ["builderBootstrap", itineraryId, destinationId] });
       if (failures.length === 0) {
         setDraftPlan(null);
+        setDraftSources(null);
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to apply changes.");
@@ -355,6 +579,7 @@ function ItineraryAssistantChat(props: {
         { method: "DELETE" }
       );
       setDraftPlan(null);
+      setDraftSources(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to dismiss draft changes.");
     } finally {
@@ -369,7 +594,16 @@ function ItineraryAssistantChat(props: {
     const nextHistory = [...messages, { role: "user", content: text } satisfies ChatMessage];
     setMessages(nextHistory);
     setInput("");
-    await requestPlan(text);
+
+    const urls = extractUrlsFromText(text, 3);
+    const hasPendingClarifications = (draftSources?.pendingClarificationsCount ?? 0) > 0;
+    const shouldImport = urls.length > 0 || (hasPendingClarifications && looksLikeImportClarificationReply(text));
+
+    if (shouldImport) {
+      await requestImport(text);
+    } else {
+      await requestPlan(text);
+    }
   };
 
   const activityById = useMemo(() => {
@@ -564,9 +798,27 @@ function ItineraryAssistantChat(props: {
           </div>
         ))}
 
-        {planning || applying ? (
+        {planning || importing || applying ? (
           <div className="max-w-[92%] rounded-2xl px-3 py-2 text-sm leading-relaxed bg-bg-0 border border-stroke-200">
-            <span className="text-shimmer">{applying ? "Applying…" : "Thinking…"}</span>
+            <span className="text-shimmer">{applying ? "Applying…" : importing ? "Importing from link…" : "Thinking…"}</span>
+          </div>
+        ) : null}
+
+        {draftSources && draftSources.sources.length > 0 ? (
+          <div className="rounded-2xl border border-stroke-200 bg-bg-0 p-3">
+            <div className="flex items-center justify-between">
+              <div className="text-sm font-semibold text-ink-900">Sources</div>
+              {(draftSources.pendingClarificationsCount ?? 0) > 0 ? (
+                <span className="text-[11px] font-semibold text-coral-600 bg-coral-500/10 rounded-full px-2 py-0.5">
+                  Needs clarification
+                </span>
+              ) : null}
+            </div>
+            <div className="mt-3 space-y-2">
+              {draftSources.sources.map((source) => (
+                <SourcePreviewCard key={source.canonicalUrl} source={source} />
+              ))}
+            </div>
           </div>
         ) : null}
 
@@ -714,7 +966,7 @@ function ItineraryAssistantChat(props: {
             disabled={!canSubmit}
             title="Send"
           >
-            {planning ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5" />}
+            {planning || importing ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5" />}
           </Button>
         </div>
 

@@ -4,10 +4,12 @@ import { fetchBuilderBootstrap } from "@/actions/supabase/builderBootstrap";
 import { softDeleteTableData2 } from "@/actions/supabase/actions";
 import { addPlaceToItinerary } from "@/actions/supabase/activities";
 import { fetchCityCoordinates, fetchPlaceDetails, searchPlacesByText } from "@/actions/google/actions";
+import { extractPlaceCandidatesFromSources, resolveLinkImportCandidates, LinkImportDraftSourcesSchema } from "@/lib/ai/linkImport";
 import { planItineraryEdits } from "@/lib/ai/itinerary/planner";
 import { openaiEmbed } from "@/lib/ai/itinerary/openai";
 import { checkAiQuota, recordAiUsage } from "@/lib/ai/usage";
 import { getAiAssistantAccessMode } from "@/lib/featureFlags";
+import { ingestUrlsFromMessage } from "@/lib/linkImport/server/providers";
 import { rateLimit, rateLimitHeaders } from "@/lib/security/rateLimit";
 import { getClientIp, isSameOrigin } from "@/lib/security/requestGuards";
 import {
@@ -18,6 +20,7 @@ import {
   type ProposedOperation,
   type Operation,
   type PlanResponsePayload,
+  type ImportResponsePayload,
   type ApplyResponsePayload,
 } from "@/lib/ai/itinerary/schema";
 import {
@@ -31,7 +34,7 @@ import {
   mergeChatContext,
   startAiItineraryRun,
   startAiItineraryRunStep,
-  updateAiItineraryThreadDraft,
+  updateAiItineraryThreadDraftAndSources,
   updateAiItineraryThreadSummary,
 } from "@/lib/ai/itinerary/chatStore";
 import { summarizeItineraryChat } from "@/lib/ai/itinerary/summarizer";
@@ -137,20 +140,49 @@ export async function GET(request: NextRequest) {
     const access = await requireAiAssistantAccess(supabase, auth.user.id);
     if (!access.ok) return respond(access.response);
 
-    let thread: { ai_itinerary_thread_id: string; summary: string | null; draft: unknown | null } | null = null;
+    const isMissingColumn = (err: any, column: string) => {
+      if (!err) return false;
+      const code = String(err.code ?? "");
+      if (code !== "42703") return false;
+      const message = String(err.message ?? "").toLowerCase();
+      return message.includes(column.toLowerCase());
+    };
+
+    let thread:
+      | { ai_itinerary_thread_id: string; summary: string | null; draft: unknown | null; draft_sources?: unknown | null }
+      | null = null;
     try {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from("ai_itinerary_thread")
-        .select("ai_itinerary_thread_id,summary,draft")
+        .select("ai_itinerary_thread_id,summary,draft,draft_sources")
         .eq("itinerary_id", Number(itineraryId))
         .eq("itinerary_destination_id", Number(destinationId))
         .maybeSingle();
+
+      if (error && isMissingColumn(error, "draft_sources")) {
+        const { data: fallbackData } = await supabase
+          .from("ai_itinerary_thread")
+          .select("ai_itinerary_thread_id,summary,draft")
+          .eq("itinerary_id", Number(itineraryId))
+          .eq("itinerary_destination_id", Number(destinationId))
+          .maybeSingle();
+
+        if (fallbackData?.ai_itinerary_thread_id) {
+          thread = {
+            ai_itinerary_thread_id: String((fallbackData as any).ai_itinerary_thread_id),
+            summary: (fallbackData as any).summary ?? null,
+            draft: (fallbackData as any).draft ?? null,
+            draft_sources: null,
+          };
+        }
+      }
 
       if (data?.ai_itinerary_thread_id) {
         thread = {
           ai_itinerary_thread_id: String((data as any).ai_itinerary_thread_id),
           summary: (data as any).summary ?? null,
           draft: (data as any).draft ?? null,
+          draft_sources: (data as any).draft_sources ?? null,
         };
       }
     } catch {
@@ -173,6 +205,24 @@ export async function GET(request: NextRequest) {
         .map((row) => ({ role: row.role, content: row.content }));
 
       const draftParsed = OperationSchema.array().max(25).safeParse(thread.draft);
+      const draftSourcesParsed = LinkImportDraftSourcesSchema.safeParse(thread.draft_sources);
+      const draftSources = draftSourcesParsed.success ? draftSourcesParsed.data : null;
+      const draftSourcesPreview = draftSources
+        ? {
+            sources: draftSources.sources.map((source) => ({
+              provider: source.provider,
+              url: source.url,
+              canonicalUrl: source.canonicalUrl,
+              externalId: source.externalId,
+              title: source.title,
+              thumbnailUrl: source.thumbnailUrl,
+              embedUrl: source.embedUrl,
+              blocked: source.blocked,
+              blockedReason: source.blockedReason,
+            })),
+            pendingClarificationsCount: (draftSources.pendingClarifications ?? []).length,
+          }
+        : null;
 
       return respond(
         NextResponse.json({
@@ -181,6 +231,7 @@ export async function GET(request: NextRequest) {
           summary: thread.summary ?? null,
           messages,
           draftOperations: draftParsed.success ? draftParsed.data : null,
+          draftSources: draftSourcesPreview,
         })
       );
     } catch (error) {
@@ -247,11 +298,22 @@ export async function DELETE(request: NextRequest) {
     const access = await requireAiAssistantAccess(supabase, auth.user.id);
     if (!access.ok) return respond(access.response);
 
-    await supabase
+    const { error: clearError } = await supabase
       .from("ai_itinerary_thread")
-      .update({ draft: null })
+      .update({ draft: null, draft_sources: null })
       .eq("itinerary_id", Number(itineraryId))
       .eq("itinerary_destination_id", Number(destinationId));
+
+    const missingDraftSources =
+      String((clearError as any)?.code ?? "") === "42703" &&
+      String((clearError as any)?.message ?? "").toLowerCase().includes("draft_sources");
+    if (missingDraftSources) {
+      await supabase
+        .from("ai_itinerary_thread")
+        .update({ draft: null })
+        .eq("itinerary_id", Number(itineraryId))
+        .eq("itinerary_destination_id", Number(destinationId));
+    }
 
     return respond(NextResponse.json({ ok: true }));
   } finally {
@@ -715,6 +777,7 @@ export async function POST(request: NextRequest) {
     let threadId: string;
     let threadSummary: string | null = null;
     let threadDraft: Operation[] = [];
+    let threadDraftSources: unknown | null = null;
     try {
       const thread = await getOrCreateAiItineraryThread({
         supabase,
@@ -727,6 +790,7 @@ export async function POST(request: NextRequest) {
       threadDraft = OperationSchema.array().max(25).safeParse(thread.draft).success
         ? (OperationSchema.array().max(25).parse(thread.draft) as any)
         : [];
+      threadDraftSources = (thread as any).draft_sources ?? null;
     } catch (error) {
       console.error("Failed to create AI chat thread:", error);
       return jsonErrorTimed(500, "chat_store_failed", "Something went wrong. Please try again.");
@@ -963,8 +1027,14 @@ export async function POST(request: NextRequest) {
       // Persist the draft only if the model produced a concrete updated plan.
       if (resolvedOperations.length > 0 && resolvedOperations.length <= MAX_OPERATIONS) {
         try {
-          await updateAiItineraryThreadDraft({ supabase, threadId, draft: resolvedOperations });
+          await updateAiItineraryThreadDraftAndSources({
+            supabase,
+            threadId,
+            draft: resolvedOperations,
+            draftSources: null,
+          });
           threadDraft = resolvedOperations;
+          threadDraftSources = null;
         } catch (error) {
           console.warn("Failed to persist AI chat draft:", error);
         }
@@ -1064,8 +1134,543 @@ export async function POST(request: NextRequest) {
     }
   }
 
+  if (parsed.data.mode === "import") {
+    const embeddingModel = process.env.OPENAI_EMBEDDING_MODEL ?? "text-embedding-3-small";
+    const userText = parsed.data.message.trim();
+
+    if (!quota.allowed) {
+      if (runId) {
+        await finishAiItineraryRun({
+          supabase,
+          runId,
+          status: "failed",
+          error: { code: "quota_exceeded" },
+        });
+      }
+
+      return jsonErrorTimed(429, "ai_quota_exceeded", "You’ve reached your monthly AI usage limit.", {
+        periodStart: quota.periodStart,
+        periodEnd: quota.periodEnd,
+        limit: quota.limit,
+        used: quota.used,
+      });
+    }
+
+    const destinationContext = {
+      city: typeof destination?.city === "string" ? destination.city : null,
+      country: typeof destination?.country === "string" ? destination.country : null,
+    };
+
+    const existingDraftSourcesParsed = LinkImportDraftSourcesSchema.safeParse(threadDraftSources);
+    const existingDraftSources = existingDraftSourcesParsed.success ? existingDraftSourcesParsed.data : null;
+
+    let contextStepId: number | null = null;
+    let fetchStepId: number | null = null;
+    let extractStepId: number | null = null;
+    let resolveStepId: number | null = null;
+
+    try {
+      let userEmbedding: number[] | null = null;
+      try {
+        const embedded = await openaiEmbed({ input: userText, model: embeddingModel });
+        userEmbedding = embedded.embedding;
+        await recordAiUsage({ userId: auth.user.id, feature: "itinerary_assistant", usage: embedded.usage });
+      } catch {
+        userEmbedding = null;
+      }
+
+      let userMessageId: number | null = null;
+      try {
+        userMessageId = await insertAiItineraryMessage({
+          supabase,
+          threadId,
+          role: "user",
+          content: userText,
+          metadata: { mode: "import" },
+          embedding: userEmbedding,
+          embeddingModel,
+        });
+      } catch (error) {
+        console.error("Failed to persist user import message:", error);
+      }
+
+      if (runId) {
+        const step = await startAiItineraryRunStep({
+          supabase,
+          runId,
+          kind: "context",
+          input: { userMessageId, hasEmbedding: !!userEmbedding },
+        }).catch(() => null);
+        contextStepId = step?.ai_itinerary_run_step_id ?? null;
+      }
+
+      if (runId) {
+        const step = await startAiItineraryRunStep({
+          supabase,
+          runId,
+          kind: "import_fetch",
+          input: { maxUrls: 3 },
+        }).catch(() => null);
+        fetchStepId = step?.ai_itinerary_run_step_id ?? null;
+      }
+
+      const ingested = await ingestUrlsFromMessage({ message: userText, maxUrls: 3 });
+
+      const providerCounts: Record<string, number> = {};
+      let blockedCount = 0;
+      for (const row of ingested) {
+        providerCounts[row.source.provider] = (providerCounts[row.source.provider] ?? 0) + 1;
+        if (row.debug?.blocked) blockedCount += 1;
+      }
+
+      if (fetchStepId) {
+        await finishAiItineraryRunStep({
+          supabase,
+          stepId: fetchStepId,
+          status: "succeeded",
+          output: {
+            ingestedCount: ingested.length,
+            providerCounts,
+            blockedCount,
+          },
+        });
+      }
+
+      const sourcesForPreview: ImportResponsePayload["sources"] = (existingDraftSources?.sources ?? []).map((source) => ({
+        provider: source.provider,
+        url: source.url,
+        canonicalUrl: source.canonicalUrl,
+        externalId: source.externalId,
+        title: source.title,
+        thumbnailUrl: source.thumbnailUrl,
+        embedUrl: source.embedUrl,
+        blocked: source.blocked,
+        blockedReason: source.blockedReason,
+      }));
+
+      const respondImport = async (payload: ImportResponsePayload, draftSourcesToPersist: unknown | null) => {
+        try {
+          let assistantEmbedding: number[] | null = null;
+          try {
+            const embedded = await openaiEmbed({ input: payload.assistantMessage, model: embeddingModel });
+            assistantEmbedding = embedded.embedding;
+            await recordAiUsage({ userId: auth.user.id, feature: "itinerary_assistant", usage: embedded.usage });
+          } catch {
+            assistantEmbedding = null;
+          }
+
+          await insertAiItineraryMessage({
+            supabase,
+            threadId,
+            role: "assistant",
+            content: payload.assistantMessage,
+            metadata: {
+              mode: "import",
+              previewLines: payload.previewLines,
+              operationCount: payload.operations.length,
+              sourceCount: payload.sources.length,
+            },
+            embedding: assistantEmbedding,
+            embeddingModel,
+          });
+        } catch (error) {
+          console.error("Failed to persist assistant import message:", error);
+        }
+
+        try {
+          const draftToPersist = payload.operations.length > 0 ? payload.operations : null;
+          await updateAiItineraryThreadDraftAndSources({
+            supabase,
+            threadId,
+            draft: draftToPersist,
+            draftSources: draftSourcesToPersist,
+          });
+          threadDraft = payload.operations;
+          threadDraftSources = draftSourcesToPersist;
+        } catch (error) {
+          console.warn("Failed to persist import draft:", error);
+        }
+
+        if (contextStepId) {
+          await finishAiItineraryRunStep({
+            supabase,
+            stepId: contextStepId,
+            status: "succeeded",
+            output: { hasDraft: payload.operations.length > 0 },
+          });
+        }
+
+        if (runId) {
+          await finishAiItineraryRun({ supabase, runId, status: "succeeded" });
+        }
+
+        return respond(NextResponse.json({ ok: true, mode: "import", ...payload }));
+      };
+
+      // Follow-up clarification flow: user replies with an option number or a more specific query.
+      const followupText = userText.trim();
+      const followupNumberMatch = followupText.match(/^(\d{1,2})$/);
+      const followupPlaceId = extractPlaceIdFromText(followupText);
+      const hasPendingClarifications = (existingDraftSources?.pendingClarifications?.length ?? 0) > 0;
+      const isClarificationReply = !!followupNumberMatch || !!followupPlaceId || ingested.length === 0;
+
+      if (hasPendingClarifications && isClarificationReply) {
+        const pending = existingDraftSources!.pendingClarifications![0]!;
+        const remainingPending = (existingDraftSources?.pendingClarifications ?? []).slice(1);
+
+        const trimmed = followupText;
+        const numberMatch = followupNumberMatch;
+
+        const pickByIndex = (idx: number) => {
+          const option = pending.options[idx];
+          if (!option) return null;
+          return { placeId: normalizePlaceId(option.placeId), name: option.name };
+        };
+
+        const directPlaceId = followupPlaceId;
+
+        let resolvedOp: Extract<Operation, { op: "add_place" }> | null = null;
+        let resolvedAttributions: any[] = [];
+        let newPending: any[] = [];
+        const clarifications: string[] = [];
+
+        if (numberMatch) {
+          const idx = Number(numberMatch[1]) - 1;
+          const picked = Number.isFinite(idx) ? pickByIndex(idx) : null;
+          if (picked?.placeId) {
+            resolvedOp = {
+              op: "add_place",
+              placeId: picked.placeId,
+              query: pending.query,
+              name: picked.name,
+              date: null,
+            };
+            resolvedAttributions = [
+              {
+                placeId: picked.placeId,
+                sourceCanonicalUrl: pending.sourceCanonicalUrl,
+                snippet: pending.evidence,
+                timestampSeconds: null,
+              },
+            ];
+          } else {
+            clarifications.push(
+              `Please reply with 1–${pending.options.length} for “${pending.query}”, or paste a Google Maps link.`
+            );
+          }
+        } else if (directPlaceId) {
+          const normalized = normalizePlaceId(directPlaceId);
+          resolvedOp = {
+            op: "add_place",
+            placeId: normalized,
+            query: pending.query,
+            date: null,
+          };
+          resolvedAttributions = [
+            {
+              placeId: normalized,
+              sourceCanonicalUrl: pending.sourceCanonicalUrl,
+              snippet: pending.evidence,
+              timestampSeconds: null,
+            },
+          ];
+        } else {
+          if (runId) {
+            const step = await startAiItineraryRunStep({
+              supabase,
+              runId,
+              kind: "resolve",
+              input: { kind: "clarification_query", query: trimmed },
+            }).catch(() => null);
+            resolveStepId = step?.ai_itinerary_run_step_id ?? null;
+          }
+
+          const followupResolved = await resolveLinkImportCandidates({
+            destination: destinationContext,
+            candidates: [
+              {
+                sourceCanonicalUrl: pending.sourceCanonicalUrl,
+                query: trimmed,
+                evidence: pending.evidence ?? trimmed,
+                confidence: 1,
+              },
+            ],
+            maxOperations: 1,
+          });
+
+          resolvedOp = followupResolved.operations[0] ?? null;
+          resolvedAttributions = followupResolved.attributions;
+          newPending = followupResolved.pendingClarifications ?? [];
+          clarifications.push(...(followupResolved.clarifications ?? []));
+
+          if (resolveStepId) {
+            await finishAiItineraryRunStep({
+              supabase,
+              stepId: resolveStepId,
+              status: "succeeded",
+              output: {
+                resolvedCount: followupResolved.operations.length,
+                clarificationCount: followupResolved.clarifications.length,
+              },
+            });
+          }
+        }
+
+        const existingOps = Array.isArray(threadDraft) ? threadDraft : [];
+        const mergedOps: Array<Extract<Operation, { op: "add_place" }>> = [];
+        const seenPlaceIds = new Set<string>();
+
+        for (const op of existingOps) {
+          if (op.op !== "add_place") continue;
+          const pid = normalizePlaceId(String(op.placeId ?? ""));
+          if (!pid) continue;
+          if (seenPlaceIds.has(pid)) continue;
+          seenPlaceIds.add(pid);
+          mergedOps.push({ ...op, placeId: pid } as any);
+        }
+
+        if (resolvedOp?.placeId) {
+          const pid = normalizePlaceId(String(resolvedOp.placeId));
+          if (!seenPlaceIds.has(pid)) {
+            seenPlaceIds.add(pid);
+            mergedOps.push({ ...resolvedOp, placeId: pid });
+          }
+        }
+
+        if (mergedOps.length > 15) {
+          return respondImport(
+            {
+              assistantMessage: `That would add ${mergedOps.length} places, which exceeds the limit of 15. Please remove some items from the draft first.`,
+              operations: existingOps.filter((op) => op.op === "add_place").slice(0, 15) as any,
+              previewLines: buildPreviewLines(existingOps, activityById),
+              requiresConfirmation: true,
+              sources: sourcesForPreview,
+              pendingClarificationsCount: (existingDraftSources?.pendingClarifications ?? []).length,
+            },
+            existingDraftSources
+          );
+        }
+
+        const mergedAttributions = [
+          ...((existingDraftSources?.attributions ?? []) as any[]),
+          ...(Array.isArray(resolvedAttributions) ? resolvedAttributions : []),
+        ];
+
+        const draftSourcesToPersist = {
+          version: 1,
+          sources: existingDraftSources?.sources ?? [],
+          attributions: mergedAttributions,
+          pendingClarifications: resolvedOp ? [...remainingPending, ...newPending] : [...existingDraftSources!.pendingClarifications!],
+        };
+
+        const assistantParts: string[] = [];
+        if (resolvedOp?.placeId) {
+          assistantParts.push(
+            `Got it — I’ll add ${resolvedOp.name ?? resolvedOp.query ?? "that place"} as an unscheduled draft activity.`
+          );
+        }
+        if (clarifications.length > 0) assistantParts.push(...clarifications);
+        if (assistantParts.length === 0) assistantParts.push("Please reply with an option number, or paste a Google Maps link.");
+
+        const payload: ImportResponsePayload = {
+          assistantMessage: assistantParts.join("\n\n"),
+          operations: mergedOps,
+          previewLines: buildPreviewLines(mergedOps, activityById),
+          requiresConfirmation: mergedOps.length > CONFIRMATION_BATCH_THRESHOLD,
+          sources: sourcesForPreview,
+          pendingClarificationsCount: (draftSourcesToPersist.pendingClarifications ?? []).length,
+        };
+
+        return respondImport(payload, draftSourcesToPersist);
+      }
+
+      if (ingested.length === 0) {
+        const payload: ImportResponsePayload = {
+          assistantMessage:
+            "Paste up to 3 links (YouTube Shorts, TikTok, Instagram Reels, TripAdvisor, or a travel webpage) and I’ll extract places to add as unscheduled draft activities.",
+          operations: [],
+          previewLines: [],
+          requiresConfirmation: false,
+          sources: sourcesForPreview,
+          pendingClarificationsCount: (existingDraftSources?.pendingClarifications ?? []).length,
+        };
+        return respondImport(payload, existingDraftSources);
+      }
+
+      if (runId) {
+        const step = await startAiItineraryRunStep({
+          supabase,
+          runId,
+          kind: "extract",
+          input: { sourceCount: ingested.length },
+        }).catch(() => null);
+        extractStepId = step?.ai_itinerary_run_step_id ?? null;
+      }
+
+      const extracted = await extractPlaceCandidatesFromSources({
+        destination: destinationContext,
+        sources: ingested,
+        maxTokens: Math.max(1, Math.min(800, quota.remaining)),
+      });
+      await recordAiUsage({ userId: auth.user.id, feature: "itinerary_assistant", usage: extracted.usage });
+
+      const allowedCanonicalUrls = new Set(ingested.map((row) => row.source.canonicalUrl));
+      const candidates = extracted.data.candidates.filter((c) => allowedCanonicalUrls.has(c.sourceCanonicalUrl));
+
+      if (extractStepId) {
+        await finishAiItineraryRunStep({
+          supabase,
+          stepId: extractStepId,
+          status: "succeeded",
+          output: { candidateCount: candidates.length },
+        });
+      }
+
+      if (runId) {
+        const step = await startAiItineraryRunStep({
+          supabase,
+          runId,
+          kind: "resolve",
+          input: { candidateCount: candidates.length, maxOperations: 15 },
+        }).catch(() => null);
+        resolveStepId = step?.ai_itinerary_run_step_id ?? null;
+      }
+
+      const resolved = await resolveLinkImportCandidates({
+        destination: destinationContext,
+        candidates,
+        maxOperations: 15,
+      });
+
+      if (resolveStepId) {
+        await finishAiItineraryRunStep({
+          supabase,
+          stepId: resolveStepId,
+          status: "succeeded",
+          output: {
+            resolvedCount: resolved.operations.length,
+            dropped: resolved.dropped,
+            clarificationCount: resolved.clarifications.length,
+          },
+        });
+      }
+
+      const draftSourcesToPersist = {
+        version: 1,
+        sources: ingested.map((row) => ({
+          provider: row.source.provider,
+          url: row.source.url,
+          canonicalUrl: row.source.canonicalUrl,
+          externalId: row.source.externalId,
+          title: row.source.title,
+          thumbnailUrl: row.source.thumbnailUrl,
+          embedUrl: row.source.embedUrl,
+          rawMetadata: row.source.rawMetadata,
+          blocked: row.debug?.blocked,
+          blockedReason: row.debug?.reason,
+        })),
+        attributions: resolved.attributions,
+        pendingClarifications: resolved.pendingClarifications,
+      };
+
+      const messageParts = [extracted.data.assistantMessage];
+      if (resolved.dropped > 0) {
+        messageParts.push(`Note: I skipped ${resolved.dropped} item(s) I couldn't confidently match to a place.`);
+      }
+      if (resolved.clarifications.length > 0) {
+        messageParts.push(...resolved.clarifications);
+      }
+      if (resolved.operations.length === 0 && resolved.clarifications.length === 0) {
+        messageParts.push("I couldn't find any specific places to add. If you can, paste the caption/description text.");
+      }
+
+      const sourcesPreview: ImportResponsePayload["sources"] = draftSourcesToPersist.sources.map((source) => ({
+        provider: source.provider,
+        url: source.url,
+        canonicalUrl: source.canonicalUrl,
+        externalId: source.externalId,
+        title: source.title,
+        thumbnailUrl: source.thumbnailUrl,
+        embedUrl: source.embedUrl,
+        blocked: source.blocked,
+        blockedReason: source.blockedReason,
+      }));
+
+      const payload: ImportResponsePayload = {
+        assistantMessage: messageParts.join("\n\n"),
+        operations: resolved.operations,
+        previewLines: buildPreviewLines(resolved.operations, activityById),
+        requiresConfirmation: resolved.operations.length > CONFIRMATION_BATCH_THRESHOLD,
+        sources: sourcesPreview,
+        pendingClarificationsCount: (draftSourcesToPersist.pendingClarifications ?? []).length,
+      };
+
+      return respondImport(payload, draftSourcesToPersist);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to import places from link(s)";
+      const isMissingApiKey = /OPENAI_API_KEY/i.test(message);
+      const code = isMissingApiKey ? "missing_api_key" : "import_failed";
+      const safeMessage = "Something went wrong. Please try again.";
+
+      if (fetchStepId) {
+        await finishAiItineraryRunStep({
+          supabase,
+          stepId: fetchStepId,
+          status: "failed",
+          error: { message: safeMessage },
+        });
+      }
+      if (extractStepId) {
+        await finishAiItineraryRunStep({
+          supabase,
+          stepId: extractStepId,
+          status: "failed",
+          error: { message: safeMessage },
+        });
+      }
+      if (resolveStepId) {
+        await finishAiItineraryRunStep({
+          supabase,
+          stepId: resolveStepId,
+          status: "failed",
+          error: { message: safeMessage },
+        });
+      }
+      if (runId) {
+        await finishAiItineraryRun({ supabase, runId, status: "failed", error: { code } });
+      }
+
+      return jsonErrorTimed(500, code, safeMessage);
+    }
+  }
+
+  if (parsed.data.mode !== "apply") {
+    return jsonErrorTimed(400, "invalid_request", "Invalid request payload");
+  }
+
   // apply
   const operations = parsed.data.operations;
+  const importDraftSourcesParsed = LinkImportDraftSourcesSchema.safeParse(threadDraftSources);
+  const importDraftSources = importDraftSourcesParsed.success ? importDraftSourcesParsed.data : null;
+
+  const importSourceByCanonicalUrl = new Map<string, any>();
+  for (const source of importDraftSources?.sources ?? []) {
+    importSourceByCanonicalUrl.set(String(source.canonicalUrl), source);
+  }
+
+  const importAttributionsByPlaceId = new Map<string, any[]>();
+  for (const attribution of importDraftSources?.attributions ?? []) {
+    const pid = normalizePlaceId(String((attribution as any)?.placeId ?? ""));
+    const src = String((attribution as any)?.sourceCanonicalUrl ?? "");
+    if (!pid || !src) continue;
+    const list = importAttributionsByPlaceId.get(pid) ?? [];
+    list.push({ ...attribution, placeId: pid, sourceCanonicalUrl: src });
+    importAttributionsByPlaceId.set(pid, list);
+  }
+
+  const itinerarySourceIdByCanonicalUrl = new Map<string, string>();
+  let canWriteAttributions: boolean | null = null;
+
   const applyRequiresConfirmation =
     operations.some((op) => op.op === "remove_activity") ||
     operations.length > CONFIRMATION_BATCH_THRESHOLD ||
@@ -1141,6 +1746,87 @@ export async function POST(request: NextRequest) {
 
         if (!result.success) {
           throw new Error(result.error?.message || "Failed to add place");
+        }
+
+        // Best-effort: write attribution rows for link-import drafts.
+        if (canWriteAttributions !== false && importDraftSources) {
+          const itineraryActivityId = Number((result.data as any)?.itineraryActivity?.itinerary_activity_id ?? "");
+          const placeId = normalizePlaceId(String(operation.placeId ?? ""));
+
+          const attributions = placeId ? importAttributionsByPlaceId.get(placeId) ?? [] : [];
+          if (itineraryActivityId && attributions.length > 0) {
+            for (const attribution of attributions) {
+              const canonicalUrl = String((attribution as any)?.sourceCanonicalUrl ?? "");
+              const source = canonicalUrl ? importSourceByCanonicalUrl.get(canonicalUrl) : null;
+              if (!source) continue;
+
+              const cachedSourceId = itinerarySourceIdByCanonicalUrl.get(canonicalUrl);
+              let itinerarySourceId = cachedSourceId ?? null;
+
+              if (!itinerarySourceId) {
+                const payload: Record<string, any> = {
+                  itinerary_id: Number(itineraryId),
+                  itinerary_destination_id: Number(destinationId),
+                  provider: source.provider,
+                  url: source.url,
+                  canonical_url: source.canonicalUrl,
+                  external_id: source.externalId ?? null,
+                  title: source.title ?? null,
+                  thumbnail_url: source.thumbnailUrl ?? null,
+                  embed_url: source.embedUrl ?? null,
+                  raw_metadata: source.rawMetadata ?? {},
+                  created_by: auth.user.id,
+                };
+
+                const { data: upserted, error: upsertError } = await supabase
+                  .from("itinerary_source")
+                  .upsert(payload, { onConflict: "itinerary_id,canonical_url" })
+                  .select("itinerary_source_id")
+                  .single();
+
+                if (upsertError || !upserted) {
+                  const code = String((upsertError as any)?.code ?? "");
+                  const isMissingTable = code === "42P01";
+                  const isMissingColumn = code === "42703";
+                  const forbidden = code === "42501";
+                  if (isMissingTable || isMissingColumn || forbidden) {
+                    canWriteAttributions = false;
+                    break;
+                  }
+                  console.warn("Failed to upsert itinerary_source:", upsertError);
+                  break;
+                }
+
+                itinerarySourceId = String((upserted as any).itinerary_source_id ?? "");
+                if (!itinerarySourceId) continue;
+                itinerarySourceIdByCanonicalUrl.set(canonicalUrl, itinerarySourceId);
+                canWriteAttributions = true;
+              }
+
+              const joinPayload: Record<string, any> = {
+                itinerary_activity_id: itineraryActivityId,
+                itinerary_source_id: itinerarySourceId,
+                snippet: (attribution as any)?.snippet ?? null,
+                timestamp_seconds: (attribution as any)?.timestampSeconds ?? null,
+              };
+
+              const { error: joinError } = await supabase
+                .from("itinerary_activity_source")
+                .upsert(joinPayload, { onConflict: "itinerary_activity_id,itinerary_source_id" });
+
+              if (joinError) {
+                const code = String((joinError as any)?.code ?? "");
+                const isMissingTable = code === "42P01";
+                const forbidden = code === "42501";
+                if (isMissingTable || forbidden) {
+                  canWriteAttributions = false;
+                  break;
+                }
+                console.warn("Failed to upsert itinerary_activity_source:", joinError);
+                break;
+              }
+            }
+          }
         }
 
         applied.push({ ok: true, operation });
@@ -1336,7 +2022,8 @@ export async function POST(request: NextRequest) {
   // Clear the saved draft only if everything applied successfully.
   if (!anyFailed) {
     try {
-      await updateAiItineraryThreadDraft({ supabase, threadId, draft: null });
+      await updateAiItineraryThreadDraftAndSources({ supabase, threadId, draft: null, draftSources: null });
+      threadDraftSources = null;
     } catch (error) {
       console.warn("Failed to clear AI chat draft after apply:", error);
     }

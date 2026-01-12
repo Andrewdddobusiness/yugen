@@ -176,6 +176,8 @@ export function ActivityBottomSheet({
 }: ActivityBottomSheetProps) {
   if (!activity) return null;
 
+  const sourceAttributions = Array.isArray((activity as any)?.sources) ? ((activity as any).sources as any[]) : [];
+
   return (
     <MobileBottomSheet
       isOpen={isOpen}
@@ -255,6 +257,56 @@ export function ActivityBottomSheet({
             )}
           </div>
         )}
+
+        {/* Source */}
+        {sourceAttributions.length > 0 ? (
+          <div className="space-y-3">
+            <div className="text-sm font-medium text-gray-700 dark:text-gray-300">Source:</div>
+            <div className="space-y-3">
+              {sourceAttributions.map((row) => {
+                const source = (row as any)?.itinerary_source ?? null;
+                const url = String(source?.canonical_url ?? source?.url ?? "").trim();
+                const title = String(source?.title ?? "").trim() || url || "Source";
+                const provider = String(source?.provider ?? "web");
+                const embedUrl = typeof source?.embed_url === "string" ? source.embed_url : "";
+                const snippet = typeof (row as any)?.snippet === "string" ? (row as any).snippet : "";
+
+                return (
+                  <div key={String(source?.itinerary_source_id ?? url)} className="space-y-2 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                    <div className="text-[11px] font-semibold text-gray-500 dark:text-gray-400">{provider.toUpperCase()}</div>
+                    {url ? (
+                      <a
+                        href={url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-sm text-blue-600 dark:text-blue-400 underline-offset-2 hover:underline"
+                      >
+                        {title}
+                      </a>
+                    ) : (
+                      <div className="text-sm">{title}</div>
+                    )}
+                    {snippet ? <div className="text-xs text-gray-600 dark:text-gray-400">{snippet}</div> : null}
+
+                    {provider === "youtube" && embedUrl ? (
+                      <div className="overflow-hidden rounded-lg border border-gray-200 dark:border-gray-700 bg-black/5">
+                        <iframe
+                          src={embedUrl}
+                          title={title}
+                          className="w-full h-[200px]"
+                          loading="lazy"
+                          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                          referrerPolicy="strict-origin-when-cross-origin"
+                          sandbox="allow-scripts allow-same-origin allow-presentation"
+                        />
+                      </div>
+                    ) : null}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        ) : null}
 
         {/* Actions */}
         <div className="flex gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">

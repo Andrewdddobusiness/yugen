@@ -4,6 +4,7 @@ export type AiItineraryThreadRow = {
   ai_itinerary_thread_id: string;
   summary: string | null;
   draft: unknown | null;
+  draft_sources?: unknown | null;
 };
 
 export type AiItineraryMessageRow = {
@@ -31,18 +32,43 @@ export async function getOrCreateAiItineraryThread(args: {
 }): Promise<AiItineraryThreadRow> {
   const { supabase, itineraryId, destinationId, userId } = args;
 
-  const { data, error } = await supabase
-    .from("ai_itinerary_thread")
-    .upsert(
-      {
-        itinerary_id: Number(itineraryId),
-        itinerary_destination_id: Number(destinationId),
-        user_id: userId,
-      },
-      { onConflict: "itinerary_id,itinerary_destination_id,user_id" }
-    )
-    .select("ai_itinerary_thread_id,summary,draft")
-    .single();
+  const isMissingColumn = (err: any, column: string) => {
+    if (!err) return false;
+    const code = String(err.code ?? "");
+    if (code !== "42703") return false;
+    const message = String(err.message ?? "").toLowerCase();
+    return message.includes(column.toLowerCase());
+  };
+
+  const upsertWithSelect = async (select: string) => {
+    return supabase
+      .from("ai_itinerary_thread")
+      .upsert(
+        {
+          itinerary_id: Number(itineraryId),
+          itinerary_destination_id: Number(destinationId),
+          user_id: userId,
+        },
+        { onConflict: "itinerary_id,itinerary_destination_id,user_id" }
+      )
+      .select(select)
+      .single();
+  };
+
+  const { data, error } = await upsertWithSelect("ai_itinerary_thread_id,summary,draft,draft_sources");
+  if (error && isMissingColumn(error, "draft_sources")) {
+    const retry = await upsertWithSelect("ai_itinerary_thread_id,summary,draft");
+    if (retry.error || !retry.data) {
+      throw new Error(retry.error?.message || "Failed to create AI chat thread");
+    }
+
+    return {
+      ai_itinerary_thread_id: String((retry.data as any).ai_itinerary_thread_id),
+      summary: (retry.data as any).summary ?? null,
+      draft: (retry.data as any).draft ?? null,
+      draft_sources: null,
+    };
+  }
 
   if (error || !data) {
     throw new Error(error?.message || "Failed to create AI chat thread");
@@ -52,6 +78,7 @@ export async function getOrCreateAiItineraryThread(args: {
     ai_itinerary_thread_id: String(data.ai_itinerary_thread_id),
     summary: (data as any).summary ?? null,
     draft: (data as any).draft ?? null,
+    draft_sources: (data as any).draft_sources ?? null,
   };
 }
 
@@ -166,6 +193,57 @@ export async function updateAiItineraryThreadDraft(args: {
   }
 }
 
+export async function updateAiItineraryThreadDraftSources(args: {
+  supabase: any;
+  threadId: string;
+  draftSources: unknown | null;
+}) {
+  const { supabase, threadId, draftSources } = args;
+
+  const { error } = await supabase
+    .from("ai_itinerary_thread")
+    .update({ draft_sources: draftSources })
+    .eq("ai_itinerary_thread_id", threadId);
+
+  if (error) {
+    const isMissingColumn =
+      String((error as any)?.code ?? "") === "42703" &&
+      String((error as any)?.message ?? "").toLowerCase().includes("draft_sources");
+    if (isMissingColumn) return;
+    throw new Error(error.message || "Failed to update AI chat draft sources");
+  }
+}
+
+export async function updateAiItineraryThreadDraftAndSources(args: {
+  supabase: any;
+  threadId: string;
+  draft: unknown | null;
+  draftSources: unknown | null;
+}) {
+  const { supabase, threadId, draft, draftSources } = args;
+
+  const { error } = await supabase
+    .from("ai_itinerary_thread")
+    .update({ draft, draft_sources: draftSources })
+    .eq("ai_itinerary_thread_id", threadId);
+
+  if (error) {
+    const isMissingDraftSources =
+      String((error as any)?.code ?? "") === "42703" &&
+      String((error as any)?.message ?? "").toLowerCase().includes("draft_sources");
+    if (isMissingDraftSources) {
+      const { error: fallbackError } = await supabase
+        .from("ai_itinerary_thread")
+        .update({ draft })
+        .eq("ai_itinerary_thread_id", threadId);
+      if (fallbackError) throw new Error(fallbackError.message || "Failed to update AI chat draft");
+      return;
+    }
+
+    throw new Error(error.message || "Failed to update AI chat draft");
+  }
+}
+
 export function mergeChatContext(args: {
   recent: AiItineraryMessageRow[];
   retrieved: Array<{ ai_itinerary_message_id: number; role: string; content: string }>;
@@ -186,7 +264,7 @@ export type AiItineraryRunRow = {
 export async function startAiItineraryRun(args: {
   supabase: any;
   threadId: string;
-  mode: "plan" | "apply" | "history";
+  mode: "plan" | "import" | "apply" | "history";
 }) {
   const { supabase, threadId, mode } = args;
   const { data, error } = await supabase
