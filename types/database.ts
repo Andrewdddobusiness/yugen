@@ -150,6 +150,34 @@ export interface ItineraryCustomEvent {
   deleted_at: string | null;
 }
 
+export type ItinerarySourceProvider = "youtube" | "tiktok" | "instagram" | "tripadvisor" | "web";
+
+export interface ItinerarySource {
+  itinerary_source_id: string;
+  itinerary_id: number;
+  itinerary_destination_id: number | null;
+  provider: ItinerarySourceProvider;
+  url: string;
+  canonical_url: string;
+  external_id: string | null;
+  title: string | null;
+  thumbnail_url: string | null;
+  embed_url: string | null;
+  raw_metadata: Record<string, any>;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ItineraryActivitySource {
+  itinerary_activity_source_id: number;
+  itinerary_activity_id: number;
+  itinerary_source_id: string;
+  snippet: string | null;
+  timestamp_seconds: number | null;
+  created_at: string;
+}
+
 // Extended types with joins
 export interface ItineraryWithDestinations extends Itinerary {
   destinations: ItineraryDestination[];

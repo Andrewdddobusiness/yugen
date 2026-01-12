@@ -35,12 +35,12 @@ Enable users to paste links (YouTube Shorts, TikTok, Instagram Reels, TripAdviso
 
 ## Tasks
 ### 1.0 Product decisions
-- [ ] 1.1 Confirm max URLs per import message (suggest: 3) and dedupe rules (canonical URL).
-- [ ] 1.2 Confirm “unscheduled by default” semantics: imported places set `date: null`, no times.
-- [ ] 1.3 Confirm blocked-content fallback: prompt user to paste caption/description text.
-- [ ] 1.4 Confirm ambiguity behavior: skip unresolved items vs keep unresolved draft rows and require selection.
+- [x] 1.1 Max URLs per import message: 3; dedupe by canonical URL.
+- [x] 1.2 Default unscheduled: imported places set `date: null`, no times.
+- [x] 1.3 Blocked-content fallback: prompt user to paste caption/description/text.
+- [x] 1.4 Ambiguity: ask a clarifying question; omit ambiguous items from the draft until clarified (no selection UI in MVP).
 
 ### 2.0 Delivery sequence
-- [ ] 2.1 Ship DB tables + RLS first so attribution can be stored on apply.
+- [x] 2.1 Ship DB tables + RLS first so attribution can be stored on apply.
 - [ ] 2.2 Ship server ingestion/extraction + AI resolution next (YouTube + generic first, then TikTok/IG/TripAdvisor heuristics).
 - [ ] 2.3 Ship UI: chat source preview + activity source display once data is available.

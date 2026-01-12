@@ -39,14 +39,14 @@ Keep `ai_itinerary_thread.draft` as the operations array, and add:
 
 ## Tasks
 ### 1.0 Migrations: source persistence
-- [ ] 1.1 Create migration for `public.itinerary_source` table + indexes + updated_at trigger.
-- [ ] 1.2 Create migration for `public.itinerary_activity_source` join table + indexes.
-- [ ] 1.3 Add `ai_itinerary_thread.draft_sources jsonb` migration.
+- [x] 1.1 Create migration for `public.itinerary_source` table + indexes + updated_at trigger.
+- [x] 1.2 Create migration for `public.itinerary_activity_source` join table + indexes.
+- [x] 1.3 Add `ai_itinerary_thread.draft_sources jsonb` migration.
 
 ### 2.0 RLS policies
-- [ ] 2.1 Enable RLS on `itinerary_source` and `itinerary_activity_source`.
-- [ ] 2.2 `SELECT`: allow `public.is_itinerary_collaborator(itinerary_id)` (and itinerary not deleted).
-- [ ] 2.3 `INSERT/UPDATE/DELETE`: allow `public.is_itinerary_editor(itinerary_id)` (or owner) only.
+- [x] 2.1 Enable RLS on `itinerary_source` and `itinerary_activity_source`.
+- [x] 2.2 `SELECT`: allow itinerary owners, public itineraries, and collaborators.
+- [x] 2.3 `INSERT/UPDATE/DELETE`: allow itinerary owners and editors only.
 
 ### 3.0 Telemetry compatibility
 - [ ] 3.1 Update `ai_itinerary_run.mode` constraint to allow `import` (if a new import mode is introduced).
