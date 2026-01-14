@@ -42,7 +42,7 @@ import { Loader2, Menu, Plus } from "lucide-react";
 import { useUserStore } from "@/store/userStore";
 import { ISubscriptionDetails, useStripeSubscriptionStore } from "@/store/stripeSubscriptionStore";
 
-import { getSubscriptionDetails } from "@/actions/stripe/actions";
+import { getSubscriptionDetailsClient } from "@/lib/billing/subscriptionClient";
 import { createClient } from "@/utils/supabase/client";
 import { cn } from "@/lib/utils";
 
@@ -93,10 +93,10 @@ export default function Navigation() {
       if (error || !user) throw error;
       return user;
     },
-    staleTime: Infinity,
-    refetchOnMount: false,
-    refetchOnWindowFocus: false,
-    refetchOnReconnect: false,
+    staleTime: 0,
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
+    refetchOnReconnect: true,
   });
 
   useEffect(() => {
@@ -168,12 +168,12 @@ export default function Navigation() {
   //***** GET SUBSCRIPTION DETAILS *****//
   const { data: subscription, isLoading: isSubscriptionLoading } = useQuery({
     queryKey: ["subscription", user?.id],
-    queryFn: () => getSubscriptionDetails(),
+    queryFn: getSubscriptionDetailsClient,
     enabled: !!user?.id,
-    staleTime: Infinity,
-    refetchOnMount: false,
-    refetchOnWindowFocus: false,
-    refetchOnReconnect: false,
+    staleTime: 0,
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
+    refetchOnReconnect: true,
   });
 
   useEffect(() => {

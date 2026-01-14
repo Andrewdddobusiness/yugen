@@ -25,14 +25,32 @@ const isActiveProSubscriber = async (supabase: ReturnType<typeof createClient>, 
       })
       .single();
 
-    if (error || !data) return false;
-    const subscriptionId = (data as any)?.out_subscription_id;
-    const periodEndRaw = (data as any)?.out_current_period_end;
-    if (!subscriptionId || !periodEndRaw) return false;
+    if (!error && data) {
+      const subscriptionId = (data as any)?.out_subscription_id;
+      const periodEndRaw = (data as any)?.out_current_period_end;
+      if (subscriptionId && periodEndRaw) {
+        const periodEnd = new Date(periodEndRaw);
+        if (!Number.isNaN(periodEnd.getTime())) {
+          return new Date() < periodEnd;
+        }
+      }
+    }
 
-    const periodEnd = new Date(periodEndRaw);
+    // Fallback: read directly from the subscriptions table (handles trialing and avoids RPC drift).
+    const { data: row, error: tableError } = await supabase
+      .from("subscriptions")
+      .select("status,current_period_end")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (tableError || !row?.current_period_end) return false;
+    const periodEnd = new Date(row.current_period_end as any);
     if (Number.isNaN(periodEnd.getTime())) return false;
-    return new Date() < periodEnd;
+    const statusRaw = String(row.status ?? "");
+    const isPaidStatus = statusRaw === "active" || statusRaw === "trialing";
+    return isPaidStatus && new Date() < periodEnd;
   } catch {
     return false;
   }

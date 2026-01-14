@@ -31,21 +31,23 @@ export async function POST(req: Request) {
       case "checkout.session.completed": {
         const session = event.data.object as Stripe.Checkout.Session;
 
-        if (session.client_reference_id && session.customer) {
+        const customerId =
+          typeof session.customer === "string" ? session.customer : session.customer?.id;
+
+        if (session.client_reference_id && customerId) {
           const { error } = await supabase
             .from("profiles")
             .update({
-              stripe_customer_id: session.customer,
+              stripe_customer_id: customerId,
             })
             .eq("user_id", session.client_reference_id);
 
           if (error) throw error;
         }
 
-        if (session.client_reference_id && session.customer && session.subscription) {
+        if (session.client_reference_id && customerId && session.subscription) {
           const subscriptionId =
             typeof session.subscription === "string" ? session.subscription : session.subscription.id;
-          const customerId = typeof session.customer === "string" ? session.customer : session.customer.id;
 
           const subscription = await stripe.subscriptions.retrieve(subscriptionId);
           const { error } = await supabase.from("subscriptions").upsert(

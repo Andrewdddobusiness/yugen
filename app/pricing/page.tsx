@@ -15,7 +15,7 @@ import { useStripeSubscriptionStore } from "@/store/stripeSubscriptionStore";
 import { Skeleton } from "@/components/ui/skeleton";
 import ManageSubscriptionButton from "@/components/button/subscription/ManageSubscriptionButton";
 import { useAuth } from "@/components/provider/auth/AuthProvider";
-import { getSubscriptionDetails } from "@/actions/stripe/actions";
+import { getSubscriptionDetailsClient } from "@/lib/billing/subscriptionClient";
 
 export default function PricingPage() {
   const { user, loading: isAuthLoading } = useAuth();
@@ -30,7 +30,7 @@ export default function PricingPage() {
 
   const { data: subscriptionData, isLoading: isLoadingSubscription } = useQuery({
     queryKey: ["subscription", user?.id],
-    queryFn: getSubscriptionDetails,
+    queryFn: getSubscriptionDetailsClient,
     enabled: !isAuthLoading && !!user?.id,
     staleTime: 5 * 60 * 1000,
     refetchOnWindowFocus: false,

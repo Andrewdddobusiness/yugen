@@ -21,7 +21,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-import { getSubscriptionDetails } from "@/actions/stripe/actions";
+import { getSubscriptionDetailsClient } from "@/lib/billing/subscriptionClient";
 
 import { useUserStore } from "@/store/userStore";
 import { useStripeSubscriptionStore, ISubscriptionDetails } from "@/store/stripeSubscriptionStore";
@@ -140,10 +140,10 @@ export default function Layout({ children }: { children: ReactNode }) {
       if (error || !user) throw error;
       return user;
     },
-    staleTime: Infinity,
-    refetchOnMount: false,
-    refetchOnWindowFocus: false,
-    refetchOnReconnect: false,
+    staleTime: 0,
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
+    refetchOnReconnect: true,
   });
 
   useEffect(() => {
@@ -250,12 +250,12 @@ export default function Layout({ children }: { children: ReactNode }) {
   //***** GET SUBSCRIPTION DETAILS *****//
   const { data: subscription, isLoading: isSubscriptionLoading } = useQuery({
     queryKey: ["subscription", user?.id],
-    queryFn: getSubscriptionDetails,
+    queryFn: getSubscriptionDetailsClient,
     enabled: !!user,
-    staleTime: Infinity,
-    refetchOnMount: false,
-    refetchOnWindowFocus: false,
-    refetchOnReconnect: false,
+    staleTime: 0,
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
+    refetchOnReconnect: true,
   });
 
   useEffect(() => {
