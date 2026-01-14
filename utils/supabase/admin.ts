@@ -9,13 +9,13 @@ export function createAdminClient() {
 
   // Prefer the server-only URL if present, but fall back to the public URL.
   const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const secretKey = process.env.SUPABASE_SECRET_KEY;
 
-  if (!supabaseUrl || !serviceRoleKey) {
-    throw new Error("Supabase admin client is not configured");
+  if (!supabaseUrl || !secretKey) {
+    throw new Error("Supabase admin client is not configured. Set SUPABASE_URL (or NEXT_PUBLIC_SUPABASE_URL) and SUPABASE_SECRET_KEY.");
   }
 
-  cachedAdminClient = createClient(supabaseUrl, serviceRoleKey, {
+  cachedAdminClient = createClient(supabaseUrl, secretKey, {
     auth: {
       autoRefreshToken: false,
       detectSessionInUrl: false,

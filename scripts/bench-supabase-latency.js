@@ -159,14 +159,14 @@ async function main() {
     fileEnv.NEXT_PUBLIC_SUPABASE_URL;
 
   const supabaseKey =
-    process.env.SUPABASE_SERVICE_ROLE_KEY ||
-    fileEnv.SUPABASE_SERVICE_ROLE_KEY ||
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
-    fileEnv.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    process.env.SUPABASE_SECRET_KEY ||
+    fileEnv.SUPABASE_SECRET_KEY ||
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
+    fileEnv.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
 
   if (!supabaseUrl || !supabaseKey) {
     console.error(
-      "Missing Supabase env. Need SUPABASE_URL/NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY (preferred) or NEXT_PUBLIC_SUPABASE_ANON_KEY."
+      "Missing Supabase env. Need SUPABASE_URL/NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SECRET_KEY (preferred) or NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY."
     );
     process.exit(1);
   }
