@@ -15,6 +15,17 @@ const getClientIpFromHeaders = () => {
   return first || headers().get("x-real-ip") || "unknown";
 };
 
+const getAppUrl = () => {
+  const explicit = process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_SITE_URL;
+  if (explicit && explicit.trim().length > 0) return explicit.replace(/\/+$/, "");
+
+  const h = headers();
+  const proto = h.get("x-forwarded-proto") ?? "http";
+  const host = h.get("x-forwarded-host") ?? h.get("host");
+  if (!host) return null;
+  return `${proto}://${host}`.replace(/\/+$/, "");
+};
+
 const EmailSchema = z.string().trim().toLowerCase().email().max(320);
 const PasswordSchema = z.string().min(6).max(200);
 const NameSchema = z
@@ -173,8 +184,13 @@ export async function resetPassword(formData: FormData) {
     return { success: false, message: "Too many requests. Please try again later." };
   }
 
+  const appUrl = getAppUrl();
+  if (!appUrl) {
+    return { success: false, message: "App URL is not configured" };
+  }
+
   const { error } = await supabase.auth.resetPasswordForEmail(parsed.data.email, {
-    redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/login/updatePassword`,
+    redirectTo: `${appUrl}/login/updatePassword`,
   });
 
   if (error) {
@@ -209,11 +225,15 @@ export async function signInWithGoogle(next?: string) {
   const supabase = createClient();
 
   const safeNext = safeRedirectPath(next, "/");
+  const appUrl = getAppUrl();
+  if (!appUrl) {
+    return { success: false, message: "App URL is not configured" };
+  }
 
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: "google",
     options: {
-      redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/auth/callback?next=${encodeURIComponent(safeNext)}`,
+      redirectTo: `${appUrl}/auth/callback?next=${encodeURIComponent(safeNext)}`,
     },
   });
 

@@ -364,7 +364,13 @@ export default function PopUpCreateItinerary({ children, className, ...props }: 
       <DialogTrigger asChild>
         <div className={`inline-flex ${className}`}>{children}</div>
       </DialogTrigger>
-      <DialogContent className={`w-[90%] sm:w-full ${showDestinationSelector ? 'max-w-[900px] h-[650px]' : 'max-w-[1000px] h-[400px] grid grid-cols-1 sm:grid-cols-2'} p-0 gap-0 rounded-xl`}>
+      <DialogContent
+        className={`w-[90%] sm:w-full ${
+          showDestinationSelector
+            ? "max-w-[900px] h-[min(90vh,650px)] max-h-[90vh]"
+            : "max-w-[1000px] grid grid-cols-1 sm:grid-cols-2 h-[min(90vh,720px)] sm:h-[min(90vh,560px)] max-h-[90vh]"
+        } p-0 gap-0 rounded-xl overflow-hidden`}
+      >
         {showDestinationSelector ? (
           <DestinationSelector
             onDestinationSelect={handleDestinationSelect}
@@ -373,18 +379,18 @@ export default function PopUpCreateItinerary({ children, className, ...props }: 
           />
         ) : (
           <>
-            <div className="relative w-full h-full hidden sm:block">
-              <Image src={steps[step].image} alt={steps[step].title} fill className="object-cover rounded-l-md" priority />
+            <div className="relative hidden h-full w-full overflow-hidden sm:block">
+              <Image src={steps[step].image} alt={steps[step].title} fill className="object-cover" priority />
             </div>
 
-            <DialogDescription className="flex flex-col px-4 sm:px-6 pt-8 sm:pt-10 pb-6 h-full justify-between">
+            <DialogDescription className="flex min-h-0 flex-col justify-between px-4 sm:px-6 pt-8 sm:pt-10 pb-6 h-full overflow-hidden">
               <VisuallyHidden.Root>
                 <DialogTitle>Create New Itinerary</DialogTitle>
               </VisuallyHidden.Root>
 
               <Form {...form}>
                 <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col h-full justify-between">
-                  <div className="flex flex-col gap-1 min-h-0 overflow-y-auto pr-1">
+                  <div className="flex flex-1 flex-col gap-1 min-h-0 overflow-y-auto pr-1">
                     <DialogTitle className="text-2xl sm:text-3xl text-black">
                       Let&apos;s build your next vacation!
                     </DialogTitle>
