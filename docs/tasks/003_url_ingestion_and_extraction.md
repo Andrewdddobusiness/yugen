@@ -1,4 +1,4 @@
-# 003 — Server: URL ingestion + provider extraction (YouTube/TikTok/Instagram/TripAdvisor/web)
+# 003 - Server: URL ingestion + provider extraction (YouTube/TikTok/Instagram/TripAdvisor/web)
 
 ## Summary
 Implement the hardened “URL → source signals” pipeline used by link-import: safe fetching, provider detection/canonicalization, metadata extraction (oEmbed/OG/JSON-LD), and provider-specific text extraction. Includes SSRF safeguards, caps, and core unit tests.

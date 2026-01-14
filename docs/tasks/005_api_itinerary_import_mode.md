@@ -1,4 +1,4 @@
-# 005 — API: `/api/ai/itinerary` import mode + draft persistence + apply attribution
+# 005 - API: `/api/ai/itinerary` import mode + draft persistence + apply attribution
 
 ## Summary
 Extend the existing itinerary AI route to support an import workflow that turns URLs into a draft list of unscheduled `add_place` operations, persists the draft + source metadata, and on apply writes source attribution records.

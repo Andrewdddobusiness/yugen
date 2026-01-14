@@ -477,7 +477,7 @@ const makeAddPlaceClarification = (query: string, cityLabel: string, options: Ar
 
   const lines = options
     .slice(0, 3)
-    .map((opt, idx) => `${idx + 1}) ${opt.name}${opt.address ? ` — ${opt.address}` : ""}`)
+    .map((opt, idx) => `${idx + 1}) ${opt.name}${opt.address ? ` - ${opt.address}` : ""}`)
     .join("\n");
 
   return `${header}\n\n${lines}\n\nReply with the correct option (or paste a Google Maps link).`;
@@ -660,9 +660,9 @@ const formatTimeHHmm = (value: unknown): string | null => {
 const formatTimeRange = (start: unknown, end: unknown): string | null => {
   const s = formatTimeHHmm(start);
   const e = formatTimeHHmm(end);
-  if (s && e) return `${s}–${e}`;
+  if (s && e) return `${s}-${e}`;
   if (s) return s;
-  if (e) return `—–${e}`;
+  if (e) return e;
   return null;
 };
 
@@ -1484,7 +1484,7 @@ export async function POST(request: NextRequest) {
         const assistantParts: string[] = [];
         if (resolvedOp?.placeId) {
           assistantParts.push(
-            `Got it — I’ll add ${resolvedOp.name ?? resolvedOp.query ?? "that place"} as an unscheduled draft activity.`
+            `Got it - I'll add ${resolvedOp.name ?? resolvedOp.query ?? "that place"} as an unscheduled draft activity.`
           );
         }
         if (clarifications.length > 0) assistantParts.push(...clarifications);
@@ -1995,7 +1995,7 @@ export async function POST(request: NextRequest) {
   const refreshed = await fetchBuilderBootstrap(itineraryId, destinationId);
   const payload: ApplyResponsePayload = {
     assistantMessage: anyFailed
-      ? `Applied ${okCount} change(s). Some changes failed${skippedCount ? ` (skipped ${skippedCount}).` : " — please review the details."}`
+      ? `Applied ${okCount} change(s). Some changes failed${skippedCount ? ` (skipped ${skippedCount}).` : " - please review the details."}`
       : `Applied ${okCount} change(s).`,
     applied,
     bootstrap: refreshed.success ? refreshed.data : undefined,

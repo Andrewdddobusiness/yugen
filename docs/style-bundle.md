@@ -98,7 +98,7 @@ export const tokens = {
 > - Typography: Nunito for body/UI, Londrina Solid for brand headings (`font-logo`). Use sketch font only for rare playful highlights.
 > - Buttons are tactile (press depth/shadow), not flat.
 > - Glass only for floating overlays/panels; primary reading surfaces are solid.
-> - Mascot (friendly wolf) appears only in onboarding, empty states, success, warnings, loading—never in dense editors.
+> - Mascot (friendly wolf) appears only in onboarding, empty states, success, warnings, loading - never in dense editors.
 > - Interaction: clear primary action, soft purposeful transitions.
 > Output must describe layout, component types, and reference tokens (brand.500, bg.50, ink.900, etc.). Do not invent new visual systems.
 

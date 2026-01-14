@@ -1,4 +1,5 @@
 import type { ChatMessage } from "@/lib/ai/itinerary/schema";
+import { sanitizeTypography } from "@/lib/text/sanitizeTypography";
 
 export type AiItineraryThreadRow = {
   ai_itinerary_thread_id: string;
@@ -96,7 +97,7 @@ export async function insertAiItineraryMessage(args: {
   const payload: any = {
     thread_id: threadId,
     role,
-    content,
+    content: sanitizeTypography(content),
     metadata: metadata ?? {},
   };
 
@@ -168,7 +169,7 @@ export async function updateAiItineraryThreadSummary(args: {
 
   const { error } = await supabase
     .from("ai_itinerary_thread")
-    .update({ summary })
+    .update({ summary: summary ? sanitizeTypography(summary) : summary })
     .eq("ai_itinerary_thread_id", threadId);
 
   if (error) {

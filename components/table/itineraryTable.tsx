@@ -432,7 +432,7 @@ export function ItineraryTableView({ showMap, onToggleMap }: ItineraryTableViewP
                               <div>
                                 <div className="text-xs text-gray-500 mb-1">Notes</div>
                                 <div className="text-sm text-gray-600 whitespace-pre-wrap">
-                                  {event.notes || "—"}
+                                  {event.notes || "-"}
                                 </div>
                               </div>
 

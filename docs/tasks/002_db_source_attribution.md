@@ -1,4 +1,4 @@
-# 002 — DB: Persist link sources + activity attribution + import draft metadata
+# 002 - DB: Persist link sources + activity attribution + import draft metadata
 
 ## Summary
 Add database structures to persist link sources used for imports and attach those sources to created `itinerary_activity` rows so the UI can show “Came from” with a link back (and embed metadata). Also persist import-draft metadata alongside the existing AI itinerary thread draft operations.
@@ -7,15 +7,15 @@ Add database structures to persist link sources used for imports and attach thos
 ### `itinerary_source` (one row per unique canonical URL per itinerary)
 - `itinerary_source_id` (uuid PK)
 - `itinerary_id` (int, FK)
-- `itinerary_destination_id` (int, FK, nullable) — context of import
-- `provider` (text) — `youtube|tiktok|instagram|tripadvisor|web`
-- `url` (text) — original
-- `canonical_url` (text) — normalized/deduped
-- `external_id` (text, nullable) — e.g., YouTube video id
+- `itinerary_destination_id` (int, FK, nullable) - context of import
+- `provider` (text) - `youtube|tiktok|instagram|tripadvisor|web`
+- `url` (text) - original
+- `canonical_url` (text) - normalized/deduped
+- `external_id` (text, nullable) - e.g., YouTube video id
 - `title` (text, nullable)
 - `thumbnail_url` (text, nullable)
-- `embed_url` (text, nullable) — allowlisted iframe URL to render
-- `raw_metadata` (jsonb) — oEmbed/OG/JSON-LD snapshot (sanitized)
+- `embed_url` (text, nullable) - allowlisted iframe URL to render
+- `raw_metadata` (jsonb) - oEmbed/OG/JSON-LD snapshot (sanitized)
 - `created_by` (uuid, nullable), timestamps
 - Unique: `(itinerary_id, canonical_url)`
 
@@ -23,14 +23,14 @@ Add database structures to persist link sources used for imports and attach thos
 - `itinerary_activity_source_id` (bigserial PK)
 - `itinerary_activity_id` (int, FK)
 - `itinerary_source_id` (uuid, FK)
-- `snippet` (text, nullable) — evidence text used to pick place
-- `timestamp_seconds` (int, nullable) — for video moments (optional)
+- `snippet` (text, nullable) - evidence text used to pick place
+- `timestamp_seconds` (int, nullable) - for video moments (optional)
 - `created_at` timestamp
 - Unique: `(itinerary_activity_id, itinerary_source_id)`
 
 ### Import draft metadata
 Keep `ai_itinerary_thread.draft` as the operations array, and add:
-- `ai_itinerary_thread.draft_sources` (jsonb) — source previews + op→source mapping for restoring the draft UI after refresh.
+- `ai_itinerary_thread.draft_sources` (jsonb) - source previews + op->source mapping for restoring the draft UI after refresh.
 
 ## Acceptance criteria
 - [ ] Source tables exist with indexes + RLS aligned with itinerary collaboration.

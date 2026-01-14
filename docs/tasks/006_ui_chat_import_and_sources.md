@@ -1,4 +1,4 @@
-# 006 — UI: Chat link-import + activity source attribution display
+# 006 - UI: Chat link-import + activity source attribution display
 
 ## Summary
 Extend the existing Itinerary Assistant chat panel to support URL import UX: show source cards (embed video where possible), show extracted places as draft changes, and handle clarifications. After apply, show “Came from …” source attribution in activity previews (link back + embed where possible).

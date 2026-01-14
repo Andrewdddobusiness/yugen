@@ -1,4 +1,4 @@
-# 004 — AI: Extract place candidates from source text + resolve to Google Places (cap 15)
+# 004 - AI: Extract place candidates from source text + resolve to Google Places (cap 15)
 
 ## Summary
 Given a set of extracted source text bundles + destination context, use the LLM to produce up to **15** concrete place candidates and then deterministically resolve them to Google Places (`placeId`) using existing Google actions. Output draft `add_place` ops that default to **unscheduled**.

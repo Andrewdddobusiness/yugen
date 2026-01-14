@@ -69,7 +69,7 @@ export default function ItineraryCustomEventRow({
         </Badge>
       </TableCell>
 
-      <TableCell className="w-[20%] min-w-[200px] text-ink-400">—</TableCell>
+      <TableCell className="w-[20%] min-w-[200px] text-ink-400">-</TableCell>
 
       <TableCell className="w-[15%] min-w-[150px]">
         <div className="inline-flex w-full rounded-xl border border-stroke-200 bg-bg-0 px-3 py-2 text-xs text-muted-foreground">
@@ -84,7 +84,7 @@ export default function ItineraryCustomEventRow({
       </TableCell>
 
       <TableCell className="w-[20%] min-w-[200px]">
-        <div className="line-clamp-2 text-xs text-ink-600">{event.notes || "—"}</div>
+        <div className="line-clamp-2 text-xs text-ink-600">{event.notes || "-"}</div>
       </TableCell>
 
       <TableCell className="w-[5%] min-w-[50px]">
@@ -108,4 +108,3 @@ export default function ItineraryCustomEventRow({
     </TableRow>
   );
 }
-

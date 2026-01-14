@@ -63,7 +63,7 @@ const makeClarification = (query: string, cityLabel: string, options: Array<{ na
 
   const lines = options
     .slice(0, 3)
-    .map((opt, idx) => `${idx + 1}) ${opt.name}${opt.address ? ` — ${opt.address}` : ""}`)
+    .map((opt, idx) => `${idx + 1}) ${opt.name}${opt.address ? ` - ${opt.address}` : ""}`)
     .join("\n");
 
   return `${header}\n\n${lines}\n\nReply with the correct option (or paste a Google Maps link).`;

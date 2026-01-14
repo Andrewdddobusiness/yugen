@@ -26,11 +26,11 @@ export default function BillingCards() {
   const currentPlanLabel = useMemo(() => {
     if (hasActiveSubscription) {
       const interval = subscription?.attrs?.plan?.interval;
-      if (interval === "month") return "Pro — Monthly";
-      if (interval === "year") return "Pro — Yearly";
+      if (interval === "month") return "Pro - Monthly";
+      if (interval === "year") return "Pro - Yearly";
       return "Pro";
     }
-    if (billingBypassEnabled) return "Pro — Testing";
+    if (billingBypassEnabled) return "Pro - Testing";
     return "Free";
   }, [billingBypassEnabled, hasActiveSubscription, subscription?.attrs]);
 

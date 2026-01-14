@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { sanitizeTypography } from "@/lib/text/sanitizeTypography";
 
 export type OpenAiUsage = {
   kind: "chat" | "embedding";
@@ -139,13 +140,22 @@ export async function openaiChatJSON<TSchema extends z.ZodTypeAny>(args: {
       throw new OpenAIError(`AI output failed validation: ${validated.error.message}`, 422);
     }
 
+    const sanitizeDeep = (value: unknown): unknown => {
+      if (typeof value === "string") return sanitizeTypography(value);
+      if (Array.isArray(value)) return value.map(sanitizeDeep);
+      if (value && typeof value === "object") {
+        return Object.fromEntries(Object.entries(value as Record<string, unknown>).map(([k, v]) => [k, sanitizeDeep(v)]));
+      }
+      return value;
+    };
+
     const promptTokens = Number(data?.usage?.prompt_tokens ?? 0) || 0;
     const completionTokens = Number(data?.usage?.completion_tokens ?? 0) || 0;
     const totalTokens =
       Number(data?.usage?.total_tokens ?? 0) || Math.max(0, promptTokens + completionTokens);
 
     return {
-      data: validated.data as z.infer<TSchema>,
+      data: sanitizeDeep(validated.data) as z.infer<TSchema>,
       usage: {
         kind: "chat",
         model,

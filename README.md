@@ -1,4 +1,4 @@
-# Yugi — Soft Navigator Travel Planner
+# Yugi - Soft Navigator Travel Planner
 
 This is the Yugi web app, a Next.js experience built around calm, glassy navigation and tactile buttons for confident trip planning.
 

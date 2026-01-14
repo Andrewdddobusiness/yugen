@@ -23,12 +23,12 @@ type TelemetrySummaryResponse =
   | { ok: false; error?: { code?: string; message?: string } };
 
 const formatMs = (value: number | null) => {
-  if (value == null || !Number.isFinite(value)) return "—";
+  if (value == null || !Number.isFinite(value)) return "-";
   return `${Math.round(value)} ms`;
 };
 
 const formatCls = (value: number | null) => {
-  if (value == null || !Number.isFinite(value)) return "—";
+  if (value == null || !Number.isFinite(value)) return "-";
   return value.toFixed(3);
 };
 
@@ -133,7 +133,7 @@ export default function PerformanceCards() {
                   </div>
                   <div className="col-span-2 flex items-center justify-between text-xs text-muted-foreground">
                     <span>{row?.count ?? 0} samples</span>
-                    <span>{row ? `${row.goodPct}% good` : "—"}</span>
+                    <span>{row ? `${row.goodPct}% good` : "-"}</span>
                   </div>
                 </div>
               )}

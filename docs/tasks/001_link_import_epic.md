@@ -1,4 +1,4 @@
-# 001 — Epic: Import places from links into itinerary drafts
+# 001 - Epic: Import places from links into itinerary drafts
 
 ## Summary
 Enable users to paste links (YouTube Shorts, TikTok, Instagram Reels, TripAdvisor, and generic travel webpages) into the existing Itinerary AI Assistant chat and get a **draft** list (cap: 15) of **unscheduled** places that can be confirmed and added to the itinerary. Persist durable source attribution so each created activity can show “Came from …” with a link back (and embed where possible).
