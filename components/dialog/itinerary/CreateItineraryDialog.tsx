@@ -153,7 +153,7 @@ export default function PopUpCreateItinerary({ children, className, ...props }: 
                       />
                       {dateRange?.from && dateRange?.to ? (
                         <div className="text-[11px] text-ink-500">
-                          {format(dateRange.from, "MMM d, yyyy")} – {format(dateRange.to, "MMM d, yyyy")}
+                          {format(dateRange.from, "MMM d, yyyy")} - {format(dateRange.to, "MMM d, yyyy")}
                         </div>
                       ) : null}
                     </div>

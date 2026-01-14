@@ -4,7 +4,7 @@ Use this as the single source of truth across web, mobile, and AI-generated scre
 
 ---
 
-## 1) Tailwind (Web – Next.js)
+## 1) Tailwind (Web - Next.js)
 
 ```ts
 import type { Config } from "tailwindcss";
@@ -51,7 +51,7 @@ export default config;
 
 ---
 
-## 2) NativeWind Tokens (Mobile – Expo)
+## 2) NativeWind Tokens (Mobile - Expo)
 
 ```ts
 export const tokens = {
@@ -82,10 +82,10 @@ export const tokens = {
 - **Primary Button (tactile)**: h-11 px-5, radius 14, `bg-brand-500 text-white shadow-pressable active:translate-y-[2px] active:shadow-pressed`.
 - **Secondary Glass Button**: Glass surface, subtle border, no heavy shadow; use for filters/secondary actions.
 - **Activity Card**: Solid surface (`bg-0`), border `stroke-200`, radius 16, optional 6px left accent bar, title + meta row (time, distance), backup options as nested tinted cards.
-- **Calendar Block**: Tint fill 10–16%, selected = border `brand-500` + glow; avoid solid fills.
+- **Calendar Block**: Tint fill 10-16%, selected = border `brand-500` + glow; avoid solid fills.
 - **Floating Panel/Sheet**: Glass container, rounded XL, slide + fade transition; inner content uses solid cards.
-- **Toast / Inline feedback**: Compact, may include small wolf head (28–32px), non-blocking.
-- **Empty State**: Wolf mascot (120–160px), one-line guidance, single primary CTA.
+- **Toast / Inline feedback**: Compact, may include small wolf head (28-32px), non-blocking.
+- **Empty State**: Wolf mascot (120-160px), one-line guidance, single primary CTA.
 - **Loading Overlay**: Use `/assets/yugi-mascot-1.png` with gentle float and glass card (see `components/loading/LoadingOverlay.tsx`).
 
 ---

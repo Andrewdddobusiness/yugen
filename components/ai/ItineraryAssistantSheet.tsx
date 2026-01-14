@@ -97,8 +97,8 @@ type ChatMessage = {
 };
 
 const examples = [
-  "Move McDonald's to Tuesday at 7:00–8:00 PM and add note “quick dinner”.",
-  "Add Roscioli to Tuesday at 12:30–1:30 PM.",
+  "Move McDonald's to Tuesday at 7:00-8:00 PM and add note \"quick dinner\".",
+  "Add Roscioli to Tuesday at 12:30-1:30 PM.",
   "Unschedule everything on Friday.",
   "Clear the notes for the bakery on Monday.",
   "Remove the sandwich shop from the itinerary.",
@@ -163,7 +163,7 @@ const formatTimeRange12h = (start: string | null | undefined, end: string | null
   const startLabel = formatTime12h(start);
   const endLabel = formatTime12h(end);
   if (!startLabel && !endLabel) return null;
-  if (startLabel && endLabel) return `${startLabel}–${endLabel}`;
+  if (startLabel && endLabel) return `${startLabel}-${endLabel}`;
   return startLabel ?? endLabel;
 };
 

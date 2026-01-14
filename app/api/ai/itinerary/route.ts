@@ -1373,7 +1373,7 @@ export async function POST(request: NextRequest) {
             ];
           } else {
             clarifications.push(
-              `Please reply with 1–${pending.options.length} for “${pending.query}”, or paste a Google Maps link.`
+              `Please reply with 1-${pending.options.length} for \"${pending.query}\", or paste a Google Maps link.`
             );
           }
         } else if (directPlaceId) {

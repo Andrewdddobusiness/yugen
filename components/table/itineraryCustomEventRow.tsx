@@ -22,7 +22,7 @@ function formatDateLabel(date: string | null) {
 
 function formatTimeLabel(startTime: string | null, endTime: string | null) {
   if (!startTime || !endTime) return "Set time";
-  return `${formatTime(startTime)} – ${formatTime(endTime)}`;
+  return `${formatTime(startTime)} - ${formatTime(endTime)}`;
 }
 
 export default function ItineraryCustomEventRow({

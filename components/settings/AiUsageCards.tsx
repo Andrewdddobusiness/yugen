@@ -15,6 +15,8 @@ type AiUsageResponse =
       tier: "free" | "pro";
       periodStart: string;
       periodEnd: string;
+      periodStartAt?: string;
+      periodEndAt?: string;
       limit: number;
       used: number;
       remaining: number;
@@ -60,6 +62,8 @@ export default function AiUsageCards() {
         accessMode: "pro" as const,
         periodStart: "",
         periodEnd: "",
+        periodStartAt: undefined,
+        periodEndAt: undefined,
         limit: 0,
         used: 0,
         remaining: 0,
@@ -75,7 +79,7 @@ export default function AiUsageCards() {
   }, [data]);
 
   const title = "AI usage";
-  const subtitle = "Track your monthly AI token usage and limits.";
+  const subtitle = "Track your AI token usage and limits.";
 
   return (
     <div className="space-y-4">
@@ -107,6 +111,8 @@ export default function AiUsageCards() {
             </CardTitle>
             {loading ? (
               <Skeleton className="h-4 w-56" />
+            ) : ui.periodEndAt ? (
+              <CardDescription>Resets on {new Date(ui.periodEndAt).toLocaleDateString()}</CardDescription>
             ) : ui.periodEnd ? (
               <CardDescription>Resets on {new Date(`${ui.periodEnd}T00:00:00Z`).toLocaleDateString()}</CardDescription>
             ) : (
@@ -151,7 +157,7 @@ export default function AiUsageCards() {
         <Card className="flex flex-col">
           <CardHeader>
             <CardDescription>Breakdown</CardDescription>
-            <CardTitle className="text-lg font-bold">This month</CardTitle>
+            <CardTitle className="text-lg font-bold">{ui.tier === "pro" ? "This period" : "This month"}</CardTitle>
           </CardHeader>
           <CardContent className="flex-1 space-y-4">
             {loading ? (
@@ -190,4 +196,3 @@ export default function AiUsageCards() {
     </div>
   );
 }
-

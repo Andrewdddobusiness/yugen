@@ -290,7 +290,7 @@ export function CustomEventBlock({
               <div className="mt-0.5 flex items-center text-xs text-ink-500">
                 <Clock className="h-3 w-3 mr-1 flex-shrink-0" />
                 <span className="truncate">
-                  {formatDisplayTime(event.startTime)} – {formatDisplayTime(event.endTime)}
+                  {formatDisplayTime(event.startTime)} - {formatDisplayTime(event.endTime)}
                 </span>
               </div>
             </div>

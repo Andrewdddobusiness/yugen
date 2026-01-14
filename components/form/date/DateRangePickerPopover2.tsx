@@ -66,9 +66,9 @@ export function DatePickerWithRangePopover2({
     const sameYear = from.getFullYear() === to.getFullYear();
     const sameMonth = sameYear && from.getMonth() === to.getMonth();
 
-    if (sameMonth) return `${format(from, "MMM d")}–${format(to, "d, yyyy")}`;
-    if (sameYear) return `${format(from, "MMM d")} – ${format(to, "MMM d, yyyy")}`;
-    return `${format(from, "MMM d, yyyy")} – ${format(to, "MMM d, yyyy")}`;
+    if (sameMonth) return `${format(from, "MMM d")} - ${format(to, "d, yyyy")}`;
+    if (sameYear) return `${format(from, "MMM d")} - ${format(to, "MMM d, yyyy")}`;
+    return `${format(from, "MMM d, yyyy")} - ${format(to, "MMM d, yyyy")}`;
   }, [date?.from, date?.to]);
 
   const today = new Date();

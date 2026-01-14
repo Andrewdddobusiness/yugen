@@ -100,7 +100,7 @@ const formatSchedule = (
     return d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
   };
 
-  return `${dateLabel} · ${toTimeLabel(start)}–${toTimeLabel(end)}`;
+  return `${dateLabel} · ${toTimeLabel(start)} - ${toTimeLabel(end)}`;
 };
 
 const HistorySkeleton = ({ count = 8 }: { count?: number }) => (

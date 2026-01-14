@@ -22,6 +22,17 @@ const getClientIpFromHeaders = () => {
   return first || headers().get("x-real-ip") || "unknown";
 };
 
+const getAppUrl = () => {
+  const explicit = process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_SITE_URL;
+  if (explicit && explicit.trim().length > 0) return explicit.replace(/\/+$/, "");
+
+  const h = headers();
+  const proto = h.get("x-forwarded-proto") ?? "http";
+  const host = h.get("x-forwarded-host") ?? h.get("host");
+  if (!host) return null;
+  return `${proto}://${host}`.replace(/\/+$/, "");
+};
+
 const AllowedPriceIdSchema = z.string().trim().min(1).max(200);
 
 export async function handleUserSignup(userId: string, email: string, firstName: string, lastName: string) {
@@ -157,7 +168,7 @@ export async function createCheckoutSession(priceId: string) {
       if (upsertError) throw upsertError;
     }
 
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_SITE_URL;
+    const appUrl = getAppUrl();
     if (!appUrl) {
       throw new Error("App URL is not configured");
     }
@@ -375,7 +386,7 @@ export async function createCustomerPortalSession() {
       if (upsertError) throw upsertError;
     }
 
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_SITE_URL;
+    const appUrl = getAppUrl();
     if (!appUrl) throw new Error("App URL is not configured");
 
     const portalSession = await stripe.billingPortal.sessions.create({

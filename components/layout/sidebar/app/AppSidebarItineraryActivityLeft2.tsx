@@ -145,7 +145,7 @@ export function AppSidebarItineraryActivityLeft({
     try {
       const from = new Date(fromDate);
       const to = new Date(toDate);
-      return `${format(from, "MMM d")} – ${format(to, "MMM d, yyyy")}`;
+      return `${format(from, "MMM d")} - ${format(to, "MMM d, yyyy")}`;
     } catch {
       return "";
     }
