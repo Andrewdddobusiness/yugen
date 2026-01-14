@@ -54,6 +54,26 @@ const jsonError = (status: number, code: string, message: string, details?: unkn
   );
 };
 
+const isActiveProGrant = async (supabase: ReturnType<typeof createClient>, userId: string) => {
+  try {
+    const { data, error } = await supabase
+      .from("pro_grants")
+      .select("enabled,expires_at")
+      .eq("user_id", userId)
+      .maybeSingle();
+
+    if (error || !data) return false;
+    if (!data.enabled) return false;
+    if (!data.expires_at) return true;
+
+    const expiresAt = new Date(data.expires_at as any);
+    if (Number.isNaN(expiresAt.getTime())) return false;
+    return new Date() < expiresAt;
+  } catch {
+    return false;
+  }
+};
+
 const isActiveProSubscriber = async (supabase: ReturnType<typeof createClient>, userId: string) => {
   try {
     const { data, error } = await supabase
@@ -102,7 +122,10 @@ const requireAiAssistantAccess = async (supabase: ReturnType<typeof createClient
     };
   }
 
-  const isPro = isDevBillingBypassEnabled() || (await isActiveProSubscriber(supabase, userId));
+  const isPro =
+    isDevBillingBypassEnabled() ||
+    (await isActiveProSubscriber(supabase, userId)) ||
+    (await isActiveProGrant(supabase, userId));
   if (mode === "pro" && !isPro) {
     return {
       ok: false as const,

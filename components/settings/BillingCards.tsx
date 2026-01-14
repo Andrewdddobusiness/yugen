@@ -19,12 +19,15 @@ export default function BillingCards() {
   const { subscription, isSubscriptionLoading } = useStripeSubscriptionStore();
 
   const billingBypassEnabled = isDevBillingBypassEnabled();
-  const hasActiveSubscription = subscription?.status === "active";
+  const isGrant = subscription?.attrs?.source === "grant";
+  const hasPaidStripeSubscription = subscription?.status === "active" && !isGrant;
+  const hasProAccess = subscription?.status === "active";
   const isLoading = (isUserLoading && !user) || isSubscriptionLoading;
-  const isPro = billingBypassEnabled || hasActiveSubscription;
+  const isPro = billingBypassEnabled || hasProAccess;
 
   const currentPlanLabel = useMemo(() => {
-    if (hasActiveSubscription) {
+    if (isGrant) return "Pro - Granted";
+    if (hasPaidStripeSubscription) {
       const interval = subscription?.attrs?.plan?.interval;
       if (interval === "month") return "Pro - Monthly";
       if (interval === "year") return "Pro - Yearly";
@@ -32,17 +35,24 @@ export default function BillingCards() {
     }
     if (billingBypassEnabled) return "Pro - Testing";
     return "Free";
-  }, [billingBypassEnabled, hasActiveSubscription, subscription?.attrs]);
+  }, [billingBypassEnabled, hasPaidStripeSubscription, isGrant, subscription?.attrs]);
 
   const [selectedInterval, setSelectedInterval] = useState<"monthly" | "yearly">("monthly");
 
   const renewalText = useMemo(() => {
     if (!isPro) return null;
-    if (billingBypassEnabled && !hasActiveSubscription) return "Billing bypass is enabled for testing.";
+    if (billingBypassEnabled && !hasProAccess) return "Billing bypass is enabled for testing.";
+    if (isGrant) {
+      if (subscription?.attrs?.expiresAt) {
+        const expiresAt = new Date(subscription.attrs.expiresAt);
+        if (!Number.isNaN(expiresAt.getTime())) return `Access expires on ${expiresAt.toLocaleDateString()}`;
+      }
+      return "Pro access was granted.";
+    }
     if (subscription?.attrs?.cancel_at_period_end) return "Cancels at period end";
     if (!subscription?.currentPeriodEnd) return null;
     return `Renews on ${subscription.currentPeriodEnd.toLocaleDateString()}`;
-  }, [billingBypassEnabled, hasActiveSubscription, isPro, subscription?.attrs, subscription?.currentPeriodEnd]);
+  }, [billingBypassEnabled, hasProAccess, isPro, isGrant, subscription?.attrs, subscription?.currentPeriodEnd]);
 
   return (
     <div className="space-y-4">
@@ -91,7 +101,7 @@ export default function BillingCards() {
                 <div className="flex items-start gap-3">
                   <Sparkles className="mt-0.5 h-4 w-4 text-yellow-500" />
                   <p>
-                    {billingBypassEnabled && !hasActiveSubscription
+                    {billingBypassEnabled && !hasProAccess
                       ? "You’re in Pro testing mode. AI and other Pro features are unlocked without billing."
                       : "You’re on Pro. Manage billing, invoices, and cancellations in Stripe using the button below."}
                   </p>
@@ -110,12 +120,14 @@ export default function BillingCards() {
           <CardFooter className="border-t px-6 py-4">
             {isLoading ? (
               <Skeleton className="h-10 w-full" />
-            ) : hasActiveSubscription ? (
+            ) : hasPaidStripeSubscription ? (
               <ManageSubscriptionButton />
             ) : (
               <div className="w-full text-sm text-muted-foreground">
                 {billingBypassEnabled
                   ? "Billing bypass is enabled for this environment."
+                  : isGrant
+                    ? "Pro access is granted for this account."
                   : "Select an interval on the right, then click “Upgrade to Pro”."}
               </div>
             )}
@@ -175,8 +187,10 @@ export default function BillingCards() {
           <CardFooter className="border-t px-6 py-4">
             {isLoading ? (
               <Skeleton className="h-10 w-full" />
-            ) : hasActiveSubscription ? (
+            ) : hasPaidStripeSubscription ? (
               <ManageSubscriptionButton />
+            ) : isGrant ? (
+              <div className="w-full text-sm text-muted-foreground">Pro access is granted for this account.</div>
             ) : (
               <CheckoutButton priceId={pricingDetails[selectedInterval].priceId}>Upgrade to Pro</CheckoutButton>
             )}

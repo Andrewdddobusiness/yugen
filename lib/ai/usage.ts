@@ -92,19 +92,59 @@ const getAiPeriodForUser = async (args: { supabase: any; userId: string; tier: A
   const periodStart = parseDateish((sub as any)?.current_period_start);
   const periodEnd = parseDateish((sub as any)?.current_period_end);
 
-  // If we can't reliably read the subscription window, fall back to calendar month.
-  if (!isPaidStatus || !periodStart || !periodEnd) return getAiCurrentPeriod();
+  // If the user is Pro via Stripe, anchor the quota window to the Stripe billing cycle.
+  if (isPaidStatus && periodStart && periodEnd) {
+    // If the Stripe billing period is larger than ~1 month (ex: yearly plans), still reset AI quotas monthly,
+    // anchored to the subscription period start.
+    const billingPeriodDays = (periodEnd.getTime() - periodStart.getTime()) / (1000 * 60 * 60 * 24);
+    if (billingPeriodDays > 35) {
+      let start = periodStart;
+      // Advance in monthly steps until the window contains `now`.
+      while (addMonthsUTC(start, 1).getTime() <= now.getTime()) {
+        start = addMonthsUTC(start, 1);
+      }
+      const end = addMonthsUTC(start, 1);
+      return {
+        periodStartAt: start,
+        periodEndAt: end,
+        periodStart: formatDateUTC(start),
+        periodEnd: formatDateUTC(end),
+      };
+    }
 
-  // If the Stripe billing period is larger than ~1 month (ex: yearly plans), still reset AI quotas monthly,
-  // anchored to the subscription period start.
-  const billingPeriodDays = (periodEnd.getTime() - periodStart.getTime()) / (1000 * 60 * 60 * 24);
-  if (billingPeriodDays > 35) {
-    let start = periodStart;
-    // Advance in monthly steps until the window contains `now`.
+    return {
+      periodStartAt: periodStart,
+      periodEndAt: periodEnd,
+      periodStart: formatDateUTC(periodStart),
+      periodEnd: formatDateUTC(periodEnd),
+    };
+  }
+
+  // Otherwise, check for a manual Pro grant and anchor quota windows to the grant creation date.
+  const { data: grant } = await supabase
+    .from("pro_grants")
+    .select("enabled,expires_at,created_at")
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  const grantEnabled = Boolean((grant as any)?.enabled);
+  const grantCreatedAt = parseDateish((grant as any)?.created_at) ?? now;
+  const grantExpiresAt = (grant as any)?.expires_at ? parseDateish((grant as any)?.expires_at) : null;
+
+  if (grantEnabled) {
+    if (grantExpiresAt && !Number.isNaN(grantExpiresAt.getTime()) && now.getTime() >= grantExpiresAt.getTime()) {
+      return getAiCurrentPeriod();
+    }
+
+    let start = grantCreatedAt;
     while (addMonthsUTC(start, 1).getTime() <= now.getTime()) {
       start = addMonthsUTC(start, 1);
     }
-    const end = addMonthsUTC(start, 1);
+    let end = addMonthsUTC(start, 1);
+    if (grantExpiresAt && !Number.isNaN(grantExpiresAt.getTime()) && grantExpiresAt.getTime() < end.getTime()) {
+      end = grantExpiresAt;
+    }
+
     return {
       periodStartAt: start,
       periodEndAt: end,
@@ -113,12 +153,9 @@ const getAiPeriodForUser = async (args: { supabase: any; userId: string; tier: A
     };
   }
 
-  return {
-    periodStartAt: periodStart,
-    periodEndAt: periodEnd,
-    periodStart: formatDateUTC(periodStart),
-    periodEnd: formatDateUTC(periodEnd),
-  };
+  // If we can't reliably read a Pro window, fall back to calendar month.
+  return getAiCurrentPeriod();
+
 };
 
 export async function getAiUsageForCurrentPeriod(args: {

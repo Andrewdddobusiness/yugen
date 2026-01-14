@@ -1,14 +1,16 @@
 -- Itinerary sources + attribution (link import)
 -- Created: 2026-01-11
 
-create extension if not exists "uuid-ossp";
+-- Supabase typically installs extensions into the `extensions` schema.
+create schema if not exists extensions;
+create extension if not exists "uuid-ossp" with schema extensions;
 
 -- =====================================================
 -- TABLES
 -- =====================================================
 
 create table if not exists public.itinerary_source (
-  itinerary_source_id uuid primary key default uuid_generate_v4(),
+  itinerary_source_id uuid primary key default extensions.uuid_generate_v4(),
   itinerary_id integer references public.itinerary(itinerary_id) on delete cascade not null,
   itinerary_destination_id integer references public.itinerary_destination(itinerary_destination_id) on delete set null,
   provider text not null check (provider in ('youtube', 'tiktok', 'instagram', 'tripadvisor', 'web')),
@@ -196,4 +198,3 @@ create trigger set_timestamp_itinerary_source
 -- Defensive; Supabase may already set default privileges.
 grant select, insert, update, delete on table public.itinerary_source to authenticated;
 grant select, insert, update, delete on table public.itinerary_activity_source to authenticated;
-

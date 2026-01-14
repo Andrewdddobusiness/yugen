@@ -31,35 +31,64 @@ export async function getSubscriptionDetailsClient() {
     return { status: "free" };
   }
 
-  const { data: row, error } = await supabase
-    .from("subscriptions")
-    .select("stripe_subscription_id,stripe_customer_id,status,currency,current_period_end,attrs")
-    .eq("user_id", user.id)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+  const [subscriptionResult, grantResult] = await Promise.all([
+    supabase
+      .from("subscriptions")
+      .select("stripe_subscription_id,stripe_customer_id,status,currency,current_period_end,attrs")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    supabase
+      .from("pro_grants")
+      .select("enabled,expires_at,note,created_at")
+      .eq("user_id", user.id)
+      .maybeSingle(),
+  ]);
 
-  if (error) {
-    return { status: "error", error };
+  if (subscriptionResult.error) {
+    return { status: "error", error: subscriptionResult.error };
   }
 
-  if (!row?.stripe_subscription_id || !row.current_period_end) {
+  const row = subscriptionResult.data as any;
+
+  if (row?.stripe_subscription_id && row.current_period_end) {
+    const periodEnd = parseDateish(row.current_period_end);
+    const statusRaw = String(row.status ?? "");
+    const isPaidStatus = statusRaw === "active" || statusRaw === "trialing";
+
+    const isActive = isPaidStatus && (Number.isNaN(periodEnd.getTime()) || new Date() < periodEnd);
+
+    return {
+      status: isActive ? "active" : "inactive",
+      currentPeriodEnd: periodEnd,
+      subscriptionId: row.stripe_subscription_id,
+      stripeCustomerId: row.stripe_customer_id,
+      currency: row.currency,
+      attrs: { ...(row.attrs ?? {}), source: "stripe" },
+    };
+  }
+
+  if (grantResult.error) {
+    return { status: "error", error: grantResult.error };
+  }
+
+  const grant = grantResult.data as any;
+  const enabled = Boolean(grant?.enabled);
+  const expiresAt = grant?.expires_at ? parseDateish(grant.expires_at) : null;
+  const isExpired = expiresAt ? !Number.isNaN(expiresAt.getTime()) && new Date() >= expiresAt : false;
+
+  if (!enabled || isExpired) {
     return { status: "free" };
   }
 
-  const periodEnd = parseDateish(row.current_period_end);
-  const statusRaw = String(row.status ?? "");
-  const isPaidStatus = statusRaw === "active" || statusRaw === "trialing";
-
-  const isActive = isPaidStatus && (Number.isNaN(periodEnd.getTime()) || new Date() < periodEnd);
-
+  // Treat manual grants as "active" for feature gating, but mark the source to avoid showing Stripe controls.
   return {
-    status: isActive ? "active" : "inactive",
-    currentPeriodEnd: periodEnd,
-    subscriptionId: row.stripe_subscription_id,
-    stripeCustomerId: row.stripe_customer_id,
-    currency: row.currency,
-    attrs: row.attrs,
+    status: "active",
+    currentPeriodEnd: expiresAt ?? new Date(NaN),
+    subscriptionId: `grant_${user.id}`,
+    stripeCustomerId: "",
+    currency: "USD",
+    attrs: { source: "grant", note: grant?.note ?? null, expiresAt: grant?.expires_at ?? null, createdAt: grant?.created_at ?? null },
   };
 }
-
