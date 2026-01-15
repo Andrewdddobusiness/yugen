@@ -23,7 +23,7 @@ export const metadata: Metadata = {
     address: false,
     telephone: false,
   },
-  metadataBase: new URL("https://www.planaway.lol"),
+  metadataBase: new URL("https://planaway.website"),
   alternates: {
     canonical: "/",
   },
@@ -31,7 +31,7 @@ export const metadata: Metadata = {
     title: "Planaway - Travel Planner",
     description:
       "Planaway blends calm guidance, glassmorphic polish, and tactile controls to make travel planning feel premium and precise.",
-    url: "https://www.planaway.lol",
+    url: "https://planaway.website",
     siteName: "Planaway",
     images: [
       {

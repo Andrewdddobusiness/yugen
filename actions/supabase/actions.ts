@@ -3,6 +3,7 @@ import { IItineraryCard } from "@/components/card/itinerary/ItineraryCard";
 import { createActivitySchema } from "@/schemas/activitySchema";
 import { createAdminClient } from "@/utils/supabase/admin";
 import { createClient } from "@/utils/supabase/server";
+import { toJsonSafe } from "@/lib/security/toJsonSafe";
 
 const SAFE_IDENTIFIER = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
 const ensureSafeIdentifiers = (values: string[]) => values.every((value) => SAFE_IDENTIFIER.test(value));
@@ -121,7 +122,7 @@ export async function insertTableData(tableName: string, tableData: any) {
 
   if (error) {
     console.log(error);
-    return { success: false, message: "Insert failed", error };
+    return { success: false, message: "Insert failed", error: toJsonSafe(error) };
   }
 
   return { success: true, message: "Insert successful", data: data };
@@ -179,7 +180,7 @@ export async function createNewItinerary(
     return { success: true };
   } catch (error) {
     console.error("Error creating itinerary:", error);
-    return { success: false, error };
+    return { success: false, error: toJsonSafe(error) };
   }
 }
 
@@ -205,7 +206,7 @@ export async function setTableData(tableName: string, tableData: any, uniqueColu
 
   if (error) {
     console.log(error);
-    return { success: false, message: "Upsert failed", error };
+    return { success: false, message: "Upsert failed", error: toJsonSafe(error) };
   }
 
   return { success: true, message: "Upsert successful", data: data };
@@ -238,7 +239,7 @@ export async function setTableDataWithCheck(tableName: string, tableData: any, u
 
   if (selectError) {
     console.error("Error checking existing data:", selectError);
-    return { success: false, message: "Check failed", error: selectError };
+    return { success: false, message: "Check failed", error: toJsonSafe(selectError) };
   }
 
   let result;
@@ -253,7 +254,7 @@ export async function setTableDataWithCheck(tableName: string, tableData: any, u
 
   if (result.error) {
     console.error("Operation failed:", result.error);
-    return { success: false, message: "Operation failed", error: result.error };
+    return { success: false, message: "Operation failed", error: toJsonSafe(result.error) };
   }
 
   return { success: true, message: "Operation successful", data: result.data };
@@ -287,7 +288,7 @@ export async function setItineraryDestinationDateRange(
 
   if (error) {
     console.error("Error setting date range:", error);
-    return { success: false, message: "Set date range failed", error };
+    return { success: false, message: "Set date range failed", error: toJsonSafe(error) };
   }
 
   return { success: true, message: "Set date range successful", data };
@@ -321,7 +322,7 @@ export async function setItineraryActivityDateTimes(
 
   if (error) {
     console.error("Error setting date range:", error);
-    return { success: false, message: "Set date range failed", error };
+    return { success: false, message: "Set date range failed", error: toJsonSafe(error) };
   }
 
   return { success: true, message: "Set date range successful", data };
@@ -349,7 +350,7 @@ export async function setItineraryActivityTimes(itineraryActivityId: string, sta
 
   if (error) {
     console.error("Error setting date range:", error);
-    return { success: false, message: "Set date range failed", error };
+    return { success: false, message: "Set date range failed", error: toJsonSafe(error) };
   }
 
   return { success: true, message: "Set date range successful", data };
@@ -367,7 +368,7 @@ export async function setItineraryActivityNotes(itineraryActivityId: string, not
 
   if (error) {
     console.error("Error setting notes:", error);
-    return { success: false, message: "Set notes failed", error };
+    return { success: false, message: "Set notes failed", error: toJsonSafe(error) };
   }
 
   return { success: true, message: "Set notes successful", data };
@@ -394,14 +395,14 @@ export async function batchUpdateItineraryActivities(updates: { id: string; orde
       return { 
         success: false, 
         message: "Some updates failed", 
-        errors: failedUpdates.map(r => r.error) 
+        errors: failedUpdates.map((result) => toJsonSafe(result.error)) 
       };
     }
 
     return { success: true, message: "Batch update successful" };
   } catch (error) {
     console.error("Error in batch update:", error);
-    return { success: false, message: "Batch update failed", error };
+    return { success: false, message: "Batch update failed", error: toJsonSafe(error) };
   }
 }
 
@@ -417,7 +418,7 @@ export async function setActivityName(activityId: string, name: string) {
 
   if (error) {
     console.error("Error setting activity name:", error);
-    return { success: false, message: "Set activity name failed", error };
+    return { success: false, message: "Set activity name failed", error: toJsonSafe(error) };
   }
 
   return { success: true, message: "Set activity name successful", data };
@@ -433,7 +434,7 @@ export async function deleteTableData(tableName: string, matchConditions: Record
 
   if (error) {
     console.error("Delete failed:", error);
-    return { success: false, message: "Delete failed", error };
+    return { success: false, message: "Delete failed", error: toJsonSafe(error) };
   }
 
   return { success: true, message: "Delete successful", data };
@@ -454,7 +455,7 @@ export async function softDeleteTableData(tableName: string, matchConditions: Re
 
   if (error) {
     console.error("Soft delete failed:", error);
-    return { success: false, message: "Soft delete failed", error };
+    return { success: false, message: "Soft delete failed", error: toJsonSafe(error) };
   }
 
   return { success: true, message: "Soft delete successful", data };
@@ -478,7 +479,7 @@ export async function softDeleteTableData2(tableName: string, matchConditions: R
 
   if (error) {
     console.error("Soft delete failed:", error);
-    return { success: false, message: "Soft delete failed", error };
+    return { success: false, message: "Soft delete failed", error: toJsonSafe(error) };
   }
 
   return { success: true, message: "Soft delete successful", data };
@@ -499,7 +500,7 @@ export const softDeleteItinerary = async (itineraryId: number) => {
     return { success: true, data };
   } catch (error) {
     console.error("Error soft deleting itinerary:", error);
-    return { success: false, error };
+    return { success: false, error: toJsonSafe(error) };
   }
 };
 
@@ -518,7 +519,7 @@ export const permanentlyDeleteUser = async (userId: string) => {
     return { success: true };
   } catch (error) {
     console.error("Error permanently deleting user:", error);
-    return { success: false, error };
+    return { success: false, error: toJsonSafe(error) };
   }
 };
 
@@ -535,7 +536,7 @@ export const deleteItinerarySearchHistory = async (itineraryId: string, itinerar
     return { success: true };
   } catch (error) {
     console.error("Error deleting search history:", error);
-    return { success: false, error };
+    return { success: false, error: toJsonSafe(error) };
   }
 };
 
@@ -565,7 +566,7 @@ export async function fetchTableData(
 
   if (error) {
     console.error(`Error fetching ${tableName} data:`, error);
-    return { error };
+    return { error: toJsonSafe(error) };
   }
 
   return { data };
@@ -583,7 +584,7 @@ export async function fetchFilteredTableData(
 
   if (error) {
     console.log(error);
-    return { success: false, message: "Fetch failed", error };
+    return { success: false, message: "Fetch failed", error: toJsonSafe(error) };
   }
 
   return { success: true, message: "Fetch successful", data: data };
@@ -615,7 +616,7 @@ export async function fetchFilteredTableData2(
     if (!isMissingActorColumns) {
       console.error("Fetch failed:", error);
     }
-    return { success: false, message: "Fetch failed", error };
+    return { success: false, message: "Fetch failed", error: toJsonSafe(error) };
   }
 
   return { success: true, message: "Fetch successful", data: data };
@@ -659,7 +660,7 @@ export const fetchCityDetails = async (itineraryId: any) => {
 
   if (error) {
     console.error("Error fetching city data:", error);
-    return { error };
+    return { error: toJsonSafe(error) };
   }
 
   return { data };
@@ -692,7 +693,7 @@ export const fetchItineraryDestination = async (itineraryId: string, destination
 
   if (error) {
     console.error("Error fetching itinerary destination:", error);
-    return { error };
+    return { error: toJsonSafe(error) };
   }
 
   return { data };
@@ -710,7 +711,7 @@ export async function fetchItineraryDestinationDateRange(itineraryId: string, de
 
   if (error) {
     console.error("Error fetching date range:", error);
-    return { success: false, message: "Fetch date range failed", error };
+    return { success: false, message: "Fetch date range failed", error: toJsonSafe(error) };
   }
 
   return {
@@ -729,7 +730,7 @@ export async function fetchActivityIdByPlaceId(placeId: string) {
 
   if (error) {
     console.error("Error fetching activity_id:", error);
-    return { success: false, message: "Fetch failed", error };
+    return { success: false, message: "Fetch failed", error: toJsonSafe(error) };
   }
 
   return { success: true, message: "Fetch successful", data };
@@ -746,7 +747,7 @@ export async function fetchItineraryActivities(itineraryId: string, destinationI
 
   if (error) {
     console.error("Error fetching activity_id:", error);
-    return { success: false, message: "Fetch failed", error };
+    return { success: false, message: "Fetch failed", error: toJsonSafe(error) };
   }
 
   return { success: true, message: "Fetch successful", data };
@@ -768,7 +769,7 @@ export const checkEntryExists = async (tableName: string, filterParams: Record<s
 
   if (error) {
     console.error("Error fetching data:", error);
-    return { exists: false, error };
+    return { exists: false, error: toJsonSafe(error) };
   }
 
   return { exists: data && data.length > 0 };
@@ -806,7 +807,7 @@ export const fetchSearchHistoryActivities = async (itineraryId: string, destinat
 
   if (searchError) {
     console.error("Error fetching search history:", searchError);
-    return { error: searchError };
+    return { error: toJsonSafe(searchError) };
   }
 
   const formattedPlaceIds = searchHistory.map((item) => item.place_id.split("/").pop());
@@ -824,7 +825,7 @@ export const fetchSearchHistoryActivities = async (itineraryId: string, destinat
 
   if (activitiesError) {
     console.error("Error fetching activities:", activitiesError);
-    return { error: activitiesError };
+    return { error: toJsonSafe(activitiesError) };
   }
 
   const mappedActivities = activities.map((activity) => {
@@ -915,7 +916,7 @@ export async function fetchUserItineraries(userId: string): Promise<{ data: IIti
     return { data: filteredData, error: null };
   } catch (error) {
     console.error("Error fetching itineraries:", error);
-    return { data: null, error };
+    return { data: null, error: toJsonSafe(error) };
   }
 }
 

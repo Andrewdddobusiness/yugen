@@ -3,7 +3,10 @@
 import { IActivity, type IOpenHours, type IReview } from "@/store/activityStore";
 import { foodTypes, shoppingTypes, historicalTypes, SearchType, includedTypes } from "@/lib/googleMaps/includedTypes";
 
-const GOOGLE_MAPS_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+const GOOGLE_MAPS_API_KEY =
+  process.env.GOOGLE_PLACES_API_KEY ||
+  process.env.GOOGLE_MAPS_API_KEY ||
+  process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
 
 const dayOfWeekToNumber = (value: unknown): number | null => {
   if (typeof value === "number" && Number.isFinite(value)) {

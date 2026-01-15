@@ -1,10 +1,20 @@
 "use server";
 
 import type { Coordinates, DatabaseResponse } from "@/types/database";
+import { toJsonSafe } from "@/lib/security/toJsonSafe";
 
 /**
  * Geocoding and reverse geocoding functions for Google Maps integration
  */
+
+const getServerPlacesKey = () =>
+  process.env.GOOGLE_PLACES_API_KEY || process.env.GOOGLE_MAPS_API_KEY || process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+
+const getServerGeocodingKey = () =>
+  process.env.GOOGLE_MAPS_API_KEY ||
+  process.env.GOOGLE_PLACES_API_KEY ||
+  process.env.NEXT_PUBLIC_GOOGLE_MAPS_GEOCODING_API_KEY ||
+  process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
 
 /**
  * Converts an address to coordinates using Google Geocoding API
@@ -15,7 +25,7 @@ export async function geocodeAddress(address: string): Promise<DatabaseResponse<
   place_id: string;
 }>> {
   try {
-    const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_GEOCODING_API_KEY || process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+    const apiKey = getServerGeocodingKey();
     
     if (!apiKey || apiKey === 'your-google-maps-api-key-here') {
       return {
@@ -72,7 +82,7 @@ export async function geocodeAddress(address: string): Promise<DatabaseResponse<
       success: false,
       error: { 
         message: error.message || "Geocoding failed",
-        details: error
+        details: toJsonSafe(error),
       }
     };
   }
@@ -87,7 +97,7 @@ export async function reverseGeocode(coordinates: Coordinates): Promise<Database
   place_id: string;
 }>> {
   try {
-    const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_GEOCODING_API_KEY || process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+    const apiKey = getServerGeocodingKey();
     
     if (!apiKey || apiKey === 'your-google-maps-api-key-here') {
       return {
@@ -139,7 +149,7 @@ export async function reverseGeocode(coordinates: Coordinates): Promise<Database
       success: false,
       error: { 
         message: error.message || "Reverse geocoding failed",
-        details: error
+        details: toJsonSafe(error),
       }
     };
   }
@@ -154,7 +164,7 @@ export async function getNearbyPlaces(
   type?: string
 ): Promise<DatabaseResponse<any[]>> {
   try {
-    const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+    const apiKey = getServerPlacesKey();
     
     if (!apiKey || apiKey === 'your-google-maps-api-key-here') {
       return {
@@ -184,7 +194,7 @@ export async function getNearbyPlaces(
       success: false,
       error: { 
         message: error.message || "Failed to fetch nearby places",
-        details: error
+        details: toJsonSafe(error),
       }
     };
   }
@@ -201,7 +211,7 @@ export async function searchPlaces(
   type?: string
 ): Promise<DatabaseResponse<any[]>> {
   try {
-    const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+    const apiKey = getServerPlacesKey();
     
     if (!apiKey || apiKey === 'your-google-maps-api-key-here') {
       return {
@@ -252,7 +262,7 @@ export async function searchPlaces(
       success: false,
       error: { 
         message: error.message || "Failed to search places",
-        details: error
+        details: toJsonSafe(error),
       }
     };
   }
@@ -264,7 +274,7 @@ export async function getPlacePhotos(
   maxHeight: number = 1000
 ): Promise<DatabaseResponse<string[]>> {
   try {
-    const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+    const apiKey = getServerPlacesKey();
     
     if (!apiKey || apiKey === 'your-google-maps-api-key-here') {
       return {
@@ -306,7 +316,7 @@ export async function getPlacePhotos(
       success: false,
       error: { 
         message: error.message || "Failed to fetch place photos",
-        details: error
+        details: toJsonSafe(error),
       }
     };
   }
@@ -321,7 +331,7 @@ export async function searchPlacesByText(
   radius?: number
 ): Promise<DatabaseResponse<any[]>> {
   try {
-    const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+    const apiKey = getServerPlacesKey();
     
     if (!apiKey || apiKey === 'your-google-maps-api-key-here') {
       return {
@@ -414,7 +424,7 @@ export async function searchPlacesByText(
       success: false,
       error: { 
         message: error.message || "Text search failed",
-        details: error
+        details: toJsonSafe(error),
       }
     };
   }
@@ -429,7 +439,7 @@ export async function getPlaceAutocomplete(
   radius?: number
 ): Promise<DatabaseResponse<any[]>> {
   try {
-    const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+    const apiKey = getServerPlacesKey();
     
     if (!apiKey || apiKey === 'your-google-maps-api-key-here') {
       return {
@@ -466,7 +476,7 @@ export async function getPlaceAutocomplete(
       success: false,
       error: { 
         message: error.message || "Autocomplete failed",
-        details: error
+        details: toJsonSafe(error),
       }
     };
   }

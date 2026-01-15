@@ -16,14 +16,23 @@ const getClientIpFromHeaders = () => {
 };
 
 const getAppUrl = () => {
-  const explicit = process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_SITE_URL;
-  if (explicit && explicit.trim().length > 0) return explicit.replace(/\/+$/, "");
-
   const h = headers();
   const proto = h.get("x-forwarded-proto") ?? "http";
   const host = h.get("x-forwarded-host") ?? h.get("host");
-  if (!host) return null;
-  return `${proto}://${host}`.replace(/\/+$/, "");
+  if (host) return `${proto}://${host}`.replace(/\/+$/, "");
+
+  const originLike = h.get("origin") ?? h.get("referer");
+  if (originLike) {
+    try {
+      return new URL(originLike).origin.replace(/\/+$/, "");
+    } catch {
+      // ignore
+    }
+  }
+
+  const explicit = process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_SITE_URL;
+  if (explicit && explicit.trim().length > 0) return explicit.replace(/\/+$/, "");
+  return null;
 };
 
 const EmailSchema = z.string().trim().toLowerCase().email().max(320);

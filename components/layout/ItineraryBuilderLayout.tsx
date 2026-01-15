@@ -107,7 +107,10 @@ export function ItineraryBuilderLayout({ children, className }: ItineraryBuilder
 
   if (destinationError || destinationData?.error || !destinationData?.data) {
     console.error('ItineraryBuilderLayout error:', destinationError, destinationData);
-    return <div>Layout Error: {destinationError?.message || destinationData?.error?.message || 'Failed to load destination data'}</div>;
+    const queryErrorMessage = destinationError instanceof Error ? destinationError.message : undefined;
+    const dataErrorMessage =
+      typeof (destinationData as any)?.error?.message === "string" ? (destinationData as any).error.message : undefined;
+    return <div>Layout Error: {queryErrorMessage || dataErrorMessage || 'Failed to load destination data'}</div>;
   }
 
   const destination = destinationData.data;

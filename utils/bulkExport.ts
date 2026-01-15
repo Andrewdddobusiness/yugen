@@ -383,7 +383,7 @@ X-WR-CALNAME:${itinerary.itineraryName || itinerary.city} Itinerary
 
 ${itinerary.activities.filter(a => a.start_time && a.date).map((activity, index) => `
 BEGIN:VEVENT
-UID:bulk-export-${index}@planaway.lol
+UID:bulk-export-${index}@planaway.website
 DTSTART:${this.formatCalendarDateTime(activity.date as string, activity.start_time!)}
 SUMMARY:${activity.activity?.name || 'Travel Activity'}
 LOCATION:${activity.activity?.address || ''}

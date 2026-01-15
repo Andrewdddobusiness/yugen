@@ -47,7 +47,7 @@ function OverviewContent() {
 
   useEffect(() => {
     const fetchCityData = async () => {
-      if (user) {
+      if (user && id) {
         setLoading(true);
         try {
           const { data, error } = await fetchCityDetails(id);
@@ -55,7 +55,11 @@ function OverviewContent() {
           if (error) {
             console.error("Error fetching itinerary data:", error);
           } else {
-            setCityData(data[0]);
+            const first = Array.isArray(data) ? data[0] : null;
+            if (!first) {
+              console.warn("No city data returned for itinerary:", id);
+            }
+            setCityData(first);
           }
         } catch (error) {
           console.error("Error fetching itinerary data:", error);

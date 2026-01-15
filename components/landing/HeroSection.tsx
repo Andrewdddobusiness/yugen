@@ -177,7 +177,7 @@ export default function HeroSection({ user, isUserLoading }: HeroSectionProps) {
                 <div className="w-3 h-3 rounded-full bg-lime-500"></div>
               </div>
               <div className="flex-1 bg-white rounded-md px-3 py-1 mx-4 shadow-inner">
-                <span className="text-sm text-ink-500">planaway.lol</span>
+                <span className="text-sm text-ink-500">planaway.website</span>
               </div>
             </div>
 
