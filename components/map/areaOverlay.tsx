@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 import { useMap } from "@vis.gl/react-google-maps";
 import LoadingSpinner from "@/components/loading/LoadingSpinner";
+import type { FeatureCollection } from "geojson";
 
 interface AreaOverlayProps {
-  data: GeoJSON.FeatureCollection;
+  data: FeatureCollection;
   onAreaClick: (properties: any) => void;
 }
 
