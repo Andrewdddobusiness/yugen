@@ -1,4 +1,4 @@
-# Yugi Design Bundle (Web + Mobile + Gemini)
+# Planaway Design Bundle (Web + Mobile + Gemini)
 
 Use this as the single source of truth across web, mobile, and AI-generated screens. Fonts and tokens match the live app (Nunito body, Londrina Solid for brand headings, Londrina Sketch reserved for rare highlights; brand colors already in `tailwind.config.ts` and `globals.css`).
 

@@ -74,7 +74,7 @@ export class CalendarExporter {
     // Calendar header
     lines.push('BEGIN:VCALENDAR');
     lines.push('VERSION:2.0');
-    lines.push('PRODID:-//Yugi//Travel Itinerary//EN');
+    lines.push('PRODID:-//Planaway//Travel Itinerary//EN');
     lines.push('CALSCALE:GREGORIAN');
     lines.push('METHOD:PUBLISH');
     

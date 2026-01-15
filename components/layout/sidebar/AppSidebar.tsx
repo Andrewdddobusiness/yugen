@@ -51,7 +51,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                   <div className="w-9 h-9 relative">
                     <Image
                       src="/assets/yugi-mascot-1.png"
-                      alt="Yugi Logo"
+                      alt="Planaway Logo"
                       fill
                       priority
                       sizes="36px"
@@ -60,7 +60,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                   </div>
                 </div>
                 <div className="grid flex-1 text-left text-sm leading-tight">
-                  <span className="truncate text-sm font-bold text-brand-600 font-logo">Yugi</span>
+                  <span className="truncate text-sm font-bold text-brand-600 font-logo">Planaway</span>
                   <span className="truncate text-xs text-gray-500">
                     {subscription?.status === "active" ? "Pro Traveler" : "Free"}
                   </span>

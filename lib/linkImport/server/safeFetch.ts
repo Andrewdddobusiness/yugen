@@ -116,7 +116,7 @@ export function createSafeFetch(config: SafeFetchConfig = {}): SafeFetch {
   const defaultTimeoutMs = config.timeoutMs ?? 8_000;
   const defaultMaxBytes = config.maxBytes ?? 2 * 1024 * 1024;
   const allowed = new Set((config.allowedContentTypes ?? DEFAULT_ALLOWED_CONTENT_TYPES).map((t) => t.toLowerCase()));
-  const userAgent = config.userAgent ?? "YugenLinkImport/1.0 (+https://yugi.app)";
+  const userAgent = config.userAgent ?? "YugenLinkImport/1.0 (+https://www.planaway.lol)";
   const acceptLanguage = config.acceptLanguage ?? "en-US,en;q=0.9";
 
   return async (inputUrl: string, options) => {

@@ -377,13 +377,13 @@ Generated on ${new Date().toLocaleString()}
   private static generateICalContent(itinerary: ItineraryDetails): string {
     return `BEGIN:VCALENDAR
 VERSION:2.0
-PRODID:-//Yugi//Bulk Export//EN
+PRODID:-//Planaway//Bulk Export//EN
 CALSCALE:GREGORIAN
 X-WR-CALNAME:${itinerary.itineraryName || itinerary.city} Itinerary
 
 ${itinerary.activities.filter(a => a.start_time && a.date).map((activity, index) => `
 BEGIN:VEVENT
-UID:bulk-export-${index}@yugi.app
+UID:bulk-export-${index}@planaway.lol
 DTSTART:${this.formatCalendarDateTime(activity.date as string, activity.start_time!)}
 SUMMARY:${activity.activity?.name || 'Travel Activity'}
 LOCATION:${activity.activity?.address || ''}

@@ -1,6 +1,6 @@
-# Yugi - Soft Navigator Travel Planner
+# Planaway - Soft Navigator Travel Planner
 
-This is the Yugi web app, a Next.js experience built around calm, glassy navigation and tactile buttons for confident trip planning.
+This is the Planaway web app, a Next.js experience built around calm, glassy navigation and tactile buttons for confident trip planning.
 
 ## Getting Started
 
@@ -42,7 +42,7 @@ Check out our [Next.js deployment documentation](https://nextjs.org/docs/deploym
 - Accent Titles: Londrina Sketch (use sparingly for landing highlights)
 - Body / UI: Nunito
 
-## Colors (Yugi Palette)
+## Colors (Planaway Palette)
 
 - Brand Slate: `#2A3B63`, `#334A7A`, `#3F5FA3`, `#5C7BCB`, `#8FA8E6`
 - Neutrals: `#FFFFFF`, `#F7F8FB`, `#EEF1F7`

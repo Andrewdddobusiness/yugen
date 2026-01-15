@@ -1,29 +1,29 @@
-# Yugi Email Templates
+# Planaway Email Templates
 
-This directory contains custom branded email templates for the Yugi travel planning application.
+This directory contains custom branded email templates for the Planaway travel planning application.
 
 ## Available Templates
 
 ### 1. **confirmation.html** - Email Verification
-- **Subject**: "Welcome to Yugi - Confirm your email ✈️"
+- **Subject**: "Welcome to Planaway - Confirm your email ✈️"
 - **Used for**: New user email verification
 - **Variables**: `{{ .ConfirmationURL }}`
 - **Design**: Blue gradient header, welcoming tone with travel emoji
 
 ### 2. **recovery.html** - Password Reset
-- **Subject**: "Reset your Yugi password 🔐"
+- **Subject**: "Reset your Planaway password 🔐"
 - **Used for**: Password reset requests
 - **Variables**: `{{ .ConfirmationURL }}`
 - **Design**: Security-focused with warning notices and expiry information
 
 ### 3. **invite.html** - User Invitations
-- **Subject**: "You're invited to Yugi! 🎉"
+- **Subject**: "You're invited to Planaway! 🎉"
 - **Used for**: Inviting new users to the platform
 - **Variables**: `{{ .ConfirmationURL }}`
 - **Design**: Pink/purple gradient, features grid showcasing app benefits
 
 ### 4. **magic_link.html** - Passwordless Sign-in
-- **Subject**: "Your Yugi magic link ✨"
+- **Subject**: "Your Planaway magic link ✨"
 - **Used for**: Magic link authentication
 - **Variables**: `{{ .ConfirmationURL }}`
 - **Design**: Teal gradient, emphasizes security and ease of use
@@ -49,7 +49,7 @@ All templates use Supabase's template variables:
 
 - **Mobile Responsive**: All templates work on mobile devices
 - **Modern Design**: Clean, professional appearance
-- **Brand Consistency**: Uses Yugi brand colors and typography
+- **Brand Consistency**: Uses Planaway brand colors and typography
 - **Accessibility**: Good contrast ratios and readable fonts
 - **Security Notices**: Appropriate warnings and expiry information
 - **Fallback Links**: Copy-paste URLs for button accessibility

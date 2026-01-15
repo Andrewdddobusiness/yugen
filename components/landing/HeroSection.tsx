@@ -132,9 +132,9 @@ export default function HeroSection({ user, isUserLoading }: HeroSectionProps) {
           </Button>
           ) : user ? (
             <PopUpCreateItinerary>
-              <Button size="lg" className="text-lg px-8 py-4 shadow-pressable hover:-translate-y-0">
+                <Button size="lg" className="text-lg px-8 py-4 shadow-pressable hover:-translate-y-0">
                 <Plus className="h-5 w-5 mr-2" />
-                Start planning with Yugi
+                Start planning with Planaway
                 <ArrowRight className="h-5 w-5 ml-2" />
               </Button>
             </PopUpCreateItinerary>
@@ -142,7 +142,7 @@ export default function HeroSection({ user, isUserLoading }: HeroSectionProps) {
             <Link href="/signUp">
               <Button size="lg" className="text-lg px-8 py-4 shadow-pressable">
                 <Plane className="h-5 w-5 mr-2" />
-                Start planning with Yugi
+                Start planning with Planaway
                 <ArrowRight className="h-5 w-5 ml-2" />
               </Button>
             </Link>
@@ -177,7 +177,7 @@ export default function HeroSection({ user, isUserLoading }: HeroSectionProps) {
                 <div className="w-3 h-3 rounded-full bg-lime-500"></div>
               </div>
               <div className="flex-1 bg-white rounded-md px-3 py-1 mx-4 shadow-inner">
-                <span className="text-sm text-ink-500">yugi.app</span>
+                <span className="text-sm text-ink-500">planaway.lol</span>
               </div>
             </div>
 
@@ -185,7 +185,7 @@ export default function HeroSection({ user, isUserLoading }: HeroSectionProps) {
             <div className="relative aspect-video bg-gradient-to-br from-brand-300/20 via-white to-teal-500/10">
               <Image
                 src="/popup-itinerary-builder.jpg"
-                alt="Yugi App Demo - Soft Navigator Travel Planner"
+                alt="Planaway App Demo - Soft Navigator Travel Planner"
                 fill
                 className="object-cover"
                 priority

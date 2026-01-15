@@ -1,4 +1,4 @@
--- Seed data for Yugi travel itinerary application
+-- Seed data for Planaway travel itinerary application
 
 -- Insert some popular countries
 INSERT INTO public.countries (country_name, country_code) VALUES

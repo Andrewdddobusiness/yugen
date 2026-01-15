@@ -32,7 +32,7 @@ export default function Loading() {
           className="object-contain animate-pulse"
         />
         </div>
-        <div className="text-xl font-semibold text-ink-900 font-logo">Yugi</div>
+        <div className="text-xl font-semibold text-ink-900 font-logo">Planaway</div>
         <div className="text-sm text-ink-500 h-5">{textOptions[currentTextIndex]}</div>
         <LoadingSpinner />
       </div>

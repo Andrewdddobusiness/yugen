@@ -249,7 +249,7 @@ export function AppSidebarItineraryActivityLeft({
                     <Image
                       className="object-contain"
                       src="/assets/yugi-mascot-1.png"
-                      alt="Yugi Logo"
+                      alt="Planaway Logo"
                       fill
                       priority
                       sizes="36px"

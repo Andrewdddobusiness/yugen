@@ -31,7 +31,7 @@ export default function LoadingOverlay({ show, message = "Loading..." }: Loading
               <div className="absolute inset-2 rounded-full bg-brand-500/15 blur-xl" />
               <Image
                 src="/assets/yugi-mascot-1.png"
-                alt="Yugi loading"
+                alt="Planaway loading"
                 fill
                 priority
                 sizes="80px"

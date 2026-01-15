@@ -41,7 +41,7 @@ Recommended: create two keys
 1. Go to [Map Management](https://console.cloud.google.com/google/maps-apis/map-ids)
 2. Click "Create Map ID"
 3. Choose "JavaScript" as the map type
-4. Give it a name (e.g., "Yugi Travel Planner")
+4. Give it a name (e.g., "Planaway Travel Planner")
 5. Copy the Map ID
 
 ### 5. Configure Environment Variables

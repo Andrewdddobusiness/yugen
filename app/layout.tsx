@@ -3,11 +3,11 @@ import "./globals.css";
 import LayoutWrapper from "./layoutWrapper";
 
 export const metadata: Metadata = {
-  title: "Yugi - Travel Planner",
+  title: "Planaway - Travel Planner",
   description:
-    "Yugi is your calm, glassy travel copilot with wolf-level focus. Discover, organize, and schedule trips with tactile buttons, smart maps, and premium clarity.",
+    "Planaway is your calm, glassy travel copilot with wolf-level focus. Discover, organize, and schedule trips with tactile buttons, smart maps, and premium clarity.",
   keywords: [
-    "Yugi",
+    "Planaway",
     "travel planner",
     "itinerary builder",
     "trip planning",
@@ -15,30 +15,30 @@ export const metadata: Metadata = {
     "vacation planner",
     "wanderlog alternative",
   ],
-  authors: [{ name: "Yugi Team" }],
-  creator: "Yugi",
-  publisher: "Yugi",
+  authors: [{ name: "Planaway Team" }],
+  creator: "Planaway",
+  publisher: "Planaway",
   formatDetection: {
     email: false,
     address: false,
     telephone: false,
   },
-  metadataBase: new URL("https://yugi.app"),
+  metadataBase: new URL("https://www.planaway.lol"),
   alternates: {
     canonical: "/",
   },
   openGraph: {
-    title: "Yugi - Travel Planner",
+    title: "Planaway - Travel Planner",
     description:
-      "Yugi blends calm guidance, glassmorphic polish, and tactile controls to make travel planning feel premium and precise.",
-    url: "https://yugi.app",
-    siteName: "Yugi",
+      "Planaway blends calm guidance, glassmorphic polish, and tactile controls to make travel planning feel premium and precise.",
+    url: "https://www.planaway.lol",
+    siteName: "Planaway",
     images: [
       {
-        url: "/yugi-og.svg",
+        url: "/planaway-og.svg",
         width: 1200,
         height: 630,
-        alt: "Yugi - Travel Itinerary Planner",
+        alt: "Planaway - Travel Itinerary Planner",
       },
     ],
     locale: "en_US",
@@ -46,11 +46,11 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "Yugi - Travel Planner",
+    title: "Planaway - Travel Planner",
     description:
       "A glassy, modern travel planner with wolf-inspired focus, tactile buttons, and map-first clarity.",
-    images: ["/yugi-og.svg"],
-    creator: "@yugiapp",
+    images: ["/planaway-og.svg"],
+    creator: "@planaway",
   },
   robots: {
     index: true,

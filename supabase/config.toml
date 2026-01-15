@@ -91,19 +91,19 @@ enable_confirmations = true
 
 # Custom email templates
 [auth.email.template.confirmation]
-subject = "Welcome to Yugi - Confirm your email ✈️"
+subject = "Welcome to Planaway - Confirm your email ✈️"
 content_path = "./supabase/templates/confirmation.html"
 
 [auth.email.template.invite]
-subject = "You're invited to Yugi! 🎉"
+subject = "You're invited to Planaway! 🎉"
 content_path = "./supabase/templates/invite.html"
 
 [auth.email.template.recovery]
-subject = "Reset your Yugi password 🔐"
+subject = "Reset your Planaway password 🔐"
 content_path = "./supabase/templates/recovery.html"
 
 [auth.email.template.magic_link]
-subject = "Your Yugi magic link ✨"
+subject = "Your Planaway magic link ✨"
 content_path = "./supabase/templates/magic_link.html"
 
 [auth.sms]

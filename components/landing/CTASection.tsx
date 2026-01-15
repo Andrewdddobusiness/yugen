@@ -80,7 +80,7 @@ export default function CTASection() {
             Step into clearer planning
             <br />
             <span className="bg-gradient-to-r from-brand-300 via-brand-500 to-teal-500 bg-clip-text text-transparent">
-              with Yugi by your side
+              with Planaway by your side
             </span>
           </h2>
           
@@ -117,7 +117,7 @@ export default function CTASection() {
               size="lg"
               className="text-lg px-8 py-4 bg-white text-brand-700 hover:bg-bg-0 shadow-float transition-all duration-300 hover:shadow-card font-semibold"
             >
-              Start planning with Yugi
+              Start planning with Planaway
               <ArrowRight className="h-5 w-5 ml-2" />
             </Button>
             

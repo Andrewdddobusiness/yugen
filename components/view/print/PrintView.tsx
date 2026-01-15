@@ -433,7 +433,7 @@ export function PrintView({ itineraryDetails, onClose }: PrintViewProps) {
           fontSize: '9pt', 
           color: '#666' 
         }}>
-          Generated on {format(new Date(), 'PPP')} • Yugi Travel Planner
+          Generated on {format(new Date(), 'PPP')} • Planaway Travel Planner
         </div>
       </div>
     </div>

@@ -13,7 +13,7 @@ const testimonials = [
     location: "San Francisco, CA",
     avatar: "/assets/yugi-mascot-1.png",
     rating: 5,
-    text: "Yugi completely transformed how I plan my trips. The drag-and-drop calendar is so intuitive - it's like having Google Calendar for travel planning. I saved 10+ hours on my last Europe trip.",
+    text: "Planaway completely transformed how I plan my trips. The drag-and-drop calendar is so intuitive - it's like having Google Calendar for travel planning. I saved 10+ hours on my last Europe trip.",
     trip: "3-week Europe Adventure",
     highlight: "Saved 10+ hours"
   },
@@ -24,7 +24,7 @@ const testimonials = [
     location: "Austin, TX",
     avatar: "/assets/yugi-mascot-2.png",
     rating: 5,
-    text: "As someone who loves detailed planning, Yugi is perfect. The area search helped me discover hidden gems in Tokyo that I never would have found otherwise. The export features are incredibly useful.",
+    text: "As someone who loves detailed planning, Planaway is perfect. The area search helped me discover hidden gems in Tokyo that I never would have found otherwise. The export features are incredibly useful.",
     trip: "2-week Japan Discovery",
     highlight: "Found hidden gems"
   },
@@ -35,7 +35,7 @@ const testimonials = [
     location: "London, UK",
     avatar: "/assets/yugi-mascot-3.png",
     rating: 5,
-    text: "Planning our family vacation used to be stressful, but Yugi made it enjoyable. The wishlist feature let everyone contribute ideas, and organizing everything was so smooth.",
+    text: "Planning our family vacation used to be stressful, but Planaway made it enjoyable. The wishlist feature let everyone contribute ideas, and organizing everything was so smooth.",
     trip: "Family Trip to Thailand",
     highlight: "Made planning enjoyable"
   }
@@ -177,7 +177,7 @@ export default function TestimonialsSection() {
     >
           <div className="bg-gradient-to-r from-brand-600 via-brand-500 to-teal-500 rounded-2xl p-8 text-white">
             <h3 className="text-2xl font-bold mb-4">
-              Ready to join the Yugi community?
+              Ready to join the Planaway community?
             </h3>
             <p className="text-white/80 mb-6 max-w-2xl mx-auto">
               Start planning your next adventure with the tool that&apos;s already helped 50,000+ travelers create unforgettable trips.

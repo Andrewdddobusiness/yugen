@@ -416,7 +416,7 @@ export default function Navigation() {
           <Image
             className="w-full h-full transition-transform duration-500 ease-in-out transform group-hover:rotate-45"
             src="/assets/yugi-mascot-1.png"
-            alt="Yugi Logo"
+            alt="Planaway Logo"
             width={100}
             height={100}
             priority
@@ -424,7 +424,7 @@ export default function Navigation() {
           />
         </div>
         <span className="hidden sm:inline-block text-lg font-semibold tracking-tight text-ink-900 font-logo">
-          Yugi
+          Planaway
         </span>
       </Link>
 

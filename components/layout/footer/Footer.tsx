@@ -17,7 +17,7 @@ export default function Footer() {
                 <Image
                   className="w-full h-full transition-transform duration-500 ease-in-out transform group-hover:rotate-6"
                   src="/assets/yugi-mascot-1.png"
-                  alt="Yugi Logo"
+                  alt="Planaway Logo"
                   width={100}
                   height={100}
                   priority
@@ -25,7 +25,7 @@ export default function Footer() {
                 />
               </div>
               <div>
-                <h3 className="text-2xl font-semibold leading-tight font-logo">Yugi</h3>
+                <h3 className="text-2xl font-semibold leading-tight font-logo">Planaway</h3>
                 <p className="text-white/70 text-sm">Soft navigator for calm, confident travel planning.</p>
               </div>
             </Link>
@@ -67,8 +67,8 @@ export default function Footer() {
             <h3 className="text-lg font-semibold mb-4">Stay in touch</h3>
             <ul className="space-y-3 text-white/80">
               <li>
-                <a href="mailto:support@yugi.app" className="hover:text-white transition-colors">
-                  support@yugi.app
+                <a href="mailto:support@planaway.lol" className="hover:text-white transition-colors">
+                  support@planaway.lol
                 </a>
               </li>
               <li className="flex space-x-4 pt-2">
@@ -87,7 +87,7 @@ export default function Footer() {
         </div>
 
         <div className="flex flex-col sm:flex-row items-center justify-between border-t border-white/15 mt-10 text-white/70 pt-6">
-          <p className="text-sm">&copy; {new Date().getFullYear()} Yugi. All rights reserved.</p>
+          <p className="text-sm">&copy; {new Date().getFullYear()} Planaway. All rights reserved.</p>
           <p className="text-sm mt-3 sm:mt-0">Built for planners who like clarity, warmth, and gentle guidance.</p>
         </div>
       </div>
