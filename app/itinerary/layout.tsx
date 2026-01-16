@@ -258,6 +258,23 @@ export default function Layout({ children }: { children: ReactNode }) {
     refetchOnReconnect: true,
   });
 
+  const { data: entitlements } = useQuery({
+    queryKey: ["billingEntitlements", user?.id],
+    enabled: !!user,
+    staleTime: 60_000,
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
+    refetchOnReconnect: true,
+    queryFn: async () => {
+      const res = await fetch("/api/billing/entitlements", { cache: "no-store" });
+      const data = (await res.json()) as any;
+      if (!res.ok || !data?.ok) {
+        return { aiAccessMode: "off" as const, isPro: false };
+      }
+      return { aiAccessMode: String(data.aiAccessMode ?? "off"), isPro: Boolean(data.isPro) };
+    },
+  });
+
   useEffect(() => {
     setIsSubscriptionLoading(isSubscriptionLoading);
   }, [isSubscriptionLoading, setIsSubscriptionLoading]);
@@ -286,7 +303,10 @@ export default function Layout({ children }: { children: ReactNode }) {
   const aiAccessMode = getAiAssistantAccessMode();
   const billingBypassEnabled = isDevBillingBypassEnabled();
   const isAiEnabledFlag = aiAccessMode !== "off";
-  const isProSubscriber = billingBypassEnabled || (subscription as any)?.status === "active";
+  const isProSubscriber =
+    billingBypassEnabled ||
+    (subscription as any)?.status === "active" ||
+    (entitlements as any)?.isPro === true;
   const canUseAiAssistant = aiAccessMode === "all" || (aiAccessMode === "pro" && isProSubscriber);
   const aiUpgradeHref = getAiAssistantUpgradeHref();
 
