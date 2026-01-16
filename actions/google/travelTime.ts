@@ -1,6 +1,7 @@
 "use server";
 
 import type { Coordinates, DatabaseResponse } from "@/types/database";
+import { toJsonSafe } from "@/lib/security/toJsonSafe";
 
 // Travel mode types supported by Google Routes API (computeRoutes)
 export type TravelMode = 'driving' | 'walking' | 'transit' | 'bicycling';
@@ -41,6 +42,29 @@ const CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hours
 const ROUTES_DEBUG = process.env.GOOGLE_ROUTES_DEBUG === "1" || process.env.GOOGLE_ROUTES_DEBUG === "true";
 const ROUTES_DEBUG_VERBOSE =
   process.env.GOOGLE_ROUTES_DEBUG_VERBOSE === "1" || process.env.GOOGLE_ROUTES_DEBUG_VERBOSE === "true";
+
+const GOOGLE_HTTP_REFERER = (() => {
+  const value = process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_SITE_URL;
+  if (!value) return null;
+  return value.endsWith("/") ? value : `${value}/`;
+})();
+
+const GOOGLE_HTTP_ORIGIN = (() => {
+  if (!GOOGLE_HTTP_REFERER) return null;
+  try {
+    return new URL(GOOGLE_HTTP_REFERER).origin;
+  } catch {
+    return GOOGLE_HTTP_REFERER;
+  }
+})();
+
+function googleRequestHeaders(headers: Record<string, string>) {
+  return {
+    ...headers,
+    ...(GOOGLE_HTTP_REFERER ? { Referer: GOOGLE_HTTP_REFERER } : {}),
+    ...(GOOGLE_HTTP_ORIGIN ? { Origin: GOOGLE_HTTP_ORIGIN } : {}),
+  };
+}
 
 function debugLog(message: string, details?: Record<string, unknown>) {
   if (!ROUTES_DEBUG) return;
@@ -172,7 +196,7 @@ export async function calculateTravelTime(
       modes: [...modes].sort(),
       origin: { lat: roundCoord(origin.lat), lng: roundCoord(origin.lng) },
       destination: { lat: roundCoord(destination.lat), lng: roundCoord(destination.lng) },
-      ...(ROUTES_DEBUG_VERBOSE && departureTime ? { departureTime: departureTime.toISOString() } : null),
+      ...(ROUTES_DEBUG_VERBOSE && departureTime ? { departureTime: departureTime.toISOString() } : {}),
     });
     
     // Make requests for each travel mode
@@ -196,7 +220,7 @@ export async function calculateTravelTime(
           });
         }
       } catch (error) {
-        console.error(`Error fetching travel time for mode ${mode}:`, error);
+        console.error(`Error fetching travel time for mode ${mode}`);
       }
     });
 
@@ -229,12 +253,12 @@ export async function calculateTravelTime(
     };
 
   } catch (error: any) {
-    console.error("Error calculating travel time:", error);
+    console.error("Error calculating travel time");
     return {
       success: false,
       error: { 
         message: error.message || "Failed to calculate travel time",
-        details: error
+        details: toJsonSafe(error),
       }
     };
   }
@@ -290,11 +314,11 @@ async function fetchRoutesTravelTime(
 
     const response = await fetch("https://routes.googleapis.com/directions/v2:computeRoutes", {
       method: "POST",
-      headers: {
+      headers: googleRequestHeaders({
         "Content-Type": "application/json",
         "X-Goog-Api-Key": apiKey,
         "X-Goog-FieldMask": "routes.distanceMeters,routes.duration",
-      },
+      }),
       body: JSON.stringify(body),
     });
 
@@ -370,12 +394,12 @@ async function fetchRoutesTravelTime(
     };
 
   } catch (error: any) {
-    console.error(`Error fetching Routes API travel time for ${mode}:`, error);
+    console.error(`Error fetching Routes API travel time for ${mode}`);
     return {
       success: false,
       error: { 
         message: error.message || `Failed to fetch travel time for ${mode}`,
-        details: error
+        details: toJsonSafe(error),
       }
     };
   }
@@ -432,12 +456,12 @@ export async function calculateBatchTravelTimes(
     };
 
   } catch (error: any) {
-    console.error("Error calculating batch travel times:", error);
+    console.error("Error calculating batch travel times");
     return {
       success: false,
       error: { 
         message: error.message || "Failed to calculate batch travel times",
-        details: error
+        details: toJsonSafe(error),
       }
     };
   }

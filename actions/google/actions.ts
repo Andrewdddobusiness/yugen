@@ -8,6 +8,26 @@ const GOOGLE_MAPS_API_KEY =
   process.env.GOOGLE_MAPS_API_KEY ||
   process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
 
+const GOOGLE_HTTP_REFERER = (() => {
+  const value = process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_SITE_URL;
+  if (!value) return null;
+  return value.endsWith("/") ? value : `${value}/`;
+})();
+const GOOGLE_HTTP_ORIGIN = (() => {
+  if (!GOOGLE_HTTP_REFERER) return null;
+  try {
+    return new URL(GOOGLE_HTTP_REFERER).origin;
+  } catch {
+    return GOOGLE_HTTP_REFERER;
+  }
+})();
+
+const googleRequestHeaders = (headers: Record<string, string>) => ({
+  ...headers,
+  ...(GOOGLE_HTTP_REFERER ? { Referer: GOOGLE_HTTP_REFERER } : {}),
+  ...(GOOGLE_HTTP_ORIGIN ? { Origin: GOOGLE_HTTP_ORIGIN } : {}),
+});
+
 const dayOfWeekToNumber = (value: unknown): number | null => {
   if (typeof value === "number" && Number.isFinite(value)) {
     if (value >= 0 && value <= 6) return value;
@@ -140,11 +160,12 @@ export const searchPlacesByText = async (
 
       const response = await fetch("https://places.googleapis.com/v1/places:searchText", {
         method: "POST",
-        headers: {
+        headers: googleRequestHeaders({
           "Content-Type": "application/json",
           "X-Goog-Api-Key": GOOGLE_MAPS_API_KEY!,
-          "X-Goog-FieldMask": "places.id,places.displayName,places.formattedAddress,places.location,places.types,places.rating,places.priceLevel,places.photos,places.editorialSummary,places.websiteUri,places.nationalPhoneNumber",
-        },
+          "X-Goog-FieldMask":
+            "places.id,places.displayName,places.formattedAddress,places.location,places.types,places.rating,places.priceLevel,places.photos,places.editorialSummary,places.websiteUri,places.nationalPhoneNumber",
+        }),
         body: JSON.stringify(requestBody),
       });
 
@@ -205,11 +226,12 @@ export const fetchNearbyActivities = async (
 
       const response = await fetch("https://places.googleapis.com/v1/places:searchNearby", {
         method: "POST",
-        headers: {
+        headers: googleRequestHeaders({
           "Content-Type": "application/json",
           "X-Goog-Api-Key": GOOGLE_MAPS_API_KEY!,
-          "X-Goog-FieldMask": "places.id,places.displayName,places.formattedAddress,places.location,places.types,places.rating,places.priceLevel,places.photos,places.editorialSummary,places.websiteUri,places.nationalPhoneNumber",
-        },
+          "X-Goog-FieldMask":
+            "places.id,places.displayName,places.formattedAddress,places.location,places.types,places.rating,places.priceLevel,places.photos,places.editorialSummary,places.websiteUri,places.nationalPhoneNumber",
+        }),
         body: JSON.stringify({
           includedTypes: includedTypesForSearch,
           maxResultCount: 20,
@@ -266,11 +288,12 @@ export const getGoogleMapsAutocomplete = async (
 
       const response = await fetch("https://places.googleapis.com/v1/places:autocomplete", {
         method: "POST",
-        headers: {
+        headers: googleRequestHeaders({
           "Content-Type": "application/json",
           "X-Goog-Api-Key": GOOGLE_MAPS_API_KEY!,
-          "X-Goog-FieldMask": "suggestions.placePrediction.place,suggestions.placePrediction.structuredFormat,suggestions.placePrediction.types",
-        },
+          "X-Goog-FieldMask":
+            "suggestions.placePrediction.place,suggestions.placePrediction.structuredFormat,suggestions.placePrediction.types",
+        }),
         body: JSON.stringify(requestBody),
       });
 
@@ -309,11 +332,11 @@ export const fetchPlaceDetails = async (placeId: string): Promise<IActivity> => 
     cacheKey,
     async () => {
       const response = await fetch(`https://places.googleapis.com/v1/places/${normalized}`, {
-        headers: {
+        headers: googleRequestHeaders({
           "X-Goog-Api-Key": GOOGLE_MAPS_API_KEY!,
           "X-Goog-FieldMask":
             "id,displayName,formattedAddress,location,types,priceLevel,rating,editorialSummary,websiteUri,nationalPhoneNumber,photos,regularOpeningHours,reviews",
-        },
+        }),
       });
 
       if (!response.ok) {
@@ -345,7 +368,9 @@ export const fetchCityCoordinates = async (cityName: string, countryName: string
         searchQuery
       )}&key=${GEOCODING_API_KEY}`;
 
-      const geocodingResponse = await fetch(geocodingUrl);
+      const geocodingResponse = await fetch(geocodingUrl, {
+        headers: googleRequestHeaders({}),
+      });
       const geocodingData = await geocodingResponse.json();
 
       if (!geocodingData.results || geocodingData.results.length === 0) {
@@ -362,6 +387,10 @@ export const fetchCityCoordinates = async (cityName: string, countryName: string
 // 6. Photo fetching - get place photos from Google Places API
 export const getPlacePhotoAction = async (photoName: string, maxWidth?: number, maxHeight?: number) => {
   try {
+    if (!GOOGLE_MAPS_API_KEY) {
+      throw new Error("Google Maps API key not configured");
+    }
+
     // Handle new Places API v1 photo references
     if (photoName.startsWith("places/")) {
       const params = new URLSearchParams({
@@ -370,11 +399,10 @@ export const getPlacePhotoAction = async (photoName: string, maxWidth?: number, 
       });
 
       const response = await fetch(`https://places.googleapis.com/v1/${photoName}/media?${params}`, {
-        headers: {
+        headers: googleRequestHeaders({
           "Content-Type": "application/json",
-          "X-Goog-Api-Key": GOOGLE_MAPS_API_KEY!,
-          Referer: process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000",
-        },
+          "X-Goog-Api-Key": GOOGLE_MAPS_API_KEY,
+        }),
       });
 
       if (!response.ok) {
@@ -394,13 +422,11 @@ export const getPlacePhotoAction = async (photoName: string, maxWidth?: number, 
       const params = new URLSearchParams({
         photoreference: photoName,
         maxwidth: (maxWidth || 1000).toString(),
-        key: GOOGLE_MAPS_API_KEY!,
+        key: GOOGLE_MAPS_API_KEY,
       });
 
       const response = await fetch(`https://maps.googleapis.com/maps/api/place/photo?${params}`, {
-        headers: {
-          Referer: process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000",
-        },
+        headers: googleRequestHeaders({}),
       });
 
       if (!response.ok) {

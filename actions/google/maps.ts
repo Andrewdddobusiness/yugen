@@ -16,6 +16,29 @@ const getServerGeocodingKey = () =>
   process.env.NEXT_PUBLIC_GOOGLE_MAPS_GEOCODING_API_KEY ||
   process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
 
+const GOOGLE_HTTP_REFERER = (() => {
+  const value = process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_SITE_URL;
+  if (!value) return null;
+  return value.endsWith("/") ? value : `${value}/`;
+})();
+
+const GOOGLE_HTTP_ORIGIN = (() => {
+  if (!GOOGLE_HTTP_REFERER) return null;
+  try {
+    return new URL(GOOGLE_HTTP_REFERER).origin;
+  } catch {
+    return GOOGLE_HTTP_REFERER;
+  }
+})();
+
+function googleRequestHeaders(headers: Record<string, string>) {
+  return {
+    ...headers,
+    ...(GOOGLE_HTTP_REFERER ? { Referer: GOOGLE_HTTP_REFERER } : {}),
+    ...(GOOGLE_HTTP_ORIGIN ? { Origin: GOOGLE_HTTP_ORIGIN } : {}),
+  };
+}
+
 /**
  * Converts an address to coordinates using Google Geocoding API
  */
@@ -37,7 +60,7 @@ export async function geocodeAddress(address: string): Promise<DatabaseResponse<
     const encodedAddress = encodeURIComponent(address);
     const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodedAddress}&key=${apiKey}`;
 
-    const response = await fetch(url);
+    const response = await fetch(url, { headers: googleRequestHeaders({}) });
     const data = await response.json();
 
     if (!response.ok) {
@@ -77,7 +100,7 @@ export async function geocodeAddress(address: string): Promise<DatabaseResponse<
     };
 
   } catch (error: any) {
-    console.error("Error in geocodeAddress:", error);
+    console.error("Error in geocodeAddress");
     return {
       success: false,
       error: { 
@@ -108,7 +131,7 @@ export async function reverseGeocode(coordinates: Coordinates): Promise<Database
 
     const url = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${coordinates.lat},${coordinates.lng}&key=${apiKey}`;
 
-    const response = await fetch(url);
+    const response = await fetch(url, { headers: googleRequestHeaders({}) });
     const data = await response.json();
 
     if (!response.ok) {
@@ -144,7 +167,7 @@ export async function reverseGeocode(coordinates: Coordinates): Promise<Database
     };
 
   } catch (error: any) {
-    console.error("Error in reverseGeocode:", error);
+    console.error("Error in reverseGeocode");
     return {
       success: false,
       error: { 
@@ -189,7 +212,7 @@ export async function getNearbyPlaces(
     };
 
   } catch (error: any) {
-    console.error("Error in getNearbyPlaces:", error);
+    console.error("Error in getNearbyPlaces");
     return {
       success: false,
       error: { 
@@ -227,7 +250,7 @@ export async function searchPlaces(
       url += `&type=${type}`;
     }
 
-    const response = await fetch(url);
+    const response = await fetch(url, { headers: googleRequestHeaders({}) });
     const data = await response.json();
 
     if (!response.ok) {
@@ -257,7 +280,7 @@ export async function searchPlaces(
     };
 
   } catch (error: any) {
-    console.error("Error in searchPlaces:", error);
+    console.error("Error in searchPlaces");
     return {
       success: false,
       error: { 
@@ -311,7 +334,7 @@ export async function getPlacePhotos(
     };
 
   } catch (error: any) {
-    console.error("Error in getPlacePhotos:", error);
+    console.error("Error in getPlacePhotos");
     return {
       success: false,
       error: { 
@@ -362,7 +385,7 @@ export async function searchPlacesByText(
 
     const response = await fetch(baseUrl, {
       method: "POST",
-      headers: {
+      headers: googleRequestHeaders({
         "Content-Type": "application/json",
         "X-Goog-Api-Key": apiKey,
         "X-Goog-FieldMask": [
@@ -379,7 +402,7 @@ export async function searchPlacesByText(
           "places.currentOpeningHours",
           "places.nationalPhoneNumber",
         ].join(","),
-      },
+      }),
       body: JSON.stringify(requestBody),
     });
 
@@ -419,7 +442,7 @@ export async function searchPlacesByText(
     };
 
   } catch (error: any) {
-    console.error("Error in searchPlacesByText:", error);
+    console.error("Error in searchPlacesByText");
     return {
       success: false,
       error: { 
@@ -471,7 +494,7 @@ export async function getPlaceAutocomplete(
     };
 
   } catch (error: any) {
-    console.error("Error in getPlaceAutocomplete:", error);
+    console.error("Error in getPlaceAutocomplete");
     return {
       success: false,
       error: { 
