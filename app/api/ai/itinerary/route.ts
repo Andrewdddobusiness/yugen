@@ -48,6 +48,64 @@ const SHOULD_LOG_AI_ITINERARY = process.env.AI_ITINERARY_LOG === "1";
 
 const stripEmDashes = (value: string) => value.replace(/[—–]/g, "-");
 
+const normalizeDestinationText = (value: unknown) => String(value ?? "").trim().toLowerCase();
+
+const isRedundantAddDestination = (args: {
+  operation: Operation & { op: "add_destination" };
+  itineraryDestinations: any[];
+}) => {
+  const city = normalizeDestinationText(args.operation.city);
+  const country = normalizeDestinationText(args.operation.country);
+  const fromDate = String(args.operation.fromDate ?? "");
+  const toDate = String(args.operation.toDate ?? "");
+  if (!city || !country || !fromDate || !toDate) return false;
+
+  return args.itineraryDestinations.some((row) => {
+    const rowCity = normalizeDestinationText((row as any)?.city);
+    const rowCountry = normalizeDestinationText((row as any)?.country);
+    if (!rowCity || !rowCountry) return false;
+    if (rowCity !== city || rowCountry !== country) return false;
+    return String((row as any)?.from_date ?? "") === fromDate && String((row as any)?.to_date ?? "") === toDate;
+  });
+};
+
+const isRedundantUpdateDestinationDates = (args: {
+  operation: Operation & { op: "update_destination_dates" };
+  destinationById: Map<string, any>;
+}) => {
+  const row = args.destinationById.get(String(args.operation.itineraryDestinationId ?? ""));
+  if (!row) return false;
+  return (
+    String((row as any)?.from_date ?? "") === String(args.operation.fromDate ?? "") &&
+    String((row as any)?.to_date ?? "") === String(args.operation.toDate ?? "")
+  );
+};
+
+const pruneRedundantDestinationOperations = (args: {
+  operations: Operation[];
+  itineraryDestinations: any[];
+  destinationById: Map<string, any>;
+}) => {
+  let removed = 0;
+  const kept: Operation[] = [];
+
+  for (const operation of args.operations) {
+    if (operation.op === "add_destination" && isRedundantAddDestination({ operation, itineraryDestinations: args.itineraryDestinations })) {
+      removed += 1;
+      continue;
+    }
+
+    if (operation.op === "update_destination_dates" && isRedundantUpdateDestinationDates({ operation, destinationById: args.destinationById })) {
+      removed += 1;
+      continue;
+    }
+
+    kept.push(operation);
+  }
+
+  return { operations: kept, removed };
+};
+
 const addDaysIso = (value: string, days: number) => {
   const base = new Date(`${value}T00:00:00Z`);
   if (Number.isNaN(base.getTime())) throw new Error(`Invalid date: ${value}`);
@@ -320,6 +378,34 @@ export async function GET(request: NextRequest) {
         .map((row) => ({ role: row.role, content: row.content }));
 
       const draftParsed = OperationSchema.array().max(25).safeParse(thread.draft);
+      let draftOps = draftParsed.success ? draftParsed.data : null;
+
+      // Hide redundant destination ops that match the current itinerary state (prevents "re-adding" existing destinations).
+      if (draftOps && draftOps.length > 0) {
+        try {
+          const { data: destinations, error: destinationsError } = await supabase
+            .from("itinerary_destination")
+            .select("itinerary_destination_id,city,country,from_date,to_date,order_number")
+            .eq("itinerary_id", Number(itineraryId))
+            .order("order_number", { ascending: true });
+          if (!destinationsError && Array.isArray(destinations) && destinations.length > 0) {
+            const itineraryDestinations = destinations as any[];
+            const destinationById = new Map(
+              itineraryDestinations
+                .map((row) => [String((row as any)?.itinerary_destination_id ?? ""), row] as const)
+                .filter((entry) => entry[0])
+            );
+            draftOps = pruneRedundantDestinationOperations({
+              operations: draftOps,
+              itineraryDestinations,
+              destinationById,
+            }).operations;
+          }
+        } catch {
+          // ignore - draft remains as-is
+        }
+      }
+
       const draftSourcesParsed = LinkImportDraftSourcesSchema.safeParse(thread.draft_sources);
       const draftSources = draftSourcesParsed.success ? draftSourcesParsed.data : null;
       const draftSourcesPreview = draftSources
@@ -345,7 +431,7 @@ export async function GET(request: NextRequest) {
           threadId: thread.ai_itinerary_thread_id,
           summary: thread.summary ?? null,
           messages,
-          draftOperations: draftParsed.success ? draftParsed.data : null,
+          draftOperations: draftOps,
           draftSources: draftSourcesPreview,
         })
       );
@@ -1133,12 +1219,18 @@ export async function POST(request: NextRequest) {
           ? ((parsed.data as any).draftOperations as Operation[])
           : threadDraft;
 
+      const prunedDraft = pruneRedundantDestinationOperations({
+        operations: draftOperations,
+        itineraryDestinations,
+        destinationById,
+      });
+
       const planResult = await planItineraryEdits({
         message: userText,
         chatHistory,
         retrievedHistory,
         summary: threadSummary,
-        draftOperations,
+        draftOperations: prunedDraft.operations,
         maxTokens: Math.max(1, Math.min(800, quota.remaining)),
         itinerary,
         destination,
@@ -1151,6 +1243,7 @@ export async function POST(request: NextRequest) {
 
       const resolvedOperations: Operation[] = [];
       let dropped = 0;
+      let redundantDropped = 0;
       const clarifications: string[] = [];
 
       for (const operation of plan.operations) {
@@ -1202,35 +1295,42 @@ export async function POST(request: NextRequest) {
         resolvedOperations.push(operation as any as Operation);
       }
 
+      const prunedResolved = pruneRedundantDestinationOperations({
+        operations: resolvedOperations,
+        itineraryDestinations,
+        destinationById,
+      });
+      redundantDropped = prunedResolved.removed;
+
       if (SHOULD_LOG_AI_ITINERARY) {
         console.info("[ai-itinerary] plan", {
           itineraryId,
           destinationId,
           userId: auth.user.id,
           proposedCount: plan.operations.length,
-          resolvedCount: resolvedOperations.length,
+          resolvedCount: prunedResolved.operations.length,
           droppedCount: dropped,
+          redundantDroppedCount: redundantDropped,
           clarificationCount: clarifications.length,
         });
       }
 
       let payload: PlanResponsePayload;
 
-      if (resolvedOperations.length > MAX_OPERATIONS) {
-        const previewLines = buildPreviewLines(draftOperations, activityById, destinationById);
+      if (prunedResolved.operations.length > MAX_OPERATIONS) {
+        const previewLines = buildPreviewLines(prunedDraft.operations, activityById, destinationById);
         payload = {
-          assistantMessage: `${stripEmDashes(plan.assistantMessage)}\n\nThat request would change ${resolvedOperations.length} items, which exceeds the limit of ${MAX_OPERATIONS} changes per request. Please narrow it down (for example, one day or one activity at a time).`,
-          operations: draftOperations,
+          assistantMessage: `${stripEmDashes(plan.assistantMessage)}\n\nThat request would change ${prunedResolved.operations.length} items, which exceeds the limit of ${MAX_OPERATIONS} changes per request. Please narrow it down (for example, one day or one activity at a time).`,
+          operations: prunedDraft.operations,
           previewLines: [
-            `Too many changes (${resolvedOperations.length}). Please narrow the request (max ${MAX_OPERATIONS} per request).`,
+            `Too many changes (${prunedResolved.operations.length}). Please narrow the request (max ${MAX_OPERATIONS} per request).`,
             ...(previewLines.length > 0 ? ["Draft unchanged:"] : []),
             ...previewLines,
           ],
           requiresConfirmation: true,
         };
       } else {
-        const draftToReturn =
-          resolvedOperations.length > 0 ? resolvedOperations : draftOperations;
+        const draftToReturn = prunedResolved.operations.length > 0 ? prunedResolved.operations : prunedDraft.operations;
 
         const requiresConfirmation =
           draftToReturn.some((op) => op.op === "remove_activity") ||
@@ -1261,6 +1361,9 @@ export async function POST(request: NextRequest) {
         if (dropped > 0) {
           messageParts.push(`Note: I ignored ${dropped} change(s) because I couldn't find a referenced item.`);
         }
+        if (redundantDropped > 0) {
+          messageParts.push(`Note: I ignored ${redundantDropped} redundant change(s) that matched your current itinerary.`);
+        }
         if (clarifications.length > 0) {
           messageParts.push(...clarifications);
         }
@@ -1274,15 +1377,15 @@ export async function POST(request: NextRequest) {
       }
 
       // Persist the draft only if the model produced a concrete updated plan.
-      if (resolvedOperations.length > 0 && resolvedOperations.length <= MAX_OPERATIONS) {
+      if (prunedResolved.operations.length > 0 && prunedResolved.operations.length <= MAX_OPERATIONS) {
         try {
           await updateAiItineraryThreadDraftAndSources({
             supabase,
             threadId,
-            draft: resolvedOperations,
+            draft: prunedResolved.operations,
             draftSources: null,
           });
-          threadDraft = resolvedOperations;
+          threadDraft = prunedResolved.operations;
           threadDraftSources = null;
         } catch (error) {
           console.warn("Failed to persist AI chat draft:", error);
@@ -1901,7 +2004,12 @@ export async function POST(request: NextRequest) {
   }
 
   // apply
-  const operations = parsed.data.operations;
+  const applyPruned = pruneRedundantDestinationOperations({
+    operations: parsed.data.operations,
+    itineraryDestinations,
+    destinationById,
+  });
+  const operations = applyPruned.operations;
   const importDraftSourcesParsed = LinkImportDraftSourcesSchema.safeParse(threadDraftSources);
   const importDraftSources = importDraftSourcesParsed.success ? importDraftSourcesParsed.data : null;
 
@@ -2628,13 +2736,21 @@ export async function POST(request: NextRequest) {
   }
 
   // Clear the saved draft only if everything applied successfully.
-  if (!anyFailed) {
-    try {
+  try {
+    if (!anyFailed) {
       await updateAiItineraryThreadDraftAndSources({ supabase, threadId, draft: null, draftSources: null });
       threadDraftSources = null;
-    } catch (error) {
-      console.warn("Failed to clear AI chat draft after apply:", error);
+    } else {
+      const remainingDraft = applied.filter((entry) => !entry.ok).map((entry) => entry.operation);
+      await updateAiItineraryThreadDraftAndSources({
+        supabase,
+        threadId,
+        draft: remainingDraft.length > 0 ? remainingDraft : null,
+        draftSources: threadDraftSources ?? null,
+      });
     }
+  } catch (error) {
+    console.warn("Failed to update AI chat draft after apply:", error);
   }
 
   if (executeStep?.ai_itinerary_run_step_id) {
