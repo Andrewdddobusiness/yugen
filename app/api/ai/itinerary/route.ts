@@ -439,6 +439,9 @@ export async function GET(request: NextRequest) {
       console.error("Failed to load AI chat history:", error);
       return respond(NextResponse.json({ ok: true, messages: [], summary: thread.summary ?? null }));
     }
+  } catch (error) {
+    console.error("Unexpected AI itinerary GET error:", error);
+    return jsonErrorTimed(500, "server_error", "Something went wrong. Please try again.");
   } finally {
     void recordApiRequestMetric({
       userId,
@@ -557,6 +560,9 @@ export async function DELETE(request: NextRequest) {
     }
 
     return respond(NextResponse.json({ ok: true }));
+  } catch (error) {
+    console.error("Unexpected AI itinerary DELETE error:", error);
+    return jsonErrorTimed(500, "server_error", "Something went wrong. Please try again.");
   } finally {
     void recordApiRequestMetric({
       userId,
@@ -2771,6 +2777,9 @@ export async function POST(request: NextRequest) {
   }
 
   return respond(NextResponse.json({ ok: true, mode: "apply", ...payload }));
+  } catch (error) {
+    console.error("Unexpected AI itinerary POST error:", error);
+    return jsonErrorTimed(500, "server_error", "Something went wrong. Please try again.");
   } finally {
     void recordApiRequestMetric({
       userId,

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Sparkles, Send, Loader2, AlertTriangle, X } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
@@ -9,6 +9,34 @@ import { cn } from "@/lib/utils";
 import { useItineraryActivityStore } from "@/store/itineraryActivityStore";
 import { useQueryClient } from "@tanstack/react-query";
 import type { Operation } from "@/lib/ai/itinerary/schema";
+
+const readJsonResponse = async <T,>(res: Response): Promise<T> => {
+  const bodyText = await res.text();
+  const trimmed = bodyText.trim();
+
+  if (!trimmed) {
+    throw new Error(`Unexpected empty response (HTTP ${res.status}). Please try again.`);
+  }
+
+  try {
+    return JSON.parse(trimmed) as T;
+  } catch (error) {
+    const looksLikeHtml = /^<!doctype html/i.test(trimmed) || /^<html/i.test(trimmed);
+    const preview = looksLikeHtml ? null : trimmed.replace(/\s+/g, " ").slice(0, 180);
+    const message = preview
+      ? `Unexpected server response (HTTP ${res.status}): ${preview}`
+      : `Unexpected server response (HTTP ${res.status}). Please try again.`;
+
+    console.error("[itinerary-assistant] Non-JSON response:", {
+      status: res.status,
+      statusText: res.statusText,
+      preview,
+      error,
+    });
+
+    throw new Error(message);
+  }
+};
 
 type PlanResponse = {
   ok: true;
@@ -372,6 +400,7 @@ function ItineraryAssistantChat(props: {
   const [error, setError] = useState<string | null>(null);
 
   const scrollRef = useRef<HTMLDivElement | null>(null);
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const historyKey = useMemo(
     () => `${itineraryId}:${destinationId}:${threadKey}`,
     [destinationId, itineraryId, threadKey]
@@ -414,6 +443,19 @@ function ItineraryAssistantChat(props: {
     setThreadKey(readStoredThreadKey());
   }, [readStoredThreadKey, storageKey]);
 
+  useLayoutEffect(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+
+    const minHeight = 44;
+    const maxHeight = 240;
+
+    el.style.height = "auto";
+    const nextHeight = Math.min(Math.max(el.scrollHeight, minHeight), maxHeight);
+    el.style.height = `${nextHeight}px`;
+    el.style.overflowY = el.scrollHeight > maxHeight ? "auto" : "hidden";
+  }, [input]);
+
   useEffect(() => {
     if (!isVisible) return;
     if (showThreads) return;
@@ -436,7 +478,7 @@ function ItineraryAssistantChat(props: {
         destinationId
       )}&threadKey=${encodeURIComponent(threadKey)}`
     )
-      .then((res) => res.json())
+      .then((res) => readJsonResponse<HistoryResponse>(res))
       .then((data) => {
         const payload = data as HistoryResponse;
         if (!payload || payload.ok !== true) return;
@@ -484,7 +526,7 @@ function ItineraryAssistantChat(props: {
           destinationId
         )}`
       );
-      const data = (await res.json()) as ThreadsResponse | ErrorResponse;
+      const data = await readJsonResponse<ThreadsResponse | ErrorResponse>(res);
       if (!("ok" in data) || data.ok !== true) return;
       setThreads(Array.isArray(data.threads) ? data.threads : []);
     } catch {
@@ -507,7 +549,7 @@ function ItineraryAssistantChat(props: {
             destinationId
           )}`
         );
-        const data = (await res.json()) as ThreadsResponse | ErrorResponse;
+        const data = await readJsonResponse<ThreadsResponse | ErrorResponse>(res);
         if (!("ok" in data) || data.ok !== true) return;
         const nextThreads = Array.isArray(data.threads) ? data.threads : [];
         setThreads(nextThreads);
@@ -545,7 +587,7 @@ function ItineraryAssistantChat(props: {
         body: JSON.stringify({ itineraryId, destinationId }),
       });
 
-      const data = (await res.json()) as CreateThreadResponse | ErrorResponse;
+      const data = await readJsonResponse<CreateThreadResponse | ErrorResponse>(res);
       if (!("ok" in data) || data.ok !== true || !data.thread?.thread_key) {
         const message = (data as any)?.error?.message ?? "Failed to create a new chat.";
         throw new Error(message);
@@ -583,7 +625,7 @@ function ItineraryAssistantChat(props: {
         }),
       });
 
-      const data = (await res.json()) as PlanResponse | ErrorResponse;
+      const data = await readJsonResponse<PlanResponse | ErrorResponse>(res);
       if (!("ok" in data) || data.ok !== true) {
         const message = data?.error?.message ?? "Failed to plan changes.";
         throw new Error(message);
@@ -620,7 +662,7 @@ function ItineraryAssistantChat(props: {
         }),
       });
 
-      const data = (await res.json()) as ImportResponse | ErrorResponse;
+      const data = await readJsonResponse<ImportResponse | ErrorResponse>(res);
       if (!("ok" in data) || data.ok !== true) {
         const message = data?.error?.message ?? "Failed to import from link.";
         throw new Error(message);
@@ -669,7 +711,7 @@ function ItineraryAssistantChat(props: {
         }),
       });
 
-      const data = (await res.json()) as ApplyResponse | ErrorResponse;
+      const data = await readJsonResponse<ApplyResponse | ErrorResponse>(res);
       if (!("ok" in data) || data.ok !== true) {
         const message = data?.error?.message ?? "Failed to apply changes.";
         throw new Error(message);
@@ -1266,10 +1308,11 @@ function ItineraryAssistantChat(props: {
       <div className="shrink-0 border-t border-stroke-200 bg-bg-0 px-5 py-4">
         <div className="flex items-end gap-2">
           <Textarea
+            ref={textareaRef}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             placeholder="Describe the changes you want…"
-            className="min-h-[44px] max-h-[140px] resize-none rounded-2xl"
+            className="min-h-[44px] resize-none rounded-2xl"
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey) {
                 e.preventDefault();
