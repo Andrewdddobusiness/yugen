@@ -15,12 +15,14 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 interface DatePickerWithRangeProps extends React.HTMLAttributes<HTMLDivElement> {
   selectedDateRange?: DateRange | undefined;
   onDateRangeConfirm: (dateRange: DateRange | undefined) => void;
+  triggerClassName?: string;
 }
 
 export function DatePickerWithRangePopover2({
   className,
   selectedDateRange,
   onDateRangeConfirm,
+  triggerClassName,
 }: DatePickerWithRangeProps) {
   // Local state for the calendar selection
   const [date, setDate] = useState<DateRange | undefined>(selectedDateRange);
@@ -84,7 +86,8 @@ export function DatePickerWithRangePopover2({
               "w-full justify-start text-left font-normal min-h-[44px] min-w-0 overflow-hidden",
               "active:scale-95 transition-transform duration-200",
               "touch-manipulation cursor-pointer",
-              !date && "text-muted-foreground"
+              !date && "text-muted-foreground",
+              triggerClassName
             )}
             onClick={() => setIsOpen(true)}
           >

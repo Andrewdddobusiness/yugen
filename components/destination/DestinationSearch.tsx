@@ -5,7 +5,7 @@ import { motion } from "framer-motion";
 import { Search, MapPin, Clock, ArrowLeft, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { geocodeAddress, getPlaceAutocomplete } from "@/actions/google/maps";
+import { getPlaceAutocomplete, getPlaceDetailsForDestination } from "@/actions/google/maps";
 
 interface Destination {
   id: string;
@@ -96,39 +96,40 @@ export default function DestinationSearch({ onDestinationSelect, onBack }: Desti
 
   const handleDestinationSelect = async (suggestion: DestinationSuggestion) => {
     setLoading(true);
+    setSearchError(null);
     try {
-      const lookup = `${suggestion.mainText}, ${suggestion.secondaryText}`.trim();
+      // Use Places details to get coordinates and canonical formatted address.
+      // This is more reliable than Geocoding and does not require the Geocoding API to be enabled.
+      const details = await getPlaceDetailsForDestination(suggestion.placeId);
 
-      // Geocode to get coordinates + canonical formatted address.
-      const geocodeResponse = await geocodeAddress(lookup);
-      
-      if (geocodeResponse.success && geocodeResponse.data) {
-        const formattedAddress = geocodeResponse.data.formatted_address;
-        const destination: Destination = {
-          id: geocodeResponse.data.place_id,
-          name: suggestion.mainText,
-          city: suggestion.mainText,
-          country: extractCountry(formattedAddress),
-          formatted_address: formattedAddress,
-          place_id: geocodeResponse.data.place_id,
-          coordinates: geocodeResponse.data.coordinates,
-          timezone: "",
-          photos: [],
-        };
-
-        // Save to recent searches
-        const updatedRecent = [
-          formattedAddress,
-          ...recentSearches.filter(item => item !== formattedAddress)
-        ].slice(0, 5);
-        
-        setRecentSearches(updatedRecent);
-        localStorage.setItem("journey-recent-destinations", JSON.stringify(updatedRecent));
-
-        onDestinationSelect(destination);
+      if (!details.success || !details.data) {
+        setSearchError("We couldn't fetch details for that destination. Please try again.");
+        return;
       }
+
+      const formattedAddress = details.data.formatted_address;
+      const destination: Destination = {
+        id: details.data.place_id,
+        name: suggestion.mainText,
+        city: suggestion.mainText,
+        country: extractCountry(formattedAddress),
+        formatted_address: formattedAddress,
+        place_id: details.data.place_id,
+        coordinates: details.data.coordinates,
+        timezone: "",
+        photos: [],
+      };
+
+      // Save to recent searches
+      const updatedRecent = [formattedAddress, ...recentSearches.filter((item) => item !== formattedAddress)].slice(0, 5);
+
+      setRecentSearches(updatedRecent);
+      localStorage.setItem("journey-recent-destinations", JSON.stringify(updatedRecent));
+
+      onDestinationSelect(destination);
     } catch (error) {
-      console.error("Error selecting destination:", error);
+      console.error("Error selecting destination");
+      setSearchError("We couldn't select that destination. Please try again.");
     } finally {
       setLoading(false);
     }

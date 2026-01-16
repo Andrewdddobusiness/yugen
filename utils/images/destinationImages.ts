@@ -12,7 +12,8 @@ type UnsplashPhotoConfig = {
 };
 
 const UNSPLASH_PHOTOS: Record<string, UnsplashPhotoConfig> = {
-  paris: { photoId: 'photo-1502602898536-47ad22581b52' },
+  // Previous Paris photo URL 404'd on Unsplash - keep this list to known-good IDs.
+  paris: { photoId: 'photo-1508057198894-247b23fe5ade' },
   tokyo: { photoId: 'photo-1540959733332-eab4deabeeaf' },
   london: { photoId: 'photo-1513635269975-59663e0ac1ad' },
   'new-york': { photoId: 'photo-1496442226666-8d4d0e62e6e9' },
@@ -74,4 +75,3 @@ export function getDestinationStockImageUrl(
     crop: options.crop ?? config.crop,
   });
 }
-

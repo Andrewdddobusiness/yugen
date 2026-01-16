@@ -504,3 +504,83 @@ export async function getPlaceAutocomplete(
     };
   }
 }
+
+/**
+ * Gets coordinates and formatted address for a place using Places API (New)
+ * This avoids relying on the Geocoding API for destination selection.
+ */
+export async function getPlaceDetailsForDestination(
+  placeIdOrResourceName: string
+): Promise<DatabaseResponse<{ place_id: string; formatted_address: string; coordinates: Coordinates }>> {
+  try {
+    const apiKey = getServerPlacesKey();
+
+    if (!apiKey || apiKey === "your-google-maps-api-key-here") {
+      return {
+        success: false,
+        error: { message: "Google Maps API key not configured" },
+      };
+    }
+
+    const raw = String(placeIdOrResourceName ?? "").trim();
+    if (!raw) {
+      return { success: false, error: { message: "Place id is required" } };
+    }
+
+    const resource = raw.startsWith("places/") ? raw : `places/${raw}`;
+    const url = `https://places.googleapis.com/v1/${resource}`;
+
+    const response = await fetch(url, {
+      headers: googleRequestHeaders({
+        "Content-Type": "application/json",
+        "X-Goog-Api-Key": apiKey,
+        "X-Goog-FieldMask": "id,formattedAddress,location,displayName",
+      }),
+    });
+
+    const data = await response.json().catch(() => null);
+    if (!response.ok) {
+      return {
+        success: false,
+        error: {
+          message: "Place details request failed",
+          code: response.status.toString(),
+          details: data,
+        },
+      };
+    }
+
+    const id: unknown = data?.id;
+    const formattedAddress: unknown = data?.formattedAddress;
+    const lat: unknown = data?.location?.latitude;
+    const lng: unknown = data?.location?.longitude;
+
+    if (typeof formattedAddress !== "string" || !Number.isFinite(Number(lat)) || !Number.isFinite(Number(lng))) {
+      return {
+        success: false,
+        error: {
+          message: "Place details response missing location data",
+          details: data,
+        },
+      };
+    }
+
+    return {
+      success: true,
+      data: {
+        place_id: typeof id === "string" && id ? id : resource,
+        formatted_address: formattedAddress,
+        coordinates: { lat: Number(lat), lng: Number(lng) },
+      },
+    };
+  } catch (error: any) {
+    console.error("Error in getPlaceDetailsForDestination");
+    return {
+      success: false,
+      error: {
+        message: error?.message || "Failed to fetch place details",
+        details: toJsonSafe(error),
+      },
+    };
+  }
+}

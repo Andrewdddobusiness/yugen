@@ -367,8 +367,8 @@ export default function PopUpCreateItinerary({ children, className, ...props }: 
       <DialogContent
         className={`w-[90%] sm:w-full ${
           showDestinationSelector
-            ? "max-w-[900px] h-[min(90vh,650px)] max-h-[90vh]"
-            : "max-w-[1000px] grid grid-cols-1 sm:grid-cols-2 h-[min(90vh,720px)] sm:h-[min(90vh,560px)] max-h-[90vh]"
+            ? "max-w-[900px] h-[min(90vh,720px)] max-h-[90vh]"
+            : "max-w-[1100px] grid grid-cols-1 sm:grid-cols-[1fr_2fr] h-[min(90vh,760px)] sm:h-[min(90vh,720px)] max-h-[90vh]"
         } p-0 gap-0 rounded-xl overflow-hidden`}
       >
         {showDestinationSelector ? (
@@ -383,22 +383,119 @@ export default function PopUpCreateItinerary({ children, className, ...props }: 
               <Image src={steps[step].image} alt={steps[step].title} fill className="object-cover" priority />
             </div>
 
-            <DialogDescription className="flex min-h-0 flex-col justify-between px-4 sm:px-6 pt-8 sm:pt-10 pb-6 h-full overflow-hidden">
+            <DialogDescription className="flex min-h-0 flex-col px-4 sm:px-6 pt-6 sm:pt-8 pb-6 h-full overflow-hidden">
               <VisuallyHidden.Root>
                 <DialogTitle>Create New Itinerary</DialogTitle>
               </VisuallyHidden.Root>
 
               <Form {...form}>
-                <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col h-full justify-between">
-                  <div className="flex flex-1 flex-col gap-1 min-h-0 overflow-y-auto pr-1">
+                <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col h-full min-h-0">
+                  {/* Header - always visible */}
+                  <div className="flex-shrink-0">
                     <DialogTitle className="text-2xl sm:text-3xl text-black">
                       Let&apos;s build your next vacation!
                     </DialogTitle>
                     <div className="text-lg sm:text-xl font-medium text-zinc-800">{steps[step].title}</div>
-                    <div className="mt-4">{steps[step].content}</div>
                   </div>
 
-                  <div className="flex flex-row mt-4 justify-between">
+                  {/* Body */}
+                  <div className="mt-4 flex-1 min-h-0 flex flex-col">
+                    {step === 0 ? (
+                      <>
+                        {/* Only the destination cards scroll */}
+                        <div className="flex-1 min-h-0 overflow-y-auto pr-1">
+                          <div className="space-y-3">
+                            {legs.map((leg, index) => {
+                              const destination = leg.destination;
+                              const dateRange = leg.dateRange;
+
+                              return (
+                                <div key={leg.id} className="rounded-xl border border-stroke-200 bg-white p-3">
+                                  <div className="flex items-center justify-between">
+                                    <div className="text-sm font-semibold text-ink-900">Destination {index + 1}</div>
+                                    {legs.length > 1 ? (
+                                      <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-8 w-8"
+                                        onClick={() => removeLeg(leg.id)}
+                                        title="Remove destination"
+                                      >
+                                        <X className="h-4 w-4" />
+                                      </Button>
+                                    ) : null}
+                                  </div>
+
+                                  <div className="mt-3 grid grid-cols-1 sm:grid-cols-[2fr_1fr] gap-3">
+                                    <div className="min-w-0">
+                                      {destination ? (
+                                        <div className="flex items-center justify-between px-3 py-2 h-14 border border-gray-300 rounded-md bg-blue-50">
+                                          <div className="flex items-center space-x-3 min-w-0">
+                                            <div className="p-2 bg-blue-600 rounded-lg flex-shrink-0">
+                                              <MapPin className="h-4 w-4 text-white" />
+                                            </div>
+                                            <div className="min-w-0">
+                                              <div className="font-medium text-gray-900 truncate">{destination.name}</div>
+                                              <div className="text-sm text-gray-600 truncate">{destination.country}</div>
+                                            </div>
+                                          </div>
+                                          <Button
+                                            type="button"
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() => setDestinationSelectorLegId(leg.id)}
+                                            className="text-blue-600 border-blue-600 hover:bg-blue-600 hover:text-white flex-shrink-0"
+                                          >
+                                            Change
+                                          </Button>
+                                        </div>
+                                      ) : (
+                                        <Button
+                                          type="button"
+                                          variant="outline"
+                                          onClick={() => setDestinationSelectorLegId(leg.id)}
+                                          className="w-full h-14 justify-start text-gray-500 border-gray-300 hover:border-blue-400 hover:text-blue-600"
+                                        >
+                                          <MapPin className="h-5 w-5 mr-3" />
+                                          Choose your destination...
+                                        </Button>
+                                      )}
+                                    </div>
+
+                                    <div className="min-w-0">
+                                      <DatePickerWithRangePopover2
+                                        selectedDateRange={dateRange}
+                                        onDateRangeConfirm={(range) => setLegDateRange(leg.id, range)}
+                                        triggerClassName="h-14"
+                                      />
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+
+                        {/* Non-scroll actions */}
+                        <div className="pt-4 flex-shrink-0 space-y-3">
+                          <Button type="button" variant="outline" className="w-full h-11 rounded-xl" onClick={() => addLeg()}>
+                            <Plus className="h-4 w-4 mr-2" />
+                            Add another destination
+                          </Button>
+                          {error ? <div className="text-sm text-red-600">{error}</div> : null}
+                        </div>
+                      </>
+                    ) : (
+                      <div className="flex-1 min-h-0 overflow-y-auto pr-1">
+                        {steps[step].content}
+                        {error ? <div className="text-sm text-red-600 mt-4">{error}</div> : null}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Footer */}
+                  <div className="flex flex-row mt-4 justify-between flex-shrink-0">
                     <Button
                       type="button"
                       className="flex w-28 rounded-xl shadow-lg"
