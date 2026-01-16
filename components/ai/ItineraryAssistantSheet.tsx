@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Sparkles, Send, Loader2, AlertTriangle, X } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
@@ -340,7 +340,22 @@ function ItineraryAssistantChat(props: {
   const setItineraryActivities = useItineraryActivityStore((s) => s.setItineraryActivities);
   const itineraryActivities = useItineraryActivityStore((s) => s.itineraryActivities);
 
-  const [threadKey, setThreadKey] = useState("default");
+  const storageKey = useMemo(() => {
+    if (!itineraryId || !destinationId) return null;
+    return `aiItineraryThreadKey:${itineraryId}:${destinationId}`;
+  }, [destinationId, itineraryId]);
+
+  const readStoredThreadKey = useCallback(() => {
+    if (!storageKey) return "default";
+    try {
+      const stored = window.localStorage.getItem(storageKey);
+      return stored?.trim() ? stored.trim() : "default";
+    } catch {
+      return "default";
+    }
+  }, [storageKey]);
+
+  const [threadKey, setThreadKey] = useState(() => "default");
   const [threads, setThreads] = useState<ThreadListItem[]>([]);
   const [threadsLoading, setThreadsLoading] = useState(false);
   const [showThreads, setShowThreads] = useState(false);
@@ -365,6 +380,20 @@ function ItineraryAssistantChat(props: {
 
   const hasPendingOps = (draftPlan?.operations?.length ?? 0) > 0;
 
+  const setActiveThreadKey = useCallback(
+    (nextKey: string) => {
+      const normalized = nextKey?.trim() ? nextKey.trim() : "default";
+      setThreadKey(normalized);
+      if (!storageKey) return;
+      try {
+        window.localStorage.setItem(storageKey, normalized);
+      } catch {
+        // ignore
+      }
+    },
+    [storageKey]
+  );
+
   const canSubmit = useMemo(() => {
     if (planning || importing || applying || dismissing) return false;
     if (showThreads) return false;
@@ -381,23 +410,9 @@ function ItineraryAssistantChat(props: {
   }, [historyKey]);
 
   useEffect(() => {
-    if (!itineraryId || !destinationId) return;
-    try {
-      const stored = window.localStorage.getItem(`aiItineraryThreadKey:${itineraryId}:${destinationId}`);
-      setThreadKey(stored?.trim() ? stored.trim() : "default");
-    } catch {
-      setThreadKey("default");
-    }
-  }, [destinationId, itineraryId]);
-
-  useEffect(() => {
-    if (!itineraryId || !destinationId) return;
-    try {
-      window.localStorage.setItem(`aiItineraryThreadKey:${itineraryId}:${destinationId}`, threadKey);
-    } catch {
-      // ignore
-    }
-  }, [destinationId, itineraryId, threadKey]);
+    if (!storageKey) return;
+    setThreadKey(readStoredThreadKey());
+  }, [readStoredThreadKey, storageKey]);
 
   useEffect(() => {
     if (!isVisible) return;
@@ -481,6 +496,38 @@ function ItineraryAssistantChat(props: {
 
   useEffect(() => {
     if (!isVisible) return;
+    if (!itineraryId || !destinationId) return;
+
+    // Ensure we don't keep a stale thread key around (e.g. cleared storage or deleted thread).
+    // If there is no stored key or it no longer exists, select the most recent thread.
+    void (async () => {
+      try {
+        const res = await fetch(
+          `/api/ai/itinerary/threads?itineraryId=${encodeURIComponent(itineraryId)}&destinationId=${encodeURIComponent(
+            destinationId
+          )}`
+        );
+        const data = (await res.json()) as ThreadsResponse | ErrorResponse;
+        if (!("ok" in data) || data.ok !== true) return;
+        const nextThreads = Array.isArray(data.threads) ? data.threads : [];
+        setThreads(nextThreads);
+
+        const stored = readStoredThreadKey();
+        if (stored !== "default" && nextThreads.some((t) => t.thread_key === stored)) {
+          setThreadKey(stored);
+          return;
+        }
+
+        const candidate = nextThreads[0]?.thread_key;
+        if (candidate) setActiveThreadKey(candidate);
+      } catch {
+        // ignore
+      }
+    })();
+  }, [destinationId, isVisible, itineraryId, readStoredThreadKey, setActiveThreadKey]);
+
+  useEffect(() => {
+    if (!isVisible) return;
     if (!showThreads) return;
     void loadThreads();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -505,7 +552,7 @@ function ItineraryAssistantChat(props: {
       }
 
       setThreads((prev) => [data.thread, ...prev.filter((t) => t.thread_key !== data.thread.thread_key)]);
-      setThreadKey(data.thread.thread_key);
+      setActiveThreadKey(data.thread.thread_key);
       setShowThreads(false);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to create a new chat.");
@@ -658,7 +705,13 @@ function ItineraryAssistantChat(props: {
         setItineraryActivities(refreshedActivities);
       }
 
-      await queryClient.invalidateQueries({ queryKey: ["builderBootstrap", itineraryId, destinationId] });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["builderBootstrap", itineraryId, destinationId] }),
+        // Destination edits should immediately refresh the left sidebar + calendar city chips.
+        queryClient.invalidateQueries({ queryKey: ["itineraryDestinationsSummary", itineraryId] }),
+        // If the current destination range changed, refresh its cached details too.
+        queryClient.invalidateQueries({ queryKey: ["itineraryDestination", itineraryId, destinationId] }),
+      ]);
       if (failures.length === 0) {
         setDraftPlan(null);
         setDraftSources(null);
@@ -982,7 +1035,7 @@ function ItineraryAssistantChat(props: {
                           isActive ? "border-brand-500 bg-brand-500/5" : "border-stroke-200 bg-bg-0 hover:bg-bg-50"
                         )}
                         onClick={() => {
-                          setThreadKey(t.thread_key);
+                          setActiveThreadKey(t.thread_key);
                           setShowThreads(false);
                         }}
                       >

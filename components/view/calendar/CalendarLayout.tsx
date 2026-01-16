@@ -510,7 +510,7 @@ export function CalendarLayout({
                       <div
                         key={`city:${dayKey}`}
                         className={cn(
-                          "flex-1 flex items-center justify-center px-2",
+                          "flex-1 min-w-0 overflow-hidden flex items-center justify-center px-2",
                           dayIndex < days.length - 1 && "border-r border-stroke-200/70"
                         )}
                       >
@@ -536,11 +536,11 @@ export function CalendarLayout({
                   const isWeekendDay = isWeekend(day);
                   const allDayActivities = allDayActivitiesByDay.get(dayKey) ?? [];
 
-                  return (
+                    return (
                     <div
                       key={`header:${dayKey}`}
                       className={cn(
-                        "flex-1 flex flex-col items-center justify-center px-2 py-1 relative",
+                        "flex-1 min-w-0 overflow-hidden flex flex-col items-center justify-center px-2 py-1 relative",
                         dayIndex < days.length - 1 && "border-r border-stroke-200/70",
                         onDateChange && "cursor-pointer hover:bg-bg-50/80",
                         isCurrentDay && "bg-brand-500/10 border-brand-400/60",
