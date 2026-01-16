@@ -225,42 +225,18 @@ export async function createAiItineraryThread(args: {
   };
 
   const first = await insert(true);
-  if (first.error && isMissingColumn(first.error, "thread_key")) {
-    const legacy = await insert(false);
-    if (legacy.error || !legacy.data) {
-      // Legacy schema only supports one thread per (itinerary,destination,user); if it already exists, return it.
-      const existing = await supabase
-        .from("ai_itinerary_thread")
-        .select("ai_itinerary_thread_id,summary,created_at,updated_at")
-        .eq("itinerary_id", Number(itineraryId))
-        .eq("itinerary_destination_id", Number(destinationId))
-        .eq("user_id", userId)
-        .maybeSingle();
 
-      if (existing.data?.ai_itinerary_thread_id) {
-        return {
-          ai_itinerary_thread_id: String((existing.data as any).ai_itinerary_thread_id),
-          thread_key: "default",
-          summary: (existing.data as any).summary ?? null,
-          created_at: String((existing.data as any).created_at),
-          updated_at: String((existing.data as any).updated_at),
-        };
-      }
-
-      throw new Error(legacy.error?.message || "Failed to create AI chat thread");
+  if (first.error) {
+    if (isMissingColumn(first.error, "thread_key")) {
+      throw new Error(
+        "[ai_threads_not_supported] Multiple chats aren't enabled for this database yet (missing `ai_itinerary_thread.thread_key`). Apply the latest Supabase migrations and refresh the API schema cache."
+      );
     }
-
-    return {
-      ai_itinerary_thread_id: String((legacy.data as any).ai_itinerary_thread_id),
-      thread_key: "default",
-      summary: (legacy.data as any).summary ?? null,
-      created_at: String((legacy.data as any).created_at),
-      updated_at: String((legacy.data as any).updated_at),
-    };
+    throw new Error(first.error?.message || "Failed to create AI chat thread");
   }
 
-  if (first.error || !first.data) {
-    throw new Error(first.error?.message || "Failed to create AI chat thread");
+  if (!first.data) {
+    throw new Error("Failed to create AI chat thread");
   }
 
   return {

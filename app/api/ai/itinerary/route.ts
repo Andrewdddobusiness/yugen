@@ -1687,13 +1687,15 @@ export async function POST(request: NextRequest) {
         }
 
         if (mergedOps.length > 15) {
-          return respondImport(
-            {
-              assistantMessage: `That would add ${mergedOps.length} places, which exceeds the limit of 15. Please remove some items from the draft first.`,
-              operations: existingOps.filter((op) => op.op === "add_place").slice(0, 15) as any,
-              previewLines: buildPreviewLines(existingOps, activityById, destinationById),
-              requiresConfirmation: true,
-              sources: sourcesForPreview,
+	          return respondImport(
+	            {
+	              assistantMessage: stripEmDashes(
+	                `That would add ${mergedOps.length} places, which exceeds the limit of 15. Please remove some items from the draft first.`
+	              ),
+	              operations: existingOps.filter((op) => op.op === "add_place").slice(0, 15) as any,
+	              previewLines: buildPreviewLines(existingOps, activityById, destinationById),
+	              requiresConfirmation: true,
+	              sources: sourcesForPreview,
               pendingClarificationsCount: (existingDraftSources?.pendingClarifications ?? []).length,
             },
             existingDraftSources
@@ -1721,26 +1723,27 @@ export async function POST(request: NextRequest) {
         if (clarifications.length > 0) assistantParts.push(...clarifications);
         if (assistantParts.length === 0) assistantParts.push("Please reply with an option number, or paste a Google Maps link.");
 
-        const payload: ImportResponsePayload = {
-          assistantMessage: assistantParts.join("\n\n"),
-          operations: mergedOps,
-          previewLines: buildPreviewLines(mergedOps, activityById, destinationById),
-          requiresConfirmation: mergedOps.length > CONFIRMATION_BATCH_THRESHOLD,
-          sources: sourcesForPreview,
-          pendingClarificationsCount: (draftSourcesToPersist.pendingClarifications ?? []).length,
-        };
+	        const payload: ImportResponsePayload = {
+	          assistantMessage: stripEmDashes(assistantParts.join("\n\n")),
+	          operations: mergedOps,
+	          previewLines: buildPreviewLines(mergedOps, activityById, destinationById),
+	          requiresConfirmation: mergedOps.length > CONFIRMATION_BATCH_THRESHOLD,
+	          sources: sourcesForPreview,
+	          pendingClarificationsCount: (draftSourcesToPersist.pendingClarifications ?? []).length,
+	        };
 
         return respondImport(payload, draftSourcesToPersist);
       }
 
-      if (ingested.length === 0) {
-        const payload: ImportResponsePayload = {
-          assistantMessage:
-            "Paste up to 3 links (YouTube Shorts, TikTok, Instagram Reels, TripAdvisor, or a travel webpage) and I’ll extract places to add as unscheduled draft activities.",
-          operations: [],
-          previewLines: [],
-          requiresConfirmation: false,
-          sources: sourcesForPreview,
+	      if (ingested.length === 0) {
+	        const payload: ImportResponsePayload = {
+	          assistantMessage: stripEmDashes(
+	            "Paste up to 3 links (YouTube Shorts, TikTok, Instagram Reels, TripAdvisor, or a travel webpage) and I’ll extract places to add as unscheduled draft activities."
+	          ),
+	          operations: [],
+	          previewLines: [],
+	          requiresConfirmation: false,
+	          sources: sourcesForPreview,
           pendingClarificationsCount: (existingDraftSources?.pendingClarifications ?? []).length,
         };
         return respondImport(payload, existingDraftSources);

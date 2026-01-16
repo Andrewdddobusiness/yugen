@@ -226,6 +226,9 @@ export async function POST(request: NextRequest) {
     return respond(NextResponse.json({ ok: true, thread: created }));
   } catch (error) {
     const message = String((error as any)?.message ?? "");
+    if (message.includes("[ai_threads_not_supported]")) {
+      return respond(jsonError(501, "threads_not_supported", message.replace("[ai_threads_not_supported] ", "")));
+    }
     if (message.toLowerCase().includes("duplicate key")) {
       // This should be extremely rare; clients can retry.
       return respond(jsonError(409, "duplicate_thread", "Chat already exists. Please try again."));
@@ -243,4 +246,3 @@ export async function POST(request: NextRequest) {
     });
   }
 }
-
