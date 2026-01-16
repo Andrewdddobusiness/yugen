@@ -140,10 +140,17 @@ export const ChatMessageSchema = z.object({
 
 export type ChatMessage = z.infer<typeof ChatMessageSchema>;
 
+export const ThreadKeySchema = z
+  .string()
+  .trim()
+  .min(1, "Thread key is required")
+  .max(64, "Thread key is too long");
+
 export const PlanRequestSchema = z.object({
   mode: z.literal("plan"),
   itineraryId: ItineraryIdSchema,
   destinationId: DestinationIdSchema,
+  threadKey: ThreadKeySchema.optional(),
   message: z.string().trim().min(1, "Message is required").max(2000, "Message is too long"),
   chatHistory: z.array(ChatMessageSchema).max(30).optional(),
   draftOperations: z.array(OperationSchema).max(25).optional(),
@@ -153,6 +160,7 @@ export const ImportRequestSchema = z.object({
   mode: z.literal("import"),
   itineraryId: ItineraryIdSchema,
   destinationId: DestinationIdSchema,
+  threadKey: ThreadKeySchema.optional(),
   message: z.string().trim().min(1, "Message is required").max(2000, "Message is too long"),
 });
 
@@ -160,6 +168,7 @@ export const ApplyRequestSchema = z.object({
   mode: z.literal("apply"),
   itineraryId: ItineraryIdSchema,
   destinationId: DestinationIdSchema,
+  threadKey: ThreadKeySchema.optional(),
   confirmed: z.boolean().optional(),
   operations: z
     .array(OperationSchema)

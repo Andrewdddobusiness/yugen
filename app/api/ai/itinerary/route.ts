@@ -152,6 +152,8 @@ export async function GET(request: NextRequest) {
   try {
     const itineraryId = request.nextUrl.searchParams.get("itineraryId") ?? "";
     const destinationId = request.nextUrl.searchParams.get("destinationId") ?? "";
+    const threadIdParam = request.nextUrl.searchParams.get("threadId") ?? "";
+    const threadKeyParam = request.nextUrl.searchParams.get("threadKey") ?? "";
 
     const parsedItineraryId = ItineraryIdSchema.safeParse(itineraryId);
     const parsedDestinationId = DestinationIdSchema.safeParse(destinationId);
@@ -165,6 +167,11 @@ export async function GET(request: NextRequest) {
       return jsonErrorTimed(401, "unauthorized", "You must be signed in to use the AI assistant.");
     }
     userId = auth.user.id;
+
+    const threadKey = threadKeyParam.trim() ? String(threadKeyParam).trim() : "default";
+    if (threadKey.length > 64) {
+      return jsonErrorTimed(400, "invalid_request", "Invalid thread key");
+    }
 
     const ip = getClientIp(request);
     const limiter = rateLimit(`ai_itinerary:get:${auth.user.id}:${ip}`, { windowMs: 60_000, max: 60 });
@@ -193,19 +200,65 @@ export async function GET(request: NextRequest) {
       | { ai_itinerary_thread_id: string; summary: string | null; draft: unknown | null; draft_sources?: unknown | null }
       | null = null;
     try {
-      const { data, error } = await supabase
-        .from("ai_itinerary_thread")
-        .select("ai_itinerary_thread_id,summary,draft,draft_sources")
-        .eq("itinerary_id", Number(itineraryId))
-        .eq("itinerary_destination_id", Number(destinationId))
-        .maybeSingle();
+      const base = supabase.from("ai_itinerary_thread").select("ai_itinerary_thread_id,summary,draft,draft_sources");
+      const query = threadIdParam.trim()
+        ? base
+            .eq("ai_itinerary_thread_id", threadIdParam.trim())
+            .eq("itinerary_id", Number(itineraryId))
+            .eq("itinerary_destination_id", Number(destinationId))
+            .eq("user_id", auth.user.id)
+        : base
+            .eq("itinerary_id", Number(itineraryId))
+            .eq("itinerary_destination_id", Number(destinationId))
+            .eq("user_id", auth.user.id)
+            .eq("thread_key", threadKey);
 
-      if (error && isMissingColumn(error, "draft_sources")) {
+      const { data, error } = await query.maybeSingle();
+
+      const missingThreadKey = error && isMissingColumn(error, "thread_key");
+
+      if (missingThreadKey) {
+        const legacy = await supabase
+          .from("ai_itinerary_thread")
+          .select("ai_itinerary_thread_id,summary,draft,draft_sources")
+          .eq("itinerary_id", Number(itineraryId))
+          .eq("itinerary_destination_id", Number(destinationId))
+          .eq("user_id", auth.user.id)
+          .maybeSingle();
+
+        if (legacy.error && isMissingColumn(legacy.error, "draft_sources")) {
+          const legacyNoSources = await supabase
+            .from("ai_itinerary_thread")
+            .select("ai_itinerary_thread_id,summary,draft")
+            .eq("itinerary_id", Number(itineraryId))
+            .eq("itinerary_destination_id", Number(destinationId))
+            .eq("user_id", auth.user.id)
+            .maybeSingle();
+
+          if (legacyNoSources.data?.ai_itinerary_thread_id) {
+            thread = {
+              ai_itinerary_thread_id: String((legacyNoSources.data as any).ai_itinerary_thread_id),
+              summary: (legacyNoSources.data as any).summary ?? null,
+              draft: (legacyNoSources.data as any).draft ?? null,
+              draft_sources: null,
+            };
+          }
+        } else if (legacy.data?.ai_itinerary_thread_id) {
+          thread = {
+            ai_itinerary_thread_id: String((legacy.data as any).ai_itinerary_thread_id),
+            summary: (legacy.data as any).summary ?? null,
+            draft: (legacy.data as any).draft ?? null,
+            draft_sources: (legacy.data as any).draft_sources ?? null,
+          };
+        }
+      } else if (error && isMissingColumn(error, "draft_sources")) {
         const { data: fallbackData } = await supabase
           .from("ai_itinerary_thread")
           .select("ai_itinerary_thread_id,summary,draft")
           .eq("itinerary_id", Number(itineraryId))
           .eq("itinerary_destination_id", Number(destinationId))
+          .eq("user_id", auth.user.id)
+          .eq("thread_key", threadKey)
           .maybeSingle();
 
         if (fallbackData?.ai_itinerary_thread_id) {
@@ -306,6 +359,8 @@ export async function DELETE(request: NextRequest) {
   try {
     const itineraryId = request.nextUrl.searchParams.get("itineraryId") ?? "";
     const destinationId = request.nextUrl.searchParams.get("destinationId") ?? "";
+    const threadIdParam = request.nextUrl.searchParams.get("threadId") ?? "";
+    const threadKeyParam = request.nextUrl.searchParams.get("threadKey") ?? "";
 
     const parsedItineraryId = ItineraryIdSchema.safeParse(itineraryId);
     const parsedDestinationId = DestinationIdSchema.safeParse(destinationId);
@@ -339,21 +394,59 @@ export async function DELETE(request: NextRequest) {
     const access = await requireAiAssistantAccess(supabase, auth.user.id);
     if (!access.ok) return respond(access.response);
 
-    const { error: clearError } = await supabase
-      .from("ai_itinerary_thread")
-      .update({ draft: null, draft_sources: null })
-      .eq("itinerary_id", Number(itineraryId))
-      .eq("itinerary_destination_id", Number(destinationId));
+    const threadKey = threadKeyParam.trim() ? String(threadKeyParam).trim() : "default";
+    if (threadKey.length > 64) {
+      return jsonErrorTimed(400, "invalid_request", "Invalid thread key");
+    }
+
+    const updateBase = supabase.from("ai_itinerary_thread").update({ draft: null, draft_sources: null });
+    const updateQuery = threadIdParam.trim()
+      ? updateBase.eq("ai_itinerary_thread_id", threadIdParam.trim()).eq("user_id", auth.user.id)
+      : updateBase
+          .eq("itinerary_id", Number(itineraryId))
+          .eq("itinerary_destination_id", Number(destinationId))
+          .eq("user_id", auth.user.id)
+          .eq("thread_key", threadKey);
+
+    const { error: clearError } = await updateQuery;
 
     const missingDraftSources =
       String((clearError as any)?.code ?? "") === "42703" &&
       String((clearError as any)?.message ?? "").toLowerCase().includes("draft_sources");
     if (missingDraftSources) {
-      await supabase
-        .from("ai_itinerary_thread")
-        .update({ draft: null })
+      const fallbackBase = supabase.from("ai_itinerary_thread").update({ draft: null });
+      const fallbackQuery = threadIdParam.trim()
+        ? fallbackBase.eq("ai_itinerary_thread_id", threadIdParam.trim()).eq("user_id", auth.user.id)
+        : fallbackBase
+            .eq("itinerary_id", Number(itineraryId))
+            .eq("itinerary_destination_id", Number(destinationId))
+            .eq("user_id", auth.user.id)
+            .eq("thread_key", threadKey);
+
+      const { error: fallbackError } = await fallbackQuery;
+
+      const missingThreadKey =
+        String((fallbackError as any)?.code ?? "") === "42703" &&
+        String((fallbackError as any)?.message ?? "").toLowerCase().includes("thread_key");
+      if (missingThreadKey) {
+        await supabase
+          .from("ai_itinerary_thread")
+          .update({ draft: null })
+          .eq("itinerary_id", Number(itineraryId))
+          .eq("itinerary_destination_id", Number(destinationId))
+          .eq("user_id", auth.user.id);
+      }
+    }
+
+    const missingThreadKey =
+      String((clearError as any)?.code ?? "") === "42703" &&
+      String((clearError as any)?.message ?? "").toLowerCase().includes("thread_key");
+    if (missingThreadKey) {
+      const legacyBase = supabase.from("ai_itinerary_thread").update({ draft: null, draft_sources: null });
+      await legacyBase
         .eq("itinerary_id", Number(itineraryId))
-        .eq("itinerary_destination_id", Number(destinationId));
+        .eq("itinerary_destination_id", Number(destinationId))
+        .eq("user_id", auth.user.id);
     }
 
     return respond(NextResponse.json({ ok: true }));
@@ -802,7 +895,7 @@ export async function POST(request: NextRequest) {
     const access = await requireAiAssistantAccess(supabase, auth.user.id);
     if (!access.ok) return respond(access.response);
 
-    const { itineraryId, destinationId } = parsed.data;
+    const { itineraryId, destinationId, threadKey } = parsed.data;
     const quota = await checkAiQuota({ supabase, userId: auth.user.id, tier: access.tier });
 
     const bootstrap = await fetchBuilderBootstrap(itineraryId, destinationId);
@@ -825,6 +918,7 @@ export async function POST(request: NextRequest) {
         itineraryId,
         destinationId,
         userId: auth.user.id,
+        threadKey,
       });
       threadId = thread.ai_itinerary_thread_id;
       threadSummary = thread.summary ?? null;

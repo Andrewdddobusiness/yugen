@@ -80,10 +80,29 @@ type ApplyResponse = {
 
 type HistoryResponse = {
   ok: true;
+  threadId?: string;
   messages: ChatMessage[];
   summary?: string | null;
   draftOperations?: Operation[] | null;
   draftSources?: DraftSourcesPreview | null;
+};
+
+type ThreadListItem = {
+  ai_itinerary_thread_id: string;
+  thread_key: string;
+  summary: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+type ThreadsResponse = {
+  ok: true;
+  threads: ThreadListItem[];
+};
+
+type CreateThreadResponse = {
+  ok: true;
+  thread: ThreadListItem;
 };
 
 type ErrorResponse = {
@@ -336,6 +355,11 @@ function ItineraryAssistantChat(props: {
   const setItineraryActivities = useItineraryActivityStore((s) => s.setItineraryActivities);
   const itineraryActivities = useItineraryActivityStore((s) => s.itineraryActivities);
 
+  const [threadKey, setThreadKey] = useState("default");
+  const [threads, setThreads] = useState<ThreadListItem[]>([]);
+  const [threadsLoading, setThreadsLoading] = useState(false);
+  const [showThreads, setShowThreads] = useState(false);
+
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [draftPlan, setDraftPlan] = useState<{ operations: Operation[]; requiresConfirmation: boolean } | null>(null);
@@ -348,15 +372,19 @@ function ItineraryAssistantChat(props: {
   const [error, setError] = useState<string | null>(null);
 
   const scrollRef = useRef<HTMLDivElement | null>(null);
-  const historyKey = useMemo(() => `${itineraryId}:${destinationId}`, [destinationId, itineraryId]);
+  const historyKey = useMemo(
+    () => `${itineraryId}:${destinationId}:${threadKey}`,
+    [destinationId, itineraryId, threadKey]
+  );
   const lastLoadedHistoryKeyRef = useRef<string | null>(null);
 
   const hasPendingOps = (draftPlan?.operations?.length ?? 0) > 0;
 
   const canSubmit = useMemo(() => {
     if (planning || importing || applying || dismissing) return false;
+    if (showThreads) return false;
     return input.trim().length > 0;
-  }, [applying, dismissing, importing, input, planning]);
+  }, [applying, dismissing, importing, input, planning, showThreads]);
 
   useEffect(() => {
     setMessages([]);
@@ -368,11 +396,31 @@ function ItineraryAssistantChat(props: {
   }, [historyKey]);
 
   useEffect(() => {
+    if (!itineraryId || !destinationId) return;
+    try {
+      const stored = window.localStorage.getItem(`aiItineraryThreadKey:${itineraryId}:${destinationId}`);
+      setThreadKey(stored?.trim() ? stored.trim() : "default");
+    } catch {
+      setThreadKey("default");
+    }
+  }, [destinationId, itineraryId]);
+
+  useEffect(() => {
+    if (!itineraryId || !destinationId) return;
+    try {
+      window.localStorage.setItem(`aiItineraryThreadKey:${itineraryId}:${destinationId}`, threadKey);
+    } catch {
+      // ignore
+    }
+  }, [destinationId, itineraryId, threadKey]);
+
+  useEffect(() => {
     if (!isVisible) return;
+    if (showThreads) return;
     setTimeout(() => {
       scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
     }, 0);
-  }, [isVisible, messages, draftPlan, draftSources, planning, importing, applying]);
+  }, [isVisible, messages, draftPlan, draftSources, planning, importing, applying, showThreads]);
 
   useEffect(() => {
     if (!isVisible) return;
@@ -383,7 +431,11 @@ function ItineraryAssistantChat(props: {
     setHistoryLoading(true);
     setError(null);
 
-    fetch(`/api/ai/itinerary?itineraryId=${encodeURIComponent(itineraryId)}&destinationId=${encodeURIComponent(destinationId)}`)
+    fetch(
+      `/api/ai/itinerary?itineraryId=${encodeURIComponent(itineraryId)}&destinationId=${encodeURIComponent(
+        destinationId
+      )}&threadKey=${encodeURIComponent(threadKey)}`
+    )
       .then((res) => res.json())
       .then((data) => {
         const payload = data as HistoryResponse;
@@ -419,7 +471,63 @@ function ItineraryAssistantChat(props: {
         // ignore history load errors
       })
       .finally(() => setHistoryLoading(false));
-  }, [destinationId, historyKey, isVisible, itineraryId]);
+  }, [destinationId, historyKey, isVisible, itineraryId, threadKey]);
+
+  const loadThreads = async () => {
+    if (!itineraryId || !destinationId) return;
+    setThreadsLoading(true);
+    setError(null);
+
+    try {
+      const res = await fetch(
+        `/api/ai/itinerary/threads?itineraryId=${encodeURIComponent(itineraryId)}&destinationId=${encodeURIComponent(
+          destinationId
+        )}`
+      );
+      const data = (await res.json()) as ThreadsResponse | ErrorResponse;
+      if (!("ok" in data) || data.ok !== true) return;
+      setThreads(Array.isArray(data.threads) ? data.threads : []);
+    } catch {
+      // ignore
+    } finally {
+      setThreadsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!isVisible) return;
+    if (!showThreads) return;
+    void loadThreads();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isVisible, showThreads, itineraryId, destinationId]);
+
+  const createNewChat = async () => {
+    if (planning || importing || applying || dismissing) return;
+    setThreadsLoading(true);
+    setError(null);
+
+    try {
+      const res = await fetch("/api/ai/itinerary/threads", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ itineraryId, destinationId }),
+      });
+
+      const data = (await res.json()) as CreateThreadResponse | ErrorResponse;
+      if (!("ok" in data) || data.ok !== true || !data.thread?.thread_key) {
+        const message = (data as any)?.error?.message ?? "Failed to create a new chat.";
+        throw new Error(message);
+      }
+
+      setThreads((prev) => [data.thread, ...prev.filter((t) => t.thread_key !== data.thread.thread_key)]);
+      setThreadKey(data.thread.thread_key);
+      setShowThreads(false);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to create a new chat.");
+    } finally {
+      setThreadsLoading(false);
+    }
+  };
 
   const pushMessage = (message: ChatMessage) => {
     setMessages((prev) => [...prev, message]);
@@ -437,6 +545,7 @@ function ItineraryAssistantChat(props: {
           mode: "plan",
           itineraryId,
           destinationId,
+          threadKey,
           message: text,
           draftOperations: sortedDraftOperations.length > 0 ? sortedDraftOperations : undefined,
         }),
@@ -474,6 +583,7 @@ function ItineraryAssistantChat(props: {
           mode: "import",
           itineraryId,
           destinationId,
+          threadKey,
           message: text,
         }),
       });
@@ -521,6 +631,7 @@ function ItineraryAssistantChat(props: {
           mode: "apply",
           itineraryId,
           destinationId,
+          threadKey,
           confirmed: true,
           operations: sortedDraftOperations,
         }),
@@ -575,7 +686,9 @@ function ItineraryAssistantChat(props: {
 
     try {
       await fetch(
-        `/api/ai/itinerary?itineraryId=${encodeURIComponent(itineraryId)}&destinationId=${encodeURIComponent(destinationId)}`,
+        `/api/ai/itinerary?itineraryId=${encodeURIComponent(itineraryId)}&destinationId=${encodeURIComponent(
+          destinationId
+        )}&threadKey=${encodeURIComponent(threadKey)}`,
         { method: "DELETE" }
       );
       setDraftPlan(null);
@@ -747,15 +860,110 @@ function ItineraryAssistantChat(props: {
           <Sparkles className="h-5 w-5 text-brand-500" />
           <div className="text-lg font-semibold text-ink-900">Itinerary Assistant</div>
         </div>
-        {onClose ? (
-          <Button type="button" size="icon" variant="ghost" className="h-9 w-9 rounded-xl" onClick={onClose}>
-            <X className="h-4 w-4" />
-            <span className="sr-only">Close</span>
+        <div className="flex items-center gap-2">
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            className="h-9 rounded-xl"
+            onClick={() => setShowThreads((prev) => !prev)}
+            disabled={planning || importing || applying || dismissing}
+          >
+            {showThreads ? "Back" : "Chats"}
           </Button>
-        ) : null}
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            className="h-9 rounded-xl"
+            onClick={createNewChat}
+            disabled={threadsLoading || planning || importing || applying || dismissing}
+          >
+            New
+          </Button>
+          {onClose ? (
+            <Button type="button" size="icon" variant="ghost" className="h-9 w-9 rounded-xl" onClick={onClose}>
+              <X className="h-4 w-4" />
+              <span className="sr-only">Close</span>
+            </Button>
+          ) : null}
+        </div>
       </div>
 
       <div ref={scrollRef} className="flex-1 min-h-0 overflow-auto px-5 py-4 space-y-3 bg-bg-50">
+        {showThreads ? (
+          <div className="space-y-3">
+            <div className="flex items-center justify-between gap-2">
+              <div className="text-sm font-semibold text-ink-900">Your chats</div>
+              {threadsLoading ? (
+                <div className="text-xs text-ink-500">Loading…</div>
+              ) : (
+                <Button type="button" size="sm" variant="ghost" className="h-8 rounded-xl" onClick={loadThreads}>
+                  Refresh
+                </Button>
+              )}
+            </div>
+
+            {threads.length === 0 && !threadsLoading ? (
+              <div className="rounded-2xl border border-stroke-200 bg-bg-0 p-3 text-sm text-ink-700">
+                No chats yet. Create one to start fresh, or just type a message and I will create the default chat.
+              </div>
+            ) : null}
+
+            {threads.map((t) => {
+              const isActive = t.thread_key === threadKey;
+              const label = t.summary?.trim() || "Untitled chat";
+              const updatedLabel = (() => {
+                try {
+                  const date = new Date(t.updated_at);
+                  if (Number.isNaN(date.getTime())) return null;
+                  return new Intl.DateTimeFormat("en-US", {
+                    month: "short",
+                    day: "numeric",
+                    hour: "numeric",
+                    minute: "2-digit",
+                  }).format(date);
+                } catch {
+                  return null;
+                }
+              })();
+
+              return (
+                <button
+                  key={t.thread_key}
+                  type="button"
+                  className={cn(
+                    "w-full text-left rounded-2xl border px-3 py-2",
+                    isActive ? "border-brand-500 bg-brand-500/5" : "border-stroke-200 bg-bg-0 hover:bg-bg-50"
+                  )}
+                  onClick={() => {
+                    setThreadKey(t.thread_key);
+                    setShowThreads(false);
+                  }}
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="text-sm font-semibold text-ink-900 truncate">{label}</div>
+                      {updatedLabel ? <div className="text-xs text-ink-500 mt-0.5">Updated {updatedLabel}</div> : null}
+                    </div>
+                    {isActive ? (
+                      <span className="text-[11px] font-semibold text-brand-700 bg-brand-500/10 rounded-full px-2 py-0.5">
+                        Active
+                      </span>
+                    ) : null}
+                  </div>
+                </button>
+              );
+            })}
+
+            <Button type="button" className="w-full h-10 rounded-2xl" onClick={createNewChat} disabled={threadsLoading}>
+              Create new chat
+            </Button>
+          </div>
+        ) : null}
+
+        {!showThreads ? (
+          <>
         {historyLoading && messages.length === 0 ? (
           <div className="max-w-[92%] rounded-2xl px-3 py-2 text-sm leading-relaxed bg-bg-0 border border-stroke-200">
             <span className="text-shimmer">Loading chat…</span>
@@ -942,6 +1150,8 @@ function ItineraryAssistantChat(props: {
             <div className="whitespace-pre-wrap">{error}</div>
           </div>
         ) : null}
+          </>
+        ) : null}
       </div>
 
       <div className="shrink-0 border-t border-stroke-200 bg-bg-0 px-5 py-4">
@@ -957,13 +1167,14 @@ function ItineraryAssistantChat(props: {
                 if (canSubmit) void handleSubmit();
               }
             }}
+            disabled={showThreads}
           />
           <Button
             type="button"
             size="icon"
             className="h-11 w-11 rounded-2xl"
             onClick={handleSubmit}
-            disabled={!canSubmit}
+            disabled={!canSubmit || showThreads}
             title="Send"
           >
             {planning || importing ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5" />}

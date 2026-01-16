@@ -6,6 +6,7 @@ export type AiItineraryThreadRow = {
   summary: string | null;
   draft: unknown | null;
   draft_sources?: unknown | null;
+  thread_key?: string | null;
 };
 
 export type AiItineraryMessageRow = {
@@ -30,8 +31,10 @@ export async function getOrCreateAiItineraryThread(args: {
   itineraryId: string;
   destinationId: string;
   userId: string;
+  threadKey?: string;
 }): Promise<AiItineraryThreadRow> {
   const { supabase, itineraryId, destinationId, userId } = args;
+  const threadKey = args.threadKey?.trim() ? String(args.threadKey).trim() : "default";
 
   const isMissingColumn = (err: any, column: string) => {
     if (!err) return false;
@@ -41,26 +44,68 @@ export async function getOrCreateAiItineraryThread(args: {
     return message.includes(column.toLowerCase());
   };
 
-  const upsertWithSelect = async (select: string) => {
+  const isUnsupportedOnConflict = (err: any) => {
+    if (!err) return false;
+    const code = String(err.code ?? "");
+    if (code === "42P10") return true; // no unique/exclusion constraint matching ON CONFLICT
+    const message = String(err.message ?? "").toLowerCase();
+    return message.includes("no unique") && message.includes("on conflict");
+  };
+
+  const upsertWithSelect = async (select: string, withThreadKey: boolean) => {
+    const payload: any = {
+      itinerary_id: Number(itineraryId),
+      itinerary_destination_id: Number(destinationId),
+      user_id: userId,
+    };
+
+    const onConflict = withThreadKey
+      ? "itinerary_id,itinerary_destination_id,user_id,thread_key"
+      : "itinerary_id,itinerary_destination_id,user_id";
+
+    if (withThreadKey) payload.thread_key = threadKey;
+
     return supabase
       .from("ai_itinerary_thread")
-      .upsert(
-        {
-          itinerary_id: Number(itineraryId),
-          itinerary_destination_id: Number(destinationId),
-          user_id: userId,
-        },
-        { onConflict: "itinerary_id,itinerary_destination_id,user_id" }
-      )
+      .upsert(payload, { onConflict })
       .select(select)
       .single();
   };
 
-  const { data, error } = await upsertWithSelect("ai_itinerary_thread_id,summary,draft,draft_sources");
+  const selectWithSources = "ai_itinerary_thread_id,summary,draft,draft_sources";
+  const selectWithoutSources = "ai_itinerary_thread_id,summary,draft";
+
+  let data: any;
+  let error: any;
+
+  const first = await upsertWithSelect(selectWithSources, true);
+  data = first.data;
+  error = first.error;
+
+  if (error && (isMissingColumn(error, "thread_key") || isUnsupportedOnConflict(error))) {
+    const legacy = await upsertWithSelect(selectWithSources, false);
+    data = legacy.data;
+    error = legacy.error;
+  }
+
   if (error && isMissingColumn(error, "draft_sources")) {
-    const retry = await upsertWithSelect("ai_itinerary_thread_id,summary,draft");
+    const retry = await upsertWithSelect(selectWithoutSources, true);
     if (retry.error || !retry.data) {
-      throw new Error(retry.error?.message || "Failed to create AI chat thread");
+      const legacyRetry =
+        retry.error && (isMissingColumn(retry.error, "thread_key") || isUnsupportedOnConflict(retry.error))
+          ? await upsertWithSelect(selectWithoutSources, false)
+          : retry;
+      if (legacyRetry.error || !legacyRetry.data) {
+        throw new Error(legacyRetry.error?.message || "Failed to create AI chat thread");
+      }
+
+      return {
+        ai_itinerary_thread_id: String((legacyRetry.data as any).ai_itinerary_thread_id),
+        summary: (legacyRetry.data as any).summary ?? null,
+        draft: (legacyRetry.data as any).draft ?? null,
+        draft_sources: null,
+        thread_key: threadKey,
+      };
     }
 
     return {
@@ -68,6 +113,7 @@ export async function getOrCreateAiItineraryThread(args: {
       summary: (retry.data as any).summary ?? null,
       draft: (retry.data as any).draft ?? null,
       draft_sources: null,
+      thread_key: threadKey,
     };
   }
 
@@ -80,6 +126,106 @@ export async function getOrCreateAiItineraryThread(args: {
     summary: (data as any).summary ?? null,
     draft: (data as any).draft ?? null,
     draft_sources: (data as any).draft_sources ?? null,
+    thread_key: threadKey,
+  };
+}
+
+export type AiItineraryThreadListRow = {
+  ai_itinerary_thread_id: string;
+  thread_key: string;
+  summary: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export async function listAiItineraryThreads(args: {
+  supabase: any;
+  itineraryId: string;
+  destinationId: string;
+  userId: string;
+  limit: number;
+}): Promise<AiItineraryThreadListRow[]> {
+  const { supabase, itineraryId, destinationId, userId, limit } = args;
+
+  const isMissingColumn = (err: any, column: string) => {
+    if (!err) return false;
+    const code = String(err.code ?? "");
+    if (code !== "42703") return false;
+    const message = String(err.message ?? "").toLowerCase();
+    return message.includes(column.toLowerCase());
+  };
+
+  const query = (select: string) =>
+    supabase
+      .from("ai_itinerary_thread")
+      .select(select)
+      .eq("itinerary_id", Number(itineraryId))
+      .eq("itinerary_destination_id", Number(destinationId))
+      .eq("user_id", userId)
+      .order("updated_at", { ascending: false })
+      .limit(Math.max(0, limit));
+
+  const { data, error } = await query("ai_itinerary_thread_id,thread_key,summary,created_at,updated_at");
+  if (error && isMissingColumn(error, "thread_key")) {
+    const legacy = await query("ai_itinerary_thread_id,summary,created_at,updated_at");
+    if (legacy.error) {
+      throw new Error(legacy.error.message || "Failed to load AI chat threads");
+    }
+
+    const rows = Array.isArray(legacy.data) ? (legacy.data as any[]) : [];
+    return rows.map((row) => ({
+      ai_itinerary_thread_id: String(row.ai_itinerary_thread_id),
+      thread_key: "default",
+      summary: row.summary ?? null,
+      created_at: String(row.created_at),
+      updated_at: String(row.updated_at),
+    }));
+  }
+
+  if (error) {
+    throw new Error(error.message || "Failed to load AI chat threads");
+  }
+
+  const rows = Array.isArray(data) ? (data as any[]) : [];
+  return rows.map((row) => ({
+    ai_itinerary_thread_id: String(row.ai_itinerary_thread_id),
+    thread_key: String(row.thread_key ?? "default"),
+    summary: row.summary ?? null,
+    created_at: String(row.created_at),
+    updated_at: String(row.updated_at),
+  }));
+}
+
+export async function createAiItineraryThread(args: {
+  supabase: any;
+  itineraryId: string;
+  destinationId: string;
+  userId: string;
+  threadKey: string;
+}): Promise<AiItineraryThreadListRow> {
+  const { supabase, itineraryId, destinationId, userId, threadKey } = args;
+
+  const { data, error } = await supabase
+    .from("ai_itinerary_thread")
+    .insert({
+      itinerary_id: Number(itineraryId),
+      itinerary_destination_id: Number(destinationId),
+      user_id: userId,
+      thread_key: threadKey,
+    })
+    .select("ai_itinerary_thread_id,thread_key,summary,created_at,updated_at")
+    .single();
+
+  if (error || !data) {
+    throw new Error(error?.message || "Failed to create AI chat thread");
+  }
+
+  return {
+    ai_itinerary_thread_id: String((data as any).ai_itinerary_thread_id),
+    thread_key: String((data as any).thread_key ?? threadKey),
+    summary: (data as any).summary ?? null,
+    created_at: String((data as any).created_at),
+    updated_at: String((data as any).updated_at),
   };
 }
 
