@@ -1,5 +1,5 @@
 "use client";
-import { ReactNode, useEffect, useState } from "react";
+import { ReactNode, useState } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
@@ -15,7 +15,6 @@ import { Form } from "@/components/ui/form";
 import DestinationSelector from "@/components/destination/DestinationSelector";
 
 import { createItinerary } from "@/actions/supabase/itinerary";
-import { createClient } from "@/utils/supabase/client";
 import { useCreateItineraryStore, type Destination, type CreateItineraryLeg } from "@/store/createItineraryStore";
 import { DatePickerWithRangePopover2 } from "@/components/form/date/DateRangePickerPopover2";
 import { format } from "date-fns";
@@ -40,13 +39,11 @@ interface PageLayoutProps extends React.HTMLAttributes<HTMLDivElement> {
 export default function PopUpCreateItinerary({ children, className, ...props }: PageLayoutProps): React.ReactElement {
   const router = useRouter();
   const queryClient = useQueryClient();
-  const supabase = createClient();
 
   // **** STORES ****
   const { legs, addLeg, removeLeg, setLegDestination, setLegDateRange, resetStore } = useCreateItineraryStore();
 
   // **** STATES ****
-  const [user, setUser] = useState<any>(null);
   const [open, setOpen] = useState(false);
   const [step, setStep] = useState(0);
   const [destinationSelectorLegId, setDestinationSelectorLegId] = useState<string | null>(null);
@@ -189,10 +186,10 @@ export default function PopUpCreateItinerary({ children, className, ...props }: 
                 <div>Adults</div>
               </div>
               <div className="flex justify-between gap-2 p-2">
-                <Button variant={"outline"} size={"sm"} onClick={() => handleDecreaseCount("adults")}>
+                <Button type="button" variant={"outline"} size={"sm"} onClick={() => handleDecreaseCount("adults")}>
                   <Minus size={12} />
                 </Button>
-                <Button variant={"outline"} size={"sm"} onClick={() => handleIncreaseCount("adults")}>
+                <Button type="button" variant={"outline"} size={"sm"} onClick={() => handleIncreaseCount("adults")}>
                   <Plus size={12} />
                 </Button>
               </div>
@@ -204,10 +201,10 @@ export default function PopUpCreateItinerary({ children, className, ...props }: 
                 <div>Kids</div>
               </div>
               <div className="flex justify-between gap-2 p-2">
-                <Button variant={"outline"} size={"sm"} onClick={() => handleDecreaseCount("kids")}>
+                <Button type="button" variant={"outline"} size={"sm"} onClick={() => handleDecreaseCount("kids")}>
                   <Minus size={12} />
                 </Button>
-                <Button variant={"outline"} size={"sm"} onClick={() => handleIncreaseCount("kids")}>
+                <Button type="button" variant={"outline"} size={"sm"} onClick={() => handleIncreaseCount("kids")}>
                   <Plus size={12} />
                 </Button>
               </div>
@@ -218,29 +215,11 @@ export default function PopUpCreateItinerary({ children, className, ...props }: 
     },
   ];
 
-  // **** EFFECTS ****
-  useEffect(() => {
-    const fetchUserData = async () => {
-      try {
-        const { auth } = supabase;
-        const { data: user } = await auth.getUser();
-        if (!user.user) {
-          throw new Error("User not authenticated");
-        }
-        setUser(user.user);
-      } catch (error) {
-        console.error("Error fetching user data:", error);
-      }
-    };
-
-    fetchUserData();
-  }, [supabase]);
-
   const handleCreateItinerary = async () => {
     const validLegs = getValidLegs();
     
-    if (!user?.id || validLegs.length === 0) {
-      setError("Missing required information");
+    if (validLegs.length === 0) {
+      setError(getStepError() ?? "Please select at least one destination and travel dates.");
       return;
     }
 
@@ -283,7 +262,8 @@ export default function PopUpCreateItinerary({ children, className, ...props }: 
         resetStore();
         router.push("/itineraries");
       } else {
-        setError(result.error?.message || "Failed to create itinerary");
+        const message = result.error?.message || "Failed to create itinerary";
+        setError(message === "User not authenticated" ? "Please sign in to create an itinerary." : message);
       }
     } catch (err) {
       console.error("Error creating itinerary:", err);
