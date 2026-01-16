@@ -8,30 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { useItineraryActivityStore } from "@/store/itineraryActivityStore";
 import { useQueryClient } from "@tanstack/react-query";
-
-type Operation =
-  | {
-      op: "update_activity";
-      itineraryActivityId: string;
-      date?: string | null;
-      startTime?: string | null;
-      endTime?: string | null;
-      notes?: string | null;
-    }
-  | {
-      op: "remove_activity";
-      itineraryActivityId: string;
-    }
-  | {
-      op: "add_place";
-      placeId: string;
-      query?: string;
-      name?: string;
-      date?: string | null;
-      startTime?: string | null;
-      endTime?: string | null;
-      notes?: string | null;
-    };
+import type { Operation } from "@/lib/ai/itinerary/schema";
 
 type PlanResponse = {
   ok: true;
@@ -201,6 +178,10 @@ const parseTimeToMinutes = (value: string | null | undefined) => {
 };
 
 const getOperationEffectiveDateKey = (op: Operation, activityById: Map<string, any>) => {
+  if (op.op === "add_destination") return op.fromDate;
+  if (op.op === "update_destination_dates") return op.fromDate;
+  if (op.op === "insert_destination_after" || op.op === "remove_destination") return "unscheduled";
+
   if (op.op === "add_place") {
     if (op.date === undefined) return "unscheduled";
     return op.date ?? "unscheduled";
@@ -218,6 +199,10 @@ const getOperationEffectiveDateKey = (op: Operation, activityById: Map<string, a
 };
 
 const getOperationEffectiveStartMinutes = (op: Operation, activityById: Map<string, any>) => {
+  if (op.op === "add_destination" || op.op === "update_destination_dates" || op.op === "insert_destination_after" || op.op === "remove_destination") {
+    return null;
+  }
+
   if (op.op === "add_place") {
     return parseTimeToMinutes(op.startTime) ?? parseTimeToMinutes(op.endTime);
   }
@@ -648,15 +633,20 @@ function ItineraryAssistantChat(props: {
       const failures = Array.isArray(data.applied) ? data.applied.filter((entry) => !entry.ok) : [];
       if (failures.length > 0) {
         const lines = failures
-          .slice(0, 6)
-          .map((entry) => {
-            const target =
-              entry.operation.op === "add_place"
-                ? entry.operation.name ?? entry.operation.query ?? entry.operation.placeId
-                : entry.operation.itineraryActivityId;
-            return `- ${entry.operation.op} (${target}): ${entry.error ?? "Failed"}`;
-          })
-          .join("\n");
+	          .slice(0, 6)
+	          .map((entry) => {
+	            const target = (() => {
+	              const op = entry.operation;
+	              if (op.op === "add_place") return op.name ?? op.query ?? op.placeId;
+	              if (op.op === "update_activity" || op.op === "remove_activity") return op.itineraryActivityId;
+	              if (op.op === "add_destination") return `${op.city}, ${op.country}`;
+	              if (op.op === "insert_destination_after") return `${op.city}, ${op.country}`;
+	              if (op.op === "update_destination_dates") return `destination ${op.itineraryDestinationId}`;
+	              return `destination ${op.itineraryDestinationId}`;
+	            })();
+	            return `- ${entry.operation.op} (${target}): ${entry.error ?? "Failed"}`;
+	          })
+	          .join("\n");
         pushMessage({
           role: "assistant",
           content: `Some changes failed:\n${lines}${failures.length > 6 ? "\n- …" : ""}`,
@@ -771,20 +761,63 @@ function ItineraryAssistantChat(props: {
       operation: Operation;
     };
 
-    const rows: Array<{ dateKey: string; row: ChangeRow }> = ops.map((op, idx) => {
-      const number = idx + 1;
-      const dateKey = getOperationEffectiveDateKey(op, activityById);
+	    const rows: Array<{ dateKey: string; row: ChangeRow }> = ops.map((op, idx) => {
+	      const number = idx + 1;
+	      const dateKey = getOperationEffectiveDateKey(op, activityById);
 
-      if (op.op === "add_place") {
-        const title = op.name ?? op.query ?? op.placeId;
-        const timeLabel = formatTimeRange12h(op.startTime ?? null, op.endTime ?? null);
-        const details: ChangeRow["details"] = [];
-        if (op.notes) details.push({ label: "Notes", after: op.notes });
-        return {
-          dateKey,
-          row: { number, kind: "add", title, timeLabel, details, operation: op },
-        };
-      }
+	      if (op.op === "add_destination") {
+	        const title = `${op.city}, ${op.country}`;
+	        const details: ChangeRow["details"] = [
+	          { label: "Dates", after: `${formatDateLabel(op.fromDate)} → ${formatDateLabel(op.toDate)}` },
+	        ];
+	        return {
+	          dateKey,
+	          row: { number, kind: "add", title, timeLabel: null, details, operation: op },
+	        };
+	      }
+
+	      if (op.op === "insert_destination_after") {
+	        const title = `${op.city}, ${op.country}`;
+	        const details: ChangeRow["details"] = [
+	          { label: "Insert after destination", after: String(op.afterItineraryDestinationId) },
+	          { label: "Duration (days)", after: String(op.durationDays) },
+	        ];
+	        return {
+	          dateKey,
+	          row: { number, kind: "add", title, timeLabel: null, details, operation: op },
+	        };
+	      }
+
+	      if (op.op === "update_destination_dates") {
+	        const title = `Destination ${op.itineraryDestinationId}`;
+	        const details: ChangeRow["details"] = [
+	          { label: "Dates", after: `${formatDateLabel(op.fromDate)} → ${formatDateLabel(op.toDate)}` },
+	          { label: "Shift activities", after: op.shiftActivities === false ? "No" : "Yes" },
+	        ];
+	        return {
+	          dateKey,
+	          row: { number, kind: "update", title, timeLabel: null, details, operation: op },
+	        };
+	      }
+
+	      if (op.op === "remove_destination") {
+	        const title = `Destination ${op.itineraryDestinationId}`;
+	        return {
+	          dateKey,
+	          row: { number, kind: "remove", title, timeLabel: null, details: [], operation: op },
+	        };
+	      }
+
+	      if (op.op === "add_place") {
+	        const title = op.name ?? op.query ?? op.placeId;
+	        const timeLabel = formatTimeRange12h(op.startTime ?? null, op.endTime ?? null);
+	        const details: ChangeRow["details"] = [];
+	        if (op.notes) details.push({ label: "Notes", after: op.notes });
+	        return {
+	          dateKey,
+	          row: { number, kind: "add", title, timeLabel, details, operation: op },
+	        };
+	      }
 
       const before = activityById.get(op.itineraryActivityId);
       const name = String(before?.activity?.name ?? `Activity ${op.itineraryActivityId}`);
@@ -892,73 +925,96 @@ function ItineraryAssistantChat(props: {
 
       <div ref={scrollRef} className="flex-1 min-h-0 overflow-auto px-5 py-4 space-y-3 bg-bg-50">
         {showThreads ? (
-          <div className="space-y-3">
-            <div className="flex items-center justify-between gap-2">
-              <div className="text-sm font-semibold text-ink-900">Your chats</div>
+          <div className="flex flex-col min-h-full">
+            <div className="space-y-3">
+              <div className="flex items-center justify-between gap-2">
+                <div className="text-sm font-semibold text-ink-900">Your chats</div>
+                {threadsLoading ? <div className="text-xs text-ink-500">Loading...</div> : null}
+              </div>
+
               {threadsLoading ? (
-                <div className="text-xs text-ink-500">Loading…</div>
-              ) : (
-                <Button type="button" size="sm" variant="ghost" className="h-8 rounded-xl" onClick={loadThreads}>
-                  Refresh
-                </Button>
-              )}
+                <div className="space-y-2">
+                  {Array.from({ length: 3 }).map((_, idx) => (
+                    <div
+                      key={`thread-skeleton-${idx}`}
+                      className="w-full rounded-2xl border border-stroke-200 bg-bg-0 px-3 py-2"
+                    >
+                      <div className="animate-pulse">
+                        <div className="h-4 w-3/4 rounded bg-bg-50" />
+                        <div className="mt-2 h-3 w-1/2 rounded bg-bg-50" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+
+              {threads.length === 0 && !threadsLoading ? (
+                <div className="rounded-2xl border border-stroke-200 bg-bg-0 p-3 text-sm text-ink-700">
+                  No chats yet. Create one to start fresh, or just type a message and I will create the default chat.
+                </div>
+              ) : null}
+
+              {!threadsLoading
+                ? threads.map((t) => {
+                    const isActive = t.thread_key === threadKey;
+                    const label = t.summary?.trim() || "Untitled chat";
+                    const updatedLabel = (() => {
+                      try {
+                        const date = new Date(t.updated_at);
+                        if (Number.isNaN(date.getTime())) return null;
+                        return new Intl.DateTimeFormat("en-US", {
+                          month: "short",
+                          day: "numeric",
+                          hour: "numeric",
+                          minute: "2-digit",
+                        }).format(date);
+                      } catch {
+                        return null;
+                      }
+                    })();
+
+                    return (
+                      <button
+                        key={t.thread_key}
+                        type="button"
+                        className={cn(
+                          "w-full text-left rounded-2xl border px-3 py-2",
+                          isActive ? "border-brand-500 bg-brand-500/5" : "border-stroke-200 bg-bg-0 hover:bg-bg-50"
+                        )}
+                        onClick={() => {
+                          setThreadKey(t.thread_key);
+                          setShowThreads(false);
+                        }}
+                      >
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="min-w-0">
+                            <div className="text-sm font-semibold text-ink-900 truncate">{label}</div>
+                            {updatedLabel ? (
+                              <div className="text-xs text-ink-500 mt-0.5">Updated {updatedLabel}</div>
+                            ) : null}
+                          </div>
+                          {isActive ? (
+                            <span className="text-[11px] font-semibold text-brand-700 bg-brand-500/10 rounded-full px-2 py-0.5">
+                              Active
+                            </span>
+                          ) : null}
+                        </div>
+                      </button>
+                    );
+                  })
+                : null}
             </div>
 
-            {threads.length === 0 && !threadsLoading ? (
-              <div className="rounded-2xl border border-stroke-200 bg-bg-0 p-3 text-sm text-ink-700">
-                No chats yet. Create one to start fresh, or just type a message and I will create the default chat.
-              </div>
-            ) : null}
-
-            {threads.map((t) => {
-              const isActive = t.thread_key === threadKey;
-              const label = t.summary?.trim() || "Untitled chat";
-              const updatedLabel = (() => {
-                try {
-                  const date = new Date(t.updated_at);
-                  if (Number.isNaN(date.getTime())) return null;
-                  return new Intl.DateTimeFormat("en-US", {
-                    month: "short",
-                    day: "numeric",
-                    hour: "numeric",
-                    minute: "2-digit",
-                  }).format(date);
-                } catch {
-                  return null;
-                }
-              })();
-
-              return (
-                <button
-                  key={t.thread_key}
-                  type="button"
-                  className={cn(
-                    "w-full text-left rounded-2xl border px-3 py-2",
-                    isActive ? "border-brand-500 bg-brand-500/5" : "border-stroke-200 bg-bg-0 hover:bg-bg-50"
-                  )}
-                  onClick={() => {
-                    setThreadKey(t.thread_key);
-                    setShowThreads(false);
-                  }}
-                >
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="min-w-0">
-                      <div className="text-sm font-semibold text-ink-900 truncate">{label}</div>
-                      {updatedLabel ? <div className="text-xs text-ink-500 mt-0.5">Updated {updatedLabel}</div> : null}
-                    </div>
-                    {isActive ? (
-                      <span className="text-[11px] font-semibold text-brand-700 bg-brand-500/10 rounded-full px-2 py-0.5">
-                        Active
-                      </span>
-                    ) : null}
-                  </div>
-                </button>
-              );
-            })}
-
-            <Button type="button" className="w-full h-10 rounded-2xl" onClick={createNewChat} disabled={threadsLoading}>
-              Create new chat
-            </Button>
+            <div className="sticky bottom-0 bg-bg-50 pt-4 pb-1">
+              <Button
+                type="button"
+                className="w-full h-10 rounded-2xl"
+                onClick={createNewChat}
+                disabled={threadsLoading}
+              >
+                Create new chat
+              </Button>
+            </div>
           </div>
         ) : null}
 

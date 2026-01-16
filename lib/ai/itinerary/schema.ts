@@ -2,6 +2,8 @@ import { z } from "zod";
 
 export const ItineraryIdSchema = z.string().regex(/^\d+$/, "Expected a numeric itinerary id");
 export const DestinationIdSchema = z.string().regex(/^\d+$/, "Expected a numeric destination id");
+// NOTE: DestinationIdSchema refers to `itinerary_destination_id` in this app.
+export const ItineraryDestinationIdSchema = DestinationIdSchema;
 export const ItineraryActivityIdSchema = z.string().regex(/^\d+$/, "Expected a numeric itinerary activity id");
 export const PlaceIdSchema = z.string().trim().min(1, "Expected a place id").max(256);
 
@@ -49,6 +51,38 @@ const RemoveActivityOperationSchema = z.object({
   itineraryActivityId: ItineraryActivityIdSchema,
 });
 
+const ItineraryDestinationCitySchema = z.string().trim().min(1, "City is required").max(100, "City is too long");
+const ItineraryDestinationCountrySchema = z.string().trim().min(1, "Country is required").max(100, "Country is too long");
+
+const AddDestinationOperationSchema = z.object({
+  op: z.literal("add_destination"),
+  city: ItineraryDestinationCitySchema,
+  country: ItineraryDestinationCountrySchema,
+  fromDate: IsoDateSchema,
+  toDate: IsoDateSchema,
+});
+
+const UpdateDestinationDatesOperationSchema = z.object({
+  op: z.literal("update_destination_dates"),
+  itineraryDestinationId: ItineraryDestinationIdSchema,
+  fromDate: IsoDateSchema,
+  toDate: IsoDateSchema,
+  shiftActivities: z.boolean().optional(),
+});
+
+const InsertDestinationAfterOperationSchema = z.object({
+  op: z.literal("insert_destination_after"),
+  afterItineraryDestinationId: ItineraryDestinationIdSchema,
+  city: ItineraryDestinationCitySchema,
+  country: ItineraryDestinationCountrySchema,
+  durationDays: z.number().int().min(1, "durationDays must be at least 1").max(60, "durationDays is too large"),
+});
+
+const RemoveDestinationOperationSchema = z.object({
+  op: z.literal("remove_destination"),
+  itineraryDestinationId: ItineraryDestinationIdSchema,
+});
+
 const ProposedAddPlaceOperationSchema = z.object({
   op: z.literal("add_place"),
   // New additions can be specified with a query; existing draft additions can include a resolved placeId.
@@ -73,7 +107,15 @@ const ResolvedAddPlaceOperationSchema = z.object({
   });
 
 export const ProposedOperationSchema = z
-  .discriminatedUnion("op", [UpdateActivityOperationSchema, RemoveActivityOperationSchema, ProposedAddPlaceOperationSchema])
+  .discriminatedUnion("op", [
+    UpdateActivityOperationSchema,
+    RemoveActivityOperationSchema,
+    ProposedAddPlaceOperationSchema,
+    AddDestinationOperationSchema,
+    UpdateDestinationDatesOperationSchema,
+    InsertDestinationAfterOperationSchema,
+    RemoveDestinationOperationSchema,
+  ])
   .superRefine((value, ctx) => {
     if (value.op === "update_activity") {
       const hasAnyField =
@@ -93,6 +135,28 @@ export const ProposedOperationSchema = z
       return;
     }
 
+    if (value.op === "add_destination") {
+      if (value.toDate < value.fromDate) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "toDate must be on or after fromDate",
+          path: ["toDate"],
+        });
+      }
+      return;
+    }
+
+    if (value.op === "update_destination_dates") {
+      if (value.toDate < value.fromDate) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "toDate must be on or after fromDate",
+          path: ["toDate"],
+        });
+      }
+      return;
+    }
+
     if (value.op === "add_place") {
       const hasQuery = typeof (value as any).query === "string" && String((value as any).query).trim().length > 0;
       const hasPlaceId = typeof (value as any).placeId === "string" && String((value as any).placeId).trim().length > 0;
@@ -107,10 +171,32 @@ export const ProposedOperationSchema = z
   });
 
 export const OperationSchema = z
-  .discriminatedUnion("op", [UpdateActivityOperationSchema, RemoveActivityOperationSchema, ResolvedAddPlaceOperationSchema])
+  .discriminatedUnion("op", [
+    UpdateActivityOperationSchema,
+    RemoveActivityOperationSchema,
+    ResolvedAddPlaceOperationSchema,
+    AddDestinationOperationSchema,
+    UpdateDestinationDatesOperationSchema,
+    InsertDestinationAfterOperationSchema,
+    RemoveDestinationOperationSchema,
+  ])
   .superRefine((value, ctx) => {
     if (value.op !== "update_activity") {
       if (value.op === "add_place") validateTimePair(value, ctx);
+      if (value.op === "add_destination" && value.toDate < value.fromDate) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "toDate must be on or after fromDate",
+          path: ["toDate"],
+        });
+      }
+      if (value.op === "update_destination_dates" && value.toDate < value.fromDate) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "toDate must be on or after fromDate",
+          path: ["toDate"],
+        });
+      }
       return;
     }
 

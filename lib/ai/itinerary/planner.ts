@@ -25,6 +25,15 @@ type DestinationSnapshot = {
   transportation_notes?: string | null;
 };
 
+type ItineraryDestinationSummary = {
+  itinerary_destination_id: unknown;
+  city?: string | null;
+  country?: string | null;
+  from_date?: string | null;
+  to_date?: string | null;
+  order_number?: unknown;
+};
+
 type ItinerarySnapshot = {
   title?: string | null;
   description?: string | null;
@@ -96,6 +105,23 @@ const formatActivityLine = (row: ActivitySnapshotRow) => {
 const formatDraftOperationLine = (operation: Operation, index: number) => {
   const number = index + 1;
 
+  if (operation.op === "add_destination") {
+    return `- #${number} add_destination: ${operation.city}, ${operation.country} | dates: ${operation.fromDate} → ${operation.toDate}`;
+  }
+
+  if (operation.op === "insert_destination_after") {
+    return `- #${number} insert_destination_after: ${operation.city}, ${operation.country} | after destinationId=${operation.afterItineraryDestinationId} | durationDays: ${operation.durationDays}`;
+  }
+
+  if (operation.op === "update_destination_dates") {
+    const shift = operation.shiftActivities === false ? "no" : "yes";
+    return `- #${number} update_destination_dates: destinationId=${operation.itineraryDestinationId} | dates: ${operation.fromDate} → ${operation.toDate} | shiftActivities: ${shift}`;
+  }
+
+  if (operation.op === "remove_destination") {
+    return `- #${number} remove_destination: destinationId=${operation.itineraryDestinationId}`;
+  }
+
   if (operation.op === "add_place") {
     const nameOrQuery = operation.name || operation.query || operation.placeId;
     const date = operation.date === undefined ? "unspecified" : operation.date ?? "unscheduled";
@@ -120,6 +146,17 @@ const formatDraftOperationLine = (operation: Operation, index: number) => {
   return `- #${number} update_activity: itineraryActivityId=${operation.itineraryActivityId} | date: ${date} | time: ${time} | notes: ${notes}`;
 };
 
+const formatDestinationLine = (row: ItineraryDestinationSummary) => {
+  const id = String(row.itinerary_destination_id ?? "");
+  const order = Number(row.order_number ?? NaN);
+  const city = row.city ? String(row.city) : "Unknown city";
+  const country = row.country ? String(row.country) : "Unknown country";
+  const from = row.from_date ? String(row.from_date) : "unknown";
+  const to = row.to_date ? String(row.to_date) : "unknown";
+  const orderLabel = Number.isFinite(order) ? `order ${order}` : "order ?";
+  return `- ${id}: ${city}, ${country} | ${from} → ${to} | ${orderLabel}`;
+};
+
 export async function planItineraryEdits(args: {
   message: string;
   chatHistory?: ChatMessage[];
@@ -129,6 +166,7 @@ export async function planItineraryEdits(args: {
   maxTokens?: number;
   itinerary?: ItinerarySnapshot | null;
   destination: DestinationSnapshot | null;
+  itineraryDestinations?: ItineraryDestinationSummary[];
   activities: ActivitySnapshotRow[];
 }): Promise<{ data: PlanResult; usage: OpenAiUsage }> {
   const recentUserContext = (args.chatHistory ?? [])
@@ -177,14 +215,21 @@ export async function planItineraryEdits(args: {
     "Your task:",
     "- Read the user's request.",
     "- If there is an existing draft plan, iteratively amend it (do not throw it away unless the user explicitly asks to start over).",
-    "- Propose a list of operations to modify existing itinerary activities (and/or draft additions).",
+    "- Propose a list of operations to modify the CURRENT itinerary only.",
+    "- You can edit activities and you can also edit the itinerary's destination schedule (add/insert/move/remove destinations).",
+    "- You CANNOT create a brand-new itinerary. Only modify the existing one you are given.",
     "",
     "Rules:",
     "- Only use these operations:",
-    '  1) {"op":"update_activity","itineraryActivityId":"<id>","date"?: "YYYY-MM-DD"|null,"startTime"?: "HH:MM"|null,"endTime"?: "HH:MM"|null,"notes"?: string|null}',
-    '  2) {"op":"remove_activity","itineraryActivityId":"<id>"}',
-    '  3) {"op":"add_place","query"?: "<place name or google maps link>","placeId"?: "<google place id>","name"?: string,"date"?: "YYYY-MM-DD"|null,"startTime"?: "HH:MM"|null,"endTime"?: "HH:MM"|null,"notes"?: string|null}',
-    "- The id MUST be one of the itineraryActivityId values in the provided activities list.",
+    '  1) {"op":"add_destination","city":"<city>","country":"<country>","fromDate":"YYYY-MM-DD","toDate":"YYYY-MM-DD"}',
+    '  2) {"op":"insert_destination_after","afterItineraryDestinationId":"<destination id>","city":"<city>","country":"<country>","durationDays": <number>}',
+    '  3) {"op":"update_destination_dates","itineraryDestinationId":"<destination id>","fromDate":"YYYY-MM-DD","toDate":"YYYY-MM-DD","shiftActivities"?: boolean}',
+    '  4) {"op":"remove_destination","itineraryDestinationId":"<destination id>"}',
+    '  5) {"op":"update_activity","itineraryActivityId":"<id>","date"?: "YYYY-MM-DD"|null,"startTime"?: "HH:MM"|null,"endTime"?: "HH:MM"|null,"notes"?: string|null}',
+    '  6) {"op":"remove_activity","itineraryActivityId":"<id>"}',
+    '  7) {"op":"add_place","query"?: "<place name or google maps link>","placeId"?: "<google place id>","name"?: string,"date"?: "YYYY-MM-DD"|null,"startTime"?: "HH:MM"|null,"endTime"?: "HH:MM"|null,"notes"?: string|null}',
+    "- For update_activity/remove_activity: itineraryActivityId MUST be one of the ids in the provided activities list.",
+    "- For destination operations: use itineraryDestinationId values from the provided destinations list.",
     "- Use 24-hour time (HH:MM) in operations.",
     "- Use dates as YYYY-MM-DD.",
     "- If you change time, ALWAYS provide both startTime and endTime (or set both to null to clear).",
@@ -192,6 +237,8 @@ export async function planItineraryEdits(args: {
     "- If you set startTime and endTime as strings, startTime MUST be before endTime.",
     "- For add_place: provide either query or placeId. If the user asks you to recommend/suggest a place, pick ONE specific real place name for query.",
     "- If a draft add_place already has a placeId, keep that placeId stable unless the user asks to change the place.",
+    "- For insert_destination_after: durationDays is the number of days for the new destination block (inclusive).",
+    "- Do NOT try to 'fix up' lots of activities one-by-one when a bulk destination shift is requested. Prefer destination operations.",
     "- If key info is missing (e.g., user says 'at 7' but no duration/end time), ask a clarifying question and return operations: [].",
     "- If the user request is ambiguous (multiple activities could match), ask a clarifying question and return operations: [].",
     "- NEVER return more than 25 operations. If the request affects many items, ask the user to narrow it down and return operations: [].",
@@ -238,6 +285,16 @@ export async function planItineraryEdits(args: {
     ...(transportationNotes ? [`Transportation notes: ${transportationNotes}`] : []),
     `Destination date range: ${fromDate ?? "unknown"} to ${toDate ?? "unknown"}`,
     "",
+    ...(Array.isArray(args.itineraryDestinations) && args.itineraryDestinations.length > 0
+      ? [
+          "Destinations in this itinerary (in order):",
+          ...args.itineraryDestinations.slice(0, 40).map(formatDestinationLine),
+          ...(args.itineraryDestinations.length > 40
+            ? [`(Showing 40 of ${args.itineraryDestinations.length} destinations.)`]
+            : []),
+          "",
+        ]
+      : []),
     "Activities (subset):",
     ...relevantActivities.map(formatActivityLine),
     ...(orderedActivities.length > relevantActivities.length

@@ -12,6 +12,8 @@ import { getAiAssistantAccessMode, isDevBillingBypassEnabled } from "@/lib/featu
 import { ingestUrlsFromMessage } from "@/lib/linkImport/server/providers";
 import { rateLimit, rateLimitHeaders } from "@/lib/security/rateLimit";
 import { getClientIp, isSameOrigin } from "@/lib/security/requestGuards";
+import { revalidateTag } from "next/cache";
+import { builderBootstrapTag } from "@/lib/cacheTags";
 import {
   DestinationIdSchema,
   ItineraryAssistantRequestSchema,
@@ -43,6 +45,25 @@ import { recordApiRequestMetric } from "@/lib/telemetry/server";
 const MAX_OPERATIONS = 25;
 const CONFIRMATION_BATCH_THRESHOLD = 10;
 const SHOULD_LOG_AI_ITINERARY = process.env.AI_ITINERARY_LOG === "1";
+
+const stripEmDashes = (value: string) => value.replace(/[—–]/g, "-");
+
+const addDaysIso = (value: string, days: number) => {
+  const base = new Date(`${value}T00:00:00Z`);
+  if (Number.isNaN(base.getTime())) throw new Error(`Invalid date: ${value}`);
+  base.setUTCDate(base.getUTCDate() + days);
+  const year = base.getUTCFullYear();
+  const month = String(base.getUTCMonth() + 1).padStart(2, "0");
+  const date = String(base.getUTCDate()).padStart(2, "0");
+  return `${year}-${month}-${date}`;
+};
+
+const diffDaysIso = (from: string, to: string) => {
+  const a = new Date(`${from}T00:00:00Z`).getTime();
+  const b = new Date(`${to}T00:00:00Z`).getTime();
+  if (Number.isNaN(a) || Number.isNaN(b)) throw new Error(`Invalid date comparison: ${from} vs ${to}`);
+  return Math.round((b - a) / (24 * 60 * 60 * 1000));
+};
 
 const jsonError = (status: number, code: string, message: string, details?: unknown, headers?: HeadersInit) => {
   return NextResponse.json(
@@ -784,10 +805,44 @@ const formatTimeRange = (start: unknown, end: unknown): string | null => {
 
 const buildPreviewLines = (
   operations: Operation[],
-  activityById: Map<string, any>
+  activityById: Map<string, any>,
+  destinationById: Map<string, any>
 ): string[] => {
   const lines: string[] = [];
-  for (const operation of operations) {
+	  for (const operation of operations) {
+    if (operation.op === "add_destination") {
+      lines.push(`Add destination "${operation.city}, ${operation.country}" (${operation.fromDate} → ${operation.toDate})`);
+      continue;
+    }
+
+    if (operation.op === "insert_destination_after") {
+      const anchor = destinationById.get(operation.afterItineraryDestinationId);
+      const anchorLabel =
+        anchor?.city && anchor?.country ? `${anchor.city}, ${anchor.country}` : `destination ${operation.afterItineraryDestinationId}`;
+      lines.push(
+        `Insert destination "${operation.city}, ${operation.country}" after "${anchorLabel}" (${operation.durationDays} day${
+          operation.durationDays === 1 ? "" : "s"
+        })`
+      );
+      continue;
+    }
+
+    if (operation.op === "update_destination_dates") {
+      const dest = destinationById.get(operation.itineraryDestinationId);
+      const label =
+        dest?.city && dest?.country ? `${dest.city}, ${dest.country}` : `destination ${operation.itineraryDestinationId}`;
+      lines.push(`Update destination dates for "${label}": ${operation.fromDate} → ${operation.toDate}`);
+      continue;
+    }
+
+    if (operation.op === "remove_destination") {
+      const dest = destinationById.get(operation.itineraryDestinationId);
+      const label =
+        dest?.city && dest?.country ? `${dest.city}, ${dest.country}` : `destination ${operation.itineraryDestinationId}`;
+      lines.push(`Remove destination "${label}"`);
+      continue;
+    }
+
     if (operation.op === "add_place") {
       const name = operation.name || operation.query || "New place";
       const date = typeof operation.date === "string" ? operation.date : null;
@@ -950,6 +1005,27 @@ export async function POST(request: NextRequest) {
     const rawActivities = Array.isArray((bootstrap.data as any)?.activities) ? (bootstrap.data as any).activities : [];
     const activeActivities = rawActivities.filter((row: any) => row?.deleted_at == null);
 
+    let itineraryDestinations: any[] = [];
+    let destinationById = new Map<string, any>();
+    try {
+      const { data: destinations, error: destinationsError } = await supabase
+        .from("itinerary_destination")
+        .select("itinerary_destination_id,city,country,from_date,to_date,order_number")
+        .eq("itinerary_id", Number(itineraryId))
+        .order("order_number", { ascending: true });
+      if (destinationsError) throw destinationsError;
+      itineraryDestinations = Array.isArray(destinations) ? destinations : [];
+      destinationById = new Map(
+        itineraryDestinations
+          .map((row) => [String((row as any)?.itinerary_destination_id ?? ""), row] as const)
+          .filter((entry) => entry[0])
+      );
+    } catch (error) {
+      console.warn("Failed to load itinerary destinations (continuing without destination context):", error);
+      itineraryDestinations = [];
+      destinationById = new Map();
+    }
+
     const activityById = new Map<string, any>();
     for (const row of activeActivities) {
       const id = String(row?.itinerary_activity_id ?? "");
@@ -1066,6 +1142,7 @@ export async function POST(request: NextRequest) {
         maxTokens: Math.max(1, Math.min(800, quota.remaining)),
         itinerary,
         destination,
+        itineraryDestinations,
         activities: activeActivities,
       });
 
@@ -1087,12 +1164,42 @@ export async function POST(request: NextRequest) {
           continue;
         }
 
-        if (!activityById.has(operation.itineraryActivityId)) {
+        if (operation.op === "insert_destination_after") {
+          const anchorId = String(operation.afterItineraryDestinationId ?? "");
+          if (!anchorId || !destinationById.has(anchorId)) {
+            dropped += 1;
+            clarifications.push(
+              `I couldn't find destination ${operation.afterItineraryDestinationId}, so I skipped inserting that destination.`
+            );
+            continue;
+          }
+        }
+
+        if (operation.op === "update_destination_dates" || operation.op === "remove_destination") {
+          const targetId = String(operation.itineraryDestinationId ?? "");
+          if (!targetId || !destinationById.has(targetId)) {
+            dropped += 1;
+            clarifications.push(
+              `I couldn't find destination ${operation.itineraryDestinationId}, so I skipped that destination change.`
+            );
+            continue;
+          }
+        }
+
+        if (operation.op === "remove_destination" && String(operation.itineraryDestinationId) === String(destinationId)) {
           dropped += 1;
+          clarifications.push("I can't remove the destination you're currently editing from within its builder.");
           continue;
         }
 
-        resolvedOperations.push(operation as Operation);
+        if (operation.op === "remove_activity" || operation.op === "update_activity") {
+          if (!activityById.has(operation.itineraryActivityId)) {
+            dropped += 1;
+            continue;
+          }
+        }
+
+        resolvedOperations.push(operation as any as Operation);
       }
 
       if (SHOULD_LOG_AI_ITINERARY) {
@@ -1110,9 +1217,9 @@ export async function POST(request: NextRequest) {
       let payload: PlanResponsePayload;
 
       if (resolvedOperations.length > MAX_OPERATIONS) {
-        const previewLines = buildPreviewLines(draftOperations, activityById);
+        const previewLines = buildPreviewLines(draftOperations, activityById, destinationById);
         payload = {
-          assistantMessage: `${plan.assistantMessage}\n\nThat request would change ${resolvedOperations.length} items, which exceeds the limit of ${MAX_OPERATIONS} changes per request. Please narrow it down (for example, one day or one activity at a time).`,
+          assistantMessage: `${stripEmDashes(plan.assistantMessage)}\n\nThat request would change ${resolvedOperations.length} items, which exceeds the limit of ${MAX_OPERATIONS} changes per request. Please narrow it down (for example, one day or one activity at a time).`,
           operations: draftOperations,
           previewLines: [
             `Too many changes (${resolvedOperations.length}). Please narrow the request (max ${MAX_OPERATIONS} per request).`,
@@ -1127,6 +1234,13 @@ export async function POST(request: NextRequest) {
 
         const requiresConfirmation =
           draftToReturn.some((op) => op.op === "remove_activity") ||
+          draftToReturn.some(
+            (op) =>
+              op.op === "add_destination" ||
+              op.op === "insert_destination_after" ||
+              op.op === "update_destination_dates" ||
+              op.op === "remove_destination"
+          ) ||
           draftToReturn.length > CONFIRMATION_BATCH_THRESHOLD ||
           draftToReturn.some(
             (op) =>
@@ -1141,11 +1255,11 @@ export async function POST(request: NextRequest) {
               isDateOutsideRange(op.date, fromDate, toDate)
           );
 
-        const previewLines = buildPreviewLines(draftToReturn, activityById);
+        const previewLines = buildPreviewLines(draftToReturn, activityById, destinationById);
 
-        const messageParts = [plan.assistantMessage];
+        const messageParts = [stripEmDashes(plan.assistantMessage)];
         if (dropped > 0) {
-          messageParts.push(`Note: I ignored ${dropped} edit(s) because I couldn't find the referenced activity.`);
+          messageParts.push(`Note: I ignored ${dropped} change(s) because I couldn't find a referenced item.`);
         }
         if (clarifications.length > 0) {
           messageParts.push(...clarifications);
@@ -1577,7 +1691,7 @@ export async function POST(request: NextRequest) {
             {
               assistantMessage: `That would add ${mergedOps.length} places, which exceeds the limit of 15. Please remove some items from the draft first.`,
               operations: existingOps.filter((op) => op.op === "add_place").slice(0, 15) as any,
-              previewLines: buildPreviewLines(existingOps, activityById),
+              previewLines: buildPreviewLines(existingOps, activityById, destinationById),
               requiresConfirmation: true,
               sources: sourcesForPreview,
               pendingClarificationsCount: (existingDraftSources?.pendingClarifications ?? []).length,
@@ -1610,7 +1724,7 @@ export async function POST(request: NextRequest) {
         const payload: ImportResponsePayload = {
           assistantMessage: assistantParts.join("\n\n"),
           operations: mergedOps,
-          previewLines: buildPreviewLines(mergedOps, activityById),
+          previewLines: buildPreviewLines(mergedOps, activityById, destinationById),
           requiresConfirmation: mergedOps.length > CONFIRMATION_BATCH_THRESHOLD,
           sources: sourcesForPreview,
           pendingClarificationsCount: (draftSourcesToPersist.pendingClarifications ?? []).length,
@@ -1734,7 +1848,7 @@ export async function POST(request: NextRequest) {
       const payload: ImportResponsePayload = {
         assistantMessage: messageParts.join("\n\n"),
         operations: resolved.operations,
-        previewLines: buildPreviewLines(resolved.operations, activityById),
+        previewLines: buildPreviewLines(resolved.operations, activityById, destinationById),
         requiresConfirmation: resolved.operations.length > CONFIRMATION_BATCH_THRESHOLD,
         sources: sourcesPreview,
         pendingClarificationsCount: (draftSourcesToPersist.pendingClarifications ?? []).length,
@@ -1808,6 +1922,13 @@ export async function POST(request: NextRequest) {
 
   const applyRequiresConfirmation =
     operations.some((op) => op.op === "remove_activity") ||
+    operations.some(
+      (op) =>
+        op.op === "add_destination" ||
+        op.op === "insert_destination_after" ||
+        op.op === "update_destination_dates" ||
+        op.op === "remove_destination"
+    ) ||
     operations.length > CONFIRMATION_BATCH_THRESHOLD ||
     operations.some(
       (op) =>
@@ -1867,9 +1988,350 @@ export async function POST(request: NextRequest) {
       continue;
     }
 
-    try {
-      if (operation.op === "add_place") {
-        const result = await addPlaceToItinerary({
+	    try {
+		      if (operation.op === "add_destination") {
+		        const newFrom = operation.fromDate;
+		        const newTo = operation.toDate;
+
+		        const overlaps = itineraryDestinations.some((dest) => {
+		          const from = (dest as any)?.from_date;
+		          const to = (dest as any)?.to_date;
+		          if (!isIsoDate(from) || !isIsoDate(to)) return false;
+		          return !(newTo < from || newFrom > to);
+		        });
+		        if (overlaps) {
+		          throw new Error(
+		            "That destination range overlaps an existing destination. Use insert_destination_after to insert and shift later destinations, or choose different dates."
+		          );
+		        }
+
+		        const newFromTime = new Date(`${newFrom}T00:00:00Z`).getTime();
+		        const normalizedExisting = itineraryDestinations
+		          .map((dest) => ({
+	            itinerary_destination_id: Number((dest as any)?.itinerary_destination_id),
+	            order_number: Number((dest as any)?.order_number ?? 0),
+	            from_time: isIsoDate((dest as any)?.from_date)
+	              ? new Date(`${(dest as any).from_date}T00:00:00Z`).getTime()
+	              : NaN,
+	          }))
+	          .filter((dest) => Number.isFinite(dest.itinerary_destination_id) && Number.isFinite(dest.order_number));
+
+	        const maxOrder = Math.max(0, ...normalizedExisting.map((dest) => dest.order_number));
+	        const insertBefore = normalizedExisting
+	          .filter((dest) => Number.isFinite(dest.from_time) && Number.isFinite(newFromTime))
+	          .find((dest) => dest.from_time > newFromTime);
+	        const insertOrderNumber = insertBefore ? Math.max(1, insertBefore.order_number) : maxOrder + 1;
+
+	        if (insertOrderNumber <= maxOrder) {
+	          const toShift = normalizedExisting
+	            .filter((dest) => dest.order_number >= insertOrderNumber)
+	            .sort((a, b) => b.order_number - a.order_number);
+
+	          for (const dest of toShift) {
+	            const { error: shiftError } = await supabase
+	              .from("itinerary_destination")
+	              .update({ order_number: dest.order_number + 1 })
+	              .eq("itinerary_id", Number(itineraryId))
+	              .eq("itinerary_destination_id", dest.itinerary_destination_id);
+
+	            if (shiftError) throw new Error(shiftError.message || "Failed to reorder destinations");
+	          }
+	        }
+
+	        const { data: inserted, error: insertError } = await supabase
+	          .from("itinerary_destination")
+	          .insert({
+	            itinerary_id: Number(itineraryId),
+	            city: operation.city,
+	            country: operation.country,
+	            from_date: newFrom,
+	            to_date: newTo,
+	            order_number: insertOrderNumber,
+	          })
+	          .select("itinerary_destination_id")
+	          .single();
+
+	        if (insertError || !inserted) throw new Error(insertError?.message || "Failed to add destination");
+
+	        const { data: refreshed } = await supabase
+	          .from("itinerary_destination")
+	          .select("itinerary_destination_id,city,country,from_date,to_date,order_number")
+	          .eq("itinerary_id", Number(itineraryId))
+	          .order("order_number", { ascending: true });
+	        itineraryDestinations = Array.isArray(refreshed) ? refreshed : itineraryDestinations;
+	        destinationById = new Map(
+	          itineraryDestinations
+	            .map((row) => [String((row as any)?.itinerary_destination_id ?? ""), row] as const)
+	            .filter((entry) => entry[0])
+	        );
+
+	        applied.push({ ok: true, operation });
+
+	        if (executeStep?.ai_itinerary_run_step_id) {
+	          await insertAiItineraryToolInvocation({
+	            supabase,
+	            stepId: executeStep.ai_itinerary_run_step_id,
+	            toolName: operation.op,
+	            status: "succeeded",
+	            toolArgs: operation,
+	            result: { itinerary_destination_id: (inserted as any)?.itinerary_destination_id },
+	          });
+	        }
+	        continue;
+	      }
+
+	      if (operation.op === "insert_destination_after") {
+	        const { error: insertError } = await supabase.rpc("ai_insert_destination_after", {
+	          _itinerary_id: Number(itineraryId),
+	          _after_itinerary_destination_id: Number(operation.afterItineraryDestinationId),
+	          _city: operation.city,
+	          _country: operation.country,
+	          _duration_days: operation.durationDays,
+	        });
+
+	        if (insertError) {
+	          const code = String((insertError as any)?.code ?? "");
+	          if (code === "42883") {
+	            throw new Error(
+	              "Missing database function ai_insert_destination_after. Please run the latest Supabase migrations."
+	            );
+	          }
+	          throw new Error(insertError.message || "Failed to insert destination");
+	        }
+
+	        const { data: refreshed } = await supabase
+	          .from("itinerary_destination")
+	          .select("itinerary_destination_id,city,country,from_date,to_date,order_number")
+	          .eq("itinerary_id", Number(itineraryId))
+	          .order("order_number", { ascending: true });
+	        itineraryDestinations = Array.isArray(refreshed) ? refreshed : itineraryDestinations;
+	        destinationById = new Map(
+	          itineraryDestinations
+	            .map((row) => [String((row as any)?.itinerary_destination_id ?? ""), row] as const)
+	            .filter((entry) => entry[0])
+	        );
+
+	        applied.push({ ok: true, operation });
+
+	        if (executeStep?.ai_itinerary_run_step_id) {
+	          await insertAiItineraryToolInvocation({
+	            supabase,
+	            stepId: executeStep.ai_itinerary_run_step_id,
+	            toolName: operation.op,
+	            status: "succeeded",
+	            toolArgs: operation,
+	          });
+	        }
+	        continue;
+	      }
+
+		      if (operation.op === "update_destination_dates") {
+		        const destinationRow = destinationById.get(String(operation.itineraryDestinationId));
+		        if (!destinationRow) {
+		          throw new Error("Destination not found (or already removed).");
+		        }
+
+		        const oldTo = String((destinationRow as any)?.to_date ?? "");
+		        const oldOrder = Number((destinationRow as any)?.order_number ?? NaN);
+		        const oldFrom = String((destinationRow as any)?.from_date ?? "");
+		        const newFrom = operation.fromDate;
+		        const newTo = operation.toDate;
+
+		        if (isIsoDate(oldFrom) && isIsoDate(oldTo) && isIsoDate(newFrom) && isIsoDate(newTo)) {
+		          const prev = Number.isFinite(oldOrder)
+		            ? itineraryDestinations
+		                .filter((dest) => Number((dest as any)?.order_number ?? NaN) < oldOrder)
+		                .sort((a, b) => Number((b as any)?.order_number ?? 0) - Number((a as any)?.order_number ?? 0))[0]
+		            : null;
+		          const prevTo = prev && isIsoDate((prev as any)?.to_date) ? String((prev as any).to_date) : null;
+		          if (prevTo && newFrom <= prevTo) {
+		            throw new Error("That date change would overlap the previous destination.");
+		          }
+		        }
+
+		        const { error: updateError } = await supabase.rpc("ai_shift_destination_dates", {
+		          _itinerary_id: Number(itineraryId),
+		          _itinerary_destination_id: Number(operation.itineraryDestinationId),
+		          _new_from: newFrom,
+		          _new_to: newTo,
+		          _shift_activities: operation.shiftActivities !== false,
+		        });
+
+		        if (updateError) {
+		          const code = String((updateError as any)?.code ?? "");
+		          if (code === "42883") {
+		            throw new Error(
+		              "Missing database function ai_shift_destination_dates. Please run the latest Supabase migrations."
+		            );
+		          }
+		          throw new Error(updateError.message || "Failed to update destination dates");
+		        }
+
+		        // Shift later destinations (and their scheduled items) based on how the destination end date changed.
+		        if (isIsoDate(oldTo) && isIsoDate(newTo) && Number.isFinite(oldOrder)) {
+		          const deltaEnd = diffDaysIso(oldTo, newTo);
+		          if (deltaEnd !== 0) {
+		            const toShift = itineraryDestinations
+		              .filter((dest) => Number((dest as any)?.order_number ?? NaN) > oldOrder)
+		              .filter((dest) => isIsoDate((dest as any)?.from_date) && isIsoDate((dest as any)?.to_date))
+		              .sort((a, b) => Number((a as any)?.order_number ?? 0) - Number((b as any)?.order_number ?? 0));
+
+		            for (const dest of toShift) {
+		              const destId = Number((dest as any)?.itinerary_destination_id);
+		              const shiftedFrom = addDaysIso(String((dest as any).from_date), deltaEnd);
+		              const shiftedTo = addDaysIso(String((dest as any).to_date), deltaEnd);
+
+		              const { error: shiftError } = await supabase.rpc("ai_shift_destination_dates", {
+		                _itinerary_id: Number(itineraryId),
+		                _itinerary_destination_id: destId,
+		                _new_from: shiftedFrom,
+		                _new_to: shiftedTo,
+		                _shift_activities: true,
+		              });
+
+		              if (shiftError) {
+		                const code = String((shiftError as any)?.code ?? "");
+		                if (code === "42883") {
+		                  throw new Error(
+		                    "Missing database function ai_shift_destination_dates. Please run the latest Supabase migrations."
+		                  );
+		                }
+		                throw new Error(shiftError.message || "Failed to shift later destinations");
+		              }
+		            }
+		          }
+		        }
+
+		        const { data: refreshed } = await supabase
+		          .from("itinerary_destination")
+		          .select("itinerary_destination_id,city,country,from_date,to_date,order_number")
+		          .eq("itinerary_id", Number(itineraryId))
+	          .order("order_number", { ascending: true });
+	        itineraryDestinations = Array.isArray(refreshed) ? refreshed : itineraryDestinations;
+	        destinationById = new Map(
+	          itineraryDestinations
+	            .map((row) => [String((row as any)?.itinerary_destination_id ?? ""), row] as const)
+	            .filter((entry) => entry[0])
+	        );
+
+	        applied.push({ ok: true, operation });
+
+	        if (executeStep?.ai_itinerary_run_step_id) {
+	          await insertAiItineraryToolInvocation({
+	            supabase,
+	            stepId: executeStep.ai_itinerary_run_step_id,
+	            toolName: operation.op,
+	            status: "succeeded",
+	            toolArgs: operation,
+	          });
+	        }
+	        continue;
+	      }
+
+		      if (operation.op === "remove_destination") {
+		        if (String(operation.itineraryDestinationId) === String(destinationId)) {
+		          throw new Error("Can't remove the currently open destination from within its builder.");
+		        }
+
+		        const destinationRow = destinationById.get(operation.itineraryDestinationId);
+		        if (!destinationRow) {
+		          throw new Error("Destination not found (or already removed).");
+		        }
+
+	        const { data: existingActivity } = await supabase
+	          .from("itinerary_activity")
+	          .select("itinerary_activity_id")
+	          .eq("itinerary_id", Number(itineraryId))
+	          .eq("itinerary_destination_id", Number(operation.itineraryDestinationId))
+	          .is("deleted_at", null)
+	          .limit(1)
+	          .maybeSingle();
+
+		        if (existingActivity?.itinerary_activity_id) {
+		          throw new Error("Destination has activities. Move or remove its activities first.");
+		        }
+
+		        const removedOrder = Number((destinationRow as any)?.order_number ?? NaN);
+		        const removedFrom = String((destinationRow as any)?.from_date ?? "");
+		        const removedTo = String((destinationRow as any)?.to_date ?? "");
+		        const durationDays =
+		          isIsoDate(removedFrom) && isIsoDate(removedTo) ? diffDaysIso(removedFrom, removedTo) + 1 : 0;
+
+		        const { error: deleteError } = await supabase
+		          .from("itinerary_destination")
+		          .delete()
+		          .eq("itinerary_id", Number(itineraryId))
+		          .eq("itinerary_destination_id", Number(operation.itineraryDestinationId));
+
+		        if (deleteError) throw new Error(deleteError.message || "Failed to remove destination");
+
+		        if (Number.isFinite(removedOrder)) {
+		          const toShift = itineraryDestinations
+		            .filter((dest) => Number((dest as any)?.order_number ?? NaN) > removedOrder)
+		            .filter((dest) => isIsoDate((dest as any)?.from_date) && isIsoDate((dest as any)?.to_date))
+		            .sort((a, b) => Number((a as any)?.order_number ?? 0) - Number((b as any)?.order_number ?? 0));
+
+		          for (const dest of toShift) {
+		            const destId = Number((dest as any)?.itinerary_destination_id);
+		            const shiftedFrom = addDaysIso(String((dest as any).from_date), -durationDays);
+		            const shiftedTo = addDaysIso(String((dest as any).to_date), -durationDays);
+
+		            const { error: shiftError } = await supabase.rpc("ai_shift_destination_dates", {
+		              _itinerary_id: Number(itineraryId),
+		              _itinerary_destination_id: destId,
+		              _new_from: shiftedFrom,
+		              _new_to: shiftedTo,
+		              _shift_activities: true,
+		            });
+
+		            if (shiftError) {
+		              const code = String((shiftError as any)?.code ?? "");
+		              if (code === "42883") {
+		                throw new Error(
+		                  "Missing database function ai_shift_destination_dates. Please run the latest Supabase migrations."
+		                );
+		              }
+		              throw new Error(shiftError.message || "Failed to shift later destinations");
+		            }
+
+		            const nextOrderNumber = Number((dest as any)?.order_number ?? 0) - 1;
+		            const { error: orderError } = await supabase
+		              .from("itinerary_destination")
+		              .update({ order_number: nextOrderNumber })
+		              .eq("itinerary_id", Number(itineraryId))
+		              .eq("itinerary_destination_id", destId);
+		            if (orderError) throw new Error(orderError.message || "Failed to reorder destinations");
+		          }
+		        }
+
+		        const { data: refreshed } = await supabase
+		          .from("itinerary_destination")
+		          .select("itinerary_destination_id,city,country,from_date,to_date,order_number")
+	          .eq("itinerary_id", Number(itineraryId))
+	          .order("order_number", { ascending: true });
+	        itineraryDestinations = Array.isArray(refreshed) ? refreshed : itineraryDestinations;
+	        destinationById = new Map(
+	          itineraryDestinations
+	            .map((row) => [String((row as any)?.itinerary_destination_id ?? ""), row] as const)
+	            .filter((entry) => entry[0])
+	        );
+
+	        applied.push({ ok: true, operation });
+
+	        if (executeStep?.ai_itinerary_run_step_id) {
+	          await insertAiItineraryToolInvocation({
+	            supabase,
+	            stepId: executeStep.ai_itinerary_run_step_id,
+	            toolName: operation.op,
+	            status: "succeeded",
+	            toolArgs: operation,
+	          });
+	        }
+	        continue;
+	      }
+
+	      if (operation.op === "add_place") {
+	        const result = await addPlaceToItinerary({
           itineraryId,
           destinationId,
           placeId: operation.placeId,
@@ -2105,15 +2567,23 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  const anyFailed = applied.some((entry) => !entry.ok);
-  const okCount = applied.filter((entry) => entry.ok).length;
-  const skippedCount = applied.filter((entry) => entry.error === "Skipped due to a previous failure.").length;
+	  const anyFailed = applied.some((entry) => !entry.ok);
+	  const okCount = applied.filter((entry) => entry.ok).length;
+	  const skippedCount = applied.filter((entry) => entry.error === "Skipped due to a previous failure.").length;
 
-  const refreshed = await fetchBuilderBootstrap(itineraryId, destinationId);
-  const payload: ApplyResponsePayload = {
-    assistantMessage: anyFailed
-      ? `Applied ${okCount} change(s). Some changes failed${skippedCount ? ` (skipped ${skippedCount}).` : " - please review the details."}`
-      : `Applied ${okCount} change(s).`,
+	  if (okCount > 0) {
+	    try {
+	      revalidateTag(builderBootstrapTag(auth.user.id, itineraryId, destinationId));
+	    } catch (error) {
+	      console.warn("Failed to revalidate builder bootstrap cache:", error);
+	    }
+	  }
+
+	  const refreshed = await fetchBuilderBootstrap(itineraryId, destinationId);
+	  const payload: ApplyResponsePayload = {
+	    assistantMessage: anyFailed
+	      ? `Applied ${okCount} change(s). Some changes failed${skippedCount ? ` (skipped ${skippedCount}).` : " - please review the details."}`
+	      : `Applied ${okCount} change(s).`,
     applied,
     bootstrap: refreshed.success ? refreshed.data : undefined,
   };

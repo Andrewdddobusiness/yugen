@@ -17,6 +17,26 @@ export type AiItineraryMessageRow = {
   created_at: string;
 };
 
+const isMissingColumn = (err: any, column: string) => {
+  if (!err) return false;
+  const code = String(err.code ?? "");
+  const message = String(err.message ?? "");
+
+  // Postgres error for unknown column.
+  if (code === "42703") {
+    return message.toLowerCase().includes(column.toLowerCase());
+  }
+
+  // PostgREST schema cache error (commonly surfaced by Supabase).
+  // Example: "Could not find the 'thread_key' column of 'ai_itinerary_thread' in the schema cache"
+  if (code.startsWith("PGRST")) {
+    const lower = message.toLowerCase();
+    return lower.includes("could not find") && lower.includes("column") && lower.includes(column.toLowerCase());
+  }
+
+  return false;
+};
+
 const toChatMessages = (rows: AiItineraryMessageRow[]): ChatMessage[] => {
   return rows
     .filter(
@@ -35,14 +55,6 @@ export async function getOrCreateAiItineraryThread(args: {
 }): Promise<AiItineraryThreadRow> {
   const { supabase, itineraryId, destinationId, userId } = args;
   const threadKey = args.threadKey?.trim() ? String(args.threadKey).trim() : "default";
-
-  const isMissingColumn = (err: any, column: string) => {
-    if (!err) return false;
-    const code = String(err.code ?? "");
-    if (code !== "42703") return false;
-    const message = String(err.message ?? "").toLowerCase();
-    return message.includes(column.toLowerCase());
-  };
 
   const isUnsupportedOnConflict = (err: any) => {
     if (!err) return false;
@@ -147,14 +159,6 @@ export async function listAiItineraryThreads(args: {
 }): Promise<AiItineraryThreadListRow[]> {
   const { supabase, itineraryId, destinationId, userId, limit } = args;
 
-  const isMissingColumn = (err: any, column: string) => {
-    if (!err) return false;
-    const code = String(err.code ?? "");
-    if (code !== "42703") return false;
-    const message = String(err.message ?? "").toLowerCase();
-    return message.includes(column.toLowerCase());
-  };
-
   const query = (select: string) =>
     supabase
       .from("ai_itinerary_thread")
@@ -205,27 +209,66 @@ export async function createAiItineraryThread(args: {
 }): Promise<AiItineraryThreadListRow> {
   const { supabase, itineraryId, destinationId, userId, threadKey } = args;
 
-  const { data, error } = await supabase
-    .from("ai_itinerary_thread")
-    .insert({
+  const insert = async (withThreadKey: boolean) => {
+    const payload: any = {
       itinerary_id: Number(itineraryId),
       itinerary_destination_id: Number(destinationId),
       user_id: userId,
-      thread_key: threadKey,
-    })
-    .select("ai_itinerary_thread_id,thread_key,summary,created_at,updated_at")
-    .single();
+    };
+    if (withThreadKey) payload.thread_key = threadKey;
 
-  if (error || !data) {
-    throw new Error(error?.message || "Failed to create AI chat thread");
+    const select = withThreadKey
+      ? "ai_itinerary_thread_id,thread_key,summary,created_at,updated_at"
+      : "ai_itinerary_thread_id,summary,created_at,updated_at";
+
+    return supabase.from("ai_itinerary_thread").insert(payload).select(select).single();
+  };
+
+  const first = await insert(true);
+  if (first.error && isMissingColumn(first.error, "thread_key")) {
+    const legacy = await insert(false);
+    if (legacy.error || !legacy.data) {
+      // Legacy schema only supports one thread per (itinerary,destination,user); if it already exists, return it.
+      const existing = await supabase
+        .from("ai_itinerary_thread")
+        .select("ai_itinerary_thread_id,summary,created_at,updated_at")
+        .eq("itinerary_id", Number(itineraryId))
+        .eq("itinerary_destination_id", Number(destinationId))
+        .eq("user_id", userId)
+        .maybeSingle();
+
+      if (existing.data?.ai_itinerary_thread_id) {
+        return {
+          ai_itinerary_thread_id: String((existing.data as any).ai_itinerary_thread_id),
+          thread_key: "default",
+          summary: (existing.data as any).summary ?? null,
+          created_at: String((existing.data as any).created_at),
+          updated_at: String((existing.data as any).updated_at),
+        };
+      }
+
+      throw new Error(legacy.error?.message || "Failed to create AI chat thread");
+    }
+
+    return {
+      ai_itinerary_thread_id: String((legacy.data as any).ai_itinerary_thread_id),
+      thread_key: "default",
+      summary: (legacy.data as any).summary ?? null,
+      created_at: String((legacy.data as any).created_at),
+      updated_at: String((legacy.data as any).updated_at),
+    };
+  }
+
+  if (first.error || !first.data) {
+    throw new Error(first.error?.message || "Failed to create AI chat thread");
   }
 
   return {
-    ai_itinerary_thread_id: String((data as any).ai_itinerary_thread_id),
-    thread_key: String((data as any).thread_key ?? threadKey),
-    summary: (data as any).summary ?? null,
-    created_at: String((data as any).created_at),
-    updated_at: String((data as any).updated_at),
+    ai_itinerary_thread_id: String((first.data as any).ai_itinerary_thread_id),
+    thread_key: String((first.data as any).thread_key ?? threadKey),
+    summary: (first.data as any).summary ?? null,
+    created_at: String((first.data as any).created_at),
+    updated_at: String((first.data as any).updated_at),
   };
 }
 
