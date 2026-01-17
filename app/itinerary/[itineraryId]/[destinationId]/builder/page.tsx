@@ -101,7 +101,6 @@ export default function Builder() {
   const { 
     currentView, 
     showMap, 
-    sharedDndActive,
     isTransitioningView,
     updateContextData,
     setCurrentView, 
@@ -551,17 +550,17 @@ export default function Builder() {
                       className="h-full w-full"
                     >
                       <Suspense fallback={<BuilderViewSkeleton view={effectiveView} />}>
-                        {effectiveView === 'calendar' ? (
-                          <div ref={calendarRef} className="h-full w-full overflow-hidden">
-                            <GoogleCalendarView
-                              isLoading={false}
-                              className="h-full w-full"
-                              selectedDate={currentDate ?? undefined}
-                              onSelectedDateChange={(date) => navigateToDate(date)}
-                              useExternalDndContext={sharedDndActive}
-                            />
-                          </div>
-                        ) : (
+	                        {effectiveView === 'calendar' ? (
+	                          <div ref={calendarRef} className="h-full w-full overflow-hidden">
+	                            <GoogleCalendarView
+	                              isLoading={false}
+	                              className="h-full w-full"
+	                              selectedDate={currentDate ?? undefined}
+	                              onSelectedDateChange={(date) => navigateToDate(date)}
+	                              useExternalDndContext={effectiveView === "calendar"}
+	                            />
+	                          </div>
+	                        ) : (
                           <div ref={tableRef} className="h-full w-full min-w-0 min-h-0 overflow-hidden">
                             <ItineraryTableView showMap={showMap} onToggleMap={toggleMap} />
                           </div>
@@ -629,17 +628,17 @@ export default function Builder() {
 	                className="h-full w-full"
 	              >
 	                <Suspense fallback={<BuilderViewSkeleton view={effectiveView} />}>
-	                  {effectiveView === 'calendar' ? (
-	                        <div ref={calendarRef} className="h-full w-full overflow-hidden">
-	                          <GoogleCalendarView
-	                            isLoading={false}
-	                            className="h-full w-full"
-	                            selectedDate={currentDate ?? undefined}
-	                            onSelectedDateChange={(date) => navigateToDate(date)}
-	                            useExternalDndContext={sharedDndActive}
-	                          />
-	                        </div>
-	                  ) : (
+		                  {effectiveView === 'calendar' ? (
+		                        <div ref={calendarRef} className="h-full w-full overflow-hidden">
+		                          <GoogleCalendarView
+		                            isLoading={false}
+		                            className="h-full w-full"
+		                            selectedDate={currentDate ?? undefined}
+		                            onSelectedDateChange={(date) => navigateToDate(date)}
+		                            useExternalDndContext={effectiveView === "calendar"}
+		                          />
+		                        </div>
+		                  ) : (
 	                    <div ref={tableRef} className="h-full w-full min-w-0 min-h-0 overflow-hidden">
 	                      <ItineraryTableView showMap={false} onToggleMap={toggleMap} />
 	                    </div>

@@ -11,7 +11,6 @@ export interface ItineraryLayoutState {
   currentView: 'calendar' | 'table' | 'list';
   timeRange: 'day' | 'week';
   showMap: boolean;
-  sharedDndActive: boolean;
   
   // Enhanced view management
   viewHistory: Array<'calendar' | 'table' | 'list'>;
@@ -96,7 +95,6 @@ export interface ItineraryLayoutState {
   setTimeRange: (range: 'day' | 'week') => void;
   setShowMap: (show: boolean) => void;
   toggleMap: () => void;
-  setSharedDndActive: (active: boolean) => void;
   
   // Enhanced view management actions
   setDefaultView: (view: 'calendar' | 'table' | 'list') => void;
@@ -197,7 +195,6 @@ export const useItineraryLayoutStore = create<ItineraryLayoutState>()(
       currentView: 'table',
       timeRange: 'day',
       showMap: false,
-      sharedDndActive: false,
       viewHistory: [],
       defaultView: 'table',
       viewPreferences: defaultViewPreferences,
@@ -249,7 +246,6 @@ export const useItineraryLayoutStore = create<ItineraryLayoutState>()(
       setTimeRange: (range) => set({ timeRange: range }),
       setShowMap: (show) => set({ showMap: show }),
       toggleMap: () => set((state) => ({ showMap: !state.showMap })),
-      setSharedDndActive: (active) => set({ sharedDndActive: active }),
 
       // Enhanced view management actions
       setDefaultView: (view) => set({ defaultView: view }),

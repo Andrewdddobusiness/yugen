@@ -507,7 +507,7 @@ function ItineraryAssistantChat(props: {
     setTimeout(() => {
       scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
     }, 0);
-  }, [isVisible, messages, draftPlan, draftSources, planning, importing, applying, showThreads]);
+  }, [isVisible, messages, draftPlan, draftSources, planning, importing, applying, showThreads, error]);
 
   useEffect(() => {
     if (!isVisible) return;
@@ -760,6 +760,9 @@ function ItineraryAssistantChat(props: {
     setApplying(true);
     setError(null);
 
+    // Let React paint the loading state before any synchronous work (e.g. JSON serialization errors).
+    await Promise.resolve();
+
     try {
       const res = await fetch("/api/ai/itinerary", {
         method: "POST",
@@ -777,6 +780,11 @@ function ItineraryAssistantChat(props: {
       const data = await readJsonResponse<ApplyResponse | ErrorResponse>(res);
       if (!("ok" in data) || data.ok !== true) {
         const message = data?.error?.message ?? "Failed to apply changes.";
+        console.error("[itinerary-assistant] apply failed", {
+          status: res.status,
+          code: data?.error?.code,
+          message,
+        });
         throw new Error(message);
       }
 
@@ -823,6 +831,7 @@ function ItineraryAssistantChat(props: {
         setDraftSources(null);
       }
     } catch (e) {
+      console.error("[itinerary-assistant] apply error", e);
       setError(toUserFacingError(e, "Failed to apply changes. Please try again."));
     } finally {
       setApplying(false);

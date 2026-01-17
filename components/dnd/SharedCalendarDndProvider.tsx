@@ -13,7 +13,13 @@ import {
 } from "@dnd-kit/core";
 import { sortableKeyboardCoordinates } from "@dnd-kit/sortable";
 
-export function SharedCalendarDndProvider({ children }: { children: React.ReactNode }) {
+export function SharedCalendarDndProvider({
+  children,
+  enabled = true,
+}: {
+  children: React.ReactNode;
+  enabled?: boolean;
+}) {
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: { distance: 6 },
@@ -31,9 +37,11 @@ export function SharedCalendarDndProvider({ children }: { children: React.ReactN
   };
 
   return (
-    <DndContext sensors={sensors} collisionDetection={collisionDetection}>
+    <DndContext
+      sensors={enabled ? sensors : []}
+      collisionDetection={enabled ? collisionDetection : closestCenter}
+    >
       {children}
     </DndContext>
   );
 }
-

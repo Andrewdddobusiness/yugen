@@ -1154,14 +1154,21 @@ export async function POST(request: NextRequest) {
   const startedAt = performance.now();
   let status = 500;
   let userId: string | null = null;
+  let requestMode: string | null = null;
+  let requestItineraryId: string | null = null;
+  let requestDestinationId: string | null = null;
+  let requestOperationCount: number | null = null;
+  let errorCode: string | null = null;
 
   const respond = <T extends Response>(response: T) => {
     status = response.status;
     return response;
   };
 
-  const jsonErrorTimed = (code: number, errorCode: string, message: string, details?: unknown, headers?: HeadersInit) =>
-    respond(jsonError(code, errorCode, message, details, headers));
+  const jsonErrorTimed = (code: number, nextErrorCode: string, message: string, details?: unknown, headers?: HeadersInit) => {
+    errorCode = nextErrorCode;
+    return respond(jsonError(code, nextErrorCode, message, details, headers));
+  };
 
   try {
     if (!isSameOrigin(request)) {
@@ -1175,10 +1182,26 @@ export async function POST(request: NextRequest) {
       return jsonErrorTimed(400, "bad_json", "Request body must be valid JSON");
     }
 
+    if (body && typeof body === "object") {
+      const maybeMode = "mode" in body ? String((body as any).mode ?? "") : "";
+      if (maybeMode) requestMode = maybeMode;
+
+      if ("itineraryId" in body) requestItineraryId = String((body as any).itineraryId ?? "") || null;
+      if ("destinationId" in body) requestDestinationId = String((body as any).destinationId ?? "") || null;
+      if (maybeMode === "apply" && Array.isArray((body as any).operations)) {
+        requestOperationCount = (body as any).operations.length;
+      }
+    }
+
     const parsed = ItineraryAssistantRequestSchema.safeParse(body);
     if (!parsed.success) {
       return jsonErrorTimed(400, "invalid_request", "Invalid request payload", parsed.error.format());
     }
+
+    requestMode = parsed.data.mode;
+    requestItineraryId = parsed.data.itineraryId;
+    requestDestinationId = parsed.data.destinationId;
+    requestOperationCount = parsed.data.mode === "apply" ? parsed.data.operations.length : null;
 
     const supabase = createClient();
     const { data: auth } = await supabase.auth.getUser();
@@ -3052,12 +3075,24 @@ export async function POST(request: NextRequest) {
     console.error("Unexpected AI itinerary POST error:", error);
     return jsonErrorTimed(500, "server_error", "Something went wrong. Please try again.");
   } finally {
+    const durationMs = performance.now() - startedAt;
+    if (requestMode === "apply" && status >= 400) {
+      console.warn("[ai-itinerary] apply_request_failed", {
+        status,
+        errorCode,
+        userId,
+        itineraryId: requestItineraryId,
+        destinationId: requestDestinationId,
+        operationCount: requestOperationCount,
+        durationMs,
+      });
+    }
     void recordApiRequestMetric({
       userId,
       route: "/api/ai/itinerary",
       method: request.method,
       status,
-      durationMs: performance.now() - startedAt,
+      durationMs,
     });
   }
 }

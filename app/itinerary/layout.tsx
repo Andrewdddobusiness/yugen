@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState, type ComponentType, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useParams, usePathname, useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
@@ -35,6 +35,7 @@ import { Download, Loader2, Lock, Share, Sparkles, Users } from "lucide-react";
 import Loading from "@/components/loading/Loading";
 import { ItineraryAssistantSheet, ItineraryAssistantSidebar } from "@/components/ai/ItineraryAssistantSheet";
 import { getAiAssistantAccessMode, getAiAssistantUpgradeHref, isDevBillingBypassEnabled } from "@/lib/featureFlags";
+import { SharedCalendarDndProvider } from "@/components/dnd/SharedCalendarDndProvider";
 
 const ShareExportDialog = dynamic(
   () => import("@/components/dialog/export/ShareExportDialog").then((mod) => mod.ShareExportDialog),
@@ -83,44 +84,10 @@ export default function Layout({ children }: { children: ReactNode }) {
   
   const isBuilderPage = pathname.includes("/builder");
   const currentView = useItineraryLayoutStore((state) => state.currentView);
-  const setSharedDndActive = useItineraryLayoutStore((state) => state.setSharedDndActive);
-  const sharedDndActive = useItineraryLayoutStore((state) => state.sharedDndActive);
   const enableSharedDnd = isBuilderPage && currentView === "calendar";
   const collaborationOpen = useItineraryCollaborationPanelStore((state) => state.isOpen);
   const openCollaboration = useItineraryCollaborationPanelStore((state) => state.open);
   const closeCollaboration = useItineraryCollaborationPanelStore((state) => state.close);
-
-  const [SharedDndProvider, setSharedDndProvider] = useState<ComponentType<{ children: ReactNode }> | null>(null);
-
-  useEffect(() => {
-    if (!enableSharedDnd) {
-      setSharedDndActive(false);
-      return;
-    }
-
-    if (SharedDndProvider) {
-      setSharedDndActive(true);
-      return;
-    }
-
-    let cancelled = false;
-    setSharedDndActive(false);
-
-    import("@/components/dnd/SharedCalendarDndProvider")
-      .then((mod) => {
-        if (cancelled) return;
-        setSharedDndProvider(() => mod.SharedCalendarDndProvider);
-        setSharedDndActive(true);
-      })
-      .catch((error) => {
-        console.error("Failed to load shared calendar DnD provider:", error);
-        setSharedDndActive(false);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [enableSharedDnd, setSharedDndActive, SharedDndProvider]);
 
   //**** STORES ****//
   const user = useUserStore((state) => state.user);
@@ -364,7 +331,7 @@ export default function Layout({ children }: { children: ReactNode }) {
   const shell = (
     <>
       <AppSidebarItineraryActivityLeft
-        useExternalDndContext={enableSharedDnd && sharedDndActive}
+        useExternalDndContext={enableSharedDnd}
       />
       <main className="flex min-w-0 flex-1 w-full">
         <div className="flex min-w-0 flex-1 flex-col w-full">
@@ -513,8 +480,9 @@ export default function Layout({ children }: { children: ReactNode }) {
     </>
   );
 
-  const sharedDndShell =
-    enableSharedDnd && SharedDndProvider && sharedDndActive ? <SharedDndProvider>{shell}</SharedDndProvider> : shell;
+  const sharedDndShell = (
+    <SharedCalendarDndProvider enabled={enableSharedDnd}>{shell}</SharedCalendarDndProvider>
+  );
 
   return (
     <>
