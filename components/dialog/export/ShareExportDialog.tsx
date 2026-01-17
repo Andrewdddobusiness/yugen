@@ -14,6 +14,7 @@ import { ExportDownloadState } from "@/components/dialog/export/ExportDownloadSt
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { downloadKML } from "@/utils/export/kmlExport";
+import { createClient } from "@/utils/supabase/client";
 
 interface ExportOption {
   id: string;
@@ -35,6 +36,7 @@ export function ShareExportDialog({ open, onOpenChange, itineraryId, destination
   const { itineraryActivities, fetchItineraryActivities, setItineraryActivities } = useItineraryActivityStore();
   const [showInstructions, setShowInstructions] = useState(false);
   const [showDownloadState, setShowDownloadState] = useState<"pdf" | "excel" | null>(null);
+  const [excelScope, setExcelScope] = useState<"destination" | "itinerary">("destination");
   const [kmlData, setKmlData] = React.useState<{ content: string; fileName: string } | null>(null);
 
   const dialogOpen = Boolean(open);
@@ -92,11 +94,25 @@ export function ShareExportDialog({ open, onOpenChange, itineraryId, destination
       disabled: !canExport,
     },
     {
-      id: "excel",
-      title: "Excel Spreadsheet",
-      description: "Export your itinerary as an Excel spreadsheet",
+      id: "excel_destination",
+      title: "Excel Spreadsheet (Calendar)",
+      description: "Export this destination as a calendar-style spreadsheet",
       icon: FileSpreadsheet,
-      onClick: () => setShowDownloadState("excel"),
+      onClick: () => {
+        setExcelScope("destination");
+        setShowDownloadState("excel");
+      },
+      disabled: !canExport,
+    },
+    {
+      id: "excel_itinerary",
+      title: "Excel Spreadsheet (Entire itinerary)",
+      description: "Export all destinations as a calendar-style spreadsheet",
+      icon: FileSpreadsheet,
+      onClick: () => {
+        setExcelScope("itinerary");
+        setShowDownloadState("excel");
+      },
       disabled: !canExport,
     },
   ];
@@ -153,7 +169,47 @@ export function ShareExportDialog({ open, onOpenChange, itineraryId, destination
         await exportToPDF(itineraryDetails);
       } else if (showDownloadState === "excel") {
         const { exportToExcel } = await import("@/utils/export/excelExport");
-        await exportToExcel(itineraryDetails);
+        if (excelScope === "destination") {
+          await exportToExcel(itineraryDetails);
+          return;
+        }
+
+        const supabase = createClient();
+        const [{ data: destinations, error: destinationsError }, { data: allActivities, error: activitiesError }] =
+          await Promise.all([
+            supabase
+              .from("itinerary_destination")
+              .select("itinerary_destination_id,city,country,from_date,to_date,order_number")
+              .eq("itinerary_id", itineraryId as string)
+              .order("order_number", { ascending: true }),
+            supabase
+              .from("itinerary_activity")
+              .select(
+                "itinerary_id,itinerary_activity_id,itinerary_destination_id,activity_id,date,start_time,end_time,notes,travel_mode_to_next,deleted_at,activity:activity(*)"
+              )
+              .eq("itinerary_id", itineraryId as string),
+          ]);
+
+        if (destinationsError) {
+          throw new Error("Failed to load itinerary destinations for export.");
+        }
+        if (activitiesError) {
+          throw new Error("Failed to load itinerary activities for export.");
+        }
+
+        const firstDestination = (destinations ?? [])[0] ?? destination;
+        const exportDetails = {
+          city: firstDestination.city,
+          country: firstDestination.country,
+          fromDate: new Date(firstDestination.from_date),
+          toDate: new Date(firstDestination.to_date),
+          activities: (allActivities ?? []) as any,
+          destinations: (destinations ?? []) as any,
+          exportScope: "itinerary" as const,
+          itineraryName: `${destination.city} itinerary`,
+        };
+
+        await exportToExcel(exportDetails as any);
       }
     } catch (error) {
       console.error("Error in executeExport:", error);

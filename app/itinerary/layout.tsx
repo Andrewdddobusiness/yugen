@@ -31,7 +31,7 @@ import { useItineraryActivityStore } from "@/store/itineraryActivityStore";
 import { useItineraryCollaborationPanelStore } from "@/store/itineraryCollaborationPanelStore";
 
 import { Button } from "@/components/ui/button";
-import { Download, Lock, Share, Sparkles, Users } from "lucide-react";
+import { Download, Loader2, Lock, Share, Sparkles, Users } from "lucide-react";
 import Loading from "@/components/loading/Loading";
 import { ItineraryAssistantSheet, ItineraryAssistantSidebar } from "@/components/ai/ItineraryAssistantSheet";
 import { getAiAssistantAccessMode, getAiAssistantUpgradeHref, isDevBillingBypassEnabled } from "@/lib/featureFlags";
@@ -123,38 +123,13 @@ export default function Layout({ children }: { children: ReactNode }) {
   }, [enableSharedDnd, setSharedDndActive, SharedDndProvider]);
 
   //**** STORES ****//
-  const { setUser, setUserLoading, setProfileUrl, setIsProfileUrlLoading } = useUserStore();
+  const user = useUserStore((state) => state.user);
+  const isUserLoading = useUserStore((state) => state.isUserLoading);
+  const setProfileUrl = useUserStore((state) => state.setProfileUrl);
+  const setIsProfileUrlLoading = useUserStore((state) => state.setIsProfileUrlLoading);
   const { setSubscription, setIsSubscriptionLoading } = useStripeSubscriptionStore();
   
   // Remove useWishlist from here to prevent multiple instances
-
-  //***** GET USER *****//
-  const { data: user, isLoading: isUserLoading } = useQuery({
-    queryKey: ["user"],
-    queryFn: async () => {
-      const supabase = createClient();
-      const {
-        data: { user },
-        error,
-      } = await supabase.auth.getUser();
-      if (error || !user) throw error;
-      return user;
-    },
-    staleTime: 0,
-    refetchOnMount: true,
-    refetchOnWindowFocus: true,
-    refetchOnReconnect: true,
-  });
-
-  useEffect(() => {
-    setUserLoading(isUserLoading);
-  }, [isUserLoading, setUserLoading]);
-
-  useEffect(() => {
-    if (user) {
-      setUser(user);
-    }
-  }, [user, setUser]);
 
   // Realtime: keep itinerary activities in sync across collaborators.
   useEffect(() => {
@@ -258,7 +233,7 @@ export default function Layout({ children }: { children: ReactNode }) {
     refetchOnReconnect: true,
   });
 
-  const { data: entitlements } = useQuery({
+  const entitlementsQuery = useQuery({
     queryKey: ["billingEntitlements", user?.id],
     enabled: !!user,
     staleTime: 60_000,
@@ -267,9 +242,12 @@ export default function Layout({ children }: { children: ReactNode }) {
     refetchOnReconnect: true,
     queryFn: async () => {
       const res = await fetch("/api/billing/entitlements", { cache: "no-store" });
-      const data = (await res.json()) as any;
-      if (!res.ok || !data?.ok) {
-        return { aiAccessMode: "off" as const, isPro: false };
+      const data = (await res.json().catch(() => null)) as any;
+      if (!res.ok) {
+        throw new Error(data?.error?.message ?? "Failed to load entitlements.");
+      }
+      if (!data?.ok) {
+        throw new Error(data?.error?.message ?? "Failed to load entitlements.");
       }
       return { aiAccessMode: String(data.aiAccessMode ?? "off"), isPro: Boolean(data.isPro) };
     },
@@ -303,11 +281,19 @@ export default function Layout({ children }: { children: ReactNode }) {
   const aiAccessMode = getAiAssistantAccessMode();
   const billingBypassEnabled = isDevBillingBypassEnabled();
   const isAiEnabledFlag = aiAccessMode !== "off";
+  const entitlements = entitlementsQuery.data;
+  const isEntitlementsLoading = entitlementsQuery.isLoading || entitlementsQuery.isFetching || entitlementsQuery.isError;
+  const isAuthed = Boolean(user?.id);
   const isProSubscriber =
     billingBypassEnabled ||
     (subscription as any)?.status === "active" ||
     (entitlements as any)?.isPro === true;
-  const canUseAiAssistant = aiAccessMode === "all" || (aiAccessMode === "pro" && isProSubscriber);
+  const canUseAiAssistant =
+    isAuthed && (aiAccessMode === "all" || (aiAccessMode === "pro" && isProSubscriber));
+  const isAiEntitlementPending =
+    isAiEnabledFlag &&
+    aiAccessMode === "pro" &&
+    (isUserLoading || !isAuthed || isSubscriptionLoading || isEntitlementsLoading);
   const aiUpgradeHref = getAiAssistantUpgradeHref();
 
   useEffect(() => {
@@ -412,6 +398,11 @@ export default function Layout({ children }: { children: ReactNode }) {
                     closeCollaboration();
                   }}
                 />
+              ) : isAiEntitlementPending ? (
+                <Button type="button" variant="outline" size="sm" className="ml-0 h-9 rounded-xl gap-2" disabled>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  AI
+                </Button>
               ) : isAiEnabledFlag ? (
                 <Button
                   type="button"
@@ -441,6 +432,17 @@ export default function Layout({ children }: { children: ReactNode }) {
                   }}
                 >
                   <Sparkles className="h-4 w-4" />
+                  AI
+                </Button>
+              ) : isAiEntitlementPending ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="hidden md:inline-flex h-9 rounded-xl gap-2"
+                  disabled
+                >
+                  <Loader2 className="h-4 w-4 animate-spin" />
                   AI
                 </Button>
               ) : (

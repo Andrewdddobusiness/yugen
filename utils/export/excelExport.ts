@@ -8,6 +8,16 @@ interface ItineraryDetails {
   fromDate: Date;
   toDate: Date;
   activities: IItineraryActivity[];
+  destinations?: Array<{
+    itinerary_destination_id?: string | number;
+    city: string;
+    country: string;
+    from_date: string | Date;
+    to_date: string | Date;
+    order_number?: number | null;
+  }>;
+  exportScope?: "destination" | "itinerary";
+  itineraryName?: string;
 }
 
 type CellStyle = any;
@@ -56,6 +66,17 @@ const parseTimeToMinutes = (time: string | null | undefined): number | null => {
 const formatHourLabel = (minutes: number) => `${Math.floor(minutes / 60)}:00`;
 
 const toIsoDate = (date: Date) => date.toISOString().slice(0, 10);
+
+const toIsoDateFromUnknown = (value: unknown): string | null => {
+  if (!value) return null;
+  if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : toIsoDate(value);
+  const str = String(value);
+  const direct = str.match(/^(\d{4}-\d{2}-\d{2})/);
+  if (direct) return direct[1];
+  const parsed = new Date(str);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return toIsoDate(parsed);
+};
 
 const parseIsoDateToUtcDate = (iso: string) => {
   const match = iso.match(/^(\d{4})-(\d{2})-(\d{2})$/);
@@ -128,13 +149,65 @@ const setHyperlink = (ws: XLSX.WorkSheet, row: number, col: number, text: string
 const buildItinerarySheet = (details: ItineraryDetails) => {
   const ws: XLSX.WorkSheet = {};
 
-  const fromIso = toIsoDate(details.fromDate);
-  const toIso = toIsoDate(details.toDate);
+  const destinationsForScope =
+    details.exportScope === "itinerary" && Array.isArray(details.destinations) && details.destinations.length > 0
+      ? details.destinations
+      : null;
+
+  const fromIso = (() => {
+    if (!destinationsForScope) return toIsoDate(details.fromDate);
+    const candidates = destinationsForScope
+      .map((dest) => toIsoDateFromUnknown(dest.from_date))
+      .filter((v): v is string => !!v)
+      .sort();
+    return candidates[0] ?? toIsoDate(details.fromDate);
+  })();
+
+  const toIso = (() => {
+    if (!destinationsForScope) return toIsoDate(details.toDate);
+    const candidates = destinationsForScope
+      .map((dest) => toIsoDateFromUnknown(dest.to_date))
+      .filter((v): v is string => !!v)
+      .sort();
+    return candidates[candidates.length - 1] ?? toIsoDate(details.toDate);
+  })();
+
   const days = eachIsoDateInclusive(fromIso, toIso);
   const dayCount = days.length;
   const lastCol = Math.max(1, dayCount); // include at least 1 day column
 
   const dayFormatter = new Intl.DateTimeFormat("en-US", { weekday: "long", timeZone: "UTC" });
+  const weekdayIndex = (iso: string) => {
+    const d = parseIsoDateToUtcDate(iso);
+    return d ? d.getUTCDay() : null;
+  };
+
+  const normalizedDestinations = (() => {
+    if (!destinationsForScope) return [];
+    return destinationsForScope
+      .map((dest) => {
+        const from = toIsoDateFromUnknown(dest.from_date);
+        const to = toIsoDateFromUnknown(dest.to_date);
+        if (!from || !to) return null;
+        return {
+          id: String(dest.itinerary_destination_id ?? ""),
+          city: String(dest.city ?? "").trim(),
+          country: String(dest.country ?? "").trim(),
+          from,
+          to,
+          order: Number(dest.order_number ?? 0),
+        };
+      })
+      .filter((v): v is NonNullable<typeof v> => !!v && !!v.city)
+      .sort((a, b) => (a.order || 0) - (b.order || 0) || a.from.localeCompare(b.from));
+  })();
+
+  const findDestinationForDay = (iso: string) => {
+    for (const dest of normalizedDestinations) {
+      if (iso >= dest.from && iso <= dest.to) return dest;
+    }
+    return null;
+  };
 
   const styles = {
     title: {
@@ -152,12 +225,22 @@ const buildItinerarySheet = (details: ItineraryDetails) => {
       alignment: { horizontal: "center", vertical: "center", wrapText: true },
       border: makeBorder(),
     },
+    headerCellTinted: (fillRgb: string) => ({
+      font: { bold: true, color: { rgb: "0D1321" } },
+      alignment: { horizontal: "center", vertical: "center", wrapText: true },
+      border: makeBorder(),
+      fill: { patternType: "solid", fgColor: { rgb: fillRgb } },
+    }),
     timeLabel: {
       font: { bold: true, color: { rgb: "2A3245" } },
       fill: { patternType: "solid", fgColor: { rgb: "EEF1F7" } },
       alignment: { horizontal: "right", vertical: "center" },
       border: makeBorder(),
     },
+    gridCell: (fillRgb?: string) => ({
+      border: makeBorder(),
+      ...(fillRgb ? { fill: { patternType: "solid", fgColor: { rgb: fillRgb } } } : {}),
+    }),
     eventCell: (fillRgb: string) => ({
       font: { bold: true, color: { rgb: "0D1321" } },
       fill: { patternType: "solid", fgColor: { rgb: fillRgb } },
@@ -171,7 +254,7 @@ const buildItinerarySheet = (details: ItineraryDetails) => {
   (ws as any)["!merges"] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: lastCol } }];
 
   // Row labels (match the reference sheet)
-  const rowLabels = ["date", "day", "From", "To", "Area"];
+  const rowLabels = ["Date", "Day", "From", "To", "Area"];
   rowLabels.forEach((label, idx) => {
     setCell(ws, 1 + idx, 0, label, styles.headerLabel);
   });
@@ -181,12 +264,30 @@ const buildItinerarySheet = (details: ItineraryDetails) => {
     const iso = days[i]!;
     const dateCol = 1 + i;
     const utcDate = parseIsoDateToUtcDate(iso);
+    const weekday = weekdayIndex(iso);
+    const isWeekend = weekday === 0 || weekday === 6;
 
-    setCell(ws, 1, dateCol, formatDisplayDate(iso), styles.headerCell);
-    setCell(ws, 2, dateCol, utcDate ? dayFormatter.format(utcDate) : "", styles.headerCell);
-    setCell(ws, 3, dateCol, "", styles.headerCell); // From (placeholder)
-    setCell(ws, 4, dateCol, details.city, styles.headerCell); // To (single destination)
-    setCell(ws, 5, dateCol, "", styles.headerCell); // Area (placeholder)
+    const currentDest = destinationsForScope ? findDestinationForDay(iso) : null;
+    const prevDest = destinationsForScope && i > 0 ? findDestinationForDay(days[i - 1]!) : null;
+    const isTransition = !!currentDest && !!prevDest && currentDest.id && prevDest.id && currentDest.id !== prevDest.id;
+
+    const headerFill = isTransition ? "E5E7EB" : isWeekend ? "F3F4F6" : "";
+    const headerStyle = headerFill ? styles.headerCellTinted(headerFill) : styles.headerCell;
+
+    const areaLabel = (() => {
+      if (!currentDest) return destinationsForScope ? "" : details.city;
+      if (isTransition) return `${prevDest!.city} → ${currentDest.city}`;
+      return currentDest.city;
+    })();
+
+    const fromLabel = isTransition ? prevDest!.city : "";
+    const toLabel = isTransition ? currentDest!.city : "";
+
+    setCell(ws, 1, dateCol, formatDisplayDate(iso), headerStyle);
+    setCell(ws, 2, dateCol, utcDate ? dayFormatter.format(utcDate) : "", headerStyle);
+    setCell(ws, 3, dateCol, fromLabel, headerStyle);
+    setCell(ws, 4, dateCol, toLabel, headerStyle);
+    setCell(ws, 5, dateCol, areaLabel, headerStyle);
   }
 
   // Time grid labels
@@ -196,6 +297,19 @@ const buildItinerarySheet = (details: ItineraryDetails) => {
     const row = timeStartRow + slot;
     const label = minutes % 60 === 0 ? formatHourLabel(minutes) : "";
     setCell(ws, row, 0, label, styles.timeLabel);
+
+    for (let i = 0; i < dayCount; i++) {
+      const iso = days[i]!;
+      const weekday = weekdayIndex(iso);
+      const isWeekend = weekday === 0 || weekday === 6;
+      const currentDest = destinationsForScope ? findDestinationForDay(iso) : null;
+      const prevDest = destinationsForScope && i > 0 ? findDestinationForDay(days[i - 1]!) : null;
+      const isTransition =
+        !!currentDest && !!prevDest && currentDest.id && prevDest.id && currentDest.id !== prevDest.id;
+      const fill = isTransition ? "F3F4F6" : isWeekend ? "FAFAFA" : undefined;
+      setCell(ws, row, 1 + i, "", styles.gridCell(fill));
+    }
+
     (ws as any)["!rows"] ??= [];
     (ws as any)["!rows"][row] = { hpt: 14 };
   }
@@ -237,9 +351,10 @@ const buildItinerarySheet = (details: ItineraryDetails) => {
     const content = notes ? `${name}\n${notes.slice(0, 80)}${notes.length > 80 ? "…" : ""}` : name;
 
     setCell(ws, startRow, col, content, styles.eventCell(fillRgb));
-    if (endRow > startRow) {
-      merges.push({ s: { r: startRow, c: col }, e: { r: endRow, c: col } });
+    for (let r = startRow + 1; r <= endRow; r++) {
+      setCell(ws, r, col, "", styles.eventCell(fillRgb));
     }
+    merges.push({ s: { r: startRow, c: col }, e: { r: endRow, c: col } });
   }
 
   (ws as any)["!merges"] = merges;
@@ -299,6 +414,12 @@ const buildItinerarySheet = (details: ItineraryDetails) => {
 const buildActivitiesSheet = (details: ItineraryDetails) => {
   const ws: XLSX.WorkSheet = {};
   const activeActivities = details.activities.filter((activity) => !activity.deleted_at);
+  const destinationCityById = new Map<string, string>();
+  for (const dest of details.destinations ?? []) {
+    const id = String(dest.itinerary_destination_id ?? "");
+    const city = String((dest as any)?.city ?? "").trim();
+    if (id && city) destinationCityById.set(id, city);
+  }
 
   const styles = {
     title: {
@@ -353,7 +474,9 @@ const buildActivitiesSheet = (details: ItineraryDetails) => {
     setCell(ws, row, 0, "", styles.row); // Yes/No placeholder
     setCell(ws, row, 1, typeLabel, styles.typeCell(fillRgb));
     setCell(ws, row, 2, activity.activity?.name || "", styles.row);
-    setCell(ws, row, 3, details.city, styles.row);
+    const activityCity =
+      destinationCityById.get(String((activity as any)?.itinerary_destination_id ?? "")) ?? details.city;
+    setCell(ws, row, 3, activityCity, styles.row);
     setCell(ws, row, 4, activity.notes || "", styles.row);
     setCell(ws, row, 5, "", styles.row); // Priority placeholder
 
@@ -408,7 +531,8 @@ export const exportToExcel = (itineraryDetails: ItineraryDetails) => {
   const activitiesSheet = buildActivitiesSheet(itineraryDetails);
   XLSX.utils.book_append_sheet(workbook, activitiesSheet, "Activities");
 
-  XLSX.writeFile(workbook, `${safeFileName(itineraryDetails.city)}_itinerary.xlsx`, {
+  const fileBase = itineraryDetails.itineraryName || itineraryDetails.city;
+  XLSX.writeFile(workbook, `${safeFileName(fileBase)}_itinerary.xlsx`, {
     bookType: "xlsx",
     compression: true,
   });
