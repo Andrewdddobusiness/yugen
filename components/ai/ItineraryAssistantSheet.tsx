@@ -490,10 +490,10 @@ function ItineraryAssistantChat(props: {
     const el = textareaRef.current;
     if (!el) return;
 
-    // Start smaller (comfortable ~2–3 lines) and grow with content.
+    // Start compact (~1–2 lines) and grow with content.
     // Include `isVisible` so reopening the sidebar recalculates height even if `input` hasn't changed.
-    const minHeight = 72;
-    const maxHeight = 240;
+    const minHeight = 44;
+    const maxHeight = 200;
 
     el.style.height = "auto";
     const nextHeight = Math.min(Math.max(el.scrollHeight, minHeight), maxHeight);
@@ -1376,7 +1376,7 @@ function ItineraryAssistantChat(props: {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             placeholder="Describe the changes you want…"
-            className="min-h-[72px] resize-none rounded-2xl"
+            className="min-h-[44px] resize-none rounded-2xl"
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey) {
                 e.preventDefault();

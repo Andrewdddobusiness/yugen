@@ -111,7 +111,165 @@ const pruneRedundantDestinationOperations = (args: {
   return { operations: kept, removed };
 };
 
-const addDaysIso = (value: string, days: number) => {
+const monthNameToNumber = (value: string): number | null => {
+  const key = value.trim().toLowerCase();
+  if (!key) return null;
+  const monthMap: Record<string, number> = {
+    jan: 1,
+    january: 1,
+    feb: 2,
+    february: 2,
+    mar: 3,
+    march: 3,
+    apr: 4,
+    april: 4,
+    may: 5,
+    jun: 6,
+    june: 6,
+    jul: 7,
+    july: 7,
+    aug: 8,
+    august: 8,
+    sep: 9,
+    sept: 9,
+    september: 9,
+    oct: 10,
+    october: 10,
+    nov: 11,
+    november: 11,
+    dec: 12,
+    december: 12,
+  };
+
+  return monthMap[key] ?? null;
+};
+
+const toIsoDate = (year: number, month: number, day: number): string | null => {
+  if (!Number.isFinite(year) || !Number.isFinite(month) || !Number.isFinite(day)) return null;
+  const date = new Date(Date.UTC(year, month - 1, day));
+  if (Number.isNaN(date.getTime())) return null;
+  const y = date.getUTCFullYear();
+  const m = String(date.getUTCMonth() + 1).padStart(2, "0");
+  const d = String(date.getUTCDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+};
+
+type ParsedTripSegment = {
+  city: string;
+  country: string;
+  from: string;
+  to: string;
+};
+
+const parseTripSegmentsFromMessage = (text: string): { segments: ParsedTripSegment[]; adjusted: boolean } => {
+  // Matches phrases like:
+  // - "Rome, Italy from March 18 to March 22, 2026"
+  // - "Florence, Italy from Mar 22 to Mar 25"
+  const pattern =
+    /([A-Za-z][^,\n]+?),\s*([A-Za-z][^\n]+?)\s+from\s+([A-Za-z]+)\s+(\d{1,2})(?:st|nd|rd|th)?\s+to\s+([A-Za-z]+)\s+(\d{1,2})(?:st|nd|rd|th)?(?:,?\s*(\d{4}))?/gi;
+
+  const segments: ParsedTripSegment[] = [];
+  let lastYear: number | null = null;
+
+  for (const match of text.matchAll(pattern)) {
+    const cityRaw = String(match[1] ?? "").trim();
+    const countryRaw = String(match[2] ?? "").trim().replace(/[.?!]+$/, "");
+    const fromMonthName = String(match[3] ?? "");
+    const fromDay = Number(match[4]);
+    const toMonthName = String(match[5] ?? "");
+    const toDay = Number(match[6]);
+    const year: number = match[7] ? Number(match[7]) : (lastYear ?? new Date().getUTCFullYear());
+
+    const fromMonth = monthNameToNumber(fromMonthName);
+    const toMonth = monthNameToNumber(toMonthName);
+    if (!fromMonth || !toMonth) continue;
+    if (!cityRaw || !countryRaw) continue;
+
+    if (match[7]) lastYear = year;
+
+    const from = toIsoDate(year, fromMonth, fromDay);
+    const to = toIsoDate(year, toMonth, toDay);
+    if (!from || !to) continue;
+    if (!isIsoDate(from) || !isIsoDate(to)) continue;
+    if (to < from) continue;
+
+    segments.push({ city: cityRaw, country: countryRaw, from, to });
+  }
+
+  if (segments.length < 2) return { segments, adjusted: false };
+
+  // Ensure day-level ranges do not overlap. If a segment's end date overlaps the next segment's start date,
+  // adjust the end date to the day before the next segment starts.
+  let adjusted = false;
+  const normalized: ParsedTripSegment[] = segments.map((s) => ({ ...s }));
+  for (let i = 0; i < normalized.length - 1; i += 1) {
+    const current = normalized[i]!;
+    const next = normalized[i + 1]!;
+    if (current.to >= next.from) {
+      try {
+        const nextMinusOne = addDaysIso(next.from, -1);
+        if (nextMinusOne < current.from) continue;
+        current.to = nextMinusOne;
+        adjusted = true;
+      } catch {
+        // ignore
+      }
+    }
+  }
+
+  return { segments: normalized, adjusted };
+};
+
+const buildDestinationOpsFromTripSegments = (args: {
+  segments: ParsedTripSegment[];
+  itineraryDestinations: any[];
+}): Operation[] => {
+  const destinationByCityCountry = new Map<string, any>();
+  for (const row of args.itineraryDestinations) {
+    const city = normalizeDestinationText((row as any)?.city);
+    const country = normalizeDestinationText((row as any)?.country);
+    const id = String((row as any)?.itinerary_destination_id ?? "");
+    if (!city || !country || !id) continue;
+    const key = `${city}|${country}`;
+    if (!destinationByCityCountry.has(key)) destinationByCityCountry.set(key, row);
+  }
+
+  const operations: Operation[] = [];
+  for (const segment of args.segments) {
+    const cityNorm = normalizeDestinationText(segment.city);
+    const countryNorm = normalizeDestinationText(segment.country);
+    if (!cityNorm || !countryNorm) continue;
+
+    const existing = destinationByCityCountry.get(`${cityNorm}|${countryNorm}`);
+    if (existing) {
+      const existingFrom = String((existing as any)?.from_date ?? "");
+      const existingTo = String((existing as any)?.to_date ?? "");
+      if (existingFrom === segment.from && existingTo === segment.to) continue;
+
+      const destinationId = String((existing as any)?.itinerary_destination_id ?? "");
+      if (!destinationId) continue;
+      operations.push({
+        op: "update_destination_dates",
+        itineraryDestinationId: destinationId,
+        fromDate: segment.from,
+        toDate: segment.to,
+      } as any);
+      continue;
+    }
+
+    operations.push({
+      op: "add_destination",
+      city: segment.city,
+      country: segment.country,
+      fromDate: segment.from,
+      toDate: segment.to,
+    } as any);
+  }
+
+  return operations;
+};
+
+function addDaysIso(value: string, days: number) {
   const base = new Date(`${value}T00:00:00Z`);
   if (Number.isNaN(base.getTime())) throw new Error(`Invalid date: ${value}`);
   base.setUTCDate(base.getUTCDate() + days);
@@ -119,14 +277,14 @@ const addDaysIso = (value: string, days: number) => {
   const month = String(base.getUTCMonth() + 1).padStart(2, "0");
   const date = String(base.getUTCDate()).padStart(2, "0");
   return `${year}-${month}-${date}`;
-};
+}
 
-const diffDaysIso = (from: string, to: string) => {
+function diffDaysIso(from: string, to: string) {
   const a = new Date(`${from}T00:00:00Z`).getTime();
   const b = new Date(`${to}T00:00:00Z`).getTime();
   if (Number.isNaN(a) || Number.isNaN(b)) throw new Error(`Invalid date comparison: ${from} vs ${to}`);
   return Math.round((b - a) / (24 * 60 * 60 * 1000));
-};
+}
 
 const jsonError = (status: number, code: string, message: string, details?: unknown, headers?: HeadersInit) => {
   return NextResponse.json(
@@ -1235,6 +1393,114 @@ export async function POST(request: NextRequest) {
         itineraryDestinations,
         destinationById,
       });
+
+      // Deterministic route parsing: if the user provides a multi-destination itinerary with explicit dates,
+      // generate destination draft ops directly (avoids LLM hallucinating "already exists", and avoids overlap failures).
+      const parsedTrip = parseTripSegmentsFromMessage(userText);
+      const segmentOpsRaw =
+        parsedTrip.segments.length >= 2
+          ? buildDestinationOpsFromTripSegments({ segments: parsedTrip.segments, itineraryDestinations })
+          : [];
+      const prunedSegmentOps = pruneRedundantDestinationOperations({
+        operations: segmentOpsRaw,
+        itineraryDestinations,
+        destinationById,
+      }).operations;
+
+      if (prunedSegmentOps.length > 0) {
+        const draftToReturn = [...prunedDraft.operations, ...prunedSegmentOps].slice(0, MAX_OPERATIONS);
+        const previewLines = buildPreviewLines(draftToReturn, activityById, destinationById);
+
+        const assistantParts = [
+          "I can update your itinerary destinations based on the travel dates you provided.",
+          parsedTrip.adjusted
+            ? "Note: To avoid overlapping days between destinations, I adjusted any end dates that overlapped the next destination's start date."
+            : null,
+        ].filter(Boolean) as string[];
+
+        const payload: PlanResponsePayload = {
+          assistantMessage: assistantParts.join("\n\n"),
+          operations: draftToReturn,
+          previewLines,
+          requiresConfirmation: true,
+        };
+
+        try {
+          await updateAiItineraryThreadDraftAndSources({
+            supabase,
+            threadId,
+            draft: draftToReturn,
+            draftSources: null,
+          });
+          threadDraft = draftToReturn;
+          threadDraftSources = null;
+        } catch (error) {
+          console.warn("Failed to persist AI chat draft:", error);
+        }
+
+        try {
+          await insertAiItineraryMessage({
+            supabase,
+            threadId,
+            role: "assistant",
+            content: payload.assistantMessage,
+            metadata: {
+              mode: "plan",
+              requiresConfirmation: payload.requiresConfirmation,
+              previewLines: payload.previewLines,
+              operationCount: payload.operations.length,
+            },
+            embedding: null,
+            embeddingModel,
+          });
+        } catch (error) {
+          console.error("Failed to persist assistant chat message:", error);
+        }
+
+        try {
+          const summarySource = [
+            ...chatHistory,
+            { role: "user" as const, content: userText },
+            { role: "assistant" as const, content: payload.assistantMessage },
+          ];
+          const summaryResult = await summarizeItineraryChat({
+            previousSummary: threadSummary,
+            messages: summarySource.slice(-20),
+          });
+          await recordAiUsage({ userId: auth.user.id, feature: "itinerary_assistant", usage: summaryResult.usage });
+
+          threadSummary = summaryResult.summary;
+          await updateAiItineraryThreadSummary({ supabase, threadId, summary: summaryResult.summary });
+        } catch (error) {
+          console.warn("Failed to update AI chat summary:", error);
+        }
+
+        if (contextStep?.ai_itinerary_run_step_id) {
+          await finishAiItineraryRunStep({
+            supabase,
+            stepId: contextStep.ai_itinerary_run_step_id,
+            status: "succeeded",
+            output: {
+              recentCount: recentWithoutCurrent.length,
+              retrievedCount: matchedWithoutCurrent.length,
+              summaryPresent: !!threadSummary,
+            },
+          });
+        }
+        if (planStepId) {
+          await finishAiItineraryRunStep({
+            supabase,
+            stepId: planStepId,
+            status: "succeeded",
+            output: { resolvedCount: payload.operations.length, requiresConfirmation: payload.requiresConfirmation },
+          });
+        }
+        if (runId) {
+          await finishAiItineraryRun({ supabase, runId, status: "succeeded" });
+        }
+
+        return respond(NextResponse.json({ ok: true, mode: "plan", ...payload }));
+      }
 
       const planResult = await planItineraryEdits({
         message: userText,
