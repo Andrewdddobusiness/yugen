@@ -42,6 +42,11 @@ import {
 import { summarizeItineraryChat } from "@/lib/ai/itinerary/summarizer";
 import { recordApiRequestMetric } from "@/lib/telemetry/server";
 
+export const runtime = "nodejs";
+// Vercel: allow longer AI requests before timing out (plan-dependent).
+export const maxDuration = 60;
+export const dynamic = "force-dynamic";
+
 const MAX_OPERATIONS = 25;
 const CONFIRMATION_BATCH_THRESHOLD = 10;
 const SHOULD_LOG_AI_ITINERARY = process.env.AI_ITINERARY_LOG === "1";

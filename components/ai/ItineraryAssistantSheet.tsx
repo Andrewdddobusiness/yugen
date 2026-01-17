@@ -10,12 +10,18 @@ import { useItineraryActivityStore } from "@/store/itineraryActivityStore";
 import { useQueryClient } from "@tanstack/react-query";
 import type { Operation } from "@/lib/ai/itinerary/schema";
 
+const USER_SAFE_RETRY_MESSAGE = "Something went wrong. Please try again in a moment.";
+
 const readJsonResponse = async <T,>(res: Response): Promise<T> => {
   const bodyText = await res.text();
   const trimmed = bodyText.trim();
 
   if (!trimmed) {
-    throw new Error(`Unexpected empty response (HTTP ${res.status}). Please try again.`);
+    console.error("[itinerary-assistant] Empty response:", {
+      status: res.status,
+      statusText: res.statusText,
+    });
+    throw new Error(USER_SAFE_RETRY_MESSAGE);
   }
 
   try {
@@ -23,9 +29,6 @@ const readJsonResponse = async <T,>(res: Response): Promise<T> => {
   } catch (error) {
     const looksLikeHtml = /^<!doctype html/i.test(trimmed) || /^<html/i.test(trimmed);
     const preview = looksLikeHtml ? null : trimmed.replace(/\s+/g, " ").slice(0, 180);
-    const message = preview
-      ? `Unexpected server response (HTTP ${res.status}): ${preview}`
-      : `Unexpected server response (HTTP ${res.status}). Please try again.`;
 
     console.error("[itinerary-assistant] Non-JSON response:", {
       status: res.status,
@@ -34,8 +37,20 @@ const readJsonResponse = async <T,>(res: Response): Promise<T> => {
       error,
     });
 
-    throw new Error(message);
+    throw new Error(USER_SAFE_RETRY_MESSAGE);
   }
+};
+
+const toUserFacingError = (error: unknown, fallback = USER_SAFE_RETRY_MESSAGE) => {
+  const message = error instanceof Error ? error.message : "";
+  const isLikelyTimeoutOrServerFailure =
+    /\b(5\d{2}|504|502|503)\b/.test(message) ||
+    /FUNCTION_INVOCATION_TIMEOUT/i.test(message) ||
+    /Unexpected server response/i.test(message);
+
+  if (isLikelyTimeoutOrServerFailure) return fallback;
+  if (message.trim()) return message;
+  return fallback;
 };
 
 type PlanResponse = {
@@ -447,14 +462,16 @@ function ItineraryAssistantChat(props: {
     const el = textareaRef.current;
     if (!el) return;
 
-    const minHeight = 44;
+    // Start smaller (comfortable ~2–3 lines) and grow with content.
+    // Include `isVisible` so reopening the sidebar recalculates height even if `input` hasn't changed.
+    const minHeight = 72;
     const maxHeight = 240;
 
     el.style.height = "auto";
     const nextHeight = Math.min(Math.max(el.scrollHeight, minHeight), maxHeight);
     el.style.height = `${nextHeight}px`;
     el.style.overflowY = el.scrollHeight > maxHeight ? "auto" : "hidden";
-  }, [input]);
+  }, [input, isVisible]);
 
   useEffect(() => {
     if (!isVisible) return;
@@ -597,7 +614,7 @@ function ItineraryAssistantChat(props: {
       setActiveThreadKey(data.thread.thread_key);
       setShowThreads(false);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to create a new chat.");
+      setError(toUserFacingError(e, "Failed to create a new chat. Please try again."));
     } finally {
       setThreadsLoading(false);
     }
@@ -639,7 +656,7 @@ function ItineraryAssistantChat(props: {
       }
       setDraftSources(null);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to plan changes.");
+      setError(toUserFacingError(e, "Failed to plan changes. Please try again."));
     } finally {
       setPlanning(false);
     }
@@ -686,7 +703,7 @@ function ItineraryAssistantChat(props: {
         setDraftPlan(null);
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to import from link.");
+      setError(toUserFacingError(e, "Failed to import. Please try again."));
     } finally {
       setImporting(false);
     }
@@ -759,7 +776,7 @@ function ItineraryAssistantChat(props: {
         setDraftSources(null);
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to apply changes.");
+      setError(toUserFacingError(e, "Failed to apply changes. Please try again."));
     } finally {
       setApplying(false);
     }
@@ -779,7 +796,7 @@ function ItineraryAssistantChat(props: {
       setDraftPlan(null);
       setDraftSources(null);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to dismiss draft changes.");
+      setError(toUserFacingError(e, "Failed to dismiss draft changes. Please try again."));
     } finally {
       setDismissing(false);
     }
@@ -1312,7 +1329,7 @@ function ItineraryAssistantChat(props: {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             placeholder="Describe the changes you want…"
-            className="min-h-[44px] resize-none rounded-2xl"
+            className="min-h-[72px] resize-none rounded-2xl"
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey) {
                 e.preventDefault();

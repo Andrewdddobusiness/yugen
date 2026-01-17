@@ -7,6 +7,10 @@ import { rateLimit, rateLimitHeaders } from "@/lib/security/rateLimit";
 import { getClientIp, isSameOrigin } from "@/lib/security/requestGuards";
 import { recordApiRequestMetric } from "@/lib/telemetry/server";
 
+export const runtime = "nodejs";
+export const maxDuration = 30;
+export const dynamic = "force-dynamic";
+
 const jsonError = (status: number, code: string, message: string, details?: unknown, headers?: HeadersInit) => {
   return NextResponse.json(
     {

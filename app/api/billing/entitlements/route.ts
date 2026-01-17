@@ -4,6 +4,10 @@ import { getAiAssistantAccessMode, isDevBillingBypassEnabled } from "@/lib/featu
 import { isSameOrigin } from "@/lib/security/requestGuards";
 import { recordApiRequestMetric } from "@/lib/telemetry/server";
 
+export const runtime = "nodejs";
+export const maxDuration = 15;
+export const dynamic = "force-dynamic";
+
 const parseDateish = (value: unknown) => {
   const str = String(value ?? "");
   const candidates: string[] = [str];
@@ -98,4 +102,3 @@ export async function GET(request: NextRequest) {
     });
   }
 }
-

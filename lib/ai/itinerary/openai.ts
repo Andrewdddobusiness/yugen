@@ -74,6 +74,31 @@ export class OpenAIError extends Error {
   }
 }
 
+const OPENAI_CHAT_TIMEOUT_MS = (() => {
+  const raw = Number(process.env.OPENAI_CHAT_TIMEOUT_MS ?? process.env.OPENAI_TIMEOUT_MS ?? 20000);
+  return Number.isFinite(raw) && raw > 0 ? raw : 20000;
+})();
+
+const OPENAI_EMBED_TIMEOUT_MS = (() => {
+  const raw = Number(process.env.OPENAI_EMBED_TIMEOUT_MS ?? process.env.OPENAI_TIMEOUT_MS ?? 10000);
+  return Number.isFinite(raw) && raw > 0 ? raw : 10000;
+})();
+
+const fetchWithTimeout = async (url: string, init: RequestInit, timeoutMs: number) => {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...init, signal: controller.signal });
+  } catch (error) {
+    if ((error as any)?.name === "AbortError") {
+      throw new OpenAIError("OpenAI request timed out. Please try again.", 504);
+    }
+    throw error;
+  } finally {
+    clearTimeout(timer);
+  }
+};
+
 export async function openaiChatJSON<TSchema extends z.ZodTypeAny>(args: {
   system: string;
   user: string;
@@ -93,7 +118,9 @@ export async function openaiChatJSON<TSchema extends z.ZodTypeAny>(args: {
   const baseUrl = process.env.OPENAI_BASE_URL ?? "https://api.openai.com/v1";
 
   const attempt = async (promptUser: string) => {
-    const response = await fetch(`${baseUrl}/chat/completions`, {
+    const response = await fetchWithTimeout(
+      `${baseUrl}/chat/completions`,
+      {
       method: "POST",
       headers: {
         Authorization: `Bearer ${apiKey}`,
@@ -109,7 +136,9 @@ export async function openaiChatJSON<TSchema extends z.ZodTypeAny>(args: {
           { role: "user", content: promptUser },
         ],
       }),
-    });
+      },
+      OPENAI_CHAT_TIMEOUT_MS
+    );
 
     const data = (await response.json().catch(() => ({}))) as OpenAIChatCompletionResponse;
 
@@ -192,7 +221,9 @@ export async function openaiEmbed(args: { input: string; model?: string }) {
     throw new OpenAIError("Embedding input was empty", 400);
   }
 
-  const response = await fetch(`${baseUrl}/embeddings`, {
+  const response = await fetchWithTimeout(
+    `${baseUrl}/embeddings`,
+    {
     method: "POST",
     headers: {
       Authorization: `Bearer ${apiKey}`,
@@ -202,7 +233,9 @@ export async function openaiEmbed(args: { input: string; model?: string }) {
       model,
       input,
     }),
-  });
+    },
+    OPENAI_EMBED_TIMEOUT_MS
+  );
 
   const data = (await response.json().catch(() => ({}))) as OpenAIEmbeddingResponse;
 
