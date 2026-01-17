@@ -53,6 +53,13 @@ const toUserFacingError = (error: unknown, fallback = USER_SAFE_RETRY_MESSAGE) =
   return fallback;
 };
 
+const isAbortError = (error: unknown) => {
+  if (!error) return false;
+  if (typeof error === "object" && "name" in error && (error as any).name === "AbortError") return true;
+  if (typeof DOMException !== "undefined" && error instanceof DOMException && error.name === "AbortError") return true;
+  return false;
+};
+
 type PlanResponse = {
   ok: true;
   mode: "plan";
@@ -416,6 +423,7 @@ function ItineraryAssistantChat(props: {
 
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const inFlightRequestRef = useRef<AbortController | null>(null);
   const historyKey = useMemo(
     () => `${itineraryId}:${destinationId}:${threadKey}`,
     [destinationId, itineraryId, threadKey]
@@ -443,6 +451,26 @@ function ItineraryAssistantChat(props: {
     if (showThreads) return false;
     return input.trim().length > 0;
   }, [applying, dismissing, importing, input, planning, showThreads]);
+
+  const abortInFlightRequest = useCallback(() => {
+    const controller = inFlightRequestRef.current;
+    if (!controller) return;
+    inFlightRequestRef.current = null;
+
+    setPlanning(false);
+    setImporting(false);
+
+    try {
+      controller.abort();
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  useEffect(() => {
+    if (isVisible) return;
+    abortInFlightRequest();
+  }, [abortInFlightRequest, isVisible]);
 
   useEffect(() => {
     setMessages([]);
@@ -625,6 +653,10 @@ function ItineraryAssistantChat(props: {
   };
 
   const requestPlan = async (text: string) => {
+    abortInFlightRequest();
+    const controller = new AbortController();
+    inFlightRequestRef.current = controller;
+
     setPlanning(true);
     setError(null);
 
@@ -632,6 +664,7 @@ function ItineraryAssistantChat(props: {
       const res = await fetch("/api/ai/itinerary", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        signal: controller.signal,
         body: JSON.stringify({
           mode: "plan",
           itineraryId,
@@ -656,13 +689,21 @@ function ItineraryAssistantChat(props: {
       }
       setDraftSources(null);
     } catch (e) {
+      if (isAbortError(e)) return;
       setError(toUserFacingError(e, "Failed to plan changes. Please try again."));
     } finally {
-      setPlanning(false);
+      if (inFlightRequestRef.current === controller) {
+        inFlightRequestRef.current = null;
+        setPlanning(false);
+      }
     }
   };
 
   const requestImport = async (text: string) => {
+    abortInFlightRequest();
+    const controller = new AbortController();
+    inFlightRequestRef.current = controller;
+
     setImporting(true);
     setError(null);
 
@@ -670,6 +711,7 @@ function ItineraryAssistantChat(props: {
       const res = await fetch("/api/ai/itinerary", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        signal: controller.signal,
         body: JSON.stringify({
           mode: "import",
           itineraryId,
@@ -703,9 +745,13 @@ function ItineraryAssistantChat(props: {
         setDraftPlan(null);
       }
     } catch (e) {
+      if (isAbortError(e)) return;
       setError(toUserFacingError(e, "Failed to import. Please try again."));
     } finally {
-      setImporting(false);
+      if (inFlightRequestRef.current === controller) {
+        inFlightRequestRef.current = null;
+        setImporting(false);
+      }
     }
   };
 
@@ -764,12 +810,13 @@ function ItineraryAssistantChat(props: {
         setItineraryActivities(refreshedActivities);
       }
 
+      // Force-refresh related UI immediately (destinations sidebar + calendar city chips + builder bootstrap).
+      // Some of these queries use long `staleTime` and won't visually update without an explicit refetch.
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["builderBootstrap", itineraryId, destinationId] }),
-        // Destination edits should immediately refresh the left sidebar + calendar city chips.
-        queryClient.invalidateQueries({ queryKey: ["itineraryDestinationsSummary", itineraryId] }),
-        // If the current destination range changed, refresh its cached details too.
-        queryClient.invalidateQueries({ queryKey: ["itineraryDestination", itineraryId, destinationId] }),
+        queryClient.refetchQueries({ queryKey: ["builderBootstrap", itineraryId, destinationId], type: "active" }),
+        queryClient.refetchQueries({ queryKey: ["itineraryDestinationsSummary", itineraryId], type: "active" }),
+        queryClient.refetchQueries({ queryKey: ["itineraryDestination", itineraryId, destinationId], type: "active" }),
+        queryClient.refetchQueries({ queryKey: ["itineraryDestinationDateRange", itineraryId, destinationId], type: "active" }),
       ]);
       if (failures.length === 0) {
         setDraftPlan(null);
@@ -1338,16 +1385,30 @@ function ItineraryAssistantChat(props: {
             }}
             disabled={showThreads}
           />
-          <Button
-            type="button"
-            size="icon"
-            className="h-11 w-11 rounded-2xl"
-            onClick={handleSubmit}
-            disabled={!canSubmit || showThreads}
-            title="Send"
-          >
-            {planning || importing ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5" />}
-          </Button>
+          {planning || importing ? (
+            <Button
+              type="button"
+              size="icon"
+              variant="outline"
+              className="h-11 w-11 rounded-2xl"
+              onClick={abortInFlightRequest}
+              disabled={showThreads}
+              title="Stop"
+            >
+              <X className="h-5 w-5" />
+            </Button>
+          ) : (
+            <Button
+              type="button"
+              size="icon"
+              className="h-11 w-11 rounded-2xl"
+              onClick={handleSubmit}
+              disabled={!canSubmit || showThreads}
+              title="Send"
+            >
+              <Send className="h-5 w-5" />
+            </Button>
+          )}
         </div>
 
         <div className="mt-2 text-[11px] text-ink-500">

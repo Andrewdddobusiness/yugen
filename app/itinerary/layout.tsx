@@ -492,13 +492,13 @@ export default function Layout({ children }: { children: ReactNode }) {
           <div className="min-w-0 flex-1 w-full">{children}</div>
         </div>
         {collaborationOpen ? <ItineraryCollaborationPanel itineraryId={itineraryIdValue} /> : null}
-        {isAiEnabledFlag ? (
-          <aside
-            className={`hidden md:block sticky top-0 h-screen shrink-0 border-l border-stroke-200 bg-bg-0 overflow-hidden transition-[width] duration-200 ease-out ${
-              assistantOpen ? "w-[var(--sidebar-width)]" : "w-0"
-            }`}
-            aria-hidden={!assistantOpen}
-          >
+	        {isAiEnabledFlag ? (
+	          <aside
+	            className={`hidden md:block sticky top-0 z-[60] h-screen shrink-0 border-l border-stroke-200 bg-bg-0 overflow-hidden transition-[width] duration-200 ease-out ${
+	              assistantOpen ? "w-[var(--sidebar-width)]" : "w-0"
+	            }`}
+	            aria-hidden={!assistantOpen}
+	          >
             <div className={`h-full min-h-0 flex flex-col ${!assistantOpen ? "opacity-0 pointer-events-none" : ""}`}>
               <ItineraryAssistantSidebar
                 itineraryId={itineraryIdValue}
