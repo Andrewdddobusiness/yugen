@@ -243,6 +243,7 @@ export async function signInWithGoogle(next?: string) {
     provider: "google",
     options: {
       redirectTo: `${appUrl}/auth/callback?next=${encodeURIComponent(safeNext)}`,
+      queryParams: { prompt: "select_account" },
     },
   });
 
