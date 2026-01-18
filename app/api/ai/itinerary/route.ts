@@ -55,6 +55,159 @@ const stripEmDashes = (value: string) => value.replace(/[—–]/g, "-");
 
 const normalizeDestinationText = (value: unknown) => String(value ?? "").trim().toLowerCase();
 
+const stripWrappingDelimiters = (value: string) =>
+  value
+    .trim()
+    .replace(/^[\s>*•\-–—;:,]+/g, "")
+    .replace(/[\s.?!;:,]+$/g, "")
+    .trim();
+
+const isLikelyNarrativePlace = (value: string) =>
+  /\b(i|we|will|would|be|travel|go|head|arrive|stay|visit|continue|return|next|then|finally|after)\b/i.test(value);
+
+const stripLeadingPlacePhrases = (value: string) => {
+  let out = stripWrappingDelimiters(value);
+  if (!out) return out;
+
+  const patterns: RegExp[] = [
+    /^(?:and|then|next|finally|after(?:ward)?|later|onward)\b[\s,–—\-:]*/i,
+    /^(?:i|we)\s+(?:will|would|am|are|'ll)\s+(?:be\s+)?(?:in|at|around)\s+/i,
+    /^(?:i|we)\s+(?:will|would|am|are|'ll)\s+(?:travel|go|head|drive|fly|take|continue|return)\s+(?:to|into)\s+/i,
+    /^(?:travel(?:ing)?|going|go|head(?:ing)?|drive(?:ing)?|fly(?:ing)?|arrive(?:ing)?|visit(?:ing)?|stay(?:ing)?|continue(?:ing)?|return(?:ing)?)\s+(?:to|in|at)\s+/i,
+    /^(?:in|to|at)\s+/i,
+  ];
+
+  for (let i = 0; i < 6; i += 1) {
+    const before = out;
+    for (const pattern of patterns) {
+      const next = out.replace(pattern, "");
+      if (next !== out) {
+        out = stripWrappingDelimiters(next);
+        break;
+      }
+    }
+    if (out === before) break;
+  }
+
+  return stripWrappingDelimiters(out);
+};
+
+const extractCityCountryFromPhrase = (phrase: string): { city: string; country: string } | null => {
+  const cleaned = stripWrappingDelimiters(stripEmDashes(phrase).replace(/\s+/g, " "));
+  if (!cleaned) return null;
+
+  const lastComma = cleaned.lastIndexOf(",");
+  if (lastComma === -1) return null;
+
+  let cityPart = cleaned.slice(0, lastComma).trim();
+  let countryPart = cleaned.slice(lastComma + 1).trim();
+
+  countryPart = stripLeadingPlacePhrases(countryPart).replace(/^the\s+/i, "");
+  countryPart = stripWrappingDelimiters(countryPart);
+
+  if (isLikelyNarrativePlace(cityPart) && cityPart.includes(",")) {
+    const lastSegment = cityPart.split(",").pop()?.trim();
+    if (lastSegment) cityPart = lastSegment;
+  }
+
+  cityPart = stripLeadingPlacePhrases(cityPart);
+  cityPart = stripWrappingDelimiters(cityPart);
+
+  if (!cityPart || !countryPart) return null;
+  if (!/[A-Za-z]/.test(cityPart) || !/[A-Za-z]/.test(countryPart)) return null;
+  if (cityPart.length > 80 || countryPart.length > 80) return null;
+
+  return { city: cityPart, country: countryPart };
+};
+
+const sanitizeDestinationOperation = (operation: Operation): Operation => {
+  if (operation.op !== "add_destination" && operation.op !== "insert_destination_after") return operation;
+
+  const cityRaw = String((operation as any).city ?? "");
+  const countryRaw = String((operation as any).country ?? "");
+
+  const looksLikeDateClause = (value: string) =>
+    /\b(from|to)\b/i.test(value) || /\d{1,2}/.test(value) || monthNameToNumber(value) != null;
+
+  const cityTrimmed = stripWrappingDelimiters(cityRaw);
+  const countryTrimmed = stripWrappingDelimiters(countryRaw);
+
+  let city = stripLeadingPlacePhrases(cityTrimmed);
+  let country = stripLeadingPlacePhrases(countryTrimmed);
+
+  if (city.includes(",") && looksLikeDateClause(country)) {
+    const extracted = extractCityCountryFromPhrase(city);
+    if (extracted) {
+      city = extracted.city;
+      country = extracted.country;
+    }
+  }
+
+  if (!city) city = cityTrimmed;
+  if (!country) country = countryTrimmed;
+
+  if (operation.op === "add_destination") {
+    return {
+      ...operation,
+      city,
+      country,
+    };
+  }
+
+  return {
+    ...operation,
+    city,
+    country,
+  };
+};
+
+const coerceOverlappingAddDestinationOps = (args: { operations: Operation[]; itineraryDestinations: any[] }) => {
+  const touchedDestinationIds = new Set<string>();
+  for (const operation of args.operations) {
+    if (operation.op === "update_destination_dates" || operation.op === "remove_destination") {
+      touchedDestinationIds.add(String((operation as any).itineraryDestinationId ?? ""));
+    }
+  }
+
+  return args.operations.map((operation) => {
+    if (operation.op !== "add_destination") return operation;
+
+    const city = normalizeDestinationText(operation.city);
+    const country = normalizeDestinationText(operation.country);
+    if (!city || !country) return operation;
+    if (!isIsoDate(operation.fromDate) || !isIsoDate(operation.toDate)) return operation;
+
+    const matches = args.itineraryDestinations.filter((row) => {
+      const rowCity = normalizeDestinationText((row as any)?.city);
+      const rowCountry = normalizeDestinationText((row as any)?.country);
+      if (!rowCity || !rowCountry) return false;
+      return rowCity === city && rowCountry === country;
+    });
+
+    if (matches.length !== 1) return operation;
+
+    const match = matches[0]!;
+    const destinationId = String((match as any)?.itinerary_destination_id ?? "");
+    if (!destinationId || touchedDestinationIds.has(destinationId)) return operation;
+
+    const existingFrom = String((match as any)?.from_date ?? "");
+    const existingTo = String((match as any)?.to_date ?? "");
+    if (!isIsoDate(existingFrom) || !isIsoDate(existingTo)) return operation;
+
+    const overlaps = !(operation.toDate < existingFrom || operation.fromDate > existingTo);
+    if (!overlaps) return operation;
+
+    touchedDestinationIds.add(destinationId);
+
+    return {
+      op: "update_destination_dates",
+      itineraryDestinationId: destinationId,
+      fromDate: operation.fromDate,
+      toDate: operation.toDate,
+    } as any;
+  });
+};
+
 const isRedundantAddDestination = (args: {
   operation: Operation & { op: "add_destination" };
   itineraryDestinations: any[];
@@ -166,26 +319,31 @@ const parseTripSegmentsFromMessage = (text: string): { segments: ParsedTripSegme
   // - "Rome, Italy from March 18 to March 22, 2026"
   // - "Florence, Italy from Mar 22 to Mar 25"
   const pattern =
-    /([A-Za-z][^,\n]+?),\s*([A-Za-z][^\n]+?)\s+from\s+([A-Za-z]+)\s+(\d{1,2})(?:st|nd|rd|th)?\s+to\s+([A-Za-z]+)\s+(\d{1,2})(?:st|nd|rd|th)?(?:,?\s*(\d{4}))?/gi;
+    /([^\n]+?)\s+from\s+([A-Za-z]+)\s+(\d{1,2})(?:st|nd|rd|th)?\s+to\s+([A-Za-z]+)\s+(\d{1,2})(?:st|nd|rd|th)?(?:,?\s*(\d{4}))?/gi;
 
   const segments: ParsedTripSegment[] = [];
   let lastYear: number | null = null;
 
   for (const match of text.matchAll(pattern)) {
-    const cityRaw = String(match[1] ?? "").trim();
-    const countryRaw = String(match[2] ?? "").trim().replace(/[.?!]+$/, "");
-    const fromMonthName = String(match[3] ?? "");
-    const fromDay = Number(match[4]);
-    const toMonthName = String(match[5] ?? "");
-    const toDay = Number(match[6]);
-    const year: number = match[7] ? Number(match[7]) : (lastYear ?? new Date().getUTCFullYear());
+    const locationPhrase = String(match[1] ?? "");
+    const extracted = extractCityCountryFromPhrase(locationPhrase);
+    if (!extracted) continue;
+
+    const cityRaw = extracted.city;
+    const countryRaw = extracted.country;
+
+    const fromMonthName = String(match[2] ?? "");
+    const fromDay = Number(match[3]);
+    const toMonthName = String(match[4] ?? "");
+    const toDay = Number(match[5]);
+    const year: number = match[6] ? Number(match[6]) : (lastYear ?? new Date().getUTCFullYear());
 
     const fromMonth = monthNameToNumber(fromMonthName);
     const toMonth = monthNameToNumber(toMonthName);
     if (!fromMonth || !toMonth) continue;
     if (!cityRaw || !countryRaw) continue;
 
-    if (match[7]) lastYear = year;
+    if (match[6]) lastYear = year;
 
     const from = toIsoDate(year, fromMonth, fromDay);
     const to = toIsoDate(year, toMonth, toDay);
@@ -1420,8 +1578,20 @@ export async function POST(request: NextRequest) {
       // Deterministic route parsing: if the user provides a multi-destination itinerary with explicit dates,
       // generate destination draft ops directly (avoids LLM hallucinating "already exists", and avoids overlap failures).
       const parsedTrip = parseTripSegmentsFromMessage(userText);
+      const hasDuplicateDestinationSegments = (() => {
+        const seen = new Set<string>();
+        for (const segment of parsedTrip.segments) {
+          const city = normalizeDestinationText(segment.city);
+          const country = normalizeDestinationText(segment.country);
+          if (!city || !country) continue;
+          const key = `${city}|${country}`;
+          if (seen.has(key)) return true;
+          seen.add(key);
+        }
+        return false;
+      })();
       const segmentOpsRaw =
-        parsedTrip.segments.length >= 2
+        parsedTrip.segments.length >= 2 && !hasDuplicateDestinationSegments
           ? buildDestinationOpsFromTripSegments({ segments: parsedTrip.segments, itineraryDestinations })
           : [];
       const prunedSegmentOps = pruneRedundantDestinationOperations({
@@ -1547,8 +1717,10 @@ export async function POST(request: NextRequest) {
       const clarifications: string[] = [];
 
       for (const operation of plan.operations) {
-        if (operation.op === "add_place") {
-          const resolved = await resolveAddPlaceOperation({ proposed: operation, destination });
+        const sanitizedOperation = sanitizeDestinationOperation(operation as any as Operation);
+
+        if (sanitizedOperation.op === "add_place") {
+          const resolved = await resolveAddPlaceOperation({ proposed: sanitizedOperation, destination });
           if (resolved.resolved) {
             resolvedOperations.push(resolved.resolved);
           } else if (resolved.clarification) {
@@ -1557,42 +1729,56 @@ export async function POST(request: NextRequest) {
           continue;
         }
 
-        if (operation.op === "insert_destination_after") {
-          const anchorId = String(operation.afterItineraryDestinationId ?? "");
+        if (sanitizedOperation.op === "add_destination") {
+          if (!sanitizedOperation.city.trim() || !sanitizedOperation.country.trim()) {
+            dropped += 1;
+            continue;
+          }
+        }
+
+        if (sanitizedOperation.op === "insert_destination_after") {
+          const anchorId = String(sanitizedOperation.afterItineraryDestinationId ?? "");
           if (!anchorId || !destinationById.has(anchorId)) {
             dropped += 1;
             clarifications.push(
-              `I couldn't find destination ${operation.afterItineraryDestinationId}, so I skipped inserting that destination.`
+              `I couldn't find destination ${sanitizedOperation.afterItineraryDestinationId}, so I skipped inserting that destination.`
             );
+            continue;
+          }
+          if (!sanitizedOperation.city.trim() || !sanitizedOperation.country.trim()) {
+            dropped += 1;
             continue;
           }
         }
 
-        if (operation.op === "update_destination_dates" || operation.op === "remove_destination") {
-          const targetId = String(operation.itineraryDestinationId ?? "");
+        if (sanitizedOperation.op === "update_destination_dates" || sanitizedOperation.op === "remove_destination") {
+          const targetId = String(sanitizedOperation.itineraryDestinationId ?? "");
           if (!targetId || !destinationById.has(targetId)) {
             dropped += 1;
             clarifications.push(
-              `I couldn't find destination ${operation.itineraryDestinationId}, so I skipped that destination change.`
+              `I couldn't find destination ${sanitizedOperation.itineraryDestinationId}, so I skipped that destination change.`
             );
             continue;
           }
         }
 
-        if (operation.op === "remove_destination" && String(operation.itineraryDestinationId) === String(destinationId)) {
+        if (
+          sanitizedOperation.op === "remove_destination" &&
+          String(sanitizedOperation.itineraryDestinationId) === String(destinationId)
+        ) {
           dropped += 1;
           clarifications.push("I can't remove the destination you're currently editing from within its builder.");
           continue;
         }
 
-        if (operation.op === "remove_activity" || operation.op === "update_activity") {
-          if (!activityById.has(operation.itineraryActivityId)) {
+        if (sanitizedOperation.op === "remove_activity" || sanitizedOperation.op === "update_activity") {
+          if (!activityById.has(sanitizedOperation.itineraryActivityId)) {
             dropped += 1;
             continue;
           }
         }
 
-        resolvedOperations.push(operation as any as Operation);
+        resolvedOperations.push(sanitizedOperation as any as Operation);
       }
 
       const prunedResolved = pruneRedundantDestinationOperations({
@@ -2304,12 +2490,14 @@ export async function POST(request: NextRequest) {
   }
 
   // apply
+  let operations = parsed.data.operations.map((operation) => sanitizeDestinationOperation(operation));
+  operations = coerceOverlappingAddDestinationOps({ operations, itineraryDestinations });
   const applyPruned = pruneRedundantDestinationOperations({
-    operations: parsed.data.operations,
+    operations,
     itineraryDestinations,
     destinationById,
   });
-  const operations = applyPruned.operations;
+  operations = applyPruned.operations;
   const importDraftSourcesParsed = LinkImportDraftSourcesSchema.safeParse(threadDraftSources);
   const importDraftSources = importDraftSourcesParsed.success ? importDraftSourcesParsed.data : null;
 

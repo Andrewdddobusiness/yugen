@@ -230,6 +230,7 @@ export async function planItineraryEdits(args: {
     '  7) {"op":"add_place","query"?: "<place name or google maps link>","placeId"?: "<google place id>","name"?: string,"date"?: "YYYY-MM-DD"|null,"startTime"?: "HH:MM"|null,"endTime"?: "HH:MM"|null,"notes"?: string|null}',
     "- For update_activity/remove_activity: itineraryActivityId MUST be one of the ids in the provided activities list.",
     "- For destination operations: use itineraryDestinationId values from the provided destinations list.",
+    '- For destination operations: "city" and "country" MUST be plain place names only (e.g., city="Rome", country="Italy"). Do NOT include sentences ("I will be in"), verbs, dates, or extra commentary in these fields.',
     "- Operations MUST be incremental changes from the current itinerary state. Do NOT include operations that merely restate existing destinations/activities unchanged.",
     "- Never emit add_destination for a destination block that already exists (same city, country, fromDate, toDate). Only use add_destination for truly new destination blocks.",
     "- Use 24-hour time (HH:MM) in operations.",
