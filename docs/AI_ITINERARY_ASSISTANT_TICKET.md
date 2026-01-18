@@ -200,3 +200,9 @@ Future: undo support
 - `actions/google/actions.ts` (Phase 2 search/add flows)
 - `store/itineraryActivityStore.ts` (client-side insert logic; candidate for server extraction)
 
+---
+
+## vNext: Itinerary Intelligence Roadmap
+For travel-time / opening-hours / preference-aware planning (and alternatives slots), see:
+- `yugen/yugen/docs/AI_ITINERARY_INTELLIGENCE_SPEC.md`
+- `yugen/yugen/docs/tasks/008_ai_itinerary_intelligence_epic.md`

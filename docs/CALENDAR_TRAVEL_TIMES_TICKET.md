@@ -122,3 +122,10 @@ Notes:
   - `components/view/calendar/CalendarControls.tsx`
   - `components/view/calendar/DayColumn.tsx`
   - `store/itineraryLayoutStore.ts`
+
+---
+
+## Related Roadmap
+Once calendar travel times exist, the AI assistant can use the same primitives for travel-time-aware scheduling:
+- `yugen/yugen/docs/AI_ITINERARY_INTELLIGENCE_SPEC.md`
+- `yugen/yugen/docs/tasks/009_ai_travel_time_aware_day_planning.md`
