@@ -67,6 +67,7 @@ type PlanResponse = {
   assistantMessage: string;
   operations: Operation[];
   previewLines: string[];
+  warnings?: string[];
   requiresConfirmation: boolean;
 };
 
@@ -94,6 +95,7 @@ type ImportResponse = {
   operations: Operation[];
   previewLines: string[];
   requiresConfirmation: boolean;
+  warnings?: string[];
   sources: ImportSource[];
   pendingClarificationsCount?: number;
 };
@@ -259,6 +261,12 @@ const getOperationEffectiveDateKey = (op: Operation, activityById: Map<string, a
     return op.date ?? "unscheduled";
   }
 
+  if (op.op === "add_alternatives") {
+    const before = activityById.get(op.targetItineraryActivityId);
+    const beforeDate = typeof before?.date === "string" ? before.date : null;
+    return beforeDate ?? "unscheduled";
+  }
+
   const before = activityById.get(op.itineraryActivityId);
   const beforeDate = typeof before?.date === "string" ? before.date : null;
 
@@ -277,6 +285,13 @@ const getOperationEffectiveStartMinutes = (op: Operation, activityById: Map<stri
 
   if (op.op === "add_place") {
     return parseTimeToMinutes(op.startTime) ?? parseTimeToMinutes(op.endTime);
+  }
+
+  if (op.op === "add_alternatives") {
+    const before = activityById.get(op.targetItineraryActivityId);
+    const beforeStart = typeof before?.start_time === "string" ? before.start_time : null;
+    const beforeEnd = typeof before?.end_time === "string" ? before.end_time : null;
+    return parseTimeToMinutes(beforeStart) ?? parseTimeToMinutes(beforeEnd);
   }
 
   const before = activityById.get(op.itineraryActivityId);
@@ -460,7 +475,11 @@ function ItineraryAssistantChat(props: {
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
-  const [draftPlan, setDraftPlan] = useState<{ operations: Operation[]; requiresConfirmation: boolean } | null>(null);
+  const [draftPlan, setDraftPlan] = useState<{
+    operations: Operation[];
+    requiresConfirmation: boolean;
+    warnings: string[];
+  } | null>(null);
   const [draftSources, setDraftSources] = useState<DraftSourcesPreview | null>(null);
   const [planning, setPlanning] = useState(false);
   const [importing, setImporting] = useState(false);
@@ -616,7 +635,7 @@ function ItineraryAssistantChat(props: {
           if (draftOps.length > 0) {
             const requiresConfirmation =
               draftOps.some((op) => op.op === "remove_activity") || draftOps.length > 10;
-            setDraftPlan({ operations: draftOps, requiresConfirmation });
+            setDraftPlan({ operations: draftOps, requiresConfirmation, warnings: [] });
           }
 
           const draftSourcesPayload = payload.draftSources;
@@ -819,7 +838,11 @@ function ItineraryAssistantChat(props: {
 
       pushMessage({ role: "assistant", content: data.assistantMessage });
       if (Array.isArray(data.operations) && data.operations.length > 0) {
-        setDraftPlan({ operations: data.operations, requiresConfirmation: data.requiresConfirmation });
+        setDraftPlan({
+          operations: data.operations,
+          requiresConfirmation: data.requiresConfirmation,
+          warnings: Array.isArray(data.warnings) ? data.warnings : [],
+        });
       } else {
         setDraftPlan(null);
       }
@@ -876,7 +899,11 @@ function ItineraryAssistantChat(props: {
       }
 
       if (Array.isArray(data.operations) && data.operations.length > 0) {
-        setDraftPlan({ operations: data.operations, requiresConfirmation: data.requiresConfirmation });
+        setDraftPlan({
+          operations: data.operations,
+          requiresConfirmation: data.requiresConfirmation,
+          warnings: Array.isArray(data.warnings) ? data.warnings : [],
+        });
       } else {
         setDraftPlan(null);
       }
@@ -934,6 +961,7 @@ function ItineraryAssistantChat(props: {
 	            const target = (() => {
 	              const op = entry.operation;
 	              if (op.op === "add_place") return op.name ?? op.query ?? op.placeId;
+                if (op.op === "add_alternatives") return op.targetItineraryActivityId;
 	              if (op.op === "update_activity" || op.op === "remove_activity") return op.itineraryActivityId;
 	              if (op.op === "add_destination") return `${op.city}, ${op.country}`;
 	              if (op.op === "insert_destination_after") return `${op.city}, ${op.country}`;
@@ -1131,6 +1159,19 @@ function ItineraryAssistantChat(props: {
 	          row: { number, kind: "add", title, timeLabel, details, operation: op },
 	        };
 	      }
+
+        if (op.op === "add_alternatives") {
+          const target = activityById.get(op.targetItineraryActivityId);
+          const title = String(target?.activity?.name ?? `Activity ${op.targetItineraryActivityId}`);
+          const alternatives = op.alternativeItineraryActivityIds
+            .map((id) => activityById.get(id)?.activity?.name ?? `Activity ${id}`)
+            .join(", ");
+          const details: ChangeRow["details"] = [{ label: "Alternatives", after: alternatives }];
+          return {
+            dateKey,
+            row: { number, kind: "add", title, timeLabel: null, details, operation: op },
+          };
+        }
 
       const before = activityById.get(op.itineraryActivityId);
       const name = String(before?.activity?.name ?? `Activity ${op.itineraryActivityId}`);
@@ -1406,6 +1447,24 @@ function ItineraryAssistantChat(props: {
               ) : null}
 	            </div>
 	
+              {draftPlan.warnings.length > 0 ? (
+                <div className="mt-3 rounded-xl border border-coral-500/20 bg-coral-500/10 p-3 text-xs text-coral-700">
+                  <div className="flex gap-2">
+                    <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+                    <div className="min-w-0">
+                      <div className="font-semibold text-coral-700">Warnings</div>
+                      <div className="mt-1 space-y-1">
+                        {draftPlan.warnings.map((warning, idx) => (
+                          <div key={`${warning}-${idx}`} className="whitespace-pre-wrap">
+                            {warning}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ) : null}
+
 	            <div className="mt-3 space-y-4">
 	              {draftGroups.map((group) => (
 	                <div key={group.dateKey} className="rounded-xl border border-stroke-200/70 bg-bg-50 p-3">

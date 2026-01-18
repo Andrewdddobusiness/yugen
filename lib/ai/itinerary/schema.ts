@@ -83,6 +83,12 @@ const RemoveDestinationOperationSchema = z.object({
   itineraryDestinationId: ItineraryDestinationIdSchema,
 });
 
+const AddAlternativesOperationSchema = z.object({
+  op: z.literal("add_alternatives"),
+  targetItineraryActivityId: ItineraryActivityIdSchema,
+  alternativeItineraryActivityIds: z.array(ItineraryActivityIdSchema).min(1).max(3),
+});
+
 const ProposedAddPlaceOperationSchema = z.object({
   op: z.literal("add_place"),
   // New additions can be specified with a query; existing draft additions can include a resolved placeId.
@@ -111,6 +117,7 @@ export const ProposedOperationSchema = z
     UpdateActivityOperationSchema,
     RemoveActivityOperationSchema,
     ProposedAddPlaceOperationSchema,
+    AddAlternativesOperationSchema,
     AddDestinationOperationSchema,
     UpdateDestinationDatesOperationSchema,
     InsertDestinationAfterOperationSchema,
@@ -167,6 +174,29 @@ export const ProposedOperationSchema = z
         });
       }
       validateTimePair(value, ctx);
+      return;
+    }
+
+    if (value.op === "add_alternatives") {
+      const target = String((value as any).targetItineraryActivityId ?? "");
+      const ids = Array.isArray((value as any).alternativeItineraryActivityIds)
+        ? (value as any).alternativeItineraryActivityIds.map((id: any) => String(id))
+        : [];
+      const unique = Array.from(new Set(ids.filter(Boolean)));
+      if (unique.length !== ids.length) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "alternativeItineraryActivityIds must be unique",
+          path: ["alternativeItineraryActivityIds"],
+        });
+      }
+      if (unique.includes(target)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "alternativeItineraryActivityIds must not include the target activity",
+          path: ["alternativeItineraryActivityIds"],
+        });
+      }
     }
   });
 
@@ -175,6 +205,7 @@ export const OperationSchema = z
     UpdateActivityOperationSchema,
     RemoveActivityOperationSchema,
     ResolvedAddPlaceOperationSchema,
+    AddAlternativesOperationSchema,
     AddDestinationOperationSchema,
     UpdateDestinationDatesOperationSchema,
     InsertDestinationAfterOperationSchema,
@@ -183,6 +214,27 @@ export const OperationSchema = z
   .superRefine((value, ctx) => {
     if (value.op !== "update_activity") {
       if (value.op === "add_place") validateTimePair(value, ctx);
+      if (value.op === "add_alternatives") {
+        const target = String((value as any).targetItineraryActivityId ?? "");
+        const ids = Array.isArray((value as any).alternativeItineraryActivityIds)
+          ? (value as any).alternativeItineraryActivityIds.map((id: any) => String(id))
+          : [];
+        const unique = Array.from(new Set(ids.filter(Boolean)));
+        if (unique.length !== ids.length) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: "alternativeItineraryActivityIds must be unique",
+            path: ["alternativeItineraryActivityIds"],
+          });
+        }
+        if (unique.includes(target)) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: "alternativeItineraryActivityIds must not include the target activity",
+            path: ["alternativeItineraryActivityIds"],
+          });
+        }
+      }
       if (value.op === "add_destination" && value.toDate < value.fromDate) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
@@ -281,6 +333,7 @@ export type PlanResponsePayload = {
   assistantMessage: string;
   operations: Operation[];
   previewLines: string[];
+  warnings?: string[];
   requiresConfirmation: boolean;
 };
 
@@ -301,6 +354,7 @@ export type ImportResponsePayload = {
   operations: Array<Extract<Operation, { op: "add_place" }>>;
   previewLines: string[];
   requiresConfirmation: boolean;
+  warnings?: string[];
   sources: ImportSourcePreview[];
   pendingClarificationsCount?: number;
 };

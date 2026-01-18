@@ -132,6 +132,11 @@ const formatDraftOperationLine = (operation: Operation, index: number) => {
     return `- #${number} add_place: ${nameOrQuery} | placeId: ${operation.placeId} | date: ${date} | time: ${time}${notes}`;
   }
 
+  if (operation.op === "add_alternatives") {
+    const alternatives = operation.alternativeItineraryActivityIds.join(", ");
+    return `- #${number} add_alternatives: target=${operation.targetItineraryActivityId} | alternatives=[${alternatives}]`;
+  }
+
   if (operation.op === "remove_activity") {
     return `- #${number} remove_activity: itineraryActivityId=${operation.itineraryActivityId}`;
   }
@@ -163,6 +168,7 @@ export async function planItineraryEdits(args: {
   retrievedHistory?: ChatMessage[];
   summary?: string | null;
   draftOperations?: Operation[];
+  preferencesPromptLines?: string[];
   maxTokens?: number;
   itinerary?: ItinerarySnapshot | null;
   destination: DestinationSnapshot | null;
@@ -228,7 +234,10 @@ export async function planItineraryEdits(args: {
     '  5) {"op":"update_activity","itineraryActivityId":"<id>","date"?: "YYYY-MM-DD"|null,"startTime"?: "HH:MM"|null,"endTime"?: "HH:MM"|null,"notes"?: string|null}',
     '  6) {"op":"remove_activity","itineraryActivityId":"<id>"}',
     '  7) {"op":"add_place","query"?: "<place name or google maps link>","placeId"?: "<google place id>","name"?: string,"date"?: "YYYY-MM-DD"|null,"startTime"?: "HH:MM"|null,"endTime"?: "HH:MM"|null,"notes"?: string|null}',
+    '  8) {"op":"add_alternatives","targetItineraryActivityId":"<id>","alternativeItineraryActivityIds":["<id>", "..."]}',
     "- For update_activity/remove_activity: itineraryActivityId MUST be one of the ids in the provided activities list.",
+    "- For add_alternatives: targetItineraryActivityId and alternativeItineraryActivityIds MUST be ids from the provided activities list.",
+    "- For add_alternatives: alternativeItineraryActivityIds MUST be unique, MUST NOT include the target, and MUST include at most 3 ids.",
     "- For destination operations: use itineraryDestinationId values from the provided destinations list.",
     '- For destination operations: "city" and "country" MUST be plain place names only (e.g., city="Rome", country="Italy"). Do NOT include sentences ("I will be in"), verbs, dates, or extra commentary in these fields.',
     "- Operations MUST be incremental changes from the current itinerary state. Do NOT include operations that merely restate existing destinations/activities unchanged.",
@@ -288,6 +297,9 @@ export async function planItineraryEdits(args: {
     ...(transportationNotes ? [`Transportation notes: ${transportationNotes}`] : []),
     `Destination date range: ${fromDate ?? "unknown"} to ${toDate ?? "unknown"}`,
     "",
+    ...(args.preferencesPromptLines && args.preferencesPromptLines.length > 0
+      ? ["Planning preferences (use as guidance):", ...args.preferencesPromptLines.map((line) => `- ${line}`), ""]
+      : []),
     ...(Array.isArray(args.itineraryDestinations) && args.itineraryDestinations.length > 0
       ? [
           "Destinations in this itinerary (in order):",

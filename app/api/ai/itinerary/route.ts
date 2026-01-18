@@ -3,6 +3,8 @@ import { createClient } from "@/utils/supabase/server";
 import { fetchBuilderBootstrap } from "@/actions/supabase/builderBootstrap";
 import { softDeleteTableData2 } from "@/actions/supabase/actions";
 import { addPlaceToItinerary } from "@/actions/supabase/activities";
+import { addActivitiesAsAlternatives } from "@/actions/supabase/slots";
+import { calculateTravelTime, type TravelMode } from "@/actions/google/travelTime";
 import { fetchCityCoordinates, fetchPlaceDetails, searchPlacesByText } from "@/actions/google/actions";
 import { geocodeAddress } from "@/actions/google/maps";
 import { extractPlaceCandidatesFromSources, resolveLinkImportCandidates, LinkImportDraftSourcesSchema } from "@/lib/ai/linkImport";
@@ -42,6 +44,14 @@ import {
 } from "@/lib/ai/itinerary/chatStore";
 import { summarizeItineraryChat } from "@/lib/ai/itinerary/summarizer";
 import { recordApiRequestMetric } from "@/lib/telemetry/server";
+import { formatMinutesToHHmm, getDayOfWeekFromIsoDate, parseTimeToMinutes } from "@/lib/ai/itinerary/intelligence/time";
+import { classifyTravelTimeConflict } from "@/lib/ai/itinerary/intelligence/travelTime";
+import { getOpenIntervalsForDay, isOpenForWindow, suggestNextOpenStart, type OpenHoursRow } from "@/lib/ai/itinerary/intelligence/openHours";
+import {
+  buildPreferencesPromptLines,
+  extractPreferenceHintsFromMessage,
+  inferPreferencesFromActivities,
+} from "@/lib/ai/itinerary/intelligence/preferences";
 
 export const runtime = "nodejs";
 // Vercel: allow longer AI requests before timing out (plan-dependent).
@@ -1387,6 +1397,16 @@ const buildPreviewLines = (
       continue;
     }
 
+    if (operation.op === "add_alternatives") {
+      const targetRow = activityById.get(operation.targetItineraryActivityId);
+      const targetName = targetRow?.activity?.name ?? `Activity ${operation.targetItineraryActivityId}`;
+      const altNames = operation.alternativeItineraryActivityIds
+        .map((id) => activityById.get(id)?.activity?.name ?? `Activity ${id}`)
+        .join(", ");
+      lines.push(`Add alternatives for "${targetName}": ${altNames}`);
+      continue;
+    }
+
     const row = activityById.get(operation.itineraryActivityId);
     const name = row?.activity?.name ?? `Activity ${operation.itineraryActivityId}`;
     const beforeDate = isIsoDate(row?.date) ? row.date : row?.date ?? null;
@@ -1428,6 +1448,474 @@ const buildPreviewLines = (
   }
 
   return lines.slice(0, 30);
+};
+
+const describeErrorForLog = (error: unknown) => {
+  if (error instanceof Error) {
+    return { name: error.name, message: error.message };
+  }
+  return { message: String(error) };
+};
+
+const parseCoordinatesToLatLng = (value: unknown): { lat: number; lng: number } | null => {
+  if (!value) return null;
+
+  if (Array.isArray(value) && value.length === 2) {
+    const lng = Number(value[0]);
+    const lat = Number(value[1]);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+    return { lat, lng };
+  }
+
+  if (typeof value === "string") {
+    const match = value.trim().match(/^\(?\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*\)?$/);
+    if (!match) return null;
+    const lat = Number(match[1]);
+    const lng = Number(match[2]);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+    return { lat, lng };
+  }
+
+  if (typeof value === "object") {
+    const x = (value as any).x;
+    const y = (value as any).y;
+    const lat = Number(x);
+    const lng = Number(y);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+    return { lat, lng };
+  }
+
+  return null;
+};
+
+const normalizeTravelMode = (value: unknown): TravelMode | null => {
+  const raw = String(value ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/[_\s]+/g, "");
+  if (!raw) return null;
+  if (raw === "walk" || raw === "walking") return "walking";
+  if (raw === "drive" || raw === "driving") return "driving";
+  if (raw === "transit") return "transit";
+  if (raw === "bike" || raw === "bicycle" || raw === "bicycling") return "bicycling";
+  return null;
+};
+
+type PlannedScheduleRow = {
+  id: string;
+  name: string;
+  date: string;
+  startTime: string;
+  endTime: string;
+  coords: { lat: number; lng: number } | null;
+  travelModeToNext: TravelMode | null;
+};
+
+const buildTravelTimeWarnings = async (args: {
+  supabase: ReturnType<typeof createClient>;
+  itineraryId: string;
+  operations: Operation[];
+  activityById: Map<string, any>;
+  activeActivities: any[];
+}): Promise<string[]> => {
+  const bufferMinutes = 10;
+  const maxSegments = 10;
+
+  const touchedDates = new Set<string>();
+  for (const op of args.operations) {
+    if (op.op === "add_place") {
+      if (isIsoDate(op.date)) touchedDates.add(op.date);
+      continue;
+    }
+
+    if (op.op === "update_activity" || op.op === "remove_activity") {
+      const row = args.activityById.get(op.itineraryActivityId);
+      const beforeDate = isIsoDate(row?.date) ? row.date : null;
+      if (beforeDate) touchedDates.add(beforeDate);
+
+      if (op.op === "update_activity") {
+        if (isIsoDate(op.date)) touchedDates.add(op.date);
+        if (op.date === null && beforeDate) touchedDates.add(beforeDate);
+      }
+    }
+  }
+
+  if (touchedDates.size === 0) return [];
+
+  const byId = new Map<string, PlannedScheduleRow & { activityId: number | null; placeId: string | null }>();
+
+  for (const row of args.activeActivities) {
+    const id = String(row?.itinerary_activity_id ?? "");
+    if (!id) continue;
+
+    const activity = row?.activity;
+    const name = typeof activity?.name === "string" && activity.name.trim() ? activity.name.trim() : `Activity ${id}`;
+    const date = isIsoDate(row?.date) ? row.date : "";
+    const startTime = typeof row?.start_time === "string" ? row.start_time : "";
+    const endTime = typeof row?.end_time === "string" ? row.end_time : "";
+    const coords = parseCoordinatesToLatLng(activity?.coordinates);
+    const travelModeToNext = normalizeTravelMode(row?.travel_mode_to_next);
+    const activityId = typeof activity?.activity_id === "number" ? activity.activity_id : Number(activity?.activity_id ?? NaN);
+    const placeId = typeof activity?.place_id === "string" ? activity.place_id : null;
+
+    byId.set(id, {
+      id,
+      name,
+      date,
+      startTime,
+      endTime,
+      coords,
+      travelModeToNext,
+      activityId: Number.isFinite(activityId) ? activityId : null,
+      placeId,
+    });
+  }
+
+  const addedPlaces: Array<PlannedScheduleRow & { activityId: number | null; placeId: string | null }> = [];
+  const placeIdsToLookup: string[] = [];
+
+  for (const [idx, op] of args.operations.entries()) {
+    if (op.op === "remove_activity") {
+      byId.delete(op.itineraryActivityId);
+      continue;
+    }
+
+    if (op.op === "update_activity") {
+      const target = byId.get(op.itineraryActivityId);
+      if (!target) continue;
+
+      if (op.date !== undefined) {
+        target.date = op.date ?? "";
+        if (op.date === null) {
+          target.startTime = "";
+          target.endTime = "";
+        }
+      }
+
+      if (op.startTime !== undefined || op.endTime !== undefined) {
+        target.startTime = typeof op.startTime === "string" ? op.startTime : "";
+        target.endTime = typeof op.endTime === "string" ? op.endTime : "";
+      }
+
+      byId.set(op.itineraryActivityId, target);
+      continue;
+    }
+
+    if (op.op === "add_place") {
+      const pseudoId = `new:${idx}`;
+      const name = op.name || op.query || "New place";
+      const date = isIsoDate(op.date) ? op.date : "";
+      const startTime = typeof op.startTime === "string" ? op.startTime : "";
+      const endTime = typeof op.endTime === "string" ? op.endTime : "";
+      const placeId = op.placeId ? String(op.placeId) : null;
+
+      if (placeId) placeIdsToLookup.push(placeId);
+
+      addedPlaces.push({
+        id: pseudoId,
+        name,
+        date,
+        startTime,
+        endTime,
+        coords: null,
+        travelModeToNext: null,
+        activityId: null,
+        placeId,
+      });
+    }
+  }
+
+  const uniquePlaceIds = Array.from(new Set(placeIdsToLookup.map((id) => String(id ?? "").trim()).filter(Boolean)));
+  const placeIdToCoords = new Map<string, { lat: number; lng: number }>();
+
+  if (uniquePlaceIds.length > 0) {
+    try {
+      const { data: rows, error } = await args.supabase
+        .from("activity")
+        .select("place_id,coordinates,name")
+        .in("place_id", uniquePlaceIds);
+      if (error) throw error;
+
+      for (const row of rows ?? []) {
+        const placeId = String((row as any)?.place_id ?? "").trim();
+        if (!placeId) continue;
+        const coords = parseCoordinatesToLatLng((row as any)?.coordinates);
+        if (coords) placeIdToCoords.set(placeId, coords);
+      }
+    } catch (error) {
+      console.warn("[ai-itinerary] travel_time_place_cache_lookup_failed", {
+        itineraryId: args.itineraryId,
+        error: describeErrorForLog(error),
+      });
+    }
+  }
+
+  for (const place of addedPlaces) {
+    if (place.placeId && placeIdToCoords.has(place.placeId)) {
+      place.coords = placeIdToCoords.get(place.placeId) ?? null;
+    } else if (place.placeId) {
+      try {
+        const details = await fetchPlaceDetails(place.placeId);
+        const coords = parseCoordinatesToLatLng((details as any)?.coordinates);
+        if (coords) {
+          place.coords = coords;
+          placeIdToCoords.set(place.placeId, coords);
+        }
+      } catch {
+        // ignore; travel time will degrade gracefully
+      }
+    }
+  }
+
+  const planned: PlannedScheduleRow[] = [];
+  for (const row of byId.values()) {
+    if (!touchedDates.has(row.date)) continue;
+    planned.push(row);
+  }
+  for (const row of addedPlaces) {
+    if (!touchedDates.has(row.date)) continue;
+    planned.push(row);
+  }
+
+  const byDate = new Map<string, PlannedScheduleRow[]>();
+  for (const row of planned) {
+    if (!isIsoDate(row.date)) continue;
+    const startMin = parseTimeToMinutes(row.startTime);
+    const endMin = parseTimeToMinutes(row.endTime);
+    if (startMin == null || endMin == null) continue;
+    if (startMin >= endMin) continue;
+
+    const list = byDate.get(row.date) ?? [];
+    list.push(row);
+    byDate.set(row.date, list);
+  }
+
+  const warnings: string[] = [];
+  let computedSegments = 0;
+  let travelTimeUnavailableWarned = false;
+
+  for (const [date, rows] of byDate.entries()) {
+    const sorted = [...rows].sort((a, b) => {
+      const aStart = parseTimeToMinutes(a.startTime) ?? 0;
+      const bStart = parseTimeToMinutes(b.startTime) ?? 0;
+      if (aStart !== bStart) return aStart - bStart;
+      return a.name.localeCompare(b.name);
+    });
+
+    for (let i = 0; i < sorted.length - 1; i += 1) {
+      if (computedSegments >= maxSegments) {
+        warnings.push("Travel-time checks skipped for some items (too many segments to validate in one request).");
+        return warnings;
+      }
+
+      const from = sorted[i]!;
+      const to = sorted[i + 1]!;
+      const fromEndMin = parseTimeToMinutes(from.endTime) ?? null;
+      const toStartMin = parseTimeToMinutes(to.startTime) ?? null;
+      if (fromEndMin == null || toStartMin == null) continue;
+
+      const gapMinutes = toStartMin - fromEndMin;
+      if (gapMinutes <= 0) {
+        warnings.push(`Schedule overlap on ${date}: "${from.name}" ends after "${to.name}" starts.`);
+        continue;
+      }
+
+      if (!from.coords || !to.coords) continue;
+
+      const mode = from.travelModeToNext ?? "walking";
+      computedSegments += 1;
+
+      const travel = await calculateTravelTime(from.coords, to.coords, [mode]);
+      if (!travel.success || !travel.data) {
+        if (!travelTimeUnavailableWarned) {
+          warnings.push("Travel-time checks are currently unavailable, so I couldn't validate commute gaps.");
+          travelTimeUnavailableWarned = true;
+        }
+        continue;
+      }
+
+      const result = travel.data.results?.[mode] ?? Object.values(travel.data.results ?? {})[0];
+      const durationSeconds = result?.duration?.value;
+      if (typeof durationSeconds !== "number" || !Number.isFinite(durationSeconds)) continue;
+
+      const travelMinutes = Math.max(0, Math.ceil(durationSeconds / 60));
+      const conflict = classifyTravelTimeConflict({ gapMinutes, travelMinutes, bufferMinutes });
+      if (conflict.ok) continue;
+
+      warnings.push(
+        `Travel time conflict on ${date}: "${from.name}" → "${to.name}" needs ~${conflict.requiredGapMinutes} min (incl. buffer) but only has ${gapMinutes} min gap.`
+      );
+    }
+  }
+
+  return warnings;
+};
+
+const buildOpenHoursWarnings = async (args: {
+  supabase: ReturnType<typeof createClient>;
+  itineraryId: string;
+  operations: Operation[];
+  activityById: Map<string, any>;
+}): Promise<string[]> => {
+  const toActivityId = (value: unknown): number | null => {
+    if (typeof value === "number" && Number.isFinite(value)) return value;
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  };
+
+  const scheduledChecks: Array<{
+    name: string;
+    date: string;
+    startMin: number;
+    endMin: number;
+    openHours: OpenHoursRow[] | null;
+    activityId: number | null;
+  }> = [];
+
+  const activityIdsToLookup = new Set<number>();
+  const addPlaceChecks: Array<{
+    name: string;
+    date: string;
+    startMin: number;
+    endMin: number;
+    placeId: string;
+  }> = [];
+
+  for (const op of args.operations) {
+    if (op.op === "update_activity") {
+      const row = args.activityById.get(op.itineraryActivityId);
+      const date = op.date !== undefined ? op.date : row?.date;
+      if (!isIsoDate(date)) continue;
+
+      const start = op.startTime !== undefined ? op.startTime : row?.start_time;
+      const end = op.endTime !== undefined ? op.endTime : row?.end_time;
+      const startMin = parseTimeToMinutes(start);
+      const endMin = parseTimeToMinutes(end);
+      if (startMin == null || endMin == null || endMin <= startMin) continue;
+
+      const name =
+        typeof row?.activity?.name === "string" && row.activity.name.trim()
+          ? row.activity.name.trim()
+          : `Activity ${String(op.itineraryActivityId)}`;
+      const activityId = toActivityId(row?.activity?.activity_id);
+      if (activityId != null) activityIdsToLookup.add(activityId);
+
+      scheduledChecks.push({
+        name,
+        date,
+        startMin,
+        endMin,
+        openHours: null,
+        activityId,
+      });
+      continue;
+    }
+
+    if (op.op === "add_place") {
+      if (!op.placeId) continue;
+      if (!isIsoDate(op.date)) continue;
+      const startMin = parseTimeToMinutes(op.startTime);
+      const endMin = parseTimeToMinutes(op.endTime);
+      if (startMin == null || endMin == null || endMin <= startMin) continue;
+
+      const name = op.name || op.query || "New place";
+      addPlaceChecks.push({
+        name,
+        date: op.date,
+        startMin,
+        endMin,
+        placeId: op.placeId,
+      });
+    }
+  }
+
+  const byActivityId = new Map<number, OpenHoursRow[]>();
+
+  if (activityIdsToLookup.size > 0) {
+    try {
+      const { data, error } = await args.supabase
+        .from("open_hours")
+        .select("activity_id,day,open_hour,open_minute,close_hour,close_minute")
+        .in("activity_id", Array.from(activityIdsToLookup));
+
+      if (error) {
+        const code = String((error as any)?.code ?? "");
+        if (code !== "42P01") throw error;
+      }
+
+      for (const row of data ?? []) {
+        const activityId = toActivityId((row as any)?.activity_id);
+        if (activityId == null) continue;
+        const list = byActivityId.get(activityId) ?? [];
+        list.push({
+          day: Number((row as any)?.day ?? -1),
+          open_hour: (row as any)?.open_hour ?? null,
+          open_minute: (row as any)?.open_minute ?? null,
+          close_hour: (row as any)?.close_hour ?? null,
+          close_minute: (row as any)?.close_minute ?? null,
+        });
+        byActivityId.set(activityId, list);
+      }
+    } catch (error) {
+      console.warn("[ai-itinerary] open_hours_lookup_failed", {
+        itineraryId: args.itineraryId,
+        error: describeErrorForLog(error),
+      });
+      // Degrade gracefully: don't block planning.
+      return ["Opening-hours checks are currently unavailable, so I couldn't validate hours for scheduled items."];
+    }
+  }
+
+  for (const check of scheduledChecks) {
+    if (check.activityId == null) continue;
+    check.openHours = byActivityId.get(check.activityId) ?? [];
+  }
+
+  const warnings: string[] = [];
+  let unknownCount = 0;
+  const unknownLimit = 3;
+
+  for (const check of scheduledChecks) {
+    const dayOfWeek = getDayOfWeekFromIsoDate(check.date);
+    const intervals = getOpenIntervalsForDay(check.openHours ?? [], dayOfWeek);
+    if (intervals.length === 0) {
+      unknownCount += 1;
+      if (unknownCount <= unknownLimit) {
+        warnings.push(`Opening hours unknown for "${check.name}" on ${check.date}.`);
+      }
+      continue;
+    }
+
+    if (isOpenForWindow(intervals, check.startMin, check.endMin)) continue;
+
+    const durationMin = Math.max(1, check.endMin - check.startMin);
+    const suggestedStart = suggestNextOpenStart(intervals, check.startMin, durationMin);
+    const suggestionText = suggestedStart != null ? ` Try ${formatMinutesToHHmm(suggestedStart)}.` : "";
+    warnings.push(`Likely closed: "${check.name}" is scheduled at ${check.date} ${formatMinutesToHHmm(check.startMin)}.${suggestionText}`);
+  }
+
+  if (unknownCount > unknownLimit) {
+    warnings.push(`Opening hours unknown for ${unknownCount - unknownLimit} other scheduled item(s).`);
+  }
+
+  for (const check of addPlaceChecks) {
+    try {
+      const details = await fetchPlaceDetails(check.placeId);
+      const openHours = Array.isArray((details as any)?.open_hours) ? ((details as any).open_hours as OpenHoursRow[]) : [];
+      const dayOfWeek = getDayOfWeekFromIsoDate(check.date);
+      const intervals = getOpenIntervalsForDay(openHours, dayOfWeek);
+      if (intervals.length === 0) continue;
+      if (isOpenForWindow(intervals, check.startMin, check.endMin)) continue;
+      const durationMin = Math.max(1, check.endMin - check.startMin);
+      const suggestedStart = suggestNextOpenStart(intervals, check.startMin, durationMin);
+      const suggestionText = suggestedStart != null ? ` Try ${formatMinutesToHHmm(suggestedStart)}.` : "";
+      warnings.push(`Likely closed: "${check.name}" is scheduled at ${check.date} ${formatMinutesToHHmm(check.startMin)}.${suggestionText}`);
+    } catch {
+      // ignore; treat as unknown hours
+    }
+  }
+
+  return warnings;
 };
 
 export async function POST(request: NextRequest) {
@@ -1725,6 +2213,20 @@ export async function POST(request: NextRequest) {
       if (prunedSegmentOps.length > 0) {
         const draftToReturn = [...prunedDraft.operations, ...prunedSegmentOps].slice(0, MAX_OPERATIONS);
         const previewLines = buildPreviewLines(draftToReturn, activityById, destinationById);
+        const travelWarnings = await buildTravelTimeWarnings({
+          supabase,
+          itineraryId,
+          operations: draftToReturn,
+          activityById,
+          activeActivities,
+        });
+        const hoursWarnings = await buildOpenHoursWarnings({
+          supabase,
+          itineraryId,
+          operations: draftToReturn,
+          activityById,
+        });
+        const warnings = [...travelWarnings, ...hoursWarnings];
 
         const assistantParts = [
           "I can update your itinerary destinations based on the travel dates you provided.",
@@ -1737,6 +2239,7 @@ export async function POST(request: NextRequest) {
           assistantMessage: assistantParts.join("\n\n"),
           operations: draftToReturn,
           previewLines,
+          warnings,
           requiresConfirmation: true,
         };
 
@@ -1817,12 +2320,20 @@ export async function POST(request: NextRequest) {
         return respond(NextResponse.json({ ok: true, mode: "plan", ...payload }));
       }
 
+      const inferredPreferences = inferPreferencesFromActivities(activeActivities);
+      const explicitPreferenceHints = extractPreferenceHintsFromMessage(userText);
+      const preferencesPromptLines = buildPreferencesPromptLines({
+        inferred: inferredPreferences,
+        explicit: explicitPreferenceHints,
+      });
+
       const planResult = await planItineraryEdits({
         message: userText,
         chatHistory,
         retrievedHistory,
         summary: threadSummary,
         draftOperations: prunedDraft.operations,
+        preferencesPromptLines,
         maxTokens: Math.max(1, Math.min(800, quota.remaining)),
         itinerary,
         destination,
@@ -1898,6 +2409,37 @@ export async function POST(request: NextRequest) {
         ) {
           dropped += 1;
           clarifications.push("I can't remove the destination you're currently editing from within its builder.");
+          continue;
+        }
+
+        if (sanitizedOperation.op === "add_alternatives") {
+          const targetId = String((sanitizedOperation as any).targetItineraryActivityId ?? "");
+          if (!targetId || !activityById.has(targetId)) {
+            dropped += 1;
+            clarifications.push(
+              `I couldn't find activity ${String((sanitizedOperation as any).targetItineraryActivityId ?? "")}, so I skipped adding alternatives.`
+            );
+            continue;
+          }
+
+          const incoming = Array.isArray((sanitizedOperation as any).alternativeItineraryActivityIds)
+            ? ((sanitizedOperation as any).alternativeItineraryActivityIds as string[])
+            : [];
+          const filtered = Array.from(new Set(incoming.map(String)))
+            .filter((id) => id && id !== targetId && activityById.has(id))
+            .slice(0, 3);
+
+          if (filtered.length === 0) {
+            dropped += 1;
+            clarifications.push(`I couldn't find any valid alternative activities for "${targetId}", so I skipped it.`);
+            continue;
+          }
+
+          resolvedOperations.push({
+            op: "add_alternatives",
+            targetItineraryActivityId: targetId,
+            alternativeItineraryActivityIds: filtered,
+          } as any);
           continue;
         }
 
@@ -2017,6 +2559,28 @@ export async function POST(request: NextRequest) {
           operations: draftToReturn,
           previewLines,
           requiresConfirmation,
+        };
+      }
+
+      const travelWarnings = await buildTravelTimeWarnings({
+        supabase,
+        itineraryId,
+        operations: payload.operations,
+        activityById,
+        activeActivities,
+      });
+      const hoursWarnings = await buildOpenHoursWarnings({
+        supabase,
+        itineraryId,
+        operations: payload.operations,
+        activityById,
+      });
+      const combinedWarnings = [...travelWarnings, ...hoursWarnings];
+      if (combinedWarnings.length > 0) {
+        payload = {
+          ...payload,
+          warnings: combinedWarnings,
+          requiresConfirmation: true,
         };
       }
 
@@ -2747,6 +3311,69 @@ export async function POST(request: NextRequest) {
     }
 
 	    try {
+          if (operation.op === "add_alternatives") {
+            const targetId = String((operation as any).targetItineraryActivityId ?? "");
+            const alternativeIds = Array.isArray((operation as any).alternativeItineraryActivityIds)
+              ? ((operation as any).alternativeItineraryActivityIds as string[])
+              : [];
+
+            const idsToCheck = Array.from(new Set([targetId, ...alternativeIds].map(String))).filter((id) => /^\d+$/.test(id));
+            if (idsToCheck.length === 0) {
+              throw new Error("Invalid alternative activity ids.");
+            }
+
+            const { data: rows, error } = await supabase
+              .from("itinerary_activity")
+              .select("itinerary_activity_id,itinerary_id,itinerary_destination_id")
+              .in(
+                "itinerary_activity_id",
+                idsToCheck.map((id) => Number(id))
+              );
+            if (error) throw new Error(error.message || "Failed to validate alternative activities");
+
+            const byActivityId = new Map<string, any>();
+            for (const row of rows ?? []) {
+              const id = String((row as any)?.itinerary_activity_id ?? "");
+              if (id) byActivityId.set(id, row);
+            }
+
+            if (!byActivityId.has(targetId)) {
+              throw new Error("Target activity not found.");
+            }
+
+            const itineraryIdNum = Number(itineraryId);
+            const destinationIdNum = Number(destinationId);
+
+            for (const id of idsToCheck) {
+              const row = byActivityId.get(id);
+              if (!row) throw new Error(`Activity ${id} not found.`);
+              if (Number(row.itinerary_id) !== itineraryIdNum) {
+                throw new Error("Activities must belong to the current itinerary.");
+              }
+              if (Number(row.itinerary_destination_id) !== destinationIdNum) {
+                throw new Error("Alternatives must belong to the current destination.");
+              }
+            }
+
+            const result = await addActivitiesAsAlternatives(targetId, alternativeIds);
+            if (!result.success) {
+              throw new Error(result.message || "Failed to add alternatives");
+            }
+
+            applied.push({ ok: true, operation });
+
+            if (executeStep?.ai_itinerary_run_step_id) {
+              await insertAiItineraryToolInvocation({
+                supabase,
+                stepId: executeStep.ai_itinerary_run_step_id,
+                toolName: operation.op,
+                status: "succeeded",
+                toolArgs: operation,
+              });
+            }
+            continue;
+          }
+
 		      if (operation.op === "add_destination") {
 		        const newFrom = operation.fromDate;
 		        const newTo = operation.toDate;

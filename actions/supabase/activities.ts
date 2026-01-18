@@ -120,6 +120,30 @@ export async function addPlaceToItinerary(
     }
 
     const activity = upserted.data;
+
+    // Best-effort: keep opening hours in sync for feasibility checks (ignore failures).
+    try {
+      const openHours = Array.isArray((place as any)?.open_hours) ? ((place as any).open_hours as any[]) : [];
+      if (openHours.length > 0) {
+        const admin = createAdminClient();
+        await admin.from("open_hours").delete().eq("activity_id", activity.activity_id);
+        await admin.from("open_hours").insert(
+          openHours.map((hours: any) => ({
+            activity_id: activity.activity_id,
+            day: hours.day,
+            open_hour: hours.open_hour,
+            open_minute: hours.open_minute,
+            close_hour: hours.close_hour,
+            close_minute: hours.close_minute,
+          }))
+        );
+      }
+    } catch (error: any) {
+      const code = String(error?.code ?? "");
+      if (code !== "42P01") {
+        console.warn("[activities] Failed to sync open hours (continuing):", error);
+      }
+    }
     const itineraryId = Number(itineraryIdValue);
     const destinationId = Number(destinationIdValue);
 
