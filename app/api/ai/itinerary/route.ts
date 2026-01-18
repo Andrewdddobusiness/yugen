@@ -53,6 +53,7 @@ import {
   inferPreferencesFromActivities,
 } from "@/lib/ai/itinerary/intelligence/preferences";
 import { buildAdjacentSegmentsForDate } from "@/lib/ai/itinerary/intelligence/segments";
+import { autoCorrectToNextOpenInterval } from "@/lib/ai/itinerary/intelligence/hoursAutoCorrect";
 
 export const runtime = "nodejs";
 // Vercel: allow longer AI requests before timing out (plan-dependent).
@@ -1912,7 +1913,13 @@ const buildOpenHoursWarnings = async (args: {
       const openHours = Array.isArray((details as any)?.open_hours) ? ((details as any).open_hours as OpenHoursRow[]) : [];
       const dayOfWeek = getDayOfWeekFromIsoDate(check.date);
       const intervals = getOpenIntervalsForDay(openHours, dayOfWeek);
-      if (intervals.length === 0) continue;
+      if (intervals.length === 0) {
+        unknownCount += 1;
+        if (unknownCount <= unknownLimit) {
+          warnings.push(`Opening hours unknown for "${check.name}" on ${check.date}.`);
+        }
+        continue;
+      }
       if (isOpenForWindow(intervals, check.startMin, check.endMin)) continue;
       const durationMin = Math.max(1, check.endMin - check.startMin);
       const suggestedStart = suggestNextOpenStart(intervals, check.startMin, durationMin);
@@ -1924,6 +1931,144 @@ const buildOpenHoursWarnings = async (args: {
   }
 
   return warnings;
+};
+
+const applyOpenHoursAutoCorrections = async (args: {
+  supabase: ReturnType<typeof createClient>;
+  itineraryId: string;
+  operations: Operation[];
+  activityById: Map<string, any>;
+}): Promise<{ operations: Operation[]; notes: string[] }> => {
+  const operations = args.operations.map((op) => ({ ...op })) as Operation[];
+  const notes: string[] = [];
+
+  const toActivityId = (value: unknown): number | null => {
+    if (typeof value === "number" && Number.isFinite(value)) return value;
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  };
+
+  const affectedActivityIds = new Set<number>();
+  for (const op of operations) {
+    if (op.op !== "update_activity") continue;
+    if (typeof op.startTime !== "string" || typeof op.endTime !== "string") continue;
+    const row = args.activityById.get(op.itineraryActivityId);
+    const activityId = toActivityId(row?.activity?.activity_id);
+    if (activityId != null) affectedActivityIds.add(activityId);
+  }
+
+  const openHoursByActivityId = new Map<number, OpenHoursRow[]>();
+  if (affectedActivityIds.size > 0) {
+    try {
+      const { data, error } = await args.supabase
+        .from("open_hours")
+        .select("activity_id,day,open_hour,open_minute,close_hour,close_minute")
+        .in("activity_id", Array.from(affectedActivityIds));
+
+      if (error) {
+        const code = String((error as any)?.code ?? "");
+        if (code !== "42P01") throw error;
+      }
+
+      for (const row of data ?? []) {
+        const activityId = toActivityId((row as any)?.activity_id);
+        if (activityId == null) continue;
+        const list = openHoursByActivityId.get(activityId) ?? [];
+        list.push({
+          day: Number((row as any)?.day ?? -1),
+          open_hour: (row as any)?.open_hour ?? null,
+          open_minute: (row as any)?.open_minute ?? null,
+          close_hour: (row as any)?.close_hour ?? null,
+          close_minute: (row as any)?.close_minute ?? null,
+        });
+        openHoursByActivityId.set(activityId, list);
+      }
+    } catch (error) {
+      console.warn("[ai-itinerary] open_hours_autocorrect_lookup_failed", {
+        itineraryId: args.itineraryId,
+        error: describeErrorForLog(error),
+      });
+      return { operations, notes };
+    }
+  }
+
+  const placeHoursCache = new Map<string, OpenHoursRow[]>();
+
+  for (const op of operations) {
+    if (op.op === "update_activity") {
+      if (typeof op.startTime !== "string" || typeof op.endTime !== "string") continue;
+
+      const row = args.activityById.get(op.itineraryActivityId);
+      const date = op.date !== undefined ? op.date : row?.date;
+      if (!isIsoDate(date)) continue;
+
+      const startMin = parseTimeToMinutes(op.startTime);
+      const endMin = parseTimeToMinutes(op.endTime);
+      if (startMin == null || endMin == null || endMin <= startMin) continue;
+
+      const activityId = toActivityId(row?.activity?.activity_id);
+      if (activityId == null) continue;
+
+      const openHours = openHoursByActivityId.get(activityId) ?? [];
+      const intervals = getOpenIntervalsForDay(openHours, getDayOfWeekFromIsoDate(date));
+      if (intervals.length === 0) continue;
+
+      const correction = autoCorrectToNextOpenInterval({ intervals, startMin, endMin });
+      if (!correction) continue;
+
+      (op as any).startTime = formatMinutesToHHmm(correction.newStartMin);
+      (op as any).endTime = formatMinutesToHHmm(correction.newEndMin);
+
+      const name =
+        typeof row?.activity?.name === "string" && row.activity.name.trim()
+          ? row.activity.name.trim()
+          : `Activity ${String(op.itineraryActivityId)}`;
+      notes.push(`Adjusted "${name}" to ${formatMinutesToHHmm(correction.newStartMin)} to fit opening hours.`);
+      continue;
+    }
+
+    if (op.op === "add_place") {
+      if (!op.placeId) continue;
+      if (!isIsoDate(op.date)) continue;
+      if (typeof op.startTime !== "string" || typeof op.endTime !== "string") continue;
+
+      const startMin = parseTimeToMinutes(op.startTime);
+      const endMin = parseTimeToMinutes(op.endTime);
+      if (startMin == null || endMin == null || endMin <= startMin) continue;
+
+      const placeId = String(op.placeId);
+      const cached = placeHoursCache.get(placeId);
+      const openHours =
+        cached ??
+        (await (async () => {
+          try {
+            const details = await fetchPlaceDetails(placeId);
+            const rows = Array.isArray((details as any)?.open_hours)
+              ? ((details as any).open_hours as OpenHoursRow[])
+              : [];
+            placeHoursCache.set(placeId, rows);
+            return rows;
+          } catch {
+            placeHoursCache.set(placeId, []);
+            return [];
+          }
+        })());
+
+      const intervals = getOpenIntervalsForDay(openHours, getDayOfWeekFromIsoDate(op.date));
+      if (intervals.length === 0) continue;
+
+      const correction = autoCorrectToNextOpenInterval({ intervals, startMin, endMin });
+      if (!correction) continue;
+
+      (op as any).startTime = formatMinutesToHHmm(correction.newStartMin);
+      (op as any).endTime = formatMinutesToHHmm(correction.newEndMin);
+
+      const name = op.name || op.query || "New place";
+      notes.push(`Adjusted "${name}" to ${formatMinutesToHHmm(correction.newStartMin)} to fit opening hours.`);
+    }
+  }
+
+  return { operations, notes };
 };
 
 export async function POST(request: NextRequest) {
@@ -2482,6 +2627,7 @@ export async function POST(request: NextRequest) {
       }
 
       let payload: PlanResponsePayload;
+      let autoCorrectionNotes: string[] = [];
 
       if (prunedResolved.operations.length > MAX_OPERATIONS) {
         const previewLines = buildPreviewLines(prunedDraft.operations, activityById, destinationById);
@@ -2570,6 +2716,20 @@ export async function POST(request: NextRequest) {
         };
       }
 
+      const corrected = await applyOpenHoursAutoCorrections({
+        supabase,
+        itineraryId,
+        operations: payload.operations,
+        activityById,
+      });
+
+      payload = {
+        ...payload,
+        operations: corrected.operations,
+        previewLines: buildPreviewLines(corrected.operations, activityById, destinationById),
+      };
+      autoCorrectionNotes = corrected.notes;
+
       const travelWarnings = await buildTravelTimeWarnings({
         supabase,
         itineraryId,
@@ -2583,7 +2743,7 @@ export async function POST(request: NextRequest) {
         operations: payload.operations,
         activityById,
       });
-      const combinedWarnings = [...travelWarnings, ...hoursWarnings];
+      const combinedWarnings = [...autoCorrectionNotes, ...travelWarnings, ...hoursWarnings];
       if (combinedWarnings.length > 0) {
         payload = {
           ...payload,
@@ -2598,10 +2758,10 @@ export async function POST(request: NextRequest) {
           await updateAiItineraryThreadDraftAndSources({
             supabase,
             threadId,
-            draft: prunedResolved.operations,
+            draft: payload.operations,
             draftSources: null,
           });
-          threadDraft = prunedResolved.operations;
+          threadDraft = payload.operations;
           threadDraftSources = null;
         } catch (error) {
           console.warn("Failed to persist AI chat draft:", error);
