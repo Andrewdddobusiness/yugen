@@ -139,7 +139,7 @@ export const searchPlacesByText = async (
     async () => {
       const requestBody = {
         textQuery,
-        pageSize: 20,
+        maxResultCount: 20,
         locationBias: {
           circle: {
             center: { latitude, longitude },

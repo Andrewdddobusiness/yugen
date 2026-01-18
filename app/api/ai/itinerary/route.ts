@@ -1921,7 +1921,18 @@ export async function POST(request: NextRequest) {
           messageParts.push(`Note: I ignored ${redundantDropped} redundant change(s) that matched your current itinerary.`);
         }
         if (clarifications.length > 0) {
-          messageParts.push(...clarifications);
+          const uniqueClarifications: string[] = [];
+          const seen = new Set<string>();
+          for (const clarification of clarifications) {
+            const key = clarification.trim();
+            if (!key) continue;
+            if (seen.has(key)) continue;
+            seen.add(key);
+            uniqueClarifications.push(key);
+          }
+          if (uniqueClarifications.length > 0) {
+            messageParts.push(...uniqueClarifications);
+          }
         }
 
         payload = {
