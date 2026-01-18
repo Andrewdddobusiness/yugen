@@ -7,8 +7,9 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { useItineraryActivityStore } from "@/store/itineraryActivityStore";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { Operation } from "@/lib/ai/itinerary/schema";
+import { listItineraryDestinationsSummary } from "@/actions/supabase/destinations";
 
 const USER_SAFE_RETRY_MESSAGE = "Something went wrong. Please try again in a moment.";
 
@@ -389,6 +390,32 @@ function ItineraryAssistantChat(props: {
   const queryClient = useQueryClient();
   const setItineraryActivities = useItineraryActivityStore((s) => s.setItineraryActivities);
   const itineraryActivities = useItineraryActivityStore((s) => s.itineraryActivities);
+  const { data: destinationsSummary = [] } = useQuery({
+    queryKey: ["itineraryDestinationsSummary", itineraryId],
+    queryFn: async () => {
+      const result = await listItineraryDestinationsSummary(itineraryId);
+      return result.success ? result.data ?? [] : [];
+    },
+    enabled: Boolean(itineraryId) && isVisible,
+    staleTime: 10 * 60 * 1000,
+    gcTime: 20 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+  });
+
+  const destinationLabelById = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const destination of destinationsSummary as any[]) {
+      const id = String((destination as any)?.itinerary_destination_id ?? "");
+      if (!id) continue;
+      const city = typeof (destination as any)?.city === "string" ? String((destination as any).city).trim() : "";
+      const country =
+        typeof (destination as any)?.country === "string" ? String((destination as any).country).trim() : "";
+      const label = city && country ? `${city}, ${country}` : city || country || `Destination ${id}`;
+      map.set(id, label);
+    }
+    return map;
+  }, [destinationsSummary]);
 
   const storageKey = useMemo(() => {
     if (!itineraryId || !destinationId) return null;
@@ -801,8 +828,11 @@ function ItineraryAssistantChat(props: {
 	              if (op.op === "update_activity" || op.op === "remove_activity") return op.itineraryActivityId;
 	              if (op.op === "add_destination") return `${op.city}, ${op.country}`;
 	              if (op.op === "insert_destination_after") return `${op.city}, ${op.country}`;
-	              if (op.op === "update_destination_dates") return `destination ${op.itineraryDestinationId}`;
-	              return `destination ${op.itineraryDestinationId}`;
+	              if (op.op === "update_destination_dates" || op.op === "remove_destination") {
+                  const id = String(op.itineraryDestinationId ?? "");
+                  return destinationLabelById.get(id) ?? `destination ${id || "unknown"}`;
+                }
+	              return `destination ${String((op as any)?.itineraryDestinationId ?? "") || "unknown"}`;
 	            })();
 	            return `- ${entry.operation.op} (${target}): ${entry.error ?? "Failed"}`;
 	          })
@@ -947,7 +977,11 @@ function ItineraryAssistantChat(props: {
 	      if (op.op === "insert_destination_after") {
 	        const title = `${op.city}, ${op.country}`;
 	        const details: ChangeRow["details"] = [
-	          { label: "Insert after destination", after: String(op.afterItineraryDestinationId) },
+	          {
+	            label: "Insert after destination",
+	            after:
+	              destinationLabelById.get(String(op.afterItineraryDestinationId)) ?? String(op.afterItineraryDestinationId),
+	          },
 	          { label: "Duration (days)", after: String(op.durationDays) },
 	        ];
 	        return {
@@ -957,7 +991,8 @@ function ItineraryAssistantChat(props: {
 	      }
 
 	      if (op.op === "update_destination_dates") {
-	        const title = `Destination ${op.itineraryDestinationId}`;
+	        const title =
+	          destinationLabelById.get(String(op.itineraryDestinationId)) ?? `Destination ${op.itineraryDestinationId}`;
 	        const details: ChangeRow["details"] = [
 	          { label: "Dates", after: `${formatDateLabel(op.fromDate)} → ${formatDateLabel(op.toDate)}` },
 	          { label: "Shift activities", after: op.shiftActivities === false ? "No" : "Yes" },
@@ -969,7 +1004,8 @@ function ItineraryAssistantChat(props: {
 	      }
 
 	      if (op.op === "remove_destination") {
-	        const title = `Destination ${op.itineraryDestinationId}`;
+	        const title =
+	          destinationLabelById.get(String(op.itineraryDestinationId)) ?? `Destination ${op.itineraryDestinationId}`;
 	        return {
 	          dateKey,
 	          row: { number, kind: "remove", title, timeLabel: null, details: [], operation: op },
@@ -1052,7 +1088,7 @@ function ItineraryAssistantChat(props: {
       label: dateKey === "unscheduled" ? "Unscheduled" : formatDateLabel(dateKey),
       rows: groups.get(dateKey) ?? [],
     }));
-  }, [activityById, draftPlan?.operations]);
+  }, [activityById, destinationLabelById, sortedDraftOperations]);
 
   return (
     <div className={cn("h-full flex flex-col", className)}>

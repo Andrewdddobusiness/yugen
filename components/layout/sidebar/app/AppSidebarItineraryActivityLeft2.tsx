@@ -294,17 +294,17 @@ export function AppSidebarItineraryActivityLeft({
 
       {/* Content Sidebar */}
       <Sidebar collapsible="none" className="hidden flex-1 md:flex gap-4 ">
-        <SidebarHeader className="px-12 pt-8 pb-4">
+        <SidebarHeader className="px-4 pt-8 pb-4">
           {itinerary ? (
             <div className="flex flex-col gap-2">
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <button
                     type="button"
-                    className="flex items-center justify-between gap-3 rounded-xl px-2 py-1 -mx-2 hover:bg-bg-50 transition-colors"
+                    className="flex w-full items-center justify-between gap-3 rounded-xl px-2 py-1 hover:bg-bg-50 transition-colors"
                     aria-label="Switch destination"
                   >
-                    <div className="min-w-0">
+                    <div className="min-w-0 flex-1 text-left">
                       <div className="text-2xl font-semibold truncate">
                         {itinerary.city} {", "} {itinerary.country}
                       </div>
@@ -349,7 +349,7 @@ export function AppSidebarItineraryActivityLeft({
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
-              <div className="text-left w-full text-xs text-muted-foreground">
+              <div className="px-2 text-left w-full text-xs text-muted-foreground">
                 <DatePickerWithRangePopover3
                   selectedDateRange={dateRange}
                   onDateRangeConfirm={handleDateRangeConfirm}
@@ -363,7 +363,7 @@ export function AppSidebarItineraryActivityLeft({
             </div>
           )}
         </SidebarHeader>
-        <div className="px-8">
+        <div className="px-4">
           <Separator />
         </div>
         <SidebarContent className="h-full w-full">

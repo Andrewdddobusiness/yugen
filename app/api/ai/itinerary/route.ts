@@ -4,6 +4,7 @@ import { fetchBuilderBootstrap } from "@/actions/supabase/builderBootstrap";
 import { softDeleteTableData2 } from "@/actions/supabase/actions";
 import { addPlaceToItinerary } from "@/actions/supabase/activities";
 import { fetchCityCoordinates, fetchPlaceDetails, searchPlacesByText } from "@/actions/google/actions";
+import { geocodeAddress } from "@/actions/google/maps";
 import { extractPlaceCandidatesFromSources, resolveLinkImportCandidates, LinkImportDraftSourcesSchema } from "@/lib/ai/linkImport";
 import { planItineraryEdits } from "@/lib/ai/itinerary/planner";
 import { openaiEmbed } from "@/lib/ai/itinerary/openai";
@@ -71,8 +72,10 @@ const stripLeadingPlacePhrases = (value: string) => {
 
   const patterns: RegExp[] = [
     /^(?:and|then|next|finally|after(?:ward)?|later|onward)\b[\s,–—\-:]*/i,
+    /^(?:i|we)\s+(?:will|would|am|are|'ll)\s+/i,
     /^(?:i|we)\s+(?:will|would|am|are|'ll)\s+(?:be\s+)?(?:in|at|around)\s+/i,
     /^(?:i|we)\s+(?:will|would|am|are|'ll)\s+(?:travel|go|head|drive|fly|take|continue|return)\s+(?:to|into)\s+/i,
+    /^(?:be\s+)?(?:in|at|around)\s+/i,
     /^(?:travel(?:ing)?|going|go|head(?:ing)?|drive(?:ing)?|fly(?:ing)?|arrive(?:ing)?|visit(?:ing)?|stay(?:ing)?|continue(?:ing)?|return(?:ing)?)\s+(?:to|in|at)\s+/i,
     /^(?:in|to|at)\s+/i,
   ];
@@ -206,6 +209,73 @@ const coerceOverlappingAddDestinationOps = (args: { operations: Operation[]; iti
       toDate: operation.toDate,
     } as any;
   });
+};
+
+const canonicalizeDestinationFromGoogleFormattedAddress = (
+  formattedAddress: string
+): { city: string; country: string } | null => {
+  const formatted = String(formattedAddress ?? "").trim();
+  if (!formatted) return null;
+
+  const parts = formatted
+    .split(",")
+    .map((part) => part.trim())
+    .filter(Boolean);
+
+  if (parts.length === 0) return null;
+  if (parts.length === 1) {
+    const label = parts[0]!;
+    return { city: label, country: label };
+  }
+
+  return { city: parts[0]!, country: parts[parts.length - 1]! };
+};
+
+const canonicalizeDestinationOpsWithGoogle = async (operations: Operation[]): Promise<Operation[]> => {
+  const cache = new Map<string, { city: string; country: string } | null>();
+  const result: Operation[] = [];
+
+  for (const operation of operations) {
+    if (operation.op !== "add_destination" && operation.op !== "insert_destination_after") {
+      result.push(operation);
+      continue;
+    }
+
+    const cityRaw = stripWrappingDelimiters(String((operation as any).city ?? ""));
+    const countryRaw = stripWrappingDelimiters(String((operation as any).country ?? ""));
+    const query = [cityRaw, countryRaw].filter(Boolean).join(", ").trim();
+    if (!query || query.length < 2) {
+      result.push(operation);
+      continue;
+    }
+
+    let canonical = cache.get(query) ?? null;
+    if (!cache.has(query)) {
+      try {
+        const geo = await geocodeAddress(query);
+        canonical =
+          geo.success && geo.data?.formatted_address
+            ? canonicalizeDestinationFromGoogleFormattedAddress(geo.data.formatted_address)
+            : null;
+      } catch {
+        canonical = null;
+      }
+      cache.set(query, canonical);
+    }
+
+    if (canonical?.city && canonical?.country) {
+      result.push({
+        ...operation,
+        city: canonical.city.slice(0, 100),
+        country: canonical.country.slice(0, 100),
+      } as any);
+      continue;
+    }
+
+    result.push(operation);
+  }
+
+  return result;
 };
 
 const isRedundantAddDestination = (args: {
@@ -2492,6 +2562,7 @@ export async function POST(request: NextRequest) {
   // apply
   let operations = parsed.data.operations.map((operation) => sanitizeDestinationOperation(operation));
   operations = coerceOverlappingAddDestinationOps({ operations, itineraryDestinations });
+  operations = await canonicalizeDestinationOpsWithGoogle(operations);
   const applyPruned = pruneRedundantDestinationOperations({
     operations,
     itineraryDestinations,
