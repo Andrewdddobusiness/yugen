@@ -143,6 +143,27 @@ type ChatMessage = {
   content: string;
 };
 
+function ChatHistorySkeleton() {
+  return (
+    <div className="space-y-3 animate-pulse">
+      <div className="max-w-[86%] rounded-2xl border border-stroke-200 bg-bg-0 px-3 py-3">
+        <div className="h-3 w-40 rounded bg-stroke-200/70" />
+        <div className="mt-2 h-3 w-64 rounded bg-stroke-200/70" />
+      </div>
+
+      <div className="ml-auto max-w-[70%] rounded-2xl bg-brand-500/10 px-3 py-3">
+        <div className="h-3 w-44 rounded bg-brand-500/20" />
+        <div className="mt-2 h-3 w-28 rounded bg-brand-500/20" />
+      </div>
+
+      <div className="max-w-[82%] rounded-2xl border border-stroke-200 bg-bg-0 px-3 py-3">
+        <div className="h-3 w-56 rounded bg-stroke-200/70" />
+        <div className="mt-2 h-3 w-36 rounded bg-stroke-200/70" />
+      </div>
+    </div>
+  );
+}
+
 const examples = [
   "Move McDonald's to Tuesday at 7:00-8:00 PM and add note \"quick dinner\".",
   "Add Roscioli to Tuesday at 12:30-1:30 PM.",
@@ -446,11 +467,13 @@ function ItineraryAssistantChat(props: {
   const [applying, setApplying] = useState(false);
   const [dismissing, setDismissing] = useState(false);
   const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyLoaded, setHistoryLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const inFlightRequestRef = useRef<AbortController | null>(null);
+  const historyRequestRef = useRef<{ key: string; controller: AbortController } | null>(null);
   const historyKey = useMemo(
     () => `${itineraryId}:${destinationId}:${threadKey}`,
     [destinationId, itineraryId, threadKey]
@@ -475,9 +498,11 @@ function ItineraryAssistantChat(props: {
 
   const canSubmit = useMemo(() => {
     if (planning || importing || applying || dismissing) return false;
+    if (!historyLoaded) return false;
+    if (historyLoading) return false;
     if (showThreads) return false;
     return input.trim().length > 0;
-  }, [applying, dismissing, importing, input, planning, showThreads]);
+  }, [applying, dismissing, historyLoaded, historyLoading, importing, input, planning, showThreads]);
 
   const abortInFlightRequest = useCallback(() => {
     const controller = inFlightRequestRef.current;
@@ -505,7 +530,16 @@ function ItineraryAssistantChat(props: {
     setDraftSources(null);
     setError(null);
     setInput("");
+    setHistoryLoaded(false);
+    setHistoryLoading(false);
     lastLoadedHistoryKeyRef.current = null;
+
+    try {
+      historyRequestRef.current?.controller.abort();
+    } catch {
+      // ignore
+    }
+    historyRequestRef.current = null;
   }, [historyKey]);
 
   useEffect(() => {
@@ -536,56 +570,131 @@ function ItineraryAssistantChat(props: {
     }, 0);
   }, [isVisible, messages, draftPlan, draftSources, planning, importing, applying, showThreads, error]);
 
+  const startHistoryFetch = useCallback(
+    (targetKey: string) => {
+      if (!itineraryId || !destinationId) return;
+      if (lastLoadedHistoryKeyRef.current === targetKey) return;
+      if (historyRequestRef.current?.key === targetKey) return;
+
+      // Cancel any stale fetch for a previous key.
+      if (historyRequestRef.current && historyRequestRef.current.key !== targetKey) {
+        try {
+          historyRequestRef.current.controller.abort();
+        } catch {
+          // ignore
+        }
+        historyRequestRef.current = null;
+      }
+
+      const controller = new AbortController();
+      historyRequestRef.current = { key: targetKey, controller };
+
+      setHistoryLoading(true);
+      setError(null);
+
+      fetch(
+        `/api/ai/itinerary?itineraryId=${encodeURIComponent(itineraryId)}&destinationId=${encodeURIComponent(
+          destinationId
+        )}&threadKey=${encodeURIComponent(threadKey)}`,
+        { signal: controller.signal }
+      )
+        .then((res) => readJsonResponse<HistoryResponse>(res))
+        .then((data) => {
+          const payload = data as HistoryResponse;
+          if (!payload || payload.ok !== true) return;
+          if (!data || data.ok !== true || !Array.isArray(data.messages)) return;
+          const restored = payload.messages
+            .filter(
+              (value: any): value is ChatMessage =>
+                !!value && typeof value.content === "string" && (value.role === "user" || value.role === "assistant")
+            )
+            .map((value: ChatMessage) => ({ role: value.role, content: value.content }))
+            .slice(-50);
+          setMessages(restored);
+
+          const draftOps = Array.isArray(payload.draftOperations) ? payload.draftOperations : [];
+          if (draftOps.length > 0) {
+            const requiresConfirmation =
+              draftOps.some((op) => op.op === "remove_activity") || draftOps.length > 10;
+            setDraftPlan({ operations: draftOps, requiresConfirmation });
+          }
+
+          const draftSourcesPayload = payload.draftSources;
+          if (
+            draftSourcesPayload &&
+            Array.isArray(draftSourcesPayload.sources) &&
+            draftSourcesPayload.sources.length > 0
+          ) {
+            setDraftSources({
+              sources: draftSourcesPayload.sources,
+              pendingClarificationsCount: draftSourcesPayload.pendingClarificationsCount,
+            });
+          } else {
+            setDraftSources(null);
+          }
+
+          lastLoadedHistoryKeyRef.current = targetKey;
+        })
+        .catch((e) => {
+          if (isAbortError(e)) return;
+          // Treat failures as "loaded" so the UI remains usable.
+          lastLoadedHistoryKeyRef.current = targetKey;
+        })
+        .finally(() => {
+          if (historyRequestRef.current?.key !== targetKey) return;
+          historyRequestRef.current = null;
+          setHistoryLoading(false);
+          setHistoryLoaded(true);
+        });
+    },
+    [destinationId, itineraryId, threadKey]
+  );
+
   useEffect(() => {
-    if (!isVisible) return;
     if (!itineraryId || !destinationId) return;
     if (lastLoadedHistoryKeyRef.current === historyKey) return;
+    if (historyRequestRef.current?.key === historyKey) return;
 
-    lastLoadedHistoryKeyRef.current = historyKey;
-    setHistoryLoading(true);
-    setError(null);
+    if (isVisible) {
+      startHistoryFetch(historyKey);
+      return;
+    }
 
-    fetch(
-      `/api/ai/itinerary?itineraryId=${encodeURIComponent(itineraryId)}&destinationId=${encodeURIComponent(
-        destinationId
-      )}&threadKey=${encodeURIComponent(threadKey)}`
-    )
-      .then((res) => readJsonResponse<HistoryResponse>(res))
-      .then((data) => {
-        const payload = data as HistoryResponse;
-        if (!payload || payload.ok !== true) return;
-        if (!data || data.ok !== true || !Array.isArray(data.messages)) return;
-        const restored = payload.messages
-          .filter(
-            (value: any): value is ChatMessage =>
-              !!value && typeof value.content === "string" && (value.role === "user" || value.role === "assistant")
-          )
-          .map((value: ChatMessage) => ({ role: value.role, content: value.content }))
-          .slice(-50);
-        setMessages(restored);
+    let idleId: number | null = null;
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
 
-        const draftOps = Array.isArray(payload.draftOperations) ? payload.draftOperations : [];
-        if (draftOps.length > 0) {
-          const requiresConfirmation =
-            draftOps.some((op) => op.op === "remove_activity") || draftOps.length > 10;
-          setDraftPlan({ operations: draftOps, requiresConfirmation });
+    const schedule = () => {
+      if ("requestIdleCallback" in window) {
+        idleId = (window as any).requestIdleCallback(() => startHistoryFetch(historyKey), { timeout: 1500 });
+        return;
+      }
+      timeoutId = setTimeout(() => startHistoryFetch(historyKey), 500);
+    };
+
+    schedule();
+
+    return () => {
+      if (idleId != null) {
+        try {
+          (window as any).cancelIdleCallback?.(idleId);
+        } catch {
+          // ignore
         }
+      }
+      if (timeoutId != null) clearTimeout(timeoutId);
+    };
+  }, [destinationId, historyKey, isVisible, itineraryId, startHistoryFetch]);
 
-        const draftSourcesPayload = payload.draftSources;
-        if (draftSourcesPayload && Array.isArray(draftSourcesPayload.sources) && draftSourcesPayload.sources.length > 0) {
-          setDraftSources({
-            sources: draftSourcesPayload.sources,
-            pendingClarificationsCount: draftSourcesPayload.pendingClarificationsCount,
-          });
-        } else {
-          setDraftSources(null);
-        }
-      })
-      .catch(() => {
-        // ignore history load errors
-      })
-      .finally(() => setHistoryLoading(false));
-  }, [destinationId, historyKey, isVisible, itineraryId, threadKey]);
+  useEffect(() => {
+    return () => {
+      try {
+        historyRequestRef.current?.controller.abort();
+      } catch {
+        // ignore
+      }
+      historyRequestRef.current = null;
+    };
+  }, []);
 
   const loadThreads = async () => {
     if (!itineraryId || !destinationId) return;
@@ -1224,33 +1333,29 @@ function ItineraryAssistantChat(props: {
 
         {!showThreads ? (
           <>
-        {historyLoading && messages.length === 0 ? (
-          <div className="max-w-[92%] rounded-2xl px-3 py-2 text-sm leading-relaxed bg-bg-0 border border-stroke-200">
-            <span className="text-shimmer">Loading chat…</span>
-          </div>
-        ) : null}
+            {!historyLoaded && messages.length === 0 ? <ChatHistorySkeleton /> : null}
 
-        {messages.length === 0 ? (
-          <div className="space-y-3">
-            <div className="text-sm text-ink-700">
-              Ask me to add places, reschedule activities, update times, edit notes, or remove items.
-            </div>
-            <div className="space-y-2">
-              {examples.map((example) => (
-                <button
-                  key={example}
-                  type="button"
-                  className="w-full text-left rounded-xl border border-stroke-200 bg-bg-0 px-3 py-2 text-sm text-ink-700 hover:bg-bg-50"
-                  onClick={() => {
-                    setInput(example);
-                  }}
-                >
-                  {example}
-                </button>
-              ))}
-            </div>
-          </div>
-        ) : null}
+            {historyLoaded && messages.length === 0 ? (
+              <div className="space-y-3">
+                <div className="text-sm text-ink-700">
+                  Ask me to add places, reschedule activities, update times, edit notes, or remove items.
+                </div>
+                <div className="space-y-2">
+                  {examples.map((example) => (
+                    <button
+                      key={example}
+                      type="button"
+                      className="w-full text-left rounded-xl border border-stroke-200 bg-bg-0 px-3 py-2 text-sm text-ink-700 hover:bg-bg-50"
+                      onClick={() => {
+                        setInput(example);
+                      }}
+                    >
+                      {example}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : null}
 
         {messages.map((message, idx) => (
           <div
@@ -1428,7 +1533,7 @@ function ItineraryAssistantChat(props: {
                 if (canSubmit) void handleSubmit();
               }
             }}
-            disabled={showThreads}
+            disabled={showThreads || !historyLoaded || historyLoading}
           />
           {planning || importing ? (
             <Button
@@ -1495,6 +1600,7 @@ export function ItineraryAssistantSheet(props: {
 
       <SheetContent
         side="right"
+        forceMount
         className="w-[420px] sm:max-w-[420px] p-0 flex flex-col [&>button]:hidden"
       >
         <SheetHeader className="sr-only">
