@@ -1106,7 +1106,20 @@ const makeAddPlaceClarification = (query: string, cityLabel: string, options: Ar
 const resolveAddPlaceOperation = async (args: {
   proposed: Extract<ProposedOperation, { op: "add_place" }>;
   destination: any;
+  context?: {
+    itineraryId?: string | null;
+    destinationId?: string | null;
+    threadId?: string | null;
+    runId?: string | null;
+  };
 }): Promise<{ resolved?: Operation; clarification?: string }> => {
+  const describeError = (error: unknown) => {
+    if (error instanceof Error) {
+      return { name: error.name, message: error.message };
+    }
+    return { message: String(error) };
+  };
+
   const proposedPlaceId =
     typeof (args.proposed as any).placeId === "string" ? normalizePlaceId((args.proposed as any).placeId) : "";
   const rawQuery = typeof (args.proposed as any).query === "string" ? String((args.proposed as any).query) : "";
@@ -1174,7 +1187,15 @@ const resolveAddPlaceOperation = async (args: {
           notes: args.proposed.notes,
         },
       };
-    } catch {
+    } catch (error) {
+      console.warn("[ai-itinerary] place_details_lookup_failed", {
+        ...args.context,
+        placeId: extractedPlaceId,
+        city,
+        country,
+        query: displayQuery,
+        error: describeError(error),
+      });
       return {
         clarification: makeAddPlaceClarification(displayQuery, cityLabel, []),
       };
@@ -1193,10 +1214,32 @@ const resolveAddPlaceOperation = async (args: {
     };
   }
 
+  const originalTextQuery = extractTextQueryFromGoogleMapsUrl(query) || query;
+  let effectiveTextQuery = originalTextQuery;
+
   try {
-    const textQuery = extractTextQueryFromGoogleMapsUrl(query) || query;
-    const { latitude, longitude } = await fetchCityCoordinates(city, country);
-    const results = await searchPlacesByText(textQuery, latitude, longitude, 20000);
+    let results: any[] = [];
+
+    let coords: { latitude: number; longitude: number } | null = null;
+    try {
+      coords = await fetchCityCoordinates(city, country);
+    } catch (geoError) {
+      console.warn("[ai-itinerary] place_geocode_failed", {
+        ...args.context,
+        city,
+        country,
+        query: displayQuery,
+        error: describeError(geoError),
+      });
+      coords = null;
+    }
+
+    if (coords) {
+      results = await searchPlacesByText(originalTextQuery, coords.latitude, coords.longitude, 20000);
+    } else {
+      effectiveTextQuery = `${originalTextQuery} in ${cityLabel}`;
+      results = await searchPlacesByText(effectiveTextQuery);
+    }
 
     if (!Array.isArray(results) || results.length === 0) {
       return { clarification: makeAddPlaceClarification(displayQuery, cityLabel, []) };
@@ -1261,7 +1304,16 @@ const resolveAddPlaceOperation = async (args: {
         }))
       ),
     };
-  } catch {
+  } catch (error) {
+    console.warn("[ai-itinerary] place_lookup_failed", {
+      ...args.context,
+      city,
+      country,
+      query: displayQuery,
+      textQuery: effectiveTextQuery,
+      originalTextQuery,
+      error: describeError(error),
+    });
     return {
       clarification: `I couldn't look up places right now. Please paste a Google Maps link for the place you want to add.`,
     };
@@ -1785,13 +1837,21 @@ export async function POST(request: NextRequest) {
       let dropped = 0;
       let redundantDropped = 0;
       const clarifications: string[] = [];
+      let proposedAddPlaceCount = 0;
+      let resolvedAddPlaceCount = 0;
 
       for (const operation of plan.operations) {
         const sanitizedOperation = sanitizeDestinationOperation(operation as any as Operation);
 
         if (sanitizedOperation.op === "add_place") {
-          const resolved = await resolveAddPlaceOperation({ proposed: sanitizedOperation, destination });
+          proposedAddPlaceCount += 1;
+          const resolved = await resolveAddPlaceOperation({
+            proposed: sanitizedOperation,
+            destination,
+            context: { itineraryId, destinationId, threadId, runId },
+          });
           if (resolved.resolved) {
+            resolvedAddPlaceCount += 1;
             resolvedOperations.push(resolved.resolved);
           } else if (resolved.clarification) {
             clarifications.push(resolved.clarification);
@@ -1913,7 +1973,24 @@ export async function POST(request: NextRequest) {
 
         const previewLines = buildPreviewLines(draftToReturn, activityById, destinationById);
 
-        const messageParts = [stripEmDashes(plan.assistantMessage)];
+        const baseAssistantMessage = stripEmDashes(plan.assistantMessage).trim();
+        const messageParts: string[] = [];
+
+        const hasPlaceOps = proposedAddPlaceCount > 0;
+        const failedAddPlaceCount = Math.max(0, proposedAddPlaceCount - resolvedAddPlaceCount);
+        const allPlaceLookupsFailed = hasPlaceOps && resolvedAddPlaceCount === 0 && failedAddPlaceCount > 0;
+
+        if (allPlaceLookupsFailed) {
+          messageParts.push("I couldn't draft adding those places yet.");
+        } else if (baseAssistantMessage) {
+          messageParts.push(baseAssistantMessage);
+        }
+
+        if (hasPlaceOps && resolvedAddPlaceCount > 0 && failedAddPlaceCount > 0) {
+          messageParts.push(
+            `Note: I drafted ${resolvedAddPlaceCount} of ${proposedAddPlaceCount} place(s), but I still need clarification for the rest.`
+          );
+        }
         if (dropped > 0) {
           messageParts.push(`Note: I ignored ${dropped} change(s) because I couldn't find a referenced item.`);
         }

@@ -8,11 +8,26 @@ const GOOGLE_MAPS_API_KEY =
   process.env.GOOGLE_MAPS_API_KEY ||
   process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
 
-const GOOGLE_HTTP_REFERER = (() => {
-  const value = process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_SITE_URL;
-  if (!value) return null;
-  return value.endsWith("/") ? value : `${value}/`;
-})();
+const normalizeBaseUrl = (value: string | undefined | null) => {
+  const raw = String(value ?? "").trim();
+  if (!raw) return null;
+
+  const withProtocol = /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
+  try {
+    const url = new URL(withProtocol);
+    const href = url.href;
+    return href.endsWith("/") ? href : `${href}/`;
+  } catch {
+    return null;
+  }
+};
+
+const GOOGLE_HTTP_REFERER =
+  normalizeBaseUrl(process.env.NEXT_PUBLIC_APP_URL) ||
+  normalizeBaseUrl(process.env.NEXT_PUBLIC_SITE_URL) ||
+  normalizeBaseUrl(process.env.VERCEL_PROJECT_PRODUCTION_URL) ||
+  normalizeBaseUrl(process.env.NEXT_PUBLIC_VERCEL_URL) ||
+  normalizeBaseUrl(process.env.VERCEL_URL);
 const GOOGLE_HTTP_ORIGIN = (() => {
   if (!GOOGLE_HTTP_REFERER) return null;
   try {
@@ -122,38 +137,49 @@ function mapGooglePlaceToActivity(place: any): IActivity {
 // 1. Text search - search for places using natural language queries
 export const searchPlacesByText = async (
   textQuery: string,
-  latitude: number,
-  longitude: number,
+  latitude?: number,
+  longitude?: number,
   radiusInMeters: number = 25000
 ): Promise<IActivity[]> => {
+  const apiKey = GOOGLE_MAPS_API_KEY;
+  if (!apiKey) {
+    throw new Error("Google Places API key not configured");
+  }
+
   if (!textQuery || textQuery.trim().length < 2) {
     throw new Error("Search query must be at least 2 characters");
   }
 
-  const validRadius = Math.max(0, Math.min(50000, radiusInMeters));
+  const hasCoordinates = typeof latitude === "number" && Number.isFinite(latitude) && typeof longitude === "number" && Number.isFinite(longitude);
+  const validRadius = hasCoordinates ? Math.max(0, Math.min(50000, radiusInMeters)) : 0;
   const { cachedSearch } = await import("@/lib/cache/searchCache");
-  const cacheKey = `textSearch:${textQuery.toLowerCase().trim()}:${latitude.toFixed(4)},${longitude.toFixed(4)}:${validRadius}`;
+  const cacheKey = hasCoordinates
+    ? `textSearch:${textQuery.toLowerCase().trim()}:${latitude!.toFixed(4)},${longitude!.toFixed(4)}:${validRadius}`
+    : `textSearch:${textQuery.toLowerCase().trim()}:global`;
   
   return await cachedSearch(
     cacheKey,
     async () => {
-      const requestBody = {
+      const requestBody: any = {
         textQuery,
         maxResultCount: 20,
-        locationBias: {
+      };
+
+      if (hasCoordinates && validRadius > 0) {
+        requestBody.locationBias = {
           circle: {
-            center: { latitude, longitude },
+            center: { latitude: latitude!, longitude: longitude! },
             radius: validRadius,
           },
-        },
-      };
+        };
+      }
 
       const shouldLog = process.env.DEBUG_GOOGLE_PLACES === "1";
       if (shouldLog) {
         console.log("Text Search API request:", {
           requestBody,
           apiKey: GOOGLE_MAPS_API_KEY ? "present" : "missing",
-          coordinates: { latitude, longitude },
+          coordinates: hasCoordinates ? { latitude, longitude } : null,
           validRadius,
         });
       }
@@ -162,7 +188,7 @@ export const searchPlacesByText = async (
         method: "POST",
         headers: googleRequestHeaders({
           "Content-Type": "application/json",
-          "X-Goog-Api-Key": GOOGLE_MAPS_API_KEY!,
+          "X-Goog-Api-Key": apiKey,
           "X-Goog-FieldMask":
             "places.id,places.displayName,places.formattedAddress,places.location,places.types,places.rating,places.priceLevel,places.photos,places.editorialSummary,places.websiteUri,places.nationalPhoneNumber",
         }),
@@ -201,6 +227,11 @@ export const fetchNearbyActivities = async (
   radiusInMeters: number = 25000,
   searchType: SearchType = "all"
 ): Promise<IActivity[]> => {
+  const apiKey = GOOGLE_MAPS_API_KEY;
+  if (!apiKey) {
+    throw new Error("Google Places API key not configured");
+  }
+
   const validRadius = Math.max(0, Math.min(50000, radiusInMeters));
   const { cachedSearch } = await import("@/lib/cache/searchCache");
   const cacheKey = `nearby:${latitude.toFixed(4)},${longitude.toFixed(4)}:${validRadius}:${searchType}`;
@@ -228,7 +259,7 @@ export const fetchNearbyActivities = async (
         method: "POST",
         headers: googleRequestHeaders({
           "Content-Type": "application/json",
-          "X-Goog-Api-Key": GOOGLE_MAPS_API_KEY!,
+          "X-Goog-Api-Key": apiKey,
           "X-Goog-FieldMask":
             "places.id,places.displayName,places.formattedAddress,places.location,places.types,places.rating,places.priceLevel,places.photos,places.editorialSummary,places.websiteUri,places.nationalPhoneNumber",
         }),
@@ -245,7 +276,10 @@ export const fetchNearbyActivities = async (
       });
 
       if (!response.ok) {
-        throw new Error(`Nearby search failed: ${response.status} ${response.statusText}`);
+        const errorBody = await response.text().catch(() => "");
+        throw new Error(
+          `Nearby search failed: ${response.status} ${response.statusText}${errorBody ? ` - ${errorBody}` : ""}`
+        );
       }
 
       const data = await response.json();
@@ -262,6 +296,11 @@ export const getGoogleMapsAutocomplete = async (
   longitude: number | undefined,
   radiusInMeters: number = 25000
 ) => {
+  const apiKey = GOOGLE_MAPS_API_KEY;
+  if (!apiKey) {
+    throw new Error("Google Places API key not configured");
+  }
+
   if (!input || input.trim().length < 2) {
     return [];
   }
@@ -290,7 +329,7 @@ export const getGoogleMapsAutocomplete = async (
         method: "POST",
         headers: googleRequestHeaders({
           "Content-Type": "application/json",
-          "X-Goog-Api-Key": GOOGLE_MAPS_API_KEY!,
+          "X-Goog-Api-Key": apiKey,
           "X-Goog-FieldMask":
             "suggestions.placePrediction.place,suggestions.placePrediction.structuredFormat,suggestions.placePrediction.types",
         }),
@@ -298,7 +337,10 @@ export const getGoogleMapsAutocomplete = async (
       });
 
       if (!response.ok) {
-        throw new Error(`Autocomplete failed: ${response.status} ${response.statusText}`);
+        const errorBody = await response.text().catch(() => "");
+        throw new Error(
+          `Autocomplete failed: ${response.status} ${response.statusText}${errorBody ? ` - ${errorBody}` : ""}`
+        );
       }
 
       const data = await response.json();
@@ -320,6 +362,11 @@ export const getGoogleMapsAutocomplete = async (
 
 // 4. Place details - get detailed information about a specific place
 export const fetchPlaceDetails = async (placeId: string): Promise<IActivity> => {
+  const apiKey = GOOGLE_MAPS_API_KEY;
+  if (!apiKey) {
+    throw new Error("Google Places API key not configured");
+  }
+
   if (!placeId || placeId.trim().length < 3) {
     throw new Error("Invalid place id");
   }
@@ -333,14 +380,17 @@ export const fetchPlaceDetails = async (placeId: string): Promise<IActivity> => 
     async () => {
       const response = await fetch(`https://places.googleapis.com/v1/places/${normalized}`, {
         headers: googleRequestHeaders({
-          "X-Goog-Api-Key": GOOGLE_MAPS_API_KEY!,
+          "X-Goog-Api-Key": apiKey,
           "X-Goog-FieldMask":
             "id,displayName,formattedAddress,location,types,priceLevel,rating,editorialSummary,websiteUri,nationalPhoneNumber,photos,regularOpeningHours,reviews",
         }),
       });
 
       if (!response.ok) {
-        throw new Error(`Failed to fetch place details: ${response.status} ${response.statusText}`);
+        const errorBody = await response.text().catch(() => "");
+        throw new Error(
+          `Failed to fetch place details: ${response.status} ${response.statusText}${errorBody ? ` - ${errorBody}` : ""}`
+        );
       }
 
       const place = await response.json();
@@ -352,7 +402,10 @@ export const fetchPlaceDetails = async (placeId: string): Promise<IActivity> => 
 
 // 5. Simple geocoding - get coordinates for a city
 export const fetchCityCoordinates = async (cityName: string, countryName: string) => {
-  const GEOCODING_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_GEOCODING_API_KEY || GOOGLE_MAPS_API_KEY;
+  const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_GEOCODING_API_KEY || GOOGLE_MAPS_API_KEY;
+  if (!apiKey) {
+    throw new Error("Google Geocoding API key not configured");
+  }
   const searchQuery = `${String(cityName ?? "").trim()}, ${String(countryName ?? "").trim()}`.trim();
   if (!searchQuery || searchQuery.length < 2) {
     throw new Error("Invalid location query");
@@ -366,15 +419,21 @@ export const fetchCityCoordinates = async (cityName: string, countryName: string
     async () => {
       const geocodingUrl = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(
         searchQuery
-      )}&key=${GEOCODING_API_KEY}`;
+      )}&key=${encodeURIComponent(apiKey)}`;
 
       const geocodingResponse = await fetch(geocodingUrl, {
         headers: googleRequestHeaders({}),
       });
       const geocodingData = await geocodingResponse.json();
 
+      const status = typeof geocodingData?.status === "string" ? geocodingData.status : "UNKNOWN";
+      if (status !== "OK") {
+        const errorMessage = typeof geocodingData?.error_message === "string" ? geocodingData.error_message : "";
+        throw new Error(`Geocoding failed (${status})${errorMessage ? `: ${errorMessage}` : ""}`);
+      }
+
       if (!geocodingData.results || geocodingData.results.length === 0) {
-        throw new Error(`No results found for: ${searchQuery}`);
+        throw new Error(`Geocoding returned no results for: ${searchQuery}`);
       }
 
       const { lng: longitude, lat: latitude } = geocodingData.results[0].geometry.location;
