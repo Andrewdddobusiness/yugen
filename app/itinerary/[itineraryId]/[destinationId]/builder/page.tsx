@@ -269,24 +269,54 @@ export default function Builder() {
       return;
     }
 
-    // Otherwise, merge in any missing rows from the query result, but never
-    // overwrite in-memory versions of existing activities.
-    const byId = new Map<string, IItineraryActivity>();
-    for (const activity of current) {
-      byId.set(String(activity.itinerary_activity_id), activity);
+    // Otherwise, reconcile against the latest bootstrap payload while preserving
+    // the current in-memory ordering. This keeps UI in sync with backend changes
+    // coming from AI/actions (including deletions), while avoiding view resets.
+    const incomingById = new Map<string, IItineraryActivity>();
+    for (const activity of data) {
+      const id = String(activity.itinerary_activity_id ?? "");
+      if (!id) continue;
+      incomingById.set(id, activity);
     }
 
+    const next: IItineraryActivity[] = [];
     let changed = false;
-    for (const activity of data) {
-      const id = String(activity.itinerary_activity_id);
-      if (!byId.has(id)) {
-        byId.set(id, activity);
+
+    for (const existing of current) {
+      const id = String(existing.itinerary_activity_id ?? "");
+      if (!id) continue;
+
+      const incoming = incomingById.get(id);
+      if (!incoming) {
+        // Removed/soft-deleted on the backend.
+        changed = true;
+        continue;
+      }
+
+      incomingById.delete(id);
+
+      const merged: IItineraryActivity = {
+        ...existing,
+        ...incoming,
+        activity:
+          existing.activity && incoming.activity
+            ? { ...existing.activity, ...incoming.activity }
+            : incoming.activity ?? existing.activity,
+      };
+
+      if (merged !== existing) {
         changed = true;
       }
+      next.push(merged);
+    }
+
+    if (incomingById.size > 0) {
+      changed = true;
+      next.push(...Array.from(incomingById.values()));
     }
 
     if (changed) {
-      setItineraryActivities(Array.from(byId.values()));
+      setItineraryActivities(next);
     }
   }, [bootstrap, itinId, setItineraryActivities]);
 
@@ -310,38 +340,62 @@ export default function Builder() {
       return;
     }
 
-    const slotsById = new Map<string, IItinerarySlot>();
-    for (const slot of currentSlots) {
-      slotsById.set(String(slot.itinerary_slot_id), slot);
+    const incomingSlotsById = new Map<string, IItinerarySlot>();
+    for (const slot of incomingSlots) {
+      const id = String(slot.itinerary_slot_id ?? "");
+      if (!id) continue;
+      incomingSlotsById.set(id, slot);
     }
 
+    const nextSlots: IItinerarySlot[] = [];
     let slotsChanged = false;
-    for (const slot of incomingSlots) {
-      const id = String(slot.itinerary_slot_id);
-      if (!slotsById.has(id)) {
-        slotsById.set(id, slot);
+    for (const existing of currentSlots) {
+      const id = String(existing.itinerary_slot_id ?? "");
+      if (!id) continue;
+      const incoming = incomingSlotsById.get(id);
+      if (!incoming) {
         slotsChanged = true;
+        continue;
       }
+      incomingSlotsById.delete(id);
+      nextSlots.push({ ...existing, ...incoming });
+      slotsChanged = true;
+    }
+    if (incomingSlotsById.size > 0) {
+      slotsChanged = true;
+      nextSlots.push(...Array.from(incomingSlotsById.values()));
     }
     if (slotsChanged) {
-      setSlots(Array.from(slotsById.values()));
+      setSlots(nextSlots);
     }
 
-    const optionsById = new Map<string, IItinerarySlotOption>();
-    for (const option of currentOptions) {
-      optionsById.set(String(option.itinerary_slot_option_id), option);
-    }
-
-    let optionsChanged = false;
+    const incomingOptionsById = new Map<string, IItinerarySlotOption>();
     for (const option of incomingOptions) {
-      const id = String(option.itinerary_slot_option_id);
-      if (!optionsById.has(id)) {
-        optionsById.set(id, option);
+      const id = String(option.itinerary_slot_option_id ?? "");
+      if (!id) continue;
+      incomingOptionsById.set(id, option);
+    }
+
+    const nextOptions: IItinerarySlotOption[] = [];
+    let optionsChanged = false;
+    for (const existing of currentOptions) {
+      const id = String(existing.itinerary_slot_option_id ?? "");
+      if (!id) continue;
+      const incoming = incomingOptionsById.get(id);
+      if (!incoming) {
         optionsChanged = true;
+        continue;
       }
+      incomingOptionsById.delete(id);
+      nextOptions.push({ ...existing, ...incoming });
+      optionsChanged = true;
+    }
+    if (incomingOptionsById.size > 0) {
+      optionsChanged = true;
+      nextOptions.push(...Array.from(incomingOptionsById.values()));
     }
     if (optionsChanged) {
-      setSlotOptions(Array.from(optionsById.values()));
+      setSlotOptions(nextOptions);
     }
   }, [bootstrap, destId, setSlots, setSlotOptions]);
 
@@ -361,22 +415,38 @@ export default function Builder() {
       return;
     }
 
-    const byId = new Map<number, ItineraryCustomEvent>();
-    for (const event of current) {
-      byId.set(Number(event.itinerary_custom_event_id), event);
+    const incomingById = new Map<string, ItineraryCustomEvent>();
+    for (const event of data) {
+      const id = String((event as any)?.itinerary_custom_event_id ?? "");
+      if (!id) continue;
+      incomingById.set(id, event);
     }
 
+    const next: ItineraryCustomEvent[] = [];
     let changed = false;
-    for (const event of data) {
-      const id = Number(event.itinerary_custom_event_id);
-      if (!byId.has(id)) {
-        byId.set(id, event);
+
+    for (const existing of current) {
+      const id = String((existing as any)?.itinerary_custom_event_id ?? "");
+      if (!id) continue;
+
+      const incoming = incomingById.get(id);
+      if (!incoming) {
         changed = true;
+        continue;
       }
+
+      incomingById.delete(id);
+      next.push({ ...existing, ...incoming });
+      changed = true;
+    }
+
+    if (incomingById.size > 0) {
+      changed = true;
+      next.push(...Array.from(incomingById.values()));
     }
 
     if (changed) {
-      setCustomEvents(Array.from(byId.values()));
+      setCustomEvents(next);
     }
   }, [bootstrap, itinId, setCustomEvents]);
 
