@@ -52,6 +52,7 @@ import {
   extractPreferenceHintsFromMessage,
   inferPreferencesFromActivities,
 } from "@/lib/ai/itinerary/intelligence/preferences";
+import { buildAdjacentSegmentsForDate } from "@/lib/ai/itinerary/intelligence/segments";
 
 export const runtime = "nodejs";
 // Vercel: allow longer AI requests before timing out (plan-dependent).
@@ -1695,26 +1696,33 @@ const buildTravelTimeWarnings = async (args: {
   let travelTimeUnavailableWarned = false;
 
   for (const [date, rows] of byDate.entries()) {
-    const sorted = [...rows].sort((a, b) => {
-      const aStart = parseTimeToMinutes(a.startTime) ?? 0;
-      const bStart = parseTimeToMinutes(b.startTime) ?? 0;
-      if (aStart !== bStart) return aStart - bStart;
-      return a.name.localeCompare(b.name);
+    const byIdForDate = new Map<string, PlannedScheduleRow>();
+    for (const row of rows) {
+      byIdForDate.set(row.id, row);
+    }
+
+    const segments = buildAdjacentSegmentsForDate({
+      date,
+      rows: rows.map((row) => ({
+        id: row.id,
+        name: row.name,
+        date: row.date,
+        startTime: row.startTime,
+        endTime: row.endTime,
+      })),
     });
 
-    for (let i = 0; i < sorted.length - 1; i += 1) {
+    for (const segment of segments) {
       if (computedSegments >= maxSegments) {
         warnings.push("Travel-time checks skipped for some items (too many segments to validate in one request).");
         return warnings;
       }
 
-      const from = sorted[i]!;
-      const to = sorted[i + 1]!;
-      const fromEndMin = parseTimeToMinutes(from.endTime) ?? null;
-      const toStartMin = parseTimeToMinutes(to.startTime) ?? null;
-      if (fromEndMin == null || toStartMin == null) continue;
+      const from = byIdForDate.get(segment.fromId);
+      const to = byIdForDate.get(segment.toId);
+      if (!from || !to) continue;
 
-      const gapMinutes = toStartMin - fromEndMin;
+      const gapMinutes = segment.gapMinutes;
       if (gapMinutes <= 0) {
         warnings.push(`Schedule overlap on ${date}: "${from.name}" ends after "${to.name}" starts.`);
         continue;
@@ -1740,7 +1748,7 @@ const buildTravelTimeWarnings = async (args: {
 
       const travelMinutes = Math.max(0, Math.ceil(durationSeconds / 60));
       const conflict = classifyTravelTimeConflict({ gapMinutes, travelMinutes, bufferMinutes });
-      if (conflict.ok) continue;
+      if (conflict.status !== "conflict") continue;
 
       warnings.push(
         `Travel time conflict on ${date}: "${from.name}" → "${to.name}" needs ~${conflict.requiredGapMinutes} min (incl. buffer) but only has ${gapMinutes} min gap.`
