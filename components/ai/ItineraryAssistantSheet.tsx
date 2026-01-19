@@ -280,6 +280,7 @@ const parseTimeToMinutes = (value: string | null | undefined) => {
 const getOperationEffectiveDateKey = (op: Operation, activityById: Map<string, any>) => {
   if (op.op === "add_destination") return op.fromDate;
   if (op.op === "update_destination_dates") return op.fromDate;
+  if (op.op === "update_destination") return op.fromDate ?? "unscheduled";
   if (op.op === "insert_destination_after" || op.op === "remove_destination") return "unscheduled";
 
   if (op.op === "add_place") {
@@ -305,7 +306,13 @@ const getOperationEffectiveDateKey = (op: Operation, activityById: Map<string, a
 };
 
 const getOperationEffectiveStartMinutes = (op: Operation, activityById: Map<string, any>) => {
-  if (op.op === "add_destination" || op.op === "update_destination_dates" || op.op === "insert_destination_after" || op.op === "remove_destination") {
+  if (
+    op.op === "add_destination" ||
+    op.op === "update_destination_dates" ||
+    op.op === "update_destination" ||
+    op.op === "insert_destination_after" ||
+    op.op === "remove_destination"
+  ) {
     return null;
   }
 
@@ -671,6 +678,7 @@ function ItineraryAssistantChat(props: {
                   op.op === "add_destination" ||
                   op.op === "insert_destination_after" ||
                   op.op === "update_destination_dates" ||
+                  op.op === "update_destination" ||
                   op.op === "remove_destination"
               ) ||
               draftOps.length > 10;
@@ -1026,7 +1034,7 @@ function ItineraryAssistantChat(props: {
 	              if (op.op === "update_activity" || op.op === "remove_activity") return op.itineraryActivityId;
 	              if (op.op === "add_destination") return `${op.city}, ${op.country}`;
 	              if (op.op === "insert_destination_after") return `${op.city}, ${op.country}`;
-	              if (op.op === "update_destination_dates" || op.op === "remove_destination") {
+	              if (op.op === "update_destination_dates" || op.op === "update_destination" || op.op === "remove_destination") {
                   const id = String(op.itineraryDestinationId ?? "");
                   return destinationLabelById.get(id) ?? `destination ${id || "unknown"}`;
                 }
@@ -1209,6 +1217,25 @@ function ItineraryAssistantChat(props: {
 	          { label: "Dates", after: `${formatDateLabel(op.fromDate)} → ${formatDateLabel(op.toDate)}` },
 	          { label: "Shift activities", after: op.shiftActivities === false ? "No" : "Yes" },
 	        ];
+	        return {
+	          dateKey,
+	          row: { number, kind: "update", title, timeLabel: null, details, operation: op },
+	        };
+	      }
+
+	      if (op.op === "update_destination") {
+	        const title =
+	          destinationLabelById.get(String(op.itineraryDestinationId)) ?? `Destination ${op.itineraryDestinationId}`;
+	        const details: ChangeRow["details"] = [];
+	        if (op.city && op.country) {
+	          details.push({ label: "Location", after: `${op.city}, ${op.country}` });
+	        }
+	        if (op.fromDate && op.toDate) {
+	          details.push({ label: "Dates", after: `${formatDateLabel(op.fromDate)} → ${formatDateLabel(op.toDate)}` });
+	        }
+	        if (op.shiftActivities !== undefined) {
+	          details.push({ label: "Shift activities", after: op.shiftActivities === false ? "No" : "Yes" });
+	        }
 	        return {
 	          dateKey,
 	          row: { number, kind: "update", title, timeLabel: null, details, operation: op },

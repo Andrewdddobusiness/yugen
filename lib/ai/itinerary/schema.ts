@@ -70,6 +70,16 @@ const UpdateDestinationDatesOperationSchema = z.object({
   shiftActivities: z.boolean().optional(),
 });
 
+const UpdateDestinationOperationSchema = z.object({
+  op: z.literal("update_destination"),
+  itineraryDestinationId: ItineraryDestinationIdSchema,
+  city: ItineraryDestinationCitySchema.optional(),
+  country: ItineraryDestinationCountrySchema.optional(),
+  fromDate: IsoDateSchema.optional(),
+  toDate: IsoDateSchema.optional(),
+  shiftActivities: z.boolean().optional(),
+});
+
 const InsertDestinationAfterOperationSchema = z.object({
   op: z.literal("insert_destination_after"),
   afterItineraryDestinationId: ItineraryDestinationIdSchema,
@@ -120,6 +130,7 @@ export const ProposedOperationSchema = z
     AddAlternativesOperationSchema,
     AddDestinationOperationSchema,
     UpdateDestinationDatesOperationSchema,
+    UpdateDestinationOperationSchema,
     InsertDestinationAfterOperationSchema,
     RemoveDestinationOperationSchema,
   ])
@@ -160,6 +171,44 @@ export const ProposedOperationSchema = z
           message: "toDate must be on or after fromDate",
           path: ["toDate"],
         });
+      }
+      return;
+    }
+
+    if (value.op === "update_destination") {
+      const touchesLocation = value.city !== undefined || value.country !== undefined;
+      const touchesDates = value.fromDate !== undefined || value.toDate !== undefined;
+      if (!touchesLocation && !touchesDates) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "update_destination must include at least one of city/country or fromDate/toDate",
+        });
+        return;
+      }
+
+      if (touchesLocation && (value.city === undefined || value.country === undefined)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "When changing destination location, provide both city and country.",
+        });
+        return;
+      }
+
+      if (touchesDates) {
+        if (value.fromDate === undefined || value.toDate === undefined) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: "When changing destination dates, provide both fromDate and toDate.",
+          });
+          return;
+        }
+        if (value.toDate < value.fromDate) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: "toDate must be on or after fromDate",
+            path: ["toDate"],
+          });
+        }
       }
       return;
     }
@@ -208,6 +257,7 @@ export const OperationSchema = z
     AddAlternativesOperationSchema,
     AddDestinationOperationSchema,
     UpdateDestinationDatesOperationSchema,
+    UpdateDestinationOperationSchema,
     InsertDestinationAfterOperationSchema,
     RemoveDestinationOperationSchema,
   ])
@@ -248,6 +298,36 @@ export const OperationSchema = z
           message: "toDate must be on or after fromDate",
           path: ["toDate"],
         });
+      }
+      if (value.op === "update_destination") {
+        const touchesLocation = value.city !== undefined || value.country !== undefined;
+        const touchesDates = value.fromDate !== undefined || value.toDate !== undefined;
+        if (!touchesLocation && !touchesDates) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: "update_destination must include at least one of city/country or fromDate/toDate",
+          });
+        }
+        if (touchesLocation && (value.city === undefined || value.country === undefined)) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: "When changing destination location, provide both city and country.",
+          });
+        }
+        if (touchesDates) {
+          if (value.fromDate === undefined || value.toDate === undefined) {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              message: "When changing destination dates, provide both fromDate and toDate.",
+            });
+          } else if (value.toDate < value.fromDate) {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              message: "toDate must be on or after fromDate",
+              path: ["toDate"],
+            });
+          }
+        }
       }
       return;
     }

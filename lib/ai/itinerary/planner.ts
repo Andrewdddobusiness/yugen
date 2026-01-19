@@ -178,6 +178,18 @@ const formatDraftOperationLine = (operation: Operation, index: number) => {
     return `- #${number} update_destination_dates: destinationId=${operation.itineraryDestinationId} | dates: ${operation.fromDate} → ${operation.toDate} | shiftActivities: ${shift}`;
   }
 
+  if (operation.op === "update_destination") {
+    const touchesLocation = typeof (operation as any).city === "string" && typeof (operation as any).country === "string";
+    const touchesDates = typeof (operation as any).fromDate === "string" && typeof (operation as any).toDate === "string";
+    const parts: string[] = [];
+    if (touchesLocation) parts.push(`location: ${(operation as any).city}, ${(operation as any).country}`);
+    if (touchesDates) parts.push(`dates: ${(operation as any).fromDate} → ${(operation as any).toDate}`);
+    if ((operation as any).shiftActivities !== undefined) {
+      parts.push(`shiftActivities: ${(operation as any).shiftActivities === false ? "no" : "yes"}`);
+    }
+    return `- #${number} update_destination: destinationId=${(operation as any).itineraryDestinationId} | ${parts.join(" | ")}`;
+  }
+
   if (operation.op === "remove_destination") {
     return `- #${number} remove_destination: destinationId=${operation.itineraryDestinationId}`;
   }
@@ -313,16 +325,18 @@ export async function planItineraryEdits(args: {
     '  1) {"op":"add_destination","city":"<city>","country":"<country>","fromDate":"YYYY-MM-DD","toDate":"YYYY-MM-DD"}',
     '  2) {"op":"insert_destination_after","afterItineraryDestinationId":"<destination id>","city":"<city>","country":"<country>","durationDays": <number>}',
     '  3) {"op":"update_destination_dates","itineraryDestinationId":"<destination id>","fromDate":"YYYY-MM-DD","toDate":"YYYY-MM-DD","shiftActivities"?: boolean}',
-    '  4) {"op":"remove_destination","itineraryDestinationId":"<destination id>"}',
-    '  5) {"op":"update_activity","itineraryActivityId":"<id>","date"?: "YYYY-MM-DD"|null,"startTime"?: "HH:MM"|null,"endTime"?: "HH:MM"|null,"notes"?: string|null}',
-    '  6) {"op":"remove_activity","itineraryActivityId":"<id>"}',
-    '  7) {"op":"add_place","query"?: "<place name or google maps link>","placeId"?: "<google place id>","name"?: string,"date"?: "YYYY-MM-DD"|null,"startTime"?: "HH:MM"|null,"endTime"?: "HH:MM"|null,"notes"?: string|null}',
-    '  8) {"op":"add_alternatives","targetItineraryActivityId":"<id>","alternativeItineraryActivityIds":["<id>", "..."]}',
+    '  4) {"op":"update_destination","itineraryDestinationId":"<destination id>","city"?: "<city>","country"?: "<country>","fromDate"?: "YYYY-MM-DD","toDate"?: "YYYY-MM-DD","shiftActivities"?: boolean}',
+    '  5) {"op":"remove_destination","itineraryDestinationId":"<destination id>"}',
+    '  6) {"op":"update_activity","itineraryActivityId":"<id>","date"?: "YYYY-MM-DD"|null,"startTime"?: "HH:MM"|null,"endTime"?: "HH:MM"|null,"notes"?: string|null}',
+    '  7) {"op":"remove_activity","itineraryActivityId":"<id>"}',
+    '  8) {"op":"add_place","query"?: "<place name or google maps link>","placeId"?: "<google place id>","name"?: string,"date"?: "YYYY-MM-DD"|null,"startTime"?: "HH:MM"|null,"endTime"?: "HH:MM"|null,"notes"?: string|null}',
+    '  9) {"op":"add_alternatives","targetItineraryActivityId":"<id>","alternativeItineraryActivityIds":["<id>", "..."]}',
     "- For update_activity/remove_activity: itineraryActivityId MUST be one of the ids in the provided activities list.",
     "- For add_alternatives: targetItineraryActivityId and alternativeItineraryActivityIds MUST be ids from the provided activities list.",
     "- For add_alternatives: alternativeItineraryActivityIds MUST be unique, MUST NOT include the target, and MUST include at most 3 ids.",
     "- For destination operations: use itineraryDestinationId values from the provided destinations list.",
     '- For destination operations: "city" and "country" MUST be plain place names only (e.g., city="Rome", country="Italy"). Do NOT include sentences ("I will be in"), verbs, dates, or extra commentary in these fields.',
+    '- For update_destination: when changing location, provide BOTH city and country; when changing dates, provide BOTH fromDate and toDate.',
     "- Operations MUST be incremental changes from the current itinerary state. Do NOT include operations that merely restate existing destinations/activities unchanged.",
     "- Never emit add_destination for a destination block that already exists (same city, country, fromDate, toDate). Only use add_destination for truly new destination blocks.",
     "- Use 24-hour time (HH:MM) in operations.",

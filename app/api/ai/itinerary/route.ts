@@ -191,7 +191,13 @@ const extractCityCountryFromPhrase = (phrase: string): { city: string; country: 
 };
 
 const sanitizeDestinationOperation = (operation: Operation): Operation => {
-  if (operation.op !== "add_destination" && operation.op !== "insert_destination_after") return operation;
+  if (
+    operation.op !== "add_destination" &&
+    operation.op !== "insert_destination_after" &&
+    operation.op !== "update_destination"
+  ) {
+    return operation;
+  }
 
   const cityRaw = String((operation as any).city ?? "");
   const countryRaw = String((operation as any).country ?? "");
@@ -224,6 +230,16 @@ const sanitizeDestinationOperation = (operation: Operation): Operation => {
     };
   }
 
+  if (operation.op === "update_destination") {
+    const hasLocation = Boolean(city.trim()) || Boolean(country.trim());
+    if (!hasLocation) return operation;
+    return {
+      ...operation,
+      city,
+      country,
+    } as any;
+  }
+
   return {
     ...operation,
     city,
@@ -234,7 +250,7 @@ const sanitizeDestinationOperation = (operation: Operation): Operation => {
 const coerceOverlappingAddDestinationOps = (args: { operations: Operation[]; itineraryDestinations: any[] }) => {
   const touchedDestinationIds = new Set<string>();
   for (const operation of args.operations) {
-    if (operation.op === "update_destination_dates" || operation.op === "remove_destination") {
+    if (operation.op === "update_destination_dates" || operation.op === "update_destination" || operation.op === "remove_destination") {
       touchedDestinationIds.add(String((operation as any).itineraryDestinationId ?? ""));
     }
   }
@@ -254,24 +270,52 @@ const coerceOverlappingAddDestinationOps = (args: { operations: Operation[]; iti
       return rowCity === city && rowCountry === country;
     });
 
-    if (matches.length !== 1) return operation;
+    if (matches.length === 1) {
+      const match = matches[0]!;
+      const destinationId = String((match as any)?.itinerary_destination_id ?? "");
+      if (destinationId && !touchedDestinationIds.has(destinationId)) {
+        const existingFrom = String((match as any)?.from_date ?? "");
+        const existingTo = String((match as any)?.to_date ?? "");
+        if (isIsoDate(existingFrom) && isIsoDate(existingTo)) {
+          const overlaps = !(operation.toDate < existingFrom || operation.fromDate > existingTo);
+          if (overlaps) {
+            touchedDestinationIds.add(destinationId);
+            return {
+              op: "update_destination_dates",
+              itineraryDestinationId: destinationId,
+              fromDate: operation.fromDate,
+              toDate: operation.toDate,
+            } as any;
+          }
+        }
+      }
+    }
 
-    const match = matches[0]!;
-    const destinationId = String((match as any)?.itinerary_destination_id ?? "");
-    if (!destinationId || touchedDestinationIds.has(destinationId)) return operation;
+    // If the date range overlaps an existing destination, treat this as a request to update that destination
+    // instead of inserting a new overlapping one.
+    const overlapping = args.itineraryDestinations.filter((dest) => {
+      const from = String((dest as any)?.from_date ?? "");
+      const to = String((dest as any)?.to_date ?? "");
+      if (!isIsoDate(from) || !isIsoDate(to)) return false;
+      return !(operation.toDate < from || operation.fromDate > to);
+    });
+    const overlapCandidates = overlapping.filter((dest) => {
+      const id = String((dest as any)?.itinerary_destination_id ?? "");
+      if (!id) return false;
+      return !touchedDestinationIds.has(id);
+    });
 
-    const existingFrom = String((match as any)?.from_date ?? "");
-    const existingTo = String((match as any)?.to_date ?? "");
-    if (!isIsoDate(existingFrom) || !isIsoDate(existingTo)) return operation;
+    if (overlapCandidates.length !== 1) return operation;
 
-    const overlaps = !(operation.toDate < existingFrom || operation.fromDate > existingTo);
-    if (!overlaps) return operation;
-
-    touchedDestinationIds.add(destinationId);
+    const overlapId = String((overlapCandidates[0] as any)?.itinerary_destination_id ?? "");
+    if (!overlapId || touchedDestinationIds.has(overlapId)) return operation;
+    touchedDestinationIds.add(overlapId);
 
     return {
-      op: "update_destination_dates",
-      itineraryDestinationId: destinationId,
+      op: "update_destination",
+      itineraryDestinationId: overlapId,
+      city: operation.city,
+      country: operation.country,
       fromDate: operation.fromDate,
       toDate: operation.toDate,
     } as any;
@@ -303,9 +347,21 @@ const canonicalizeDestinationOpsWithGoogle = async (operations: Operation[]): Pr
   const result: Operation[] = [];
 
   for (const operation of operations) {
-    if (operation.op !== "add_destination" && operation.op !== "insert_destination_after") {
+    if (
+      operation.op !== "add_destination" &&
+      operation.op !== "insert_destination_after" &&
+      operation.op !== "update_destination"
+    ) {
       result.push(operation);
       continue;
+    }
+
+    if (operation.op === "update_destination") {
+      const hasLocation = typeof (operation as any).city === "string" && typeof (operation as any).country === "string";
+      if (!hasLocation) {
+        result.push(operation);
+        continue;
+      }
     }
 
     const cityRaw = stripWrappingDelimiters(String((operation as any).city ?? ""));
@@ -376,6 +432,36 @@ const isRedundantUpdateDestinationDates = (args: {
   );
 };
 
+const isRedundantUpdateDestination = (args: {
+  operation: Operation & { op: "update_destination" };
+  destinationById: Map<string, any>;
+}) => {
+  const row = args.destinationById.get(String(args.operation.itineraryDestinationId ?? ""));
+  if (!row) return false;
+
+  const touchesLocation = typeof (args.operation as any).city === "string" || typeof (args.operation as any).country === "string";
+  if (touchesLocation) {
+    if (
+      String((row as any)?.city ?? "") !== String((args.operation as any)?.city ?? "") ||
+      String((row as any)?.country ?? "") !== String((args.operation as any)?.country ?? "")
+    ) {
+      return false;
+    }
+  }
+
+  const touchesDates = typeof (args.operation as any).fromDate === "string" || typeof (args.operation as any).toDate === "string";
+  if (touchesDates) {
+    if (
+      String((row as any)?.from_date ?? "") !== String((args.operation as any)?.fromDate ?? "") ||
+      String((row as any)?.to_date ?? "") !== String((args.operation as any)?.toDate ?? "")
+    ) {
+      return false;
+    }
+  }
+
+  return true;
+};
+
 const pruneRedundantDestinationOperations = (args: {
   operations: Operation[];
   itineraryDestinations: any[];
@@ -391,6 +477,11 @@ const pruneRedundantDestinationOperations = (args: {
     }
 
     if (operation.op === "update_destination_dates" && isRedundantUpdateDestinationDates({ operation, destinationById: args.destinationById })) {
+      removed += 1;
+      continue;
+    }
+
+    if (operation.op === "update_destination" && isRedundantUpdateDestination({ operation, destinationById: args.destinationById })) {
       removed += 1;
       continue;
     }
@@ -519,33 +610,88 @@ const buildDestinationOpsFromTripSegments = (args: {
   segments: ParsedTripSegment[];
   itineraryDestinations: any[];
 }): Operation[] => {
-  const destinationByCityCountry = new Map<string, any>();
+  const destinations: Array<{
+    id: string;
+    cityNorm: string;
+    countryNorm: string;
+    from: string | null;
+    to: string | null;
+    order: number;
+    row: any;
+  }> = [];
+  const destinationByCityCountry = new Map<string, any[]>();
+
   for (const row of args.itineraryDestinations) {
-    const city = normalizeDestinationText((row as any)?.city);
-    const country = normalizeDestinationText((row as any)?.country);
+    const cityNorm = normalizeDestinationText((row as any)?.city);
+    const countryNorm = normalizeDestinationText((row as any)?.country);
     const id = String((row as any)?.itinerary_destination_id ?? "");
-    if (!city || !country || !id) continue;
-    const key = `${city}|${country}`;
-    if (!destinationByCityCountry.has(key)) destinationByCityCountry.set(key, row);
+    if (!cityNorm || !countryNorm || !id) continue;
+
+    const from = isIsoDate((row as any)?.from_date) ? String((row as any).from_date) : null;
+    const to = isIsoDate((row as any)?.to_date) ? String((row as any).to_date) : null;
+    const order = Number((row as any)?.order_number ?? 0);
+
+    destinations.push({ id, cityNorm, countryNorm, from, to, order, row });
+
+    const key = `${cityNorm}|${countryNorm}`;
+    const list = destinationByCityCountry.get(key) ?? [];
+    list.push(row);
+    destinationByCityCountry.set(key, list);
+  }
+
+  for (const [key, list] of destinationByCityCountry) {
+    destinationByCityCountry.set(
+      key,
+      list.slice().sort((a, b) => Number((a as any)?.order_number ?? 0) - Number((b as any)?.order_number ?? 0))
+    );
   }
 
   const operations: Operation[] = [];
+  const usedDestinationIds = new Set<string>();
+
   for (const segment of args.segments) {
     const cityNorm = normalizeDestinationText(segment.city);
     const countryNorm = normalizeDestinationText(segment.country);
     if (!cityNorm || !countryNorm) continue;
 
-    const existing = destinationByCityCountry.get(`${cityNorm}|${countryNorm}`);
-    if (existing) {
-      const existingFrom = String((existing as any)?.from_date ?? "");
-      const existingTo = String((existing as any)?.to_date ?? "");
+    const key = `${cityNorm}|${countryNorm}`;
+    const matching = (destinationByCityCountry.get(key) ?? []).find((row) => {
+      const id = String((row as any)?.itinerary_destination_id ?? "");
+      return id && !usedDestinationIds.has(id);
+    });
+
+    if (matching) {
+      const destinationId = String((matching as any)?.itinerary_destination_id ?? "");
+      if (!destinationId) continue;
+      usedDestinationIds.add(destinationId);
+
+      const existingFrom = String((matching as any)?.from_date ?? "");
+      const existingTo = String((matching as any)?.to_date ?? "");
       if (existingFrom === segment.from && existingTo === segment.to) continue;
 
-      const destinationId = String((existing as any)?.itinerary_destination_id ?? "");
-      if (!destinationId) continue;
       operations.push({
         op: "update_destination_dates",
         itineraryDestinationId: destinationId,
+        fromDate: segment.from,
+        toDate: segment.to,
+      } as any);
+      continue;
+    }
+
+    const overlapCandidates = destinations.filter((dest) => {
+      if (usedDestinationIds.has(dest.id)) return false;
+      if (!dest.from || !dest.to) return false;
+      return !(segment.to < dest.from || segment.from > dest.to);
+    });
+
+    if (overlapCandidates.length === 1) {
+      const overlap = overlapCandidates[0]!;
+      usedDestinationIds.add(overlap.id);
+      operations.push({
+        op: "update_destination",
+        itineraryDestinationId: overlap.id,
+        city: segment.city,
+        country: segment.country,
         fromDate: segment.from,
         toDate: segment.to,
       } as any);
@@ -1434,6 +1580,20 @@ const buildPreviewLines = (
       const label =
         dest?.city && dest?.country ? `${dest.city}, ${dest.country}` : `destination ${operation.itineraryDestinationId}`;
       lines.push(`Update destination dates for "${label}": ${operation.fromDate} → ${operation.toDate}`);
+      continue;
+    }
+
+    if (operation.op === "update_destination") {
+      const dest = destinationById.get(operation.itineraryDestinationId);
+      const beforeLabel =
+        dest?.city && dest?.country ? `${dest.city}, ${dest.country}` : `destination ${operation.itineraryDestinationId}`;
+      const hasLocation =
+        typeof (operation as any).city === "string" && typeof (operation as any).country === "string";
+      const hasDates =
+        typeof (operation as any).fromDate === "string" && typeof (operation as any).toDate === "string";
+      const afterLabel = hasLocation ? `${(operation as any).city}, ${(operation as any).country}` : beforeLabel;
+      const dateLabel = hasDates ? ` (${(operation as any).fromDate} → ${(operation as any).toDate})` : "";
+      lines.push(`Update destination "${beforeLabel}" → "${afterLabel}"${dateLabel}`);
       continue;
     }
 
@@ -3407,8 +3567,9 @@ export async function POST(request: NextRequest) {
         parsedTrip.segments.length >= 2 && !hasDuplicateDestinationSegments
           ? buildDestinationOpsFromTripSegments({ segments: parsedTrip.segments, itineraryDestinations })
           : [];
+      const segmentOpsSanitized = segmentOpsRaw.map((operation) => sanitizeDestinationOperation(operation));
       const prunedSegmentOps = pruneRedundantDestinationOperations({
-        operations: segmentOpsRaw,
+        operations: segmentOpsSanitized,
         itineraryDestinations,
         destinationById,
       }).operations;
@@ -3639,7 +3800,11 @@ export async function POST(request: NextRequest) {
           }
         }
 
-        if (sanitizedOperation.op === "update_destination_dates" || sanitizedOperation.op === "remove_destination") {
+        if (
+          sanitizedOperation.op === "update_destination_dates" ||
+          sanitizedOperation.op === "update_destination" ||
+          sanitizedOperation.op === "remove_destination"
+        ) {
           const targetId = String(sanitizedOperation.itineraryDestinationId ?? "");
           if (!targetId || !destinationById.has(targetId)) {
             dropped += 1;
@@ -3656,6 +3821,16 @@ export async function POST(request: NextRequest) {
         ) {
           dropped += 1;
           clarifications.push("I can't remove the destination you're currently editing from within its builder.");
+          continue;
+        }
+
+        if (
+          sanitizedOperation.op === "update_destination" &&
+          String(sanitizedOperation.itineraryDestinationId) === String(destinationId) &&
+          (sanitizedOperation as any).city !== undefined
+        ) {
+          dropped += 1;
+          clarifications.push("I can't change the location of the destination you're currently editing from within its builder.");
           continue;
         }
 
@@ -4073,6 +4248,7 @@ export async function POST(request: NextRequest) {
               op.op === "add_destination" ||
               op.op === "insert_destination_after" ||
               op.op === "update_destination_dates" ||
+              op.op === "update_destination" ||
               op.op === "remove_destination"
           ) ||
           draftToReturn.length > CONFIRMATION_BATCH_THRESHOLD ||
@@ -4864,6 +5040,7 @@ export async function POST(request: NextRequest) {
         op.op === "add_destination" ||
         op.op === "insert_destination_after" ||
         op.op === "update_destination_dates" ||
+        op.op === "update_destination" ||
         op.op === "remove_destination"
     ) ||
     operations.length > CONFIRMATION_BATCH_THRESHOLD ||
@@ -5227,6 +5404,146 @@ export async function POST(request: NextRequest) {
 	            );
 	          }
 	          throw new Error(insertError.message || "Failed to insert destination");
+	        }
+
+	        const { data: refreshed } = await supabase
+	          .from("itinerary_destination")
+	          .select("itinerary_destination_id,city,country,from_date,to_date,order_number")
+	          .eq("itinerary_id", Number(itineraryId))
+	          .order("order_number", { ascending: true });
+	        itineraryDestinations = Array.isArray(refreshed) ? refreshed : itineraryDestinations;
+	        destinationById = new Map(
+	          itineraryDestinations
+	            .map((row) => [String((row as any)?.itinerary_destination_id ?? ""), row] as const)
+	            .filter((entry) => entry[0])
+	        );
+
+	        applied.push({ ok: true, operation });
+
+	        if (executeStep?.ai_itinerary_run_step_id) {
+	          await insertAiItineraryToolInvocation({
+	            supabase,
+	            stepId: executeStep.ai_itinerary_run_step_id,
+	            toolName: operation.op,
+	            status: "succeeded",
+	            toolArgs: operation,
+	          });
+	        }
+	        continue;
+	      }
+
+	      if (operation.op === "update_destination") {
+	        const destinationRow = destinationById.get(String(operation.itineraryDestinationId));
+	        if (!destinationRow) {
+	          throw new Error("Destination not found (or already removed).");
+	        }
+
+	        const touchesLocation =
+	          typeof (operation as any).city === "string" && typeof (operation as any).country === "string";
+	        const touchesDates =
+	          typeof (operation as any).fromDate === "string" && typeof (operation as any).toDate === "string";
+
+	        if (touchesLocation && String(operation.itineraryDestinationId) === String(destinationId)) {
+	          throw new Error("Can't change the location of the currently open destination from within its builder.");
+	        }
+
+	        if (touchesDates) {
+	          const oldTo = String((destinationRow as any)?.to_date ?? "");
+	          const oldOrder = Number((destinationRow as any)?.order_number ?? NaN);
+	          const oldFrom = String((destinationRow as any)?.from_date ?? "");
+	          const newFrom = (operation as any).fromDate;
+	          const newTo = (operation as any).toDate;
+
+	          if (isIsoDate(oldFrom) && isIsoDate(oldTo) && isIsoDate(newFrom) && isIsoDate(newTo)) {
+	            const prev = Number.isFinite(oldOrder)
+	              ? itineraryDestinations
+	                  .filter((dest) => Number((dest as any)?.order_number ?? NaN) < oldOrder)
+	                  .sort((a, b) => Number((b as any)?.order_number ?? 0) - Number((a as any)?.order_number ?? 0))[0]
+	              : null;
+	            const prevTo = prev && isIsoDate((prev as any)?.to_date) ? String((prev as any).to_date) : null;
+	            if (prevTo && newFrom <= prevTo) {
+	              throw new Error("That date change would overlap the previous destination.");
+	            }
+	          }
+
+	          const { error: updateError } = await supabase.rpc("ai_shift_destination_dates", {
+	            _itinerary_id: Number(itineraryId),
+	            _itinerary_destination_id: Number(operation.itineraryDestinationId),
+	            _new_from: newFrom,
+	            _new_to: newTo,
+	            _shift_activities: (operation as any).shiftActivities !== false,
+	          });
+
+	          if (updateError) {
+	            const code = String((updateError as any)?.code ?? "");
+	            if (code === "42883") {
+	              throw new Error(
+	                "Missing database function ai_shift_destination_dates. Please run the latest Supabase migrations."
+	              );
+	            }
+	            throw new Error(updateError.message || "Failed to update destination dates");
+	          }
+
+	          // Shift later destinations (and their scheduled items) based on how the destination end date changed.
+	          if (isIsoDate(oldTo) && isIsoDate(newTo) && Number.isFinite(oldOrder)) {
+	            const deltaEnd = diffDaysIso(oldTo, newTo);
+	            if (deltaEnd !== 0) {
+	              const toShift = itineraryDestinations
+	                .filter((dest) => Number((dest as any)?.order_number ?? NaN) > oldOrder)
+	                .filter((dest) => isIsoDate((dest as any)?.from_date) && isIsoDate((dest as any)?.to_date))
+	                .sort((a, b) => Number((a as any)?.order_number ?? 0) - Number((b as any)?.order_number ?? 0));
+
+	              for (const dest of toShift) {
+	                const destId = Number((dest as any)?.itinerary_destination_id);
+	                const shiftedFrom = addDaysIso(String((dest as any).from_date), deltaEnd);
+	                const shiftedTo = addDaysIso(String((dest as any).to_date), deltaEnd);
+
+	                const { error: shiftError } = await supabase.rpc("ai_shift_destination_dates", {
+	                  _itinerary_id: Number(itineraryId),
+	                  _itinerary_destination_id: destId,
+	                  _new_from: shiftedFrom,
+	                  _new_to: shiftedTo,
+	                  _shift_activities: true,
+	                });
+
+	                if (shiftError) {
+	                  const code = String((shiftError as any)?.code ?? "");
+	                  if (code === "42883") {
+	                    throw new Error(
+	                      "Missing database function ai_shift_destination_dates. Please run the latest Supabase migrations."
+	                    );
+	                  }
+	                  throw new Error(shiftError.message || "Failed to shift later destinations");
+	                }
+	              }
+	            }
+	          }
+	        }
+
+	        if (touchesLocation) {
+	          const { data: existingActivity } = await supabase
+	            .from("itinerary_activity")
+	            .select("itinerary_activity_id")
+	            .eq("itinerary_id", Number(itineraryId))
+	            .eq("itinerary_destination_id", Number(operation.itineraryDestinationId))
+	            .is("deleted_at", null)
+	            .limit(1)
+	            .maybeSingle();
+
+	          if (existingActivity?.itinerary_activity_id) {
+	            throw new Error("Destination has activities. Move or remove its activities first.");
+	          }
+
+	          const { error: updateError } = await supabase
+	            .from("itinerary_destination")
+	            .update({
+	              city: String((operation as any).city),
+	              country: String((operation as any).country),
+	            })
+	            .eq("itinerary_id", Number(itineraryId))
+	            .eq("itinerary_destination_id", Number(operation.itineraryDestinationId));
+
+	          if (updateError) throw new Error(updateError.message || "Failed to update destination");
 	        }
 
 	        const { data: refreshed } = await supabase
