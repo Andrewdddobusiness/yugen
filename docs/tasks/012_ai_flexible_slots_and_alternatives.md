@@ -115,7 +115,7 @@ struct SlotOption {
 - [x] The assistant never creates more than 3 alternatives for a single slot in v1.
 
 ## 8. Testing Requirements
-- [ ] Unit tests:
+- [x] Unit tests:
   - [x] Candidate ranking respects max 3 and same-destination constraint
   - [x] Schema validation rejects invalid payloads
 - [ ] Integration tests:

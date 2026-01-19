@@ -665,7 +665,15 @@ function ItineraryAssistantChat(props: {
           const draftOps = Array.isArray(payload.draftOperations) ? payload.draftOperations : [];
           if (draftOps.length > 0) {
             const requiresConfirmation =
-              draftOps.some((op) => op.op === "remove_activity") || draftOps.length > 10;
+              draftOps.some((op) => op.op === "remove_activity") ||
+              draftOps.some(
+                (op) =>
+                  op.op === "add_destination" ||
+                  op.op === "insert_destination_after" ||
+                  op.op === "update_destination_dates" ||
+                  op.op === "remove_destination"
+              ) ||
+              draftOps.length > 10;
             setDraftPlan({ operations: draftOps, requiresConfirmation, warnings: [], dayPlans: undefined });
             setCurationSelection(null);
             setCurationExpanded(new Set());
@@ -859,7 +867,8 @@ function ItineraryAssistantChat(props: {
           destinationId,
           threadKey,
           message: text,
-          draftOperations: sortedDraftOperations.length > 0 ? sortedDraftOperations : undefined,
+          // Preserve original draft order when sending back to the server — some operations (e.g. destinations) are order-dependent.
+          draftOperations: (draftPlan?.operations?.length ?? 0) > 0 ? draftPlan?.operations : undefined,
         }),
       });
 
@@ -970,7 +979,7 @@ function ItineraryAssistantChat(props: {
 
   const applyPlan = async () => {
     if (!draftPlan || draftPlan.operations.length === 0) return;
-    const operationsToApply = selectedDraftOperations;
+    const operationsToApply = selectedDraftOperationsForApply;
     if (operationsToApply.length === 0) return;
     setApplying(true);
     setError(null);
@@ -1309,15 +1318,16 @@ function ItineraryAssistantChat(props: {
     }));
   }, [activityById, destinationLabelById, sortedDraftOperations]);
 
-  const selectedDraftOperations = useMemo(() => {
-    const ops = sortedDraftOperations ?? [];
+  const selectedDraftOperationsForApply = useMemo(() => {
+    const ops = draftPlan?.operations ?? [];
     const selected = curationSelection;
     const hasDayPlans = Array.isArray(draftPlan?.dayPlans) && (draftPlan?.dayPlans?.length ?? 0) > 0;
     if (!hasDayPlans) return ops;
     if (!selected) return ops;
     if (selected.size === 0) return [];
+    // Preserve original draft order for apply to avoid breaking destination dependencies.
     return ops.filter((op) => selected.has(getOperationEffectiveDateKey(op, activityById)));
-  }, [activityById, curationSelection, draftPlan?.dayPlans, sortedDraftOperations]);
+  }, [activityById, curationSelection, draftPlan?.dayPlans, draftPlan?.operations]);
 
   const applyButtonLabel = useMemo(() => {
     const base = draftPlan?.requiresConfirmation ? "Confirm & Apply" : "Apply";
@@ -1740,7 +1750,7 @@ function ItineraryAssistantChat(props: {
                   size="sm"
                   className="h-9 rounded-xl"
                   onClick={applyPlan}
-                  disabled={applying || selectedDraftOperations.length === 0}
+                  disabled={applying || selectedDraftOperationsForApply.length === 0}
                 >
                   {applying ? (
                     <>

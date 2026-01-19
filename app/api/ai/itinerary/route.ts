@@ -102,18 +102,20 @@ const isAutoScheduleIntentMessage = (message: string) => {
     return false;
   }
 
-  const mentionsActivities = /\b(activity|activities|places?|things)\b/.test(text);
+  const mentionsActivities = /\b(activity|activities|places?|things|stops?|events?)\b/.test(text);
   const mentionsDayContext = /\b(day|days|week|itinerary|calendar)\b/.test(text);
-  const mentionsTime = /\b(time|times|timeslot|time\s*slot|duration|hour|hours)\b/.test(text);
-  const mentionsPlan = /\b(schedule|reschedule|organize|organise|arrange|plan)\b/.test(text);
+  const mentionsTime = /\b(time|times|timeslots?|time\s*slots?|duration|hour|hours)\b/.test(text);
+  const mentionsPlan = /\b(schedule|reschedule|organize|organise|arrange|plan|slot|slots)\b/.test(text);
   const mentionsRoute =
     /\b(route|sequence|order|nearby|close\s+by|proximity|distance|walkable|walking|location|area|neighbou?rhood|district)\b/.test(
       text
     );
 
-  if (mentionsActivities && mentionsTime) return true;
-  if (mentionsActivities && mentionsRoute) return true;
-  if (mentionsActivities && mentionsPlan && mentionsDayContext) return true;
+  const mentionsSchedulingTarget = mentionsActivities || mentionsDayContext;
+
+  if (mentionsSchedulingTarget && mentionsTime) return true;
+  if (mentionsSchedulingTarget && mentionsRoute) return true;
+  if (mentionsSchedulingTarget && mentionsPlan && mentionsDayContext) return true;
   return false;
 };
 

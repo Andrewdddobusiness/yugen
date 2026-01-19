@@ -596,7 +596,7 @@ export function DayColumn({
             return (
               <div
                 key={`custom-${event.id}`}
-                className="absolute pointer-events-auto"
+                className="absolute pointer-events-auto hover:!z-50 focus-within:!z-50"
                 style={{
                   top: `${displayPosition.startSlot * slotHeightPx}px`,
                   height: `${displayPosition.span * slotHeightPx}px`,
@@ -641,7 +641,7 @@ export function DayColumn({
             return (
               <div
                 key={activity.id}
-                className="absolute pointer-events-auto"
+                className="absolute pointer-events-auto hover:!z-50 focus-within:!z-50"
                 style={{
                   top: `${displayPosition.startSlot * slotHeightPx}px`,
                   height: `${displayPosition.span * slotHeightPx}px`,

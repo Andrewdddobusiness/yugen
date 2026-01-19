@@ -97,7 +97,7 @@ struct Segment {
 - [x] Applying the plan yields the same end-state shown in preview (no hidden shifts).
 
 ## 8. Testing Requirements
-- [ ] Unit tests:
+- [x] Unit tests:
   - [x] Segment builder ordering + gap computation
   - [x] Conflict classification (`ok | tight | conflict`)
 - [ ] Integration tests:

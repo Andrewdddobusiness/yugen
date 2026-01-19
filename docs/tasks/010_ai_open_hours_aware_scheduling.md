@@ -97,7 +97,7 @@ struct OpenInterval {
 - [x] Preview UI can display an hours warning for affected draft changes.
 
 ## 8. Testing Requirements
-- [ ] Unit tests:
+- [x] Unit tests:
   - [x] Interval normalization (multi-interval, overnight)
   - [x] Overlap check for time windows
 - [ ] Integration tests:

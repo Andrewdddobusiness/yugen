@@ -115,7 +115,7 @@ struct IntelligenceSignals {
 - [x] Preview + confirmation remains the default for destructive/large changes.
 
 ## 8. Testing Requirements
-- [ ] Unit tests:
+- [x] Unit tests:
   - [x] Travel-time conflict classification (gap vs duration+buffer)
   - [x] Opening-hours interval overlap logic
   - [x] Preference inference heuristics

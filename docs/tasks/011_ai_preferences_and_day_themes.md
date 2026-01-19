@@ -112,7 +112,7 @@ struct DayTheme {
 - [x] No breaking changes to existing add/update/delete flows when preferences are absent.
 
 ## 8. Testing Requirements
-- [ ] Unit tests:
+- [x] Unit tests:
   - [x] Inference: day start/end from scheduled times
   - [x] Inference: pace classification from activity density
   - [x] Theme tagging: types → bucket mapping
