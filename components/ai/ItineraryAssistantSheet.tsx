@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { useItineraryActivityStore } from "@/store/itineraryActivityStore";
+import { useItinerarySlotStore } from "@/store/itinerarySlotStore";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { Operation } from "@/lib/ai/itinerary/schema";
 import { listItineraryDestinationsSummary } from "@/actions/supabase/destinations";
@@ -426,6 +427,8 @@ function ItineraryAssistantChat(props: {
   const queryClient = useQueryClient();
   const setItineraryActivities = useItineraryActivityStore((s) => s.setItineraryActivities);
   const itineraryActivities = useItineraryActivityStore((s) => s.itineraryActivities);
+  const setSlots = useItinerarySlotStore((s) => s.setSlots);
+  const setSlotOptions = useItinerarySlotStore((s) => s.setSlotOptions);
   const { data: destinationsSummary = [] } = useQuery({
     queryKey: ["itineraryDestinationsSummary", itineraryId],
     queryFn: async () => {
@@ -985,6 +988,16 @@ function ItineraryAssistantChat(props: {
         setItineraryActivities(refreshedActivities);
       }
 
+      const refreshedSlots = data.bootstrap?.slots;
+      if (Array.isArray(refreshedSlots)) {
+        setSlots(refreshedSlots);
+      }
+
+      const refreshedSlotOptions = data.bootstrap?.slotOptions;
+      if (Array.isArray(refreshedSlotOptions)) {
+        setSlotOptions(refreshedSlotOptions);
+      }
+
       // Force-refresh related UI immediately (destinations sidebar + calendar city chips + builder bootstrap).
       // Some of these queries use long `staleTime` and won't visually update without an explicit refetch.
       await Promise.all([
@@ -1163,13 +1176,16 @@ function ItineraryAssistantChat(props: {
         if (op.op === "add_alternatives") {
           const target = activityById.get(op.targetItineraryActivityId);
           const title = String(target?.activity?.name ?? `Activity ${op.targetItineraryActivityId}`);
+          const timeLabel = formatTimeRange12h(target?.start_time ?? null, target?.end_time ?? null);
           const alternatives = op.alternativeItineraryActivityIds
             .map((id) => activityById.get(id)?.activity?.name ?? `Activity ${id}`)
             .join(", ");
-          const details: ChangeRow["details"] = [{ label: "Alternatives", after: alternatives }];
+          const details: ChangeRow["details"] = [];
+          if (timeLabel) details.push({ label: "Time window", after: timeLabel });
+          details.push({ label: "Alternatives", after: alternatives });
           return {
             dateKey,
-            row: { number, kind: "add", title, timeLabel: null, details, operation: op },
+            row: { number, kind: "add", title, timeLabel, details, operation: op },
           };
         }
 

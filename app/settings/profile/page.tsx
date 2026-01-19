@@ -9,10 +9,18 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { updateProfile } from "@/actions/auth/actions";
 import { createClient } from "@/utils/supabase/client";
 import { useAuth } from "@/components/provider/auth/AuthProvider";
+import { updateAiItineraryPreferences } from "@/actions/supabase/profilePreferences";
+import {
+  getAiItineraryPreferencesFromProfile,
+  type ItineraryInterest,
+  type ItineraryPace,
+  type ItineraryTravelMode,
+} from "@/lib/ai/itinerary/intelligence/preferences";
 
 const profileSchema = z.object({
   display_name: z.string().min(1, "Display name is required").max(100, "Display name too long"),
@@ -34,10 +42,33 @@ const timezones = [
   { value: "Asia/Sydney", label: "Sydney" },
 ];
 
+const itineraryInterestOptions: Array<{ key: ItineraryInterest; label: string }> = [
+  { key: "sights", label: "Sights" },
+  { key: "museums", label: "Museums" },
+  { key: "food", label: "Food" },
+  { key: "shopping", label: "Shopping" },
+  { key: "nature", label: "Nature" },
+  { key: "nightlife", label: "Nightlife" },
+];
+
 export default function ProfilePage() {
   const { user, refreshUser } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [profile, setProfile] = useState<any>(null);
+  const [isPreferencesSaving, setIsPreferencesSaving] = useState(false);
+  const [itineraryPreferences, setItineraryPreferences] = useState<{
+    pace: ItineraryPace | "";
+    dayStart: string;
+    dayEnd: string;
+    travelMode: ItineraryTravelMode | "";
+    interests: ItineraryInterest[];
+  }>({
+    pace: "",
+    dayStart: "",
+    dayEnd: "",
+    travelMode: "",
+    interests: [],
+  });
   const supabase = createClient();
 
   const {
@@ -78,6 +109,15 @@ export default function ProfilePage() {
         setValue("display_name", data.display_name || "");
         setValue("avatar_url", data.avatar_url || "");
         setValue("timezone", data.timezone || "UTC");
+
+        const aiPrefs = getAiItineraryPreferencesFromProfile(data.preferences);
+        setItineraryPreferences({
+          pace: (aiPrefs?.pace ?? "") as ItineraryPace | "",
+          dayStart: aiPrefs?.day_start ?? "",
+          dayEnd: aiPrefs?.day_end ?? "",
+          travelMode: (aiPrefs?.travel_mode ?? "") as ItineraryTravelMode | "",
+          interests: Array.isArray(aiPrefs?.interests) ? aiPrefs!.interests! : [],
+        });
       } else {
         // Set default values if no profile exists
         setValue("display_name", user.user_metadata?.full_name || "");
@@ -86,6 +126,31 @@ export default function ProfilePage() {
       }
     } catch (error) {
       console.error("Error fetching profile:", error);
+    }
+  };
+
+  const onSaveItineraryPreferences = async () => {
+    setIsPreferencesSaving(true);
+    try {
+      const result = await updateAiItineraryPreferences({
+        pace: itineraryPreferences.pace ? itineraryPreferences.pace : null,
+        dayStart: itineraryPreferences.dayStart ? itineraryPreferences.dayStart : null,
+        dayEnd: itineraryPreferences.dayEnd ? itineraryPreferences.dayEnd : null,
+        travelMode: itineraryPreferences.travelMode ? itineraryPreferences.travelMode : null,
+        interests: itineraryPreferences.interests.length > 0 ? itineraryPreferences.interests : null,
+      });
+
+      if (result.success) {
+        toast.success("Itinerary assistant preferences updated");
+        await fetchProfile();
+      } else {
+        toast.error(result.message || "Failed to update itinerary assistant preferences");
+      }
+    } catch (error) {
+      console.error("Preferences update error:", error);
+      toast.error("An unexpected error occurred");
+    } finally {
+      setIsPreferencesSaving(false);
     }
   };
 
@@ -127,7 +192,7 @@ export default function ProfilePage() {
   }
 
   return (
-    <div className="container max-w-2xl mx-auto py-8">
+    <div className="container max-w-2xl mx-auto py-8 space-y-6">
       <Card>
         <CardHeader>
           <CardTitle>Profile Settings</CardTitle>
@@ -207,6 +272,129 @@ export default function ProfilePage() {
               </Button>
             </div>
           </form>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Itinerary Assistant Preferences</CardTitle>
+          <CardDescription>
+            These preferences guide the assistant when planning schedules and themed days.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label>Pace</Label>
+              <Select
+                value={itineraryPreferences.pace || "default"}
+                onValueChange={(value) =>
+                  setItineraryPreferences((prev) => ({
+                    ...prev,
+                    pace: value === "default" ? "" : (value as ItineraryPace),
+                  }))
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select pace" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="default">Use defaults</SelectItem>
+                  <SelectItem value="relaxed">Relaxed</SelectItem>
+                  <SelectItem value="balanced">Balanced</SelectItem>
+                  <SelectItem value="packed">Packed</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Travel mode</Label>
+              <Select
+                value={itineraryPreferences.travelMode || "default"}
+                onValueChange={(value) =>
+                  setItineraryPreferences((prev) => ({
+                    ...prev,
+                    travelMode: value === "default" ? "" : (value as ItineraryTravelMode),
+                  }))
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select travel mode" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="default">Use defaults</SelectItem>
+                  <SelectItem value="walking">Walking</SelectItem>
+                  <SelectItem value="transit">Transit</SelectItem>
+                  <SelectItem value="driving">Driving</SelectItem>
+                  <SelectItem value="bicycling">Bicycling</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Day start</Label>
+              <Input
+                type="time"
+                value={itineraryPreferences.dayStart}
+                onChange={(e) =>
+                  setItineraryPreferences((prev) => ({
+                    ...prev,
+                    dayStart: e.target.value,
+                  }))
+                }
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Day end</Label>
+              <Input
+                type="time"
+                value={itineraryPreferences.dayEnd}
+                onChange={(e) =>
+                  setItineraryPreferences((prev) => ({
+                    ...prev,
+                    dayEnd: e.target.value,
+                  }))
+                }
+              />
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Interests</Label>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              {itineraryInterestOptions.map((option) => {
+                const checked = itineraryPreferences.interests.includes(option.key);
+                return (
+                  <label key={option.key} className="flex items-center gap-3 text-sm">
+                    <Checkbox
+                      checked={checked}
+                      onCheckedChange={(next) => {
+                        setItineraryPreferences((prev) => {
+                          const set = new Set(prev.interests);
+                          if (next) set.add(option.key);
+                          else set.delete(option.key);
+                          return { ...prev, interests: Array.from(set) };
+                        });
+                      }}
+                    />
+                    <span>{option.label}</span>
+                  </label>
+                );
+              })}
+            </div>
+          </div>
+
+          <Button type="button" onClick={onSaveItineraryPreferences} disabled={isPreferencesSaving} className="w-full">
+            {isPreferencesSaving ? (
+              <div className="flex items-center gap-2">
+                <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                Saving...
+              </div>
+            ) : (
+              "Save Itinerary Assistant Preferences"
+            )}
+          </Button>
         </CardContent>
       </Card>
     </div>

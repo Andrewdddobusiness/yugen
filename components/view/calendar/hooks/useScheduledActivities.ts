@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { isSameDay } from 'date-fns';
 import { useItineraryActivityStore } from '@/store/itineraryActivityStore';
+import { useItinerarySlotStore } from '@/store/itinerarySlotStore';
 import { TimeSlot } from '../TimeGrid';
 
 /**
@@ -38,8 +39,51 @@ export interface ScheduledActivity {
  */
 export function useScheduledActivities(days: Date[], timeSlots: TimeSlot[]): ScheduledActivity[] {
   const { itineraryActivities } = useItineraryActivityStore();
+  const slots = useItinerarySlotStore((s) => s.slots);
+  const slotOptions = useItinerarySlotStore((s) => s.slotOptions);
 
   const scheduledActivities: ScheduledActivity[] = useMemo(() => {
+    const slotIdByActivityId = new Map<string, string>();
+    const activityIdsBySlotId = new Map<string, string[]>();
+
+    for (const option of slotOptions) {
+      const slotId = String((option as any)?.itinerary_slot_id ?? "").trim();
+      const activityId = String((option as any)?.itinerary_activity_id ?? "").trim();
+      if (!slotId || !activityId) continue;
+      slotIdByActivityId.set(activityId, slotId);
+      const list = activityIdsBySlotId.get(slotId) ?? [];
+      list.push(activityId);
+      activityIdsBySlotId.set(slotId, list);
+    }
+
+    const primaryBySlotId = new Map<string, string>();
+    for (const slot of slots) {
+      const slotId = String((slot as any)?.itinerary_slot_id ?? "").trim();
+      if (!slotId) continue;
+      const primary = String((slot as any)?.primary_itinerary_activity_id ?? "").trim();
+      if (primary) primaryBySlotId.set(slotId, primary);
+    }
+
+    const isPrimaryForActivity = (itineraryActivityId: string) => {
+      const id = String(itineraryActivityId ?? "").trim();
+      if (!id) return true;
+
+      const slotId = slotIdByActivityId.get(id);
+      if (!slotId) return true;
+
+      const optionIds = activityIdsBySlotId.get(slotId) ?? [];
+      if (optionIds.length <= 1) return true;
+
+      const primary =
+        primaryBySlotId.get(slotId) ??
+        optionIds
+          .slice()
+          .sort((a, b) => Number(a) - Number(b))
+          .find(Boolean);
+      if (!primary) return true;
+      return primary === id;
+    };
+
     const parseTimeToMinutes = (time: string | null | undefined) => {
       if (!time) return null;
       const [hourStr, minuteStr] = time.split(":");
@@ -55,6 +99,7 @@ export function useScheduledActivities(days: Date[], timeSlots: TimeSlot[]): Sch
     for (const activity of itineraryActivities) {
       if (!activity.date) continue;
       if (activity.deleted_at !== null) continue;
+      if (!isPrimaryForActivity(String(activity.itinerary_activity_id))) continue;
       if (
         !activity.activity?.coordinates ||
         !Array.isArray(activity.activity.coordinates) ||
@@ -97,6 +142,7 @@ export function useScheduledActivities(days: Date[], timeSlots: TimeSlot[]): Sch
 
     return itineraryActivities
       .filter(activity => activity.date && activity.start_time && activity.end_time)
+      .filter((activity) => isPrimaryForActivity(String(activity.itinerary_activity_id)))
       .map(activity => {
         const activityDate = new Date(activity.date as string);
         const dayIndex = days.findIndex(day => isSameDay(day, activityDate));
@@ -173,7 +219,7 @@ export function useScheduledActivities(days: Date[], timeSlots: TimeSlot[]): Sch
         };
       })
       .filter(Boolean) as ScheduledActivity[];
-  }, [itineraryActivities, days, timeSlots]);
+  }, [days, itineraryActivities, slotOptions, slots, timeSlots]);
 
   return scheduledActivities;
 }

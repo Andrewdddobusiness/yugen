@@ -16,6 +16,7 @@ import { useToast } from '@/components/ui/use-toast';
 import { getActivityThemeForTypes, hexToRgba, type ActivityAccent } from '@/lib/activityAccent';
 import { useItineraryLayoutStore } from '@/store/itineraryLayoutStore';
 import { colors } from '@/lib/colors/colors';
+import { SlotOptionsPopover } from '@/components/itinerary/SlotOptionsPopover';
 
 const accentStyles: Record<ActivityAccent, { border: string; tint: string }> = {
   brand: { border: "border-l-brand-500", tint: "bg-brand-500/10" },
@@ -446,6 +447,12 @@ export function ActivityBlock({
       />
 
       {waypointBadge()}
+
+      {!isOverlay && (
+        <div className="absolute top-1 left-1 z-30">
+          <SlotOptionsPopover itineraryActivityId={String(activity.id)} compact />
+        </div>
+      )}
 
       {/* Drag handle (show on hover; always visible on touch) */}
       {!isOverlay && !isResizing && (

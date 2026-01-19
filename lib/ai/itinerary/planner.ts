@@ -1,6 +1,7 @@
 import { PlanResultSchema, type Operation, type PlanResult } from "@/lib/ai/itinerary/schema";
 import { openaiChatJSON, type OpenAiUsage } from "@/lib/ai/itinerary/openai";
 import type { ChatMessage } from "@/lib/ai/itinerary/schema";
+import { primaryThemeFromTypes } from "@/lib/ai/itinerary/intelligence/themes";
 
 type ActivitySnapshotRow = {
   itinerary_activity_id: unknown;
@@ -99,7 +100,9 @@ const formatActivityLine = (row: ActivitySnapshotRow) => {
   const time = start && end ? `${start}-${end}` : start || end ? `${start}${end ? `-${end}` : ""}` : "";
   const address = truncate(row.activity?.address ?? "", 72);
   const types = Array.isArray(row.activity?.types) ? row.activity?.types?.slice(0, 4).join(", ") : "";
-  return `- ${id}: ${name} | date: ${date} | time: ${time || "none"} | types: ${types || "n/a"} | address: ${address}`;
+  const theme = primaryThemeFromTypes(row.activity?.types ?? []);
+  const themeLabel = theme ? ` | theme: ${theme}` : "";
+  return `- ${id}: ${name} | date: ${date} | time: ${time || "none"} | types: ${types || "n/a"}${themeLabel} | address: ${address}`;
 };
 
 const formatDraftOperationLine = (operation: Operation, index: number) => {

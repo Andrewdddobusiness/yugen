@@ -20,6 +20,7 @@ import { ActivityCreatedBy } from "@/components/collaboration/ActivityCreatedBy"
 import { useItineraryLayoutStore } from "@/store/itineraryLayoutStore";
 import { ACTIVITY_ACCENT_DOT_CLASSES, getActivityThemeForTypes, hexToRgba } from "@/lib/activityAccent";
 import { cn } from "@/lib/utils";
+import { SlotOptionsPopover } from "@/components/itinerary/SlotOptionsPopover";
 
 interface ItineraryTableRowProps {
   activity: any; // Replace with proper type
@@ -80,13 +81,19 @@ export default function ItineraryTableRow({
       onClick={handleRowClick}
     >
       <TableCell className="w-[20%] min-w-[200px]">
-        <div className="flex flex-col">
-          <div className="truncate">{activity.activity?.name}</div>
-          <ActivityCreatedBy
-            userId={activity.created_by}
-            mode="text"
-            textClassName="text-[11px]"
-          />
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0">
+            <div className="truncate">{activity.activity?.name}</div>
+            <ActivityCreatedBy userId={activity.created_by} mode="text" textClassName="text-[11px]" />
+          </div>
+          <div
+            className="shrink-0"
+            onClick={(e) => {
+              e.stopPropagation();
+            }}
+          >
+            <SlotOptionsPopover itineraryActivityId={String(activity.itinerary_activity_id)} />
+          </div>
         </div>
       </TableCell>
       <TableCell className="w-[200px] min-w-[200px] shrink-0">

@@ -49,11 +49,15 @@ import { classifyTravelTimeConflict } from "@/lib/ai/itinerary/intelligence/trav
 import { getOpenIntervalsForDay, isOpenForWindow, suggestNextOpenStart, type OpenHoursRow } from "@/lib/ai/itinerary/intelligence/openHours";
 import {
   buildPreferencesPromptLines,
+  getAiItineraryPreferencesFromProfile,
   extractPreferenceHintsFromMessage,
   inferPreferencesFromActivities,
+  mergeEffectivePreferences,
 } from "@/lib/ai/itinerary/intelligence/preferences";
 import { buildAdjacentSegmentsForDate } from "@/lib/ai/itinerary/intelligence/segments";
 import { autoCorrectToNextOpenInterval } from "@/lib/ai/itinerary/intelligence/hoursAutoCorrect";
+import { rankSlotAlternativeCandidates } from "@/lib/ai/itinerary/intelligence/alternatives";
+import { inferDayThemeFromMessage } from "@/lib/ai/itinerary/intelligence/themes";
 
 export const runtime = "nodejs";
 // Vercel: allow longer AI requests before timing out (plan-dependent).
@@ -1402,10 +1406,13 @@ const buildPreviewLines = (
     if (operation.op === "add_alternatives") {
       const targetRow = activityById.get(operation.targetItineraryActivityId);
       const targetName = targetRow?.activity?.name ?? `Activity ${operation.targetItineraryActivityId}`;
+      const date = isIsoDate(targetRow?.date) ? targetRow.date : null;
+      const time = formatTimeRange(targetRow?.start_time, targetRow?.end_time);
+      const when = date || time ? ` (${[date, time].filter(Boolean).join(" ")})` : "";
       const altNames = operation.alternativeItineraryActivityIds
         .map((id) => activityById.get(id)?.activity?.name ?? `Activity ${id}`)
         .join(", ");
-      lines.push(`Add alternatives for "${targetName}": ${altNames}`);
+      lines.push(`Add alternatives for "${targetName}"${when}: ${altNames}`);
       continue;
     }
 
@@ -1519,6 +1526,7 @@ const buildTravelTimeWarnings = async (args: {
   operations: Operation[];
   activityById: Map<string, any>;
   activeActivities: any[];
+  defaultTravelMode?: TravelMode;
 }): Promise<string[]> => {
   const bufferMinutes = 10;
   const maxSegments = 10;
@@ -1731,7 +1739,7 @@ const buildTravelTimeWarnings = async (args: {
 
       if (!from.coords || !to.coords) continue;
 
-      const mode = from.travelModeToNext ?? "walking";
+      const mode = from.travelModeToNext ?? args.defaultTravelMode ?? "walking";
       computedSegments += 1;
 
       const travel = await calculateTravelTime(from.coords, to.coords, [mode]);
@@ -2203,6 +2211,27 @@ export async function POST(request: NextRequest) {
     const toDate = isIsoDate(destination?.to_date) ? destination.to_date : null;
     const rawActivities = Array.isArray((bootstrap.data as any)?.activities) ? (bootstrap.data as any).activities : [];
     const activeActivities = rawActivities.filter((row: any) => row?.deleted_at == null);
+    const rawSlots = Array.isArray((bootstrap.data as any)?.slots) ? (bootstrap.data as any).slots : [];
+    const rawSlotOptions = Array.isArray((bootstrap.data as any)?.slotOptions) ? (bootstrap.data as any).slotOptions : [];
+
+    const slotById = new Map<string, any>();
+    for (const slot of rawSlots) {
+      const id = String((slot as any)?.itinerary_slot_id ?? "");
+      if (!id) continue;
+      slotById.set(id, slot);
+    }
+
+    const slotIdByActivityId = new Map<string, string>();
+    const activityIdsBySlotId = new Map<string, string[]>();
+    for (const option of rawSlotOptions) {
+      const slotId = String((option as any)?.itinerary_slot_id ?? "");
+      const activityId = String((option as any)?.itinerary_activity_id ?? "");
+      if (!slotId || !activityId) continue;
+      slotIdByActivityId.set(activityId, slotId);
+      const list = activityIdsBySlotId.get(slotId) ?? [];
+      list.push(activityId);
+      activityIdsBySlotId.set(slotId, list);
+    }
 
     let itineraryDestinations: any[] = [];
     let destinationById = new Map<string, any>();
@@ -2338,6 +2367,34 @@ export async function POST(request: NextRequest) {
         destinationById,
       });
 
+      let explicitProfilePreferences: any | null = null;
+      try {
+        const { data, error } = await supabase
+          .from("profiles")
+          .select("preferences")
+          .eq("user_id", auth.user.id)
+          .maybeSingle();
+        if (!error) {
+          explicitProfilePreferences = getAiItineraryPreferencesFromProfile((data as any)?.preferences);
+        }
+      } catch {
+        explicitProfilePreferences = null;
+      }
+
+      const inferredPreferences = inferPreferencesFromActivities(activeActivities);
+      const explicitPreferenceHints = extractPreferenceHintsFromMessage(userText);
+      const mergedPreferences = mergeEffectivePreferences({
+        explicitProfile: explicitProfilePreferences,
+        inferred: inferredPreferences,
+        messageHints: explicitPreferenceHints,
+      });
+      const inferredTheme = inferDayThemeFromMessage(userText);
+      const preferencesPromptLines = [
+        ...buildPreferencesPromptLines({ preferences: mergedPreferences.preferences, source: mergedPreferences.source }),
+        ...(inferredTheme ? [`Requested day theme: ${inferredTheme}`] : []),
+      ];
+      const defaultTravelMode = mergedPreferences.preferences.travelMode as TravelMode;
+
       // Deterministic route parsing: if the user provides a multi-destination itinerary with explicit dates,
       // generate destination draft ops directly (avoids LLM hallucinating "already exists", and avoids overlap failures).
       const parsedTrip = parseTripSegmentsFromMessage(userText);
@@ -2372,6 +2429,7 @@ export async function POST(request: NextRequest) {
           operations: draftToReturn,
           activityById,
           activeActivities,
+          defaultTravelMode,
         });
         const hoursWarnings = await buildOpenHoursWarnings({
           supabase,
@@ -2473,13 +2531,6 @@ export async function POST(request: NextRequest) {
         return respond(NextResponse.json({ ok: true, mode: "plan", ...payload }));
       }
 
-      const inferredPreferences = inferPreferencesFromActivities(activeActivities);
-      const explicitPreferenceHints = extractPreferenceHintsFromMessage(userText);
-      const preferencesPromptLines = buildPreferencesPromptLines({
-        inferred: inferredPreferences,
-        explicit: explicitPreferenceHints,
-      });
-
       const planResult = await planItineraryEdits({
         message: userText,
         chatHistory,
@@ -2503,6 +2554,50 @@ export async function POST(request: NextRequest) {
       const clarifications: string[] = [];
       let proposedAddPlaceCount = 0;
       let resolvedAddPlaceCount = 0;
+      const openHoursByActivityId = new Map<number, OpenHoursRow[]>();
+
+      const loadOpenHoursForActivities = async (activityIds: number[]) => {
+        const ids = Array.from(new Set(activityIds.filter((id) => Number.isFinite(id))));
+        const missing = ids.filter((id) => !openHoursByActivityId.has(id));
+        if (missing.length === 0) return;
+
+        try {
+          const { data, error } = await supabase
+            .from("open_hours")
+            .select("activity_id,day,open_hour,open_minute,close_hour,close_minute")
+            .in("activity_id", missing);
+
+          if (error) {
+            const code = String((error as any)?.code ?? "");
+            if (code !== "42P01") throw error;
+            // Missing open_hours table (older environments). Treat as unknown and proceed.
+            for (const id of missing) openHoursByActivityId.set(id, []);
+            return;
+          }
+
+          for (const id of missing) openHoursByActivityId.set(id, []);
+
+          for (const row of data ?? []) {
+            const id = Number((row as any)?.activity_id);
+            if (!Number.isFinite(id)) continue;
+            const list = openHoursByActivityId.get(id) ?? [];
+            list.push({
+              day: Number((row as any)?.day ?? -1),
+              open_hour: (row as any)?.open_hour ?? null,
+              open_minute: (row as any)?.open_minute ?? null,
+              close_hour: (row as any)?.close_hour ?? null,
+              close_minute: (row as any)?.close_minute ?? null,
+            });
+            openHoursByActivityId.set(id, list);
+          }
+        } catch (error) {
+          console.warn("[ai-itinerary] open_hours_lookup_failed", {
+            itineraryId,
+            error: describeErrorForLog(error),
+          });
+          for (const id of missing) openHoursByActivityId.set(id, []);
+        }
+      };
 
       for (const operation of plan.operations) {
         const sanitizedOperation = sanitizeDestinationOperation(operation as any as Operation);
@@ -2575,23 +2670,84 @@ export async function POST(request: NextRequest) {
             continue;
           }
 
+          const targetRow = activityById.get(targetId);
+          const targetDestinationId = String(targetRow?.itinerary_destination_id ?? "");
+          if (targetDestinationId && targetDestinationId !== String(destinationId)) {
+            dropped += 1;
+            clarifications.push("I can only add alternatives for activities in the destination you're currently editing.");
+            continue;
+          }
+
+          const targetDate = typeof targetRow?.date === "string" ? targetRow.date : null;
+          const targetStart = typeof targetRow?.start_time === "string" ? targetRow.start_time : null;
+          const targetEnd = typeof targetRow?.end_time === "string" ? targetRow.end_time : null;
+          if (!isIsoDate(targetDate) || !targetStart || !targetEnd) {
+            dropped += 1;
+            clarifications.push("That activity needs a date and time before I can attach alternative options to it.");
+            continue;
+          }
+
+          const slotId = slotIdByActivityId.get(targetId) ?? null;
+          const existingSlotActivityIds = slotId ? activityIdsBySlotId.get(slotId) ?? [] : [];
+
+          const maxAlternatives = 3;
+          const existingAlternatives = Math.max(0, existingSlotActivityIds.length - 1);
+          const available = Math.max(0, maxAlternatives - existingAlternatives);
+          if (available <= 0) {
+            dropped += 1;
+            clarifications.push("That time window already has the maximum number of backup options (3).");
+            continue;
+          }
+
           const incoming = Array.isArray((sanitizedOperation as any).alternativeItineraryActivityIds)
             ? ((sanitizedOperation as any).alternativeItineraryActivityIds as string[])
             : [];
-          const filtered = Array.from(new Set(incoming.map(String)))
-            .filter((id) => id && id !== targetId && activityById.has(id))
-            .slice(0, 3);
 
-          if (filtered.length === 0) {
+          const requestedCount = Math.max(1, Math.min(3, incoming.length || 2));
+          const desiredCount = Math.min(requestedCount, available);
+
+          const excluded = new Set<string>([targetId, ...existingSlotActivityIds.map(String)]);
+          const candidatePool = activeActivities.filter((row: any) => {
+            const id = String(row?.itinerary_activity_id ?? "");
+            if (!id || excluded.has(id)) return false;
+            if (String(row?.itinerary_destination_id ?? "") !== String(destinationId)) return false;
+            // Prefer unscheduled activities for alternatives.
+            return row?.date == null && row?.start_time == null && row?.end_time == null;
+          });
+
+          const candidateActivityIds: number[] = [];
+          for (const row of candidatePool) {
+            const activityIdRaw = (row as any)?.activity?.activity_id ?? (row as any)?.activity_id;
+            const activityId = typeof activityIdRaw === "number" ? activityIdRaw : Number(activityIdRaw);
+            if (Number.isFinite(activityId)) candidateActivityIds.push(activityId);
+          }
+          await loadOpenHoursForActivities(candidateActivityIds.slice(0, 500));
+
+          const ranked = rankSlotAlternativeCandidates({
+            target: targetRow,
+            candidates: candidatePool,
+            openHoursByActivityId,
+          });
+
+          const picked = ranked.slice(0, desiredCount).map((entry) => entry.itineraryActivityId);
+          if (picked.length === 0) {
             dropped += 1;
-            clarifications.push(`I couldn't find any valid alternative activities for "${targetId}", so I skipped it.`);
+            clarifications.push("I couldn't find any good backup options in your unscheduled list for that time slot.");
             continue;
           }
+
+          const targetName =
+            typeof targetRow?.activity?.name === "string" && targetRow.activity.name.trim()
+              ? targetRow.activity.name.trim()
+              : `Activity ${targetId}`;
+          clarifications.push(
+            `Picked ${picked.length} backup option(s) for "${targetName}" based on proximity, similar vibe, and opening hours (when available).`
+          );
 
           resolvedOperations.push({
             op: "add_alternatives",
             targetItineraryActivityId: targetId,
-            alternativeItineraryActivityIds: filtered,
+            alternativeItineraryActivityIds: picked,
           } as any);
           continue;
         }
@@ -2736,6 +2892,7 @@ export async function POST(request: NextRequest) {
         operations: payload.operations,
         activityById,
         activeActivities,
+        defaultTravelMode,
       });
       const hoursWarnings = await buildOpenHoursWarnings({
         supabase,
@@ -3492,7 +3649,7 @@ export async function POST(request: NextRequest) {
 
             const { data: rows, error } = await supabase
               .from("itinerary_activity")
-              .select("itinerary_activity_id,itinerary_id,itinerary_destination_id")
+              .select("itinerary_activity_id,itinerary_id,itinerary_destination_id,activity_id,date,start_time,end_time,deleted_at")
               .in(
                 "itinerary_activity_id",
                 idsToCheck.map((id) => Number(id))
@@ -3505,9 +3662,9 @@ export async function POST(request: NextRequest) {
               if (id) byActivityId.set(id, row);
             }
 
-            if (!byActivityId.has(targetId)) {
-              throw new Error("Target activity not found.");
-            }
+            const targetRow = byActivityId.get(targetId);
+            if (!targetRow) throw new Error("Target activity not found.");
+            if ((targetRow as any)?.deleted_at != null) throw new Error("Target activity is deleted.");
 
             const itineraryIdNum = Number(itineraryId);
             const destinationIdNum = Number(destinationId);
@@ -3515,12 +3672,109 @@ export async function POST(request: NextRequest) {
             for (const id of idsToCheck) {
               const row = byActivityId.get(id);
               if (!row) throw new Error(`Activity ${id} not found.`);
+              if ((row as any)?.deleted_at != null) throw new Error(`Activity ${id} is deleted.`);
               if (Number(row.itinerary_id) !== itineraryIdNum) {
                 throw new Error("Activities must belong to the current itinerary.");
               }
               if (Number(row.itinerary_destination_id) !== destinationIdNum) {
                 throw new Error("Alternatives must belong to the current destination.");
               }
+            }
+
+            const slotDate = String((targetRow as any)?.date ?? "");
+            const slotStart = String((targetRow as any)?.start_time ?? "");
+            const slotEnd = String((targetRow as any)?.end_time ?? "");
+            if (!isIsoDate(slotDate) || !slotStart || !slotEnd) {
+              throw new Error("Target activity must be scheduled to create alternatives.");
+            }
+
+            const slotStartMin = parseTimeToMinutes(slotStart);
+            const slotEndMin = parseTimeToMinutes(slotEnd);
+            if (slotStartMin == null || slotEndMin == null || slotEndMin <= slotStartMin) {
+              throw new Error("Target activity has an invalid time range.");
+            }
+
+            // Safety: avoid silently rescheduling other planned items into this slot.
+            for (const alternativeId of alternativeIds) {
+              const row = byActivityId.get(String(alternativeId));
+              if (!row) continue;
+
+              const date = (row as any)?.date ?? null;
+              const start = (row as any)?.start_time ?? null;
+              const end = (row as any)?.end_time ?? null;
+
+              const isUnscheduled = date == null && start == null && end == null;
+              const matchesSlot = String(date ?? "") === slotDate && String(start ?? "") === slotStart && String(end ?? "") === slotEnd;
+              if (!isUnscheduled && !matchesSlot) {
+                const name =
+                  activityById.get(String(alternativeId))?.activity?.name ?? `Activity ${String(alternativeId)}`;
+                throw new Error(
+                  `"${name}" is already scheduled elsewhere. Pick an unscheduled activity for alternatives (or one already in the same time window).`
+                );
+              }
+            }
+
+            // Reject alternatives that we know are closed during the slot window.
+            const activityIdsToCheck: number[] = [];
+            const activityIdByItineraryActivityId = new Map<string, number>();
+            for (const alternativeId of alternativeIds) {
+              const row = byActivityId.get(String(alternativeId));
+              if (!row) continue;
+              const raw = (row as any)?.activity_id;
+              const parsed = typeof raw === "number" ? raw : Number(raw);
+              if (!Number.isFinite(parsed)) continue;
+              activityIdsToCheck.push(parsed);
+              activityIdByItineraryActivityId.set(String(alternativeId), parsed);
+            }
+
+            const openHoursByActivityId = new Map<number, OpenHoursRow[]>();
+            const uniqueActivityIds = Array.from(new Set(activityIdsToCheck));
+            if (uniqueActivityIds.length > 0) {
+              try {
+                const { data, error } = await supabase
+                  .from("open_hours")
+                  .select("activity_id,day,open_hour,open_minute,close_hour,close_minute")
+                  .in("activity_id", uniqueActivityIds);
+                if (error) {
+                  const code = String((error as any)?.code ?? "");
+                  if (code !== "42P01") throw error;
+                } else {
+                  for (const row of data ?? []) {
+                    const id = Number((row as any)?.activity_id);
+                    if (!Number.isFinite(id)) continue;
+                    const list = openHoursByActivityId.get(id) ?? [];
+                    list.push({
+                      day: Number((row as any)?.day ?? -1),
+                      open_hour: (row as any)?.open_hour ?? null,
+                      open_minute: (row as any)?.open_minute ?? null,
+                      close_hour: (row as any)?.close_hour ?? null,
+                      close_minute: (row as any)?.close_minute ?? null,
+                    });
+                    openHoursByActivityId.set(id, list);
+                  }
+                }
+              } catch (error) {
+                console.warn("[ai-itinerary] open_hours_alternatives_lookup_failed", {
+                  itineraryId,
+                  destinationId,
+                  error: describeErrorForLog(error),
+                });
+              }
+            }
+
+            for (const alternativeId of alternativeIds) {
+              const activityId = activityIdByItineraryActivityId.get(String(alternativeId));
+              if (!activityId) continue;
+              const hours = openHoursByActivityId.get(activityId) ?? [];
+              if (hours.length === 0) continue;
+
+              const intervals = getOpenIntervalsForDay(hours, getDayOfWeekFromIsoDate(slotDate));
+              if (intervals.length === 0) continue;
+              if (isOpenForWindow(intervals, slotStartMin, slotEndMin)) continue;
+
+              const name =
+                activityById.get(String(alternativeId))?.activity?.name ?? `Activity ${String(alternativeId)}`;
+              throw new Error(`"${name}" is likely closed during that time window, so I skipped it.`);
             }
 
             const result = await addActivitiesAsAlternatives(targetId, alternativeIds);

@@ -37,6 +37,8 @@ interface ItinerarySlotStoreState {
   getSlotIdForActivity: (itineraryActivityId: string) => string | null;
   getActivityIdsForSlot: (slotId: string) => string[];
   getSlotById: (slotId: string) => IItinerarySlot | null;
+  getPrimaryActivityIdForSlot: (slotId: string) => string | null;
+  isPrimaryForActivity: (itineraryActivityId: string) => boolean;
 }
 
 const normalizeId = (value: unknown) => String(value ?? "").trim();
@@ -152,5 +154,35 @@ export const useItinerarySlotStore = create<ItinerarySlotStoreState>((set, get) 
     if (!id) return null;
     return get().slots.find((s) => normalizeId(s.itinerary_slot_id) === id) ?? null;
   },
-}));
 
+  getPrimaryActivityIdForSlot: (slotId) => {
+    const id = normalizeId(slotId);
+    if (!id) return null;
+
+    const slot = get().getSlotById(id);
+    const primary = slot?.primary_itinerary_activity_id ? normalizeId(slot.primary_itinerary_activity_id) : "";
+    if (primary) return primary;
+
+    const optionIds = get().getActivityIdsForSlot(id);
+    if (optionIds.length === 0) return null;
+    return optionIds
+      .slice()
+      .sort((a, b) => Number(a) - Number(b))
+      .find(Boolean) ?? null;
+  },
+
+  isPrimaryForActivity: (itineraryActivityId) => {
+    const activityId = normalizeId(itineraryActivityId);
+    if (!activityId) return true;
+
+    const slotId = get().getSlotIdForActivity(activityId);
+    if (!slotId) return true;
+
+    const optionIds = get().getActivityIdsForSlot(slotId);
+    if (optionIds.length <= 1) return true;
+
+    const primary = get().getPrimaryActivityIdForSlot(slotId);
+    if (!primary) return true;
+    return primary === activityId;
+  },
+}));

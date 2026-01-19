@@ -8,6 +8,7 @@ import TimePopover from "@/components/form/TimePopover";
 import { DatePickerPopover } from "@/components/form/date/DatePickerPopover";
 
 import { useItineraryActivityStore } from "@/store/itineraryActivityStore";
+import { useItinerarySlotStore } from "@/store/itinerarySlotStore";
 import { useItineraryLayoutStore } from "@/store/itineraryLayoutStore";
 import { NotesPopover } from "@/components/form/NotesPopover";
 import { ChevronDown, MapPin, Phone, Globe, Search, SlidersHorizontal, X } from "lucide-react";
@@ -111,6 +112,8 @@ export function ItineraryTableView({ showMap, onToggleMap }: ItineraryTableViewP
 
   /* STORE */
   const { itineraryActivities, removeItineraryActivity } = useItineraryActivityStore();
+  const slots = useItinerarySlotStore((s) => s.slots);
+  const slotOptions = useItinerarySlotStore((s) => s.slotOptions);
   const customEvents = useItineraryCustomEventStore((s) => s.customEvents);
   const updateCustomEvent = useItineraryCustomEventStore((s) => s.updateCustomEvent);
   const upsertCustomEvent = useItineraryCustomEventStore((s) => s.upsertCustomEvent);
@@ -236,8 +239,51 @@ export function ItineraryTableView({ showMap, onToggleMap }: ItineraryTableViewP
   };
 
   const itineraryActivitiesOnlyActivities = useMemo(
-    () => itineraryActivities.filter((itineraryActivity) => itineraryActivity.deleted_at === null),
-    [itineraryActivities]
+    () => {
+      const slotIdByActivityId = new Map<string, string>();
+      const activityIdsBySlotId = new Map<string, string[]>();
+
+      for (const option of slotOptions) {
+        const slotId = String((option as any)?.itinerary_slot_id ?? "").trim();
+        const activityId = String((option as any)?.itinerary_activity_id ?? "").trim();
+        if (!slotId || !activityId) continue;
+        slotIdByActivityId.set(activityId, slotId);
+        const list = activityIdsBySlotId.get(slotId) ?? [];
+        list.push(activityId);
+        activityIdsBySlotId.set(slotId, list);
+      }
+
+      const primaryBySlotId = new Map<string, string>();
+      for (const slot of slots) {
+        const slotId = String((slot as any)?.itinerary_slot_id ?? "").trim();
+        if (!slotId) continue;
+        const primary = String((slot as any)?.primary_itinerary_activity_id ?? "").trim();
+        if (primary) primaryBySlotId.set(slotId, primary);
+      }
+
+      const isPrimaryForActivity = (itineraryActivityId: string) => {
+        const id = String(itineraryActivityId ?? "").trim();
+        if (!id) return true;
+        const slotId = slotIdByActivityId.get(id);
+        if (!slotId) return true;
+        const optionIds = activityIdsBySlotId.get(slotId) ?? [];
+        if (optionIds.length <= 1) return true;
+        const primary =
+          primaryBySlotId.get(slotId) ??
+          optionIds
+            .slice()
+            .sort((a, b) => Number(a) - Number(b))
+            .find(Boolean);
+        if (!primary) return true;
+        return primary === id;
+      };
+
+      return itineraryActivities.filter(
+        (itineraryActivity) =>
+          itineraryActivity.deleted_at === null && isPrimaryForActivity(String(itineraryActivity.itinerary_activity_id))
+      );
+    },
+    [itineraryActivities, slotOptions, slots]
   );
 
   const itineraryCustomEventsOnlyEvents = useMemo(

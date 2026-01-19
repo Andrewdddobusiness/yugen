@@ -57,6 +57,9 @@ type SlotOptionRow = {
   created_at: string;
 };
 
+const MAX_SLOT_ALTERNATIVES = 3;
+const MAX_SLOT_OPTIONS = MAX_SLOT_ALTERNATIVES + 1;
+
 export async function addActivitiesAsAlternatives(
   targetItineraryActivityId: string,
   itineraryActivityIdsToAdd: string[]
@@ -178,6 +181,62 @@ export async function addActivitiesAsAlternatives(
 
   if (!slotId || !slotRow) {
     return { success: false, message: "Failed to resolve slot" };
+  }
+
+  // Validate that all incoming alternatives belong to the same itinerary + destination as the target.
+  const { data: addActivityRows, error: addActivityRowsError } = await supabase
+    .from("itinerary_activity")
+    .select("itinerary_activity_id,itinerary_id,itinerary_destination_id,deleted_at")
+    .in("itinerary_activity_id", addIds);
+
+  if (addActivityRowsError) {
+    return { success: false, message: "Failed to validate alternative activities", error: addActivityRowsError };
+  }
+
+  const expectedItineraryId = Number(target.itinerary_id);
+  const expectedDestinationId = Number(target.itinerary_destination_id);
+  const validatedAddIds = new Set<string>();
+
+  for (const row of addActivityRows ?? []) {
+    const id = String((row as any)?.itinerary_activity_id ?? "");
+    if (!id) continue;
+    if ((row as any)?.deleted_at != null) {
+      return { success: false, message: "Alternative activities must not be deleted." };
+    }
+    if (Number((row as any)?.itinerary_id) !== expectedItineraryId) {
+      return { success: false, message: "Alternative activities must belong to the same itinerary as the target." };
+    }
+    if (Number((row as any)?.itinerary_destination_id) !== expectedDestinationId) {
+      return { success: false, message: "Alternative activities must belong to the same destination as the target." };
+    }
+    validatedAddIds.add(id);
+  }
+
+  if (validatedAddIds.size !== addIds.length) {
+    return { success: false, message: "One or more alternative activities could not be found." };
+  }
+
+  // Enforce a strict cap: 1 primary + up to 3 alternatives (4 options total).
+  const { data: existingSlotOptionRows, error: existingSlotOptionRowsError } = await supabase
+    .from("itinerary_slot_option")
+    .select("itinerary_activity_id")
+    .eq("itinerary_slot_id", slotId);
+
+  if (existingSlotOptionRowsError) {
+    return { success: false, message: "Failed to load existing slot options", error: existingSlotOptionRowsError };
+  }
+
+  const existingInSlot = new Set<number>(
+    (existingSlotOptionRows ?? [])
+      .map((row) => Number((row as any)?.itinerary_activity_id))
+      .filter((id) => Number.isFinite(id))
+  );
+  const newUniqueCount = new Set<number>([...existingInSlot, ...addIds]).size;
+  if (newUniqueCount > MAX_SLOT_OPTIONS) {
+    return {
+      success: false,
+      message: `This time slot already has ${Math.max(0, existingInSlot.size - 1)} alternative(s). Each slot supports up to ${MAX_SLOT_ALTERNATIVES} alternatives.`,
+    };
   }
 
   // Read existing slot associations for the incoming alternatives so we can clean up source slots.
@@ -340,6 +399,54 @@ export async function updateItinerarySlotTimeRange(
     if (updateActivitiesError) {
       return { success: false, message: "Failed to update activities in slot", error: updateActivitiesError };
     }
+  }
+
+  revalidatePath(`/itinerary/${slot.itinerary_id}`);
+  revalidateTag(builderBootstrapTag(auth.user.id, String(slot.itinerary_id), String(slot.itinerary_destination_id)));
+
+  return { success: true, data: { slot: slot as unknown as SlotRow } };
+}
+
+export async function setItinerarySlotPrimaryActivity(
+  itinerarySlotId: string,
+  itineraryActivityId: string
+): Promise<{ success: true; data: { slot: SlotRow } } | { success: false; message: string; error?: any }> {
+  const slotId = parseIntId(itinerarySlotId);
+  if (!slotId) return { success: false, message: "Invalid slot id" };
+
+  const activityId = parseIntId(itineraryActivityId);
+  if (!activityId) return { success: false, message: "Invalid itinerary activity id" };
+
+  const supabase = createClient();
+  const { data: auth } = await supabase.auth.getUser();
+  if (!auth?.user) return { success: false, message: "User not authenticated" };
+
+  const { data: option, error: optionError } = await supabase
+    .from("itinerary_slot_option")
+    .select("itinerary_slot_option_id")
+    .eq("itinerary_slot_id", slotId)
+    .eq("itinerary_activity_id", activityId)
+    .maybeSingle();
+
+  if (optionError) {
+    return { success: false, message: "Failed to validate slot option", error: optionError };
+  }
+
+  if (!option) {
+    return { success: false, message: "That activity is not an option for this slot." };
+  }
+
+  const { data: slot, error: slotError } = await supabase
+    .from("itinerary_slot")
+    .update({ primary_itinerary_activity_id: activityId })
+    .eq("itinerary_slot_id", slotId)
+    .select(
+      "itinerary_slot_id,itinerary_id,itinerary_destination_id,date,start_time,end_time,primary_itinerary_activity_id,created_by,updated_by,created_at,updated_at,deleted_at"
+    )
+    .single();
+
+  if (slotError || !slot) {
+    return { success: false, message: "Failed to update slot primary option", error: slotError };
   }
 
   revalidatePath(`/itinerary/${slot.itinerary_id}`);
