@@ -5299,6 +5299,8 @@ export async function POST(request: NextRequest) {
 		      if (operation.op === "add_destination") {
 		        const newFrom = operation.fromDate;
 		        const newTo = operation.toDate;
+		        const newFromTime = new Date(`${newFrom}T00:00:00Z`).getTime();
+		        const newToTime = new Date(`${newTo}T00:00:00Z`).getTime();
 
 		        const overlaps = itineraryDestinations.some((dest) => {
 		          const from = (dest as any)?.from_date;
@@ -5307,12 +5309,160 @@ export async function POST(request: NextRequest) {
 		          return !(newTo < from || newFrom > to);
 		        });
 		        if (overlaps) {
-		          throw new Error(
-		            "That destination range overlaps an existing destination. Use insert_destination_after to insert and shift later destinations, or choose different dates."
+		          const msPerDay = 24 * 60 * 60 * 1000;
+		          const durationDays = Math.round((newToTime - newFromTime) / msPerDay) + 1;
+
+		          if (!Number.isFinite(durationDays) || durationDays < 1 || durationDays > 60) {
+		            throw new Error("Destination duration must be between 1 and 60 days.");
+		          }
+
+		          const anchorCandidates = itineraryDestinations
+		            .map((dest) => {
+		              const id = Number((dest as any)?.itinerary_destination_id);
+		              const order = Number((dest as any)?.order_number ?? 0);
+		              const to = String((dest as any)?.to_date ?? "");
+		              const toTime = isIsoDate(to) ? new Date(`${to}T00:00:00Z`).getTime() : NaN;
+		              return {
+		                itinerary_destination_id: id,
+		                order_number: order,
+		                to_date: to,
+		                to_time: toTime,
+		              };
+		            })
+		            .filter(
+		              (dest) =>
+		                Number.isFinite(dest.itinerary_destination_id) &&
+		                Number.isFinite(dest.to_time) &&
+		                dest.to_time < newFromTime
+		            )
+		            .sort((a, b) => {
+		              if (b.to_time !== a.to_time) return b.to_time - a.to_time;
+		              return b.order_number - a.order_number;
+		            });
+
+		          const anchor = anchorCandidates[0] ?? null;
+		          if (!anchor) {
+		            throw new Error(
+		              "That destination range overlaps an existing destination, and I couldn't find a safe place to insert it. Try choosing dates after your current first destination, or adjust existing destination dates."
+		            );
+		          }
+
+		          const { data: insertData, error: insertError } = await supabase.rpc("ai_insert_destination_after", {
+		            _itinerary_id: Number(itineraryId),
+		            _after_itinerary_destination_id: Number(anchor.itinerary_destination_id),
+		            _city: operation.city,
+		            _country: operation.country,
+		            _duration_days: durationDays,
+		          });
+
+		          if (insertError) {
+		            const code = String((insertError as any)?.code ?? "");
+		            if (code === "42883") {
+		              throw new Error(
+		                "Missing database function ai_insert_destination_after. Please run the latest Supabase migrations."
+		              );
+		            }
+		            throw new Error(insertError.message || "Failed to insert destination");
+		          }
+
+		          const insertedId = String((insertData as any)?.inserted?.itinerary_destination_id ?? "");
+		          const insertedFrom = String((insertData as any)?.newFrom ?? "");
+		          const insertedTo = String((insertData as any)?.newTo ?? "");
+
+		          const { data: refreshedAfterInsert } = await supabase
+		            .from("itinerary_destination")
+		            .select("itinerary_destination_id,city,country,from_date,to_date,order_number")
+		            .eq("itinerary_id", Number(itineraryId))
+		            .order("order_number", { ascending: true });
+		          itineraryDestinations = Array.isArray(refreshedAfterInsert) ? refreshedAfterInsert : itineraryDestinations;
+		          destinationById = new Map(
+		            itineraryDestinations
+		              .map((row) => [String((row as any)?.itinerary_destination_id ?? ""), row] as const)
+		              .filter((entry) => entry[0])
 		          );
+
+		          const canShiftInsertedToMatchRequested =
+		            insertedId &&
+		            isIsoDate(insertedFrom) &&
+		            isIsoDate(insertedTo) &&
+		            (insertedFrom !== newFrom || insertedTo !== newTo);
+
+		          if (canShiftInsertedToMatchRequested) {
+		            const insertedFromTime = new Date(`${insertedFrom}T00:00:00Z`).getTime();
+		            const deltaDays = Math.round((newFromTime - insertedFromTime) / msPerDay);
+
+		            if (deltaDays > 0) {
+		              const insertedRow = destinationById.get(insertedId);
+		              const insertedOrderNumber = Number((insertedRow as any)?.order_number ?? NaN);
+		              const nextDest = Number.isFinite(insertedOrderNumber)
+		                ? itineraryDestinations
+		                    .map((dest) => ({
+		                      order_number: Number((dest as any)?.order_number ?? NaN),
+		                      from_date: String((dest as any)?.from_date ?? ""),
+		                    }))
+		                    .filter(
+		                      (dest) =>
+		                        Number.isFinite(dest.order_number) &&
+		                        dest.order_number > insertedOrderNumber &&
+		                        isIsoDate(dest.from_date)
+		                    )
+		                    .sort((a, b) => a.order_number - b.order_number)[0] ?? null
+		                : null;
+
+		              const nextFrom = nextDest?.from_date ?? null;
+		              const wouldOverlapNext = nextFrom && !(newTo < nextFrom);
+
+		              if (!wouldOverlapNext) {
+		                const { error: shiftError } = await supabase.rpc("ai_shift_destination_dates", {
+		                  _itinerary_id: Number(itineraryId),
+		                  _itinerary_destination_id: Number(insertedId),
+		                  _new_from: newFrom,
+		                  _new_to: newTo,
+		                  _shift_activities: false,
+		                });
+
+		                if (shiftError) {
+		                  const code = String((shiftError as any)?.code ?? "");
+		                  if (code === "42883") {
+		                    throw new Error(
+		                      "Missing database function ai_shift_destination_dates. Please run the latest Supabase migrations."
+		                    );
+		                  }
+		                  throw new Error(shiftError.message || "Failed to align inserted destination dates");
+		                }
+
+		                const { data: refreshedAfterShift } = await supabase
+		                  .from("itinerary_destination")
+		                  .select("itinerary_destination_id,city,country,from_date,to_date,order_number")
+		                  .eq("itinerary_id", Number(itineraryId))
+		                  .order("order_number", { ascending: true });
+		                itineraryDestinations = Array.isArray(refreshedAfterShift)
+		                  ? refreshedAfterShift
+		                  : itineraryDestinations;
+		                destinationById = new Map(
+		                  itineraryDestinations
+		                    .map((row) => [String((row as any)?.itinerary_destination_id ?? ""), row] as const)
+		                    .filter((entry) => entry[0])
+		                );
+		              }
+		            }
+		          }
+
+		          applied.push({ ok: true, operation });
+
+		          if (executeStep?.ai_itinerary_run_step_id) {
+		            await insertAiItineraryToolInvocation({
+		              supabase,
+		              stepId: executeStep.ai_itinerary_run_step_id,
+		              toolName: operation.op,
+		              status: "succeeded",
+		              toolArgs: operation,
+		              result: insertedId ? { itinerary_destination_id: insertedId } : undefined,
+		            });
+		          }
+		          continue;
 		        }
 
-		        const newFromTime = new Date(`${newFrom}T00:00:00Z`).getTime();
 		        const normalizedExisting = itineraryDestinations
 		          .map((dest) => ({
 	            itinerary_destination_id: Number((dest as any)?.itinerary_destination_id),
