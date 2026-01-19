@@ -13,6 +13,8 @@ type ActivitySnapshotRow = {
     name?: string | null;
     address?: string | null;
     types?: string[] | null;
+    coordinates?: unknown;
+    duration?: unknown;
   } | null;
 };
 
@@ -99,10 +101,24 @@ const formatActivityLine = (row: ActivitySnapshotRow) => {
   const end = row.end_time ? String(row.end_time).slice(0, 5) : "";
   const time = start && end ? `${start}-${end}` : start || end ? `${start}${end ? `-${end}` : ""}` : "";
   const address = truncate(row.activity?.address ?? "", 72);
+  const duration = (() => {
+    const raw = row.activity?.duration;
+    if (typeof raw === "number" && Number.isFinite(raw)) return `${Math.max(0, Math.round(raw))}m`;
+    if (typeof raw === "string" && raw.trim()) return truncate(raw.trim(), 16);
+    return "n/a";
+  })();
+  const coords = (() => {
+    const raw = row.activity?.coordinates;
+    if (!Array.isArray(raw) || raw.length !== 2) return null;
+    const lng = Number(raw[0]);
+    const lat = Number(raw[1]);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+    return `${lat.toFixed(4)},${lng.toFixed(4)}`;
+  })();
   const types = Array.isArray(row.activity?.types) ? row.activity?.types?.slice(0, 4).join(", ") : "";
   const theme = primaryThemeFromTypes(row.activity?.types ?? []);
   const themeLabel = theme ? ` | theme: ${theme}` : "";
-  return `- ${id}: ${name} | date: ${date} | time: ${time || "none"} | types: ${types || "n/a"}${themeLabel} | address: ${address}`;
+  return `- ${id}: ${name} | date: ${date} | time: ${time || "none"} | duration: ${duration} | coords: ${coords ?? "n/a"} | types: ${types || "n/a"}${themeLabel} | address: ${address}`;
 };
 
 const formatDraftOperationLine = (operation: Operation, index: number) => {
@@ -247,6 +263,8 @@ export async function planItineraryEdits(args: {
     "- Never emit add_destination for a destination block that already exists (same city, country, fromDate, toDate). Only use add_destination for truly new destination blocks.",
     "- Use 24-hour time (HH:MM) in operations.",
     "- Use dates as YYYY-MM-DD.",
+    "- When the user asks to schedule/organize/sequence activities into a plan, set startTime and endTime using the provided duration and keep nearby coordinates together when possible.",
+    "- When picking times, prefer the destination's typical day window and avoid overlapping existing timed items.",
     "- If you change time, ALWAYS provide both startTime and endTime (or set both to null to clear).",
     "- If you set date to null (unschedule), ALSO set startTime and endTime to null.",
     "- If you set startTime and endTime as strings, startTime MUST be before endTime.",

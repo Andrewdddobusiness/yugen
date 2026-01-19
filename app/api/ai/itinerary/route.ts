@@ -3,7 +3,7 @@ import { createClient } from "@/utils/supabase/server";
 import { fetchBuilderBootstrap } from "@/actions/supabase/builderBootstrap";
 import { softDeleteTableData2 } from "@/actions/supabase/actions";
 import { addPlaceToItinerary } from "@/actions/supabase/activities";
-import { addActivitiesAsAlternatives } from "@/actions/supabase/slots";
+import { addActivitiesAsAlternatives, updateItinerarySlotTimeRange } from "@/actions/supabase/slots";
 import { calculateTravelTime, type TravelMode } from "@/actions/google/travelTime";
 import { fetchCityCoordinates, fetchPlaceDetails, searchPlacesByText } from "@/actions/google/actions";
 import { geocodeAddress } from "@/actions/google/maps";
@@ -59,6 +59,7 @@ import { autoCorrectToNextOpenInterval } from "@/lib/ai/itinerary/intelligence/h
 import { rankSlotAlternativeCandidates } from "@/lib/ai/itinerary/intelligence/alternatives";
 import { inferDayThemeFromMessage } from "@/lib/ai/itinerary/intelligence/themes";
 import { buildCuratedDayPlan, buildIsoDateRange, parseDurationToMinutes, type CurationCandidate } from "@/lib/ai/itinerary/intelligence/curation";
+import { autoScheduleActivities, listIsoDatesInRange } from "@/lib/ai/itinerary/intelligence/scheduler";
 
 export const runtime = "nodejs";
 // Vercel: allow longer AI requests before timing out (plan-dependent).
@@ -86,10 +87,46 @@ const isLikelyNarrativePlace = (value: string) =>
 const isCurationIntentMessage = (message: string) => {
   const text = String(message ?? "").toLowerCase();
   if (!text.trim()) return false;
-  const wantsPlan = /\b(plan|curate|schedule|organize|arrange|build)\b/.test(text);
+  const wantsPlan = /\b(plan|curate|schedule|organize|organise|arrange|build)\b/.test(text);
   const mentionsDay = /\b(day|days|week|itinerary)\b/.test(text);
   const mentionsBacklog = /\b(backlog|unscheduled|ideas|wishlist|list)\b/.test(text);
   return (wantsPlan && mentionsDay) || (wantsPlan && mentionsBacklog) || /\bplan my day\b/.test(text);
+};
+
+const isAutoScheduleIntentMessage = (message: string) => {
+  const text = String(message ?? "").toLowerCase();
+  if (!text.trim()) return false;
+  if (/\b(unassign|unschedule|clear\s+(?:the\s+)?time|remove\s+(?:the\s+)?time|no\s+times?)\b/.test(text)) {
+    return false;
+  }
+
+  const mentionsActivities = /\b(activity|activities|places?|things)\b/.test(text);
+  const mentionsDayContext = /\b(day|days|week|itinerary|calendar)\b/.test(text);
+  const mentionsTime = /\b(time|times|timeslot|time\s*slot|duration|hour|hours)\b/.test(text);
+  const mentionsPlan = /\b(schedule|reschedule|organize|organise|arrange|plan)\b/.test(text);
+  const mentionsRoute =
+    /\b(route|sequence|order|nearby|close\s+by|proximity|distance|walkable|walking|location|area|neighbou?rhood|district)\b/.test(
+      text
+    );
+
+  if (mentionsActivities && mentionsTime) return true;
+  if (mentionsActivities && mentionsRoute) return true;
+  if (mentionsActivities && mentionsPlan && mentionsDayContext) return true;
+  return false;
+};
+
+const travelModeToMetersPerMinute = (mode: TravelMode | null | undefined) => {
+  if (mode === "driving") return 600;
+  if (mode === "transit") return 250;
+  if (mode === "bicycling") return 200;
+  return 75;
+};
+
+const travelModeToBufferMinutes = (mode: TravelMode | null | undefined) => {
+  if (mode === "driving") return 10;
+  if (mode === "bicycling") return 10;
+  if (mode === "transit") return 15;
+  return 10;
 };
 
 const stripLeadingPlacePhrases = (value: string) => {
@@ -3253,36 +3290,286 @@ export async function POST(request: NextRequest) {
       });
       redundantDropped = prunedResolved.removed;
 
+      let resolvedDraftOperations = prunedResolved.operations;
+      let autoScheduledCount = 0;
+      let autoScheduleUnplacedCount = 0;
+
+      if (isAutoScheduleIntentMessage(userText) && fromDate && toDate) {
+        const datePool = listIsoDatesInRange(fromDate, toDate);
+
+        const isPrimaryActivity = (itineraryActivityId: string) => {
+          const slotId = slotIdByActivityId.get(itineraryActivityId);
+          if (!slotId) return true;
+          const slot = slotById.get(slotId);
+          const primaryId = String((slot as any)?.primary_itinerary_activity_id ?? "");
+          if (!primaryId) return true;
+          return primaryId === itineraryActivityId;
+        };
+
+        const stateById = new Map<
+          string,
+          {
+            row: any;
+            destinationId: string;
+            date: string | null;
+            startTime: string | null;
+            endTime: string | null;
+          }
+        >();
+
+        for (const row of activeActivities) {
+          const id = String((row as any)?.itinerary_activity_id ?? "");
+          if (!id) continue;
+          if (!isPrimaryActivity(id)) continue;
+
+          stateById.set(id, {
+            row,
+            destinationId: String((row as any)?.itinerary_destination_id ?? ""),
+            date: isIsoDate((row as any)?.date) ? String((row as any).date) : ((row as any)?.date ?? null),
+            startTime: typeof (row as any)?.start_time === "string" ? String((row as any).start_time) : ((row as any)?.start_time ?? null),
+            endTime: typeof (row as any)?.end_time === "string" ? String((row as any).end_time) : ((row as any)?.end_time ?? null),
+          });
+        }
+
+        const explicitlyCleared = new Set<string>();
+        for (const op of resolvedDraftOperations) {
+          if (op.op !== "update_activity") continue;
+          if (op.date === null) explicitlyCleared.add(op.itineraryActivityId);
+          if (op.startTime === null || op.endTime === null) explicitlyCleared.add(op.itineraryActivityId);
+        }
+
+        for (const op of resolvedDraftOperations) {
+          if (op.op === "remove_activity") {
+            stateById.delete(op.itineraryActivityId);
+            continue;
+          }
+
+          if (op.op === "update_activity") {
+            const entry = stateById.get(op.itineraryActivityId);
+            if (!entry) continue;
+
+            if (op.date !== undefined) {
+              entry.date = op.date;
+              if (op.date === null) {
+                entry.startTime = null;
+                entry.endTime = null;
+              }
+            }
+
+            const isUnscheduling = op.date === null;
+            if (!isUnscheduling && op.startTime !== undefined) {
+              entry.startTime = op.startTime as any;
+            }
+            if (!isUnscheduling && op.endTime !== undefined) {
+              entry.endTime = op.endTime as any;
+            }
+          }
+        }
+
+        const updateOpIndexByActivityId = new Map<string, number>();
+        for (let index = 0; index < resolvedDraftOperations.length; index += 1) {
+          const op = resolvedDraftOperations[index];
+          if (op?.op !== "update_activity") continue;
+          updateOpIndexByActivityId.set(op.itineraryActivityId, index);
+        }
+
+        const needsSchedule: string[] = [];
+        for (const [id, entry] of stateById) {
+          if (String(entry.destinationId) !== String(destinationId)) continue;
+          if (explicitlyCleared.has(id)) continue;
+
+          const date = entry.date;
+          if (date != null && (!isIsoDate(date) || !datePool.includes(date))) continue;
+
+          const startMin = parseTimeToMinutes(entry.startTime ?? null);
+          const endMin = parseTimeToMinutes(entry.endTime ?? null);
+          const hasValidTimes = startMin != null && endMin != null && endMin > startMin;
+          if (!hasValidTimes) needsSchedule.push(id);
+        }
+
+        const scheduleFromDraft: string[] = [];
+        const scheduleNew: string[] = [];
+        for (const id of needsSchedule) {
+          if (updateOpIndexByActivityId.has(id)) {
+            scheduleFromDraft.push(id);
+          } else {
+            scheduleNew.push(id);
+          }
+        }
+
+        const remainingBudget = Math.max(0, MAX_OPERATIONS - resolvedDraftOperations.length);
+        const scheduleNewWithinBudget = scheduleNew.slice(0, remainingBudget);
+        const idsToSchedule = [...scheduleFromDraft, ...scheduleNewWithinBudget];
+
+        if (idsToSchedule.length > 0 && datePool.length > 0) {
+          const idsToScheduleSet = new Set(idsToSchedule);
+
+          const hoursActivityIds: number[] = [];
+          for (const itineraryActivityId of idsToSchedule) {
+            const entry = stateById.get(itineraryActivityId);
+            const activityIdRaw = entry?.row?.activity?.activity_id ?? entry?.row?.activity_id ?? null;
+            const activityId = typeof activityIdRaw === "number" ? activityIdRaw : Number(activityIdRaw);
+            if (Number.isFinite(activityId)) hoursActivityIds.push(activityId);
+          }
+
+          await loadOpenHoursForActivities(hoursActivityIds.slice(0, 500));
+
+          const items = idsToSchedule
+            .map((itineraryActivityId) => {
+              const entry = stateById.get(itineraryActivityId);
+              if (!entry) return null;
+
+              const activity = entry.row?.activity ?? null;
+              const name =
+                typeof activity?.name === "string" && activity.name.trim()
+                  ? activity.name.trim()
+                  : `Activity ${itineraryActivityId}`;
+              const coords = parseCoordinatesToLatLng(activity?.coordinates);
+              const durationMin = parseDurationToMinutes(activity?.duration) ?? 60;
+              const activityIdRaw = activity?.activity_id ?? entry.row?.activity_id ?? null;
+              const activityId = typeof activityIdRaw === "number" ? activityIdRaw : Number(activityIdRaw);
+              const openHours = Number.isFinite(activityId) ? openHoursByActivityId.get(activityId) ?? [] : null;
+              const preferredDate = entry.date && isIsoDate(entry.date) ? entry.date : null;
+
+              return {
+                itineraryActivityId,
+                name,
+                coords,
+                durationMin,
+                preferredDate,
+                openHours,
+              };
+            })
+            .filter(Boolean) as Array<{
+            itineraryActivityId: string;
+            name: string;
+            coords: { lat: number; lng: number } | null;
+            durationMin: number;
+            preferredDate: string | null;
+            openHours: OpenHoursRow[] | null;
+          }>;
+
+          const fixed = Array.from(stateById.entries())
+            .map(([itineraryActivityId, entry]) => {
+              if (idsToScheduleSet.has(itineraryActivityId)) return null;
+              if (!entry.date || !isIsoDate(entry.date) || !datePool.includes(entry.date)) return null;
+              const startMin = parseTimeToMinutes(entry.startTime ?? null);
+              const endMin = parseTimeToMinutes(entry.endTime ?? null);
+              if (startMin == null || endMin == null || endMin <= startMin) return null;
+
+              return {
+                date: entry.date,
+                startMin,
+                endMin,
+                coords: parseCoordinatesToLatLng(entry.row?.activity?.coordinates),
+              };
+            })
+            .filter(Boolean) as Array<{
+            date: string;
+            startMin: number;
+            endMin: number;
+            coords: { lat: number; lng: number } | null;
+          }>;
+
+          const dayStartMin = parseTimeToMinutes(mergedPreferences.preferences.dayStart) ?? 9 * 60;
+          const dayEndMin = parseTimeToMinutes(mergedPreferences.preferences.dayEnd) ?? 18 * 60;
+          const metersPerMinute = travelModeToMetersPerMinute(defaultTravelMode);
+          const bufferMin = travelModeToBufferMinutes(defaultTravelMode);
+
+          const scheduled = autoScheduleActivities({
+            datePool,
+            items,
+            fixed,
+            dayStartMin,
+            dayEndMin,
+            metersPerMinute,
+            bufferMin,
+          });
+
+          const nextOperations = resolvedDraftOperations.map((op) => ({ ...op })) as Operation[];
+
+          for (const placement of scheduled.placements) {
+            const existingIndex = updateOpIndexByActivityId.get(placement.itineraryActivityId);
+            if (existingIndex != null) {
+              const op = nextOperations[existingIndex];
+              if (op?.op === "update_activity" && op.date !== null) {
+                nextOperations[existingIndex] = {
+                  ...op,
+                  date: placement.date,
+                  startTime: placement.startTime,
+                  endTime: placement.endTime,
+                } as any;
+              }
+              continue;
+            }
+
+            if (nextOperations.length >= MAX_OPERATIONS) continue;
+
+            nextOperations.push({
+              op: "update_activity",
+              itineraryActivityId: placement.itineraryActivityId,
+              date: placement.date,
+              startTime: placement.startTime,
+              endTime: placement.endTime,
+            } as any);
+          }
+
+          if (nextOperations.length <= MAX_OPERATIONS && scheduled.placements.length > 0) {
+            resolvedDraftOperations = nextOperations;
+            autoScheduledCount = scheduled.placements.length;
+            autoScheduleUnplacedCount = scheduled.unplaced.length;
+
+            clarifications.push(
+              `Assigned times for ${autoScheduledCount} activity(ies), keeping nearby stops together and considering opening hours when available.`
+            );
+
+            if (autoScheduleUnplacedCount > 0) {
+              clarifications.push(
+                `I couldn't fit ${autoScheduleUnplacedCount} item(s) into the available day window, so they remain unscheduled.`
+              );
+            }
+
+            if (scheduleNew.length > scheduleNewWithinBudget.length) {
+              clarifications.push(
+                `Note: ${scheduleNew.length - scheduleNewWithinBudget.length} additional unscheduled item(s) weren't changed due to the ${MAX_OPERATIONS} changes-per-request limit.`
+              );
+            }
+          }
+        }
+      }
+
       if (SHOULD_LOG_AI_ITINERARY) {
         console.info("[ai-itinerary] plan", {
           itineraryId,
           destinationId,
           userId: auth.user.id,
           proposedCount: plan.operations.length,
-          resolvedCount: prunedResolved.operations.length,
+          resolvedCount: resolvedDraftOperations.length,
           droppedCount: dropped,
           redundantDroppedCount: redundantDropped,
           clarificationCount: clarifications.length,
+          autoScheduledCount,
+          autoScheduleUnplacedCount,
         });
       }
 
       let payload: PlanResponsePayload;
       let autoCorrectionNotes: string[] = [];
 
-      if (prunedResolved.operations.length > MAX_OPERATIONS) {
+      if (resolvedDraftOperations.length > MAX_OPERATIONS) {
         const previewLines = buildPreviewLines(prunedDraft.operations, activityById, destinationById);
         payload = {
-          assistantMessage: `${stripEmDashes(plan.assistantMessage)}\n\nThat request would change ${prunedResolved.operations.length} items, which exceeds the limit of ${MAX_OPERATIONS} changes per request. Please narrow it down (for example, one day or one activity at a time).`,
+          assistantMessage: `${stripEmDashes(plan.assistantMessage)}\n\nThat request would change ${resolvedDraftOperations.length} items, which exceeds the limit of ${MAX_OPERATIONS} changes per request. Please narrow it down (for example, one day or one activity at a time).`,
           operations: prunedDraft.operations,
           previewLines: [
-            `Too many changes (${prunedResolved.operations.length}). Please narrow the request (max ${MAX_OPERATIONS} per request).`,
+            `Too many changes (${resolvedDraftOperations.length}). Please narrow the request (max ${MAX_OPERATIONS} per request).`,
             ...(previewLines.length > 0 ? ["Draft unchanged:"] : []),
             ...previewLines,
           ],
           requiresConfirmation: true,
         };
       } else {
-        const draftToReturn = prunedResolved.operations.length > 0 ? prunedResolved.operations : prunedDraft.operations;
+        const draftToReturn = resolvedDraftOperations.length > 0 ? resolvedDraftOperations : prunedDraft.operations;
 
         const requiresConfirmation =
           draftToReturn.some((op) => op.op === "remove_activity") ||
@@ -3394,7 +3681,7 @@ export async function POST(request: NextRequest) {
       }
 
       // Persist the draft only if the model produced a concrete updated plan.
-      if (prunedResolved.operations.length > 0 && prunedResolved.operations.length <= MAX_OPERATIONS) {
+      if (resolvedDraftOperations.length > 0 && resolvedDraftOperations.length <= MAX_OPERATIONS) {
         try {
           await updateAiItineraryThreadDraftAndSources({
             supabase,
@@ -4266,6 +4553,39 @@ export async function POST(request: NextRequest) {
               throw new Error(result.message || "Failed to add alternatives");
             }
 
+            // Keep in-memory slot maps in sync for subsequent operations in this apply request.
+            try {
+              const slot = (result as any)?.data?.slot ?? null;
+              const slotIdStr = slot ? String((slot as any)?.itinerary_slot_id ?? "") : "";
+              if (slotIdStr) slotById.set(slotIdStr, slot);
+
+              const options = Array.isArray((result as any)?.data?.slotOptions) ? ((result as any).data.slotOptions as any[]) : [];
+              if (slotIdStr && options.length > 0) {
+                const activityIds: string[] = [];
+                for (const option of options) {
+                  const activityId = String((option as any)?.itinerary_activity_id ?? "");
+                  if (!activityId) continue;
+                  slotIdByActivityId.set(activityId, slotIdStr);
+                  activityIds.push(activityId);
+                }
+                if (activityIds.length > 0) {
+                  activityIdsBySlotId.set(slotIdStr, activityIds);
+                }
+              }
+
+              const removedSlotIds = Array.isArray((result as any)?.data?.removedSlotIds)
+                ? ((result as any).data.removedSlotIds as any[])
+                : [];
+              for (const removedSlotId of removedSlotIds) {
+                const removedId = String(removedSlotId ?? "");
+                if (!removedId) continue;
+                slotById.delete(removedId);
+                activityIdsBySlotId.delete(removedId);
+              }
+            } catch {
+              // ignore - best effort only
+            }
+
             applied.push({ ok: true, operation });
 
             if (executeStep?.ai_itinerary_run_step_id) {
@@ -4823,6 +5143,100 @@ export async function POST(request: NextRequest) {
 
         if (error) {
           throw new Error(error.message || "Database update failed");
+        }
+
+        // Keep local activity cache in sync for subsequent ops/warnings in this apply request.
+        const cachedRow = activityById.get(operation.itineraryActivityId);
+        if (cachedRow) {
+          if (operation.date !== undefined) {
+            (cachedRow as any).date = operation.date;
+            if (operation.date === null) {
+              (cachedRow as any).start_time = null;
+              (cachedRow as any).end_time = null;
+            }
+          }
+          if (!isUnscheduling && update.start_time !== undefined) {
+            (cachedRow as any).start_time = update.start_time;
+          }
+          if (!isUnscheduling && update.end_time !== undefined) {
+            (cachedRow as any).end_time = update.end_time;
+          }
+          if (operation.notes !== undefined) {
+            (cachedRow as any).notes = operation.notes;
+          }
+        }
+
+        // If this activity is the primary option for a slot, keep the slot time range aligned.
+        const scheduleChanged =
+          operation.date !== undefined || operation.startTime !== undefined || operation.endTime !== undefined;
+        if (scheduleChanged && !isUnscheduling) {
+          let slotId = slotIdByActivityId.get(operation.itineraryActivityId) ?? null;
+
+          if (!slotId) {
+            try {
+              const { data: optionRow, error: optionError } = await supabase
+                .from("itinerary_slot_option")
+                .select("itinerary_slot_id")
+                .eq("itinerary_activity_id", Number(operation.itineraryActivityId))
+                .maybeSingle();
+              if (!optionError && optionRow) {
+                const found = String((optionRow as any)?.itinerary_slot_id ?? "");
+                if (found) slotId = found;
+              }
+            } catch {
+              slotId = null;
+            }
+          }
+
+          if (slotId) {
+            slotIdByActivityId.set(operation.itineraryActivityId, slotId);
+
+            let isPrimary = false;
+            const slot = slotById.get(slotId) ?? null;
+            if (slot) {
+              const primaryId = String((slot as any)?.primary_itinerary_activity_id ?? "");
+              if (primaryId) isPrimary = primaryId === String(operation.itineraryActivityId);
+            } else {
+              try {
+                const { data: slotRow, error: slotError } = await supabase
+                  .from("itinerary_slot")
+                  .select("itinerary_slot_id,primary_itinerary_activity_id")
+                  .eq("itinerary_slot_id", Number(slotId))
+                  .maybeSingle();
+                if (!slotError && slotRow) {
+                  const primaryId = String((slotRow as any)?.primary_itinerary_activity_id ?? "");
+                  if (primaryId) isPrimary = primaryId === String(operation.itineraryActivityId);
+                }
+              } catch {
+                // ignore
+              }
+            }
+
+            if (isPrimary) {
+              const updatedRow = activityById.get(operation.itineraryActivityId) ?? null;
+              const nextDate = typeof (updatedRow as any)?.date === "string" ? String((updatedRow as any).date) : null;
+              const nextStart =
+                typeof (updatedRow as any)?.start_time === "string" ? String((updatedRow as any).start_time) : null;
+              const nextEnd =
+                typeof (updatedRow as any)?.end_time === "string" ? String((updatedRow as any).end_time) : null;
+
+              if (nextDate && nextStart && nextEnd) {
+                try {
+                  const synced = await updateItinerarySlotTimeRange(slotId, nextDate, nextStart, nextEnd);
+                  if (synced.success) {
+                    slotById.set(slotId, synced.data.slot);
+                  }
+                } catch (error) {
+                  console.warn("[ai-itinerary] slot_sync_failed", {
+                    itineraryId,
+                    destinationId,
+                    slotId,
+                    error: describeErrorForLog(error),
+                  });
+                }
+              }
+            }
+          }
         }
 
         applied.push({ ok: true, operation });
