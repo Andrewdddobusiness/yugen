@@ -55,11 +55,11 @@ struct Segment {
 
 **Estimated**: 3–6 hours
 
-- [ ] Build an “adjacent segments” extractor for a day after applying the proposed operations in-memory
-  - [ ] Sort scheduled activities by start time within a day
-  - [ ] Build segments for adjacent pairs and compute available gap
-- [ ] Add buffer minutes + conflict thresholds
-  - [ ] Default buffer (e.g., 10m) and a single source of truth for conflict classification
+- [x] Build an “adjacent segments” extractor for a day after applying the proposed operations in-memory
+  - [x] Sort scheduled activities by start time within a day
+  - [x] Build segments for adjacent pairs and compute available gap
+- [x] Add buffer minutes + conflict thresholds
+  - [x] Default buffer (e.g., 10m) and a single source of truth for conflict classification
 
 **Files:**  
 `yugen/yugen/app/api/ai/itinerary/route.ts`  
@@ -69,10 +69,10 @@ struct Segment {
 
 **Estimated**: 3–6 hours
 
-- [ ] After resolving operations, validate resulting day schedules
-  - [ ] Only compute travel times for segments impacted by the plan (adjacent pairs)
-- [ ] If conflicts exist, provide safe resolutions
-  - [ ] Shift next activity by +X minutes (when safe and bounded)
+- [x] After resolving operations, validate resulting day schedules
+  - [x] Only compute travel times for segments impacted by the plan (adjacent pairs)
+- [x] If conflicts exist, provide safe resolutions
+  - [x] Shift next activity by +X minutes (when safe and bounded)
   - [ ] Otherwise: add a clear warning + ask user preference (mode, allow shift, etc.)
 - [ ] Add preview metadata for UI highlighting
   - [ ] Include conflict count + affected activities (IDs + labels)
@@ -85,21 +85,21 @@ struct Segment {
 
 **Estimated**: 2–4 hours
 
-- [ ] Respect `travel_mode_to_next` if set
+- [x] Respect `travel_mode_to_next` if set
 - [ ] If missing, infer a default mode and only propose persisting mode changes with confirmation
 
 **Files:**  
 `yugen/yugen/app/api/ai/itinerary/route.ts`
 
 ## 7. Acceptance Criteria (Strict)
-- [ ] The AI does not create a new adjacent segment where `travel_time + buffer > gap` without warning or a deterministic fix.
-- [ ] If Routes API is unavailable, planning still works and the UI does not crash (warnings become “travel time unavailable”).
-- [ ] Applying the plan yields the same end-state shown in preview (no hidden shifts).
+- [x] The AI does not create a new adjacent segment where `travel_time + buffer > gap` without warning or a deterministic fix.
+- [x] If Routes API is unavailable, planning still works and the UI does not crash (warnings become “travel time unavailable”).
+- [x] Applying the plan yields the same end-state shown in preview (no hidden shifts).
 
 ## 8. Testing Requirements
 - [ ] Unit tests:
-  - [ ] Segment builder ordering + gap computation
-  - [ ] Conflict classification (`ok | tight | conflict`)
+  - [x] Segment builder ordering + gap computation
+  - [x] Conflict classification (`ok | tight | conflict`)
 - [ ] Integration tests:
   - [ ] Plan with a known conflict returns warning + requires confirmation (if needed)
 - [ ] Manual QA checklist:

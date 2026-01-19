@@ -62,14 +62,14 @@ struct SlotOption {
 
 **Estimated**: 4–8 hours
 
-- [ ] Extend AI operation schema for alternatives slots
-  - [ ] Add runtime validation + max 3 limit
-  - [ ] Ensure IDs are itinerary-scoped and destination-scoped
-- [ ] Implement execution using `addActivitiesAsAlternatives`
-  - [ ] Preserve existing scheduled item as primary unless user requests otherwise
-  - [ ] Return stable preview metadata (names + option count)
-- [ ] Wire into plan preview + apply pipeline
-  - [ ] Confirm/apply creates slot + options deterministically
+- [x] Extend AI operation schema for alternatives slots
+  - [x] Add runtime validation + max 3 limit
+  - [x] Ensure IDs are itinerary-scoped and destination-scoped
+- [x] Implement execution using `addActivitiesAsAlternatives`
+  - [x] Preserve existing scheduled item as primary unless user requests otherwise
+  - [x] Return stable preview metadata (names + option count)
+- [x] Wire into plan preview + apply pipeline
+  - [x] Confirm/apply creates slot + options deterministically
 
 **Files:**  
 `yugen/yugen/lib/ai/itinerary/schema.ts`  
@@ -80,14 +80,14 @@ struct SlotOption {
 
 **Estimated**: 2–5 hours
 
-- [ ] Build a small candidate pool
-  - [ ] Prefer unscheduled activities in the same destination
+- [x] Build a small candidate pool
+  - [x] Prefer unscheduled activities in the same destination
   - [ ] Optional: allow “find new places” as a later phase (explicitly gated)
-- [ ] Rank candidates by simple heuristics
-  - [ ] proximity (coordinates distance)
-  - [ ] type similarity (theme bucket match)
-  - [ ] opening-hours overlap when known
-- [ ] Keep outputs explainable (why each alternative is suggested)
+- [x] Rank candidates by simple heuristics
+  - [x] proximity (coordinates distance)
+  - [x] type similarity (theme bucket match)
+  - [x] opening-hours overlap when known
+- [x] Keep outputs explainable (why each alternative is suggested)
 
 **Files:**  
 `yugen/yugen/lib/ai/itinerary/*` (new helper)  
@@ -97,27 +97,27 @@ struct SlotOption {
 
 **Estimated**: 2–4 hours
 
-- [ ] Render options in itinerary UI
-  - [ ] Indicate “Options (3)” on the slot/activity card
-  - [ ] Expand to show Option A/B/C
-- [ ] Add safe UX copy and selection behavior
-  - [ ] “Pick a backup option for this time window”
-  - [ ] Ensure option creation is visible in the assistant preview
+- [x] Render options in itinerary UI
+  - [x] Indicate “Options (3)” on the slot/activity card
+  - [x] Expand to show Option A/B/C
+- [x] Add safe UX copy and selection behavior
+  - [x] “Pick a backup option for this time window”
+  - [x] Ensure option creation is visible in the assistant preview
 
 **Files:**  
 `yugen/yugen/components/ai/ItineraryAssistantSheet.tsx`  
 `yugen/yugen/components/itinerary/*` (calendar/table cards)
 
 ## 7. Acceptance Criteria (Strict)
-- [ ] The assistant can create a slot with 2–3 alternatives and the UI reflects it immediately after apply.
-- [ ] Alternatives are presented with place names (not IDs) in preview and in the itinerary UI.
-- [ ] The system prevents alternatives from other itineraries/destinations from being attached to the slot.
-- [ ] The assistant never creates more than 3 alternatives for a single slot in v1.
+- [x] The assistant can create a slot with 2–3 alternatives and the UI reflects it immediately after apply.
+- [x] Alternatives are presented with place names (not IDs) in preview and in the itinerary UI.
+- [x] The system prevents alternatives from other itineraries/destinations from being attached to the slot.
+- [x] The assistant never creates more than 3 alternatives for a single slot in v1.
 
 ## 8. Testing Requirements
 - [ ] Unit tests:
-  - [ ] Candidate ranking respects max 3 and same-destination constraint
-  - [ ] Schema validation rejects invalid payloads
+  - [x] Candidate ranking respects max 3 and same-destination constraint
+  - [x] Schema validation rejects invalid payloads
 - [ ] Integration tests:
   - [ ] Plan → apply creates `itinerary_slot` + `itinerary_slot_option` rows and UI re-fetch shows options
 - [ ] Manual QA checklist (if relevant):

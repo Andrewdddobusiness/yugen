@@ -68,14 +68,14 @@ struct DayPlan {
 
 **Estimated**: 4–8 hours
 
-- [ ] Extend `/api/ai/itinerary` to accept `mode: "curate"`
-  - [ ] Default to `edit` to avoid breaking existing clients
-- [ ] Define strict schema output for curate mode
-  - [ ] Day-by-day summary blocks (human-readable)
-  - [ ] Operations payload (existing schema) + warnings metadata
-- [ ] Add guardrails
-  - [ ] Operation cap and clear rejection messaging when exceeded
-  - [ ] Confirmation required before apply
+- [x] Extend `/api/ai/itinerary` to accept `mode: "curate"`
+  - [x] Default to `edit` to avoid breaking existing clients
+- [x] Define strict schema output for curate mode
+  - [x] Day-by-day summary blocks (human-readable)
+  - [x] Operations payload (existing schema) + warnings metadata
+- [x] Add guardrails
+  - [x] Operation cap and clear rejection messaging when exceeded
+  - [x] Confirmation required before apply
 
 **Files:**  
 `yugen/yugen/app/api/ai/itinerary/route.ts`  
@@ -85,14 +85,14 @@ struct DayPlan {
 
 **Estimated**: 4–8 hours
 
-- [ ] Build a compact planning context for the requested date range
-  - [ ] Candidate activities (scheduled + unscheduled) with coords, types, durations
+- [x] Build a compact planning context for the requested date range
+  - [x] Candidate activities (scheduled + unscheduled) with coords, types, durations
   - [ ] Destination timezone + date range boundaries
-  - [ ] Opening hours summaries (when known)
-  - [ ] Preferences (explicit + inferred) and optional theme intent
-- [ ] Add a travel-time lookup strategy for curation
-  - [ ] Compute only needed segments (adjacent candidates in the proposed order)
-  - [ ] Cache results and avoid repeated calls
+  - [x] Opening hours summaries (when known)
+  - [x] Preferences (explicit + inferred) and optional theme intent
+- [x] Add a travel-time lookup strategy for curation
+  - [x] Compute only needed segments (adjacent candidates in the proposed order)
+  - [x] Cache results and avoid repeated calls
 
 **Files:**  
 `yugen/yugen/actions/supabase/builderBootstrap.ts`  
@@ -103,15 +103,15 @@ struct DayPlan {
 
 **Estimated**: 6–16 hours
 
-- [ ] Implement a simple heuristic scheduler (v1)
-  - [ ] Cluster by proximity (and optionally by theme bucket)
-  - [ ] Order within cluster to minimize travel time
-  - [ ] Assign time windows using day start/end + durations
+- [x] Implement a simple heuristic scheduler (v1)
+  - [x] Cluster by proximity (and optionally by theme bucket)
+  - [x] Order within cluster to minimize travel time
+  - [x] Assign time windows using day start/end + durations
   - [ ] Insert breaks and meal anchors heuristically (bounded)
-- [ ] Validate iteratively using deterministic validators
-  - [ ] Opening-hours checks (010)
-  - [ ] Travel-time conflicts between adjacent scheduled items (009)
-  - [ ] Emit warnings when constraints cannot be satisfied
+- [x] Validate iteratively using deterministic validators
+  - [x] Opening-hours checks (010)
+  - [x] Travel-time conflicts between adjacent scheduled items (009)
+  - [x] Emit warnings when constraints cannot be satisfied
 
 **Files:**  
 `yugen/yugen/app/api/ai/itinerary/route.ts`  
@@ -121,26 +121,26 @@ struct DayPlan {
 
 **Estimated**: 2–8 hours
 
-- [ ] Update assistant UI to render day-plan blocks
-  - [ ] Clear “This is a draft plan” copy
-  - [ ] Per-day expand/collapse and warnings badges
-- [ ] Support partial apply
-  - [ ] Apply selected days only (subset of operations)
-  - [ ] Ensure UI refresh reflects applied changes reliably
+- [x] Update assistant UI to render day-plan blocks
+  - [x] Clear “This is a draft plan” copy
+  - [x] Per-day expand/collapse and warnings badges
+- [x] Support partial apply
+  - [x] Apply selected days only (subset of operations)
+  - [x] Ensure UI refresh reflects applied changes reliably
 
 **Files:**  
 `yugen/yugen/components/ai/ItineraryAssistantSheet.tsx`  
 `yugen/yugen/app/api/ai/itinerary/route.ts`
 
 ## 7. Acceptance Criteria (Strict)
-- [ ] A curate request produces a day-by-day preview and a valid operations payload.
-- [ ] Applying the plan updates the itinerary and the UI reflects the changes without manual refresh.
-- [ ] Travel-time and opening-hours conflicts are either avoided or surfaced as warnings before apply.
-- [ ] Operation caps prevent runaway plans; the assistant explains how to narrow scope.
+- [x] A curate request produces a day-by-day preview and a valid operations payload.
+- [x] Applying the plan updates the itinerary and the UI reflects the changes without manual refresh.
+- [x] Travel-time and opening-hours conflicts are either avoided or surfaced as warnings before apply.
+- [x] Operation caps prevent runaway plans; the assistant explains how to narrow scope.
 
 ## 8. Testing Requirements
 - [ ] Unit tests:
-  - [ ] Cluster ordering produces stable results for the same input set
+  - [x] Cluster ordering produces stable results for the same input set
   - [ ] Validation loop surfaces travel-time and hours warnings correctly
 - [ ] Integration tests:
   - [ ] Curate request → apply → builder UI shows scheduled items on the correct days
@@ -150,7 +150,7 @@ struct DayPlan {
   - [ ] Apply only Day 1 → verify Day 2 remains untouched
 
 ## 9. Rollout / Migration Notes (Optional)
-- [ ] Feature flag: `NEXT_PUBLIC_ASSISTANT_CURATION_MODE`
+- [x] Feature flag: `NEXT_PUBLIC_ASSISTANT_CURATION_MODE`
 - [ ] Backward compatibility: default `mode` remains `edit`
 
 ## 10. Risks / Open Questions

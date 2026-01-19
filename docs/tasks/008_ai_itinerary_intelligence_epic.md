@@ -54,10 +54,10 @@ struct IntelligenceSignals {
 
 **Estimated**: 8–16 hours
 
-- [ ] Implement deterministic travel-time validation and conflict surfacing
-  - [ ] Compute adjacency segments for the resulting day schedule (in-memory plan)
-  - [ ] Enforce buffer minutes + conflict threshold rules
-  - [ ] Provide safe resolutions (shift/reorder/mode prompt)
+- [x] Implement deterministic travel-time validation and conflict surfacing
+  - [x] Compute adjacency segments for the resulting day schedule (in-memory plan)
+  - [x] Enforce buffer minutes + conflict threshold rules
+  - [x] Provide safe resolutions (shift/reorder/mode prompt)
 
 **Files:**  
 `yugen/yugen/docs/tasks/009_ai_travel_time_aware_day_planning.md:1`
@@ -66,9 +66,9 @@ struct IntelligenceSignals {
 
 **Estimated**: 6–14 hours
 
-- [ ] Implement deterministic opening-hours validation and warnings
-  - [ ] `isOpen` utility for intervals
-  - [ ] Resolve violations via safe auto-shifts or clarifying questions
+- [x] Implement deterministic opening-hours validation and warnings
+  - [x] `isOpen` utility for intervals
+  - [x] Resolve violations via safe auto-shifts or clarifying questions
 
 **Files:**  
 `yugen/yugen/docs/tasks/010_ai_open_hours_aware_scheduling.md:1`
@@ -77,10 +77,10 @@ struct IntelligenceSignals {
 
 **Estimated**: 10–20 hours
 
-- [ ] Add preference schema + inference
-  - [ ] Store + read user preferences safely
-  - [ ] Infer pace defaults from existing schedules
-  - [ ] Theme-aware planning inputs (shopping/sights/food/mixed)
+- [x] Add preference schema + inference
+  - [x] Store + read user preferences safely
+  - [x] Infer pace defaults from existing schedules
+  - [x] Theme-aware planning inputs (shopping/sights/food/mixed)
 
 **Files:**  
 `yugen/yugen/docs/tasks/011_ai_preferences_and_day_themes.md:1`
@@ -89,9 +89,9 @@ struct IntelligenceSignals {
 
 **Estimated**: 8–16 hours
 
-- [ ] Add AI operation + execution path for alternatives
-  - [ ] Extend schema + preview UI
-  - [ ] Execute via `addActivitiesAsAlternatives`
+- [x] Add AI operation + execution path for alternatives
+  - [x] Extend schema + preview UI
+  - [x] Execute via `addActivitiesAsAlternatives`
 
 **Files:**  
 `yugen/yugen/docs/tasks/012_ai_flexible_slots_and_alternatives.md:1`
@@ -100,25 +100,25 @@ struct IntelligenceSignals {
 
 **Estimated**: 16–40 hours
 
-- [ ] Add a “curate” mode to schedule an unscheduled backlog into a coherent plan
-  - [ ] Build compact planning context + deterministic validation loop
-  - [ ] Support partial apply (day-by-day)
+- [x] Add a “curate” mode to schedule an unscheduled backlog into a coherent plan
+  - [x] Build compact planning context + deterministic validation loop
+  - [x] Support partial apply (day-by-day)
 
 **Files:**  
 `yugen/yugen/docs/tasks/013_ai_day_plan_curation_mode.md:1`
 
 ## 7. Acceptance Criteria (Strict)
-- [ ] AI plans do not produce new obvious travel-time conflicts without warnings/fixes.
-- [ ] AI plans do not schedule activities outside known opening windows without warnings/fixes.
-- [ ] AI plans reflect user preferences (pace + theme) in a user-observable way.
-- [ ] AI can create alternatives slots for flexibility (where supported by migrations).
-- [ ] Preview + confirmation remains the default for destructive/large changes.
+- [x] AI plans do not produce new obvious travel-time conflicts without warnings/fixes.
+- [x] AI plans do not schedule activities outside known opening windows without warnings/fixes.
+- [x] AI plans reflect user preferences (pace + theme) in a user-observable way.
+- [x] AI can create alternatives slots for flexibility (where supported by migrations).
+- [x] Preview + confirmation remains the default for destructive/large changes.
 
 ## 8. Testing Requirements
 - [ ] Unit tests:
-  - [ ] Travel-time conflict classification (gap vs duration+buffer)
-  - [ ] Opening-hours interval overlap logic
-  - [ ] Preference inference heuristics
+  - [x] Travel-time conflict classification (gap vs duration+buffer)
+  - [x] Opening-hours interval overlap logic
+  - [x] Preference inference heuristics
 - [ ] Integration tests:
   - [ ] AI plan → apply updates itinerary and refreshes builder UI
 - [ ] Manual QA checklist:

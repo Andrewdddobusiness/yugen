@@ -54,11 +54,11 @@ struct OpenInterval {
 
 **Estimated**: 2–4 hours
 
-- [ ] Implement `getOpenIntervals(open_hours, date)` → normalized intervals
-  - [ ] Support multiple intervals per day
-  - [ ] Handle missing minute/hour fields conservatively
-- [ ] Implement `isOpenForWindow(intervals, startTime, endTime)`
-  - [ ] Support overnight hours (close < open)
+- [x] Implement `getOpenIntervals(open_hours, date)` → normalized intervals
+  - [x] Support multiple intervals per day
+  - [x] Handle missing minute/hour fields conservatively
+- [x] Implement `isOpenForWindow(intervals, startTime, endTime)`
+  - [x] Support overnight hours (close < open)
 
 **Files:**  
 `yugen/yugen/types/database.ts`  
@@ -69,12 +69,12 @@ struct OpenInterval {
 
 **Estimated**: 3–6 hours
 
-- [ ] Validate proposed schedules for `update_activity` and `add_place`
-  - [ ] Only validate when both date and time are present (or when time changes are requested)
-- [ ] Define safe correction rules
-  - [ ] Auto-shift to nearest valid interval (same day) when unambiguous
+- [x] Validate proposed schedules for `update_activity` and `add_place`
+  - [x] Only validate when both date and time are present (or when time changes are requested)
+- [x] Define safe correction rules
+  - [x] Auto-shift to nearest valid interval (same day) when unambiguous
   - [ ] Otherwise ask: “This seems closed at 9am — should I schedule it after 10am?”
-- [ ] Persist “hours warnings” metadata for preview UI
+- [x] Persist “hours warnings” metadata for preview UI
 
 **Files:**  
 `yugen/yugen/app/api/ai/itinerary/route.ts`  
@@ -84,7 +84,7 @@ struct OpenInterval {
 
 **Estimated**: 1–4 hours
 
-- [ ] Ensure open hours are persisted when adding a new place (if Google returns hours)
+- [x] Ensure open hours are persisted when adding a new place (if Google returns hours)
 - [ ] Consider a lightweight refresh strategy for popular activities (defer if too big)
 
 **Files:**  
@@ -92,14 +92,14 @@ struct OpenInterval {
 `yugen/yugen/actions/supabase/activities.ts`
 
 ## 7. Acceptance Criteria (Strict)
-- [ ] If an activity has known hours, the AI does not schedule it entirely outside an open interval without warning or a safe shift.
-- [ ] If hours are unknown, the plan explicitly marks it as “unknown hours” (no hard failure).
-- [ ] Preview UI can display an hours warning for affected draft changes.
+- [x] If an activity has known hours, the AI does not schedule it entirely outside an open interval without warning or a safe shift.
+- [x] If hours are unknown, the plan explicitly marks it as “unknown hours” (no hard failure).
+- [x] Preview UI can display an hours warning for affected draft changes.
 
 ## 8. Testing Requirements
 - [ ] Unit tests:
-  - [ ] Interval normalization (multi-interval, overnight)
-  - [ ] Overlap check for time windows
+  - [x] Interval normalization (multi-interval, overnight)
+  - [x] Overlap check for time windows
 - [ ] Integration tests:
   - [ ] Plan with “closed” time returns warning + suggested shift
 - [ ] Manual QA checklist:

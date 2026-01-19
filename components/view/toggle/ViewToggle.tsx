@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import { useItineraryLayoutStore } from "@/store/itineraryLayoutStore";
 import { MobileViewSelector } from "./MobileViewSelector";
 import { ActivityCategoryColorsPopover } from "./ActivityCategoryColorsPopover";
+import { TripEventBlocksToolbar } from "./TripEventBlocksToolbar";
 
 export type ViewMode = "calendar" | "table" | "list";
 
@@ -117,7 +118,7 @@ export function ViewToggle({
 
   return (
     <TooltipProvider>
-      <div className={cn("flex items-center gap-2", className)}>
+      <div className={cn("flex flex-wrap items-center gap-2", className)}>
         <div className="flex items-center bg-bg-100 dark:bg-ink-900 rounded-xl p-1 border border-stroke-200/70 dark:border-white/10">
           {viewConfigs.map((config) => {
             const Icon = config.icon;
@@ -193,6 +194,13 @@ export function ViewToggle({
             </TooltipContent>
           </Tooltip>
         )}
+
+        {currentView === "calendar" ? (
+          <div className="hidden md:flex items-center gap-3">
+            <div className="h-6 w-px bg-stroke-200/70 dark:bg-white/10" aria-hidden="true" />
+            <TripEventBlocksToolbar />
+          </div>
+        ) : null}
 
         <ActivityCategoryColorsPopover />
       </div>

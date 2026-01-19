@@ -61,12 +61,12 @@ struct DayTheme {
 
 **Estimated**: 4–8 hours
 
-- [ ] Define the preference payload shape + validation
-  - [ ] Add a TypeScript type + runtime validation helper
-  - [ ] Add a stable JSON namespace (e.g., `profiles.preferences.ai_itinerary`)
-- [ ] Implement read/write helpers
-  - [ ] Server action to update preferences (explicit user choice)
-  - [ ] Client hook to fetch + update preferences (optimistic UI optional)
+- [x] Define the preference payload shape + validation
+  - [x] Add a TypeScript type + runtime validation helper
+  - [x] Add a stable JSON namespace (e.g., `profiles.preferences.ai_itinerary`)
+- [x] Implement read/write helpers
+  - [x] Server action to update preferences (explicit user choice)
+  - [x] Client hook to fetch + update preferences (optimistic UI optional)
 
 **Files:**  
 `yugen/yugen/types/database.ts`  
@@ -77,10 +77,10 @@ struct DayTheme {
 
 **Estimated**: 3–6 hours
 
-- [ ] Implement deterministic inference from itinerary history
-  - [ ] Infer typical day start/end from scheduled items (median)
-  - [ ] Infer pacing from average activities/day
-  - [ ] Infer interests from place types (coarse buckets)
+- [x] Implement deterministic inference from itinerary history
+  - [x] Infer typical day start/end from scheduled items (median)
+  - [x] Infer pacing from average activities/day
+  - [x] Infer interests from place types (coarse buckets)
 - [ ] Add “ask a clarifying question” rules when confidence is low
   - [ ] Single-question max (“Do you prefer packed or relaxed days?”)
   - [ ] Only ask when it affects a requested plan
@@ -93,12 +93,12 @@ struct DayTheme {
 
 **Estimated**: 3–6 hours
 
-- [ ] Add deterministic “theme tags” for activities
-  - [ ] Map Google place types → theme buckets
-  - [ ] Prefer simple + explainable mapping
-- [ ] Update planner prompt/context to include preferences + theme
-  - [ ] Ensure the LLM only proposes operations; server still validates feasibility
-- [ ] Add preview explanation copy (“Planned as a shopping-focused day near …”)
+- [x] Add deterministic “theme tags” for activities
+  - [x] Map Google place types → theme buckets
+  - [x] Prefer simple + explainable mapping
+- [x] Update planner prompt/context to include preferences + theme
+  - [x] Ensure the LLM only proposes operations; server still validates feasibility
+- [x] Add preview explanation copy (“Planned as a shopping-focused day near …”)
 
 **Files:**  
 `yugen/yugen/actions/google/actions.ts` (types surface)  
@@ -106,16 +106,16 @@ struct DayTheme {
 `yugen/yugen/components/ai/ItineraryAssistantSheet.tsx`
 
 ## 7. Acceptance Criteria (Strict)
-- [ ] With explicit preferences set, AI plans reflect day start/end and pacing (fewer items for “relaxed”, more for “packed”).
-- [ ] Without explicit preferences, AI uses inferred/default preferences and does not write them to the database.
-- [ ] If the user asks for a themed day (“shopping day”), the plan clusters by relevant activity types and avoids long cross-city hops.
-- [ ] No breaking changes to existing add/update/delete flows when preferences are absent.
+- [x] With explicit preferences set, AI plans reflect day start/end and pacing (fewer items for “relaxed”, more for “packed”).
+- [x] Without explicit preferences, AI uses inferred/default preferences and does not write them to the database.
+- [x] If the user asks for a themed day (“shopping day”), the plan clusters by relevant activity types and avoids long cross-city hops.
+- [x] No breaking changes to existing add/update/delete flows when preferences are absent.
 
 ## 8. Testing Requirements
 - [ ] Unit tests:
-  - [ ] Inference: day start/end from scheduled times
-  - [ ] Inference: pace classification from activity density
-  - [ ] Theme tagging: types → bucket mapping
+  - [x] Inference: day start/end from scheduled times
+  - [x] Inference: pace classification from activity density
+  - [x] Theme tagging: types → bucket mapping
 - [ ] Integration tests:
   - [ ] `/api/ai/itinerary` includes preferences context and remains schema-valid
 - [ ] Manual QA checklist (if relevant):
