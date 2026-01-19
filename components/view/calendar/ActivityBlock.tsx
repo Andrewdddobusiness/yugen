@@ -153,13 +153,16 @@ export function ActivityBlock({
   }, []);
 
   const handleResizeStart = useCallback((direction: 'top' | 'bottom', e: MouseEvent) => {
-    setIsResizing(true);
-    setResizeDirection(direction);
-    
-    // Get initial mouse position and calendar grid context
-    const initialMouseY = e.clientY;
+    if (e.button !== 0) return;
+
     const blockElement = blockRef.current;
     if (!blockElement) return;
+
+    setIsResizing(true);
+    setResizeDirection(direction);
+
+    // Get initial mouse position and calendar grid context
+    const initialMouseY = e.clientY;
     const baseTransform = blockElement.style.transform;
     
     const MIN_DURATION = minutesPerSlot; // Minimum 1 slot
@@ -254,11 +257,13 @@ export function ActivityBlock({
   }, [activity.duration, activity.id, minutesPerSlot, onResize, slotHeightPx]);
 
   const handleResizeTopMouseDown = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
     e.stopPropagation();
     handleResizeStart('top', e.nativeEvent);
   }, [handleResizeStart]);
 
   const handleResizeBottomMouseDown = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
     e.stopPropagation();
     handleResizeStart('bottom', e.nativeEvent);
   }, [handleResizeStart]);
@@ -487,25 +492,27 @@ export function ActivityBlock({
         isDragging={isDragging}
       />
 
-      {/* Resize Handles - only show for standard+ blocks */}
-      {!isOverlay && onResize && blockSize !== 'compact' && (
+      {/* Resize Handles */}
+      {!isOverlay && onResize && (
         <>
           <div 
             className={cn(
-              "absolute top-0 left-0 right-0 h-2 cursor-n-resize transition-all z-20",
+              "absolute left-0 right-0 cursor-n-resize transition-all z-10",
+              blockSize === "compact" ? "-top-1 h-3" : "top-0 h-2",
               isResizing && resizeDirection === 'top' 
                 ? "bg-brand-500/30 opacity-100" 
-                : "hover:bg-brand-500/20 opacity-0 group-hover:opacity-100"
+                : cn("hover:bg-brand-500/20 opacity-0 group-hover:opacity-100", "[@media(pointer:coarse)]:opacity-100")
             )}
             onMouseDown={handleResizeTopMouseDown}
             title="Adjust start time (drag up to start earlier, down to start later)"
           />
           <div 
             className={cn(
-              "absolute bottom-0 left-0 right-0 h-2 cursor-s-resize transition-all z-20",
+              "absolute left-0 right-0 cursor-s-resize transition-all z-10",
+              blockSize === "compact" ? "-bottom-1 h-3" : "bottom-0 h-2",
               isResizing && resizeDirection === 'bottom' 
                 ? "bg-brand-500/30 opacity-100" 
-                : "hover:bg-brand-500/20 opacity-0 group-hover:opacity-100"
+                : cn("hover:bg-brand-500/20 opacity-0 group-hover:opacity-100", "[@media(pointer:coarse)]:opacity-100")
             )}
             onMouseDown={handleResizeBottomMouseDown}
             title="Adjust end time (drag down to end later, up to end earlier)"

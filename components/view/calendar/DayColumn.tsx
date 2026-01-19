@@ -14,6 +14,7 @@ import {
   getCalendarSlotHeightPx,
 } from "./layoutMetrics";
 import type { TimeSlot } from "./TimeGrid";
+import type { ScheduledCustomEvent } from "./hooks/useScheduledCustomEvents";
 import type { TravelMode } from "@/actions/google/travelTime";
 import type { CommuteSegment, CommuteTravelTime } from "./commute";
 import { getCommuteOverlayId, parseTimeToMinutes } from "./commute";
@@ -32,18 +33,6 @@ interface ScheduledActivity {
     address?: string;
     coordinates?: [number, number];
   };
-}
-
-interface ScheduledCustomEvent {
-  id: string;
-  date: Date;
-  startTime: string;
-  endTime: string;
-  duration: number;
-  position: { day: number; startSlot: number; span: number };
-  title: string;
-  notes?: string | null;
-  colorHex?: string | null;
 }
 
 interface DayColumnProps {

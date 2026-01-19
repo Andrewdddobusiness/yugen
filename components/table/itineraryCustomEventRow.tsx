@@ -1,6 +1,6 @@
 import { TableCell, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { MoreHorizontal, StickyNote, Trash2 } from "lucide-react";
+import { LogIn, LogOut, MoreHorizontal, Plane, StickyNote, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -11,6 +11,7 @@ import {
 import { ActivityCreatedBy } from "@/components/collaboration/ActivityCreatedBy";
 import { formatTime } from "@/utils/formatting/datetime";
 import { cn } from "@/lib/utils";
+import { getCustomEventKindLabel } from "@/lib/customEvents/kinds";
 import type { ItineraryCustomEvent } from "@/store/itineraryCustomEventStore";
 
 function formatDateLabel(date: string | null) {
@@ -33,13 +34,17 @@ export default function ItineraryCustomEventRow({
   onRemove: (eventId: number) => void;
 }) {
   const dotStyle = event.color_hex ? { backgroundColor: event.color_hex } : undefined;
+  const kind = event.kind ?? "custom";
+  const label = getCustomEventKindLabel(kind);
+  const KindIcon =
+    kind === "flight" ? Plane : kind === "hotel_check_in" ? LogIn : kind === "hotel_check_out" ? LogOut : StickyNote;
 
   return (
     <TableRow className="flex w-full hover:bg-gray-50">
       <TableCell className="w-[20%] min-w-[200px]">
         <div className="flex flex-col">
           <div className="flex items-center gap-2 min-w-0">
-            <StickyNote className="h-4 w-4 shrink-0 text-ink-400" />
+            <KindIcon className="h-4 w-4 shrink-0 text-ink-400" />
             <div className="truncate">{event.title}</div>
           </div>
           {event.created_by ? (
@@ -59,13 +64,13 @@ export default function ItineraryCustomEventRow({
             "dark:border-white/10 dark:bg-white/5 dark:text-white/80 dark:hover:bg-white/10"
           )}
           style={event.color_hex ? { borderColor: event.color_hex } : undefined}
-          title="Custom note"
+          title={label}
         >
           <span
             className={cn("h-1.5 w-1.5 shrink-0 rounded-full", !event.color_hex && "bg-slate-400")}
             style={dotStyle}
           />
-          <span className="min-w-0 truncate">Note</span>
+          <span className="min-w-0 truncate">{label}</span>
         </Badge>
       </TableCell>
 

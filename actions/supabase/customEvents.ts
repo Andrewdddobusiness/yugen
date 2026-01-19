@@ -4,12 +4,20 @@ import { z } from "zod";
 import { revalidateTag } from "next/cache";
 import { createClient } from "@/utils/supabase/server";
 import { builderBootstrapTag } from "@/lib/cacheTags";
+import {
+  ITINERARY_CUSTOM_EVENT_KIND_VALUES,
+  type ItineraryCustomEventKind,
+} from "@/lib/customEvents/kinds";
 import type { DatabaseResponse, ItineraryCustomEvent } from "@/types/database";
 
 const DATE_STRING = /^\d{4}-\d{2}-\d{2}$/;
 const TIME_STRING = /^\d{2}:\d{2}(:\d{2})?$/;
 
 const toTimeString = (value: string) => (value.length === 5 ? `${value}:00` : value);
+
+const itineraryCustomEventKindSchema = z.enum(
+  [...ITINERARY_CUSTOM_EVENT_KIND_VALUES] as [ItineraryCustomEventKind, ...ItineraryCustomEventKind[]]
+);
 
 function getSupabaseErrorSummary(
   error: unknown
@@ -24,9 +32,24 @@ function getSupabaseErrorSummary(
   };
 }
 
+const isMissingColumn = (error: unknown, column: string) => {
+  if (!error || typeof error !== "object") return false;
+  const summary = getSupabaseErrorSummary(error);
+  const code = String(summary.code ?? "");
+  if (code !== "42703") return false;
+  const message = String(summary.message ?? "").toLowerCase();
+  return message.includes(column.toLowerCase());
+};
+
+const CUSTOM_EVENT_SELECT_WITH_KIND =
+  "itinerary_custom_event_id,itinerary_id,itinerary_destination_id,kind,title,notes,date,start_time,end_time,color_hex,created_by,updated_by,created_at,updated_at,deleted_at";
+const CUSTOM_EVENT_SELECT_LEGACY =
+  "itinerary_custom_event_id,itinerary_id,itinerary_destination_id,title,notes,date,start_time,end_time,color_hex,created_by,updated_by,created_at,updated_at,deleted_at";
+
 const createCustomEventSchema = z.object({
   itinerary_id: z.number().int().positive(),
   itinerary_destination_id: z.number().int().positive().nullable().optional(),
+  kind: itineraryCustomEventKindSchema.optional(),
   title: z.string().trim().min(1).max(140),
   notes: z.string().trim().max(2000).nullable().optional(),
   date: z.string().regex(DATE_STRING),
@@ -36,6 +59,7 @@ const createCustomEventSchema = z.object({
 });
 
 const updateCustomEventSchema = z.object({
+  kind: itineraryCustomEventKindSchema.optional(),
   title: z.string().trim().min(1).max(140).optional(),
   notes: z.string().trim().max(2000).nullable().optional(),
   date: z.string().regex(DATE_STRING).nullable().optional(),
@@ -63,9 +87,7 @@ export async function listItineraryCustomEvents(
 
   const { data, error } = await supabase
     .from("itinerary_custom_event")
-    .select(
-      "itinerary_custom_event_id,itinerary_id,itinerary_destination_id,title,notes,date,start_time,end_time,color_hex,created_by,updated_by,created_at,updated_at,deleted_at"
-    )
+    .select(CUSTOM_EVENT_SELECT_WITH_KIND)
     .eq("itinerary_id", itineraryIdValue)
     .is("deleted_at", null)
     .order("date", { ascending: true })
@@ -78,6 +100,25 @@ export async function listItineraryCustomEvents(
     if (code === "42P01") {
       // Table not present yet (migration not applied).
       return { success: true, data: [] };
+    }
+    if (isMissingColumn(error, "kind")) {
+      const { data: legacyData, error: legacyError } = await supabase
+        .from("itinerary_custom_event")
+        .select(CUSTOM_EVENT_SELECT_LEGACY)
+        .eq("itinerary_id", itineraryIdValue)
+        .is("deleted_at", null)
+        .order("date", { ascending: true })
+        .order("start_time", { ascending: true })
+        .limit(2000);
+
+      if (legacyError) {
+        const legacySummary = getSupabaseErrorSummary(legacyError);
+        const legacyCode = String(legacySummary.code ?? "");
+        console.error("Error listing custom events (legacy):", legacySummary);
+        return { success: false, error: { message: "Failed to load custom events", code: legacyCode } };
+      }
+
+      return { success: true, data: (legacyData ?? []) as ItineraryCustomEvent[] };
     }
     console.error("Error listing custom events:", summary);
     return { success: false, error: { message: "Failed to load custom events", code } };
@@ -102,6 +143,7 @@ export async function createItineraryCustomEvent(
     const insertRow = {
       itinerary_id: validated.itinerary_id,
       itinerary_destination_id: validated.itinerary_destination_id ?? null,
+      kind: validated.kind ?? "custom",
       title: validated.title,
       notes: validated.notes ?? null,
       date: validated.date,
@@ -110,13 +152,34 @@ export async function createItineraryCustomEvent(
       color_hex: validated.color_hex ?? null,
     };
 
+    const insertWithoutKind = (() => {
+      const { kind: _kind, ...rest } = insertRow as any;
+      return rest;
+    })();
+
     const { data, error } = await supabase
       .from("itinerary_custom_event")
-      .insert(insertRow)
-      .select(
-        "itinerary_custom_event_id,itinerary_id,itinerary_destination_id,title,notes,date,start_time,end_time,color_hex,created_by,updated_by,created_at,updated_at,deleted_at"
-      )
+      .insert(insertRow as any)
+      .select(CUSTOM_EVENT_SELECT_WITH_KIND)
       .single();
+
+    if (error && isMissingColumn(error, "kind")) {
+      const { data: legacyData, error: legacyError } = await supabase
+        .from("itinerary_custom_event")
+        .insert(insertWithoutKind)
+        .select(CUSTOM_EVENT_SELECT_LEGACY)
+        .single();
+
+      if (legacyError || !legacyData) {
+        const legacySummary = getSupabaseErrorSummary(legacyError);
+        const legacyCode = String(legacySummary.code ?? "");
+        console.error("Error creating custom event (legacy):", legacySummary);
+        return { success: false, error: { message: "Failed to create custom event", code: legacyCode } };
+      }
+
+      revalidateTag(builderBootstrapTag("0", String(validated.itinerary_id), "0"));
+      return { success: true, data: legacyData as ItineraryCustomEvent };
+    }
 
     if (error || !data) {
       const summary = getSupabaseErrorSummary(error);
@@ -150,6 +213,7 @@ export async function updateItineraryCustomEvent(
     const validated = updateCustomEventSchema.parse(patch);
 
     const updateRow: Record<string, any> = {};
+    if (validated.kind !== undefined) updateRow.kind = validated.kind;
     if (validated.title !== undefined) updateRow.title = validated.title;
     if (validated.notes !== undefined) updateRow.notes = validated.notes;
     if (validated.date !== undefined) updateRow.date = validated.date;
@@ -161,14 +225,33 @@ export async function updateItineraryCustomEvent(
     }
     if (validated.deleted_at !== undefined) updateRow.deleted_at = validated.deleted_at;
 
+    const { kind: _kind, ...updateWithoutKind } = updateRow;
+
     const { data, error } = await supabase
       .from("itinerary_custom_event")
       .update(updateRow)
       .eq("itinerary_custom_event_id", itineraryCustomEventIdValue)
-      .select(
-        "itinerary_custom_event_id,itinerary_id,itinerary_destination_id,title,notes,date,start_time,end_time,color_hex,created_by,updated_by,created_at,updated_at,deleted_at"
-      )
+      .select(CUSTOM_EVENT_SELECT_WITH_KIND)
       .single();
+
+    if (error && isMissingColumn(error, "kind")) {
+      const { data: legacyData, error: legacyError } = await supabase
+        .from("itinerary_custom_event")
+        .update(updateWithoutKind)
+        .eq("itinerary_custom_event_id", itineraryCustomEventIdValue)
+        .select(CUSTOM_EVENT_SELECT_LEGACY)
+        .single();
+
+      if (legacyError || !legacyData) {
+        const legacySummary = getSupabaseErrorSummary(legacyError);
+        const legacyCode = String(legacySummary.code ?? "");
+        console.error("Error updating custom event (legacy):", legacySummary);
+        return { success: false, error: { message: "Failed to update custom event", code: legacyCode } };
+      }
+
+      revalidateTag(builderBootstrapTag("0", String((legacyData as any).itinerary_id), "0"));
+      return { success: true, data: legacyData as ItineraryCustomEvent };
+    }
 
     if (error || !data) {
       const summary = getSupabaseErrorSummary(error);

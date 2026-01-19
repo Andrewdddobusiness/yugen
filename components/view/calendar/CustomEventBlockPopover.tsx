@@ -3,18 +3,8 @@
 import React from "react";
 import { createPortal } from "react-dom";
 import { Calendar, FileText } from "lucide-react";
-
-interface ScheduledCustomEvent {
-  id: string;
-  date: Date;
-  startTime: string;
-  endTime: string;
-  duration: number;
-  position: { day: number; startSlot: number; span: number };
-  title: string;
-  notes?: string | null;
-  colorHex?: string | null;
-}
+import { getCustomEventKindLabel } from "@/lib/customEvents/kinds";
+import type { ScheduledCustomEvent } from "./hooks/useScheduledCustomEvents";
 
 interface CustomEventBlockPopoverProps {
   event: ScheduledCustomEvent;
@@ -24,6 +14,8 @@ interface CustomEventBlockPopoverProps {
 
 export function CustomEventBlockPopover({ event, isVisible, position }: CustomEventBlockPopoverProps) {
   if (!isVisible) return null;
+
+  const kindLabel = getCustomEventKindLabel(event.kind);
 
   const formatTime = (timeString: string) => {
     const [hours, minutes] = timeString.split(":");
@@ -62,9 +54,9 @@ export function CustomEventBlockPopover({ event, isVisible, position }: CustomEv
       {/* Header */}
       <div className="mb-3">
         <div className="font-semibold text-ink-900 dark:text-white/90 text-base leading-tight mb-1">
-          {event.title || "Untitled note"}
+          {event.title || kindLabel}
         </div>
-        <div className="text-sm text-ink-500 dark:text-white/60">Note</div>
+        <div className="text-sm text-ink-500 dark:text-white/60">{kindLabel}</div>
       </div>
 
       {/* Date and Time */}

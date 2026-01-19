@@ -10,7 +10,7 @@ import { format } from 'date-fns';
 import { useParams } from 'next/navigation';
 import { useToast } from '@/components/ui/use-toast';
 import { fetchFilteredTableData2, setItineraryActivityDateTimes, setTableDataWithCheck } from '@/actions/supabase/actions';
-import { setItineraryCustomEventDateTimes } from "@/actions/supabase/customEvents";
+import { createItineraryCustomEvent, setItineraryCustomEventDateTimes } from "@/actions/supabase/customEvents";
 import { addActivitiesAsAlternatives, updateItinerarySlotTimeRange } from '@/actions/supabase/slots';
 import { useItineraryActivityStore } from '@/store/itineraryActivityStore';
 import { useItineraryCustomEventStore } from "@/store/itineraryCustomEventStore";
@@ -21,6 +21,8 @@ import { ScheduledActivity } from './useScheduledActivities';
 import type { ScheduledCustomEvent } from "./useScheduledCustomEvents";
 import { TimeSlot } from '../TimeGrid';
 import { timeToMinutes } from '@/utils/calendar/collisionDetection';
+import { getTripEventBlockTemplate } from "@/lib/customEvents/tripEventBlocks";
+import type { TripEventKind } from "@/lib/customEvents/kinds";
 
 type DropOverlapMode = 'overlap' | 'trim';
 type TrimPreviewById = Record<string, { startSlot: number; span: number } | null>;
@@ -138,10 +140,11 @@ export function useDragAndDrop(
     if (raw.startsWith('sidebar:')) return raw.slice('sidebar:'.length);
     if (raw.startsWith('custom-overlay:')) return raw.slice('custom-overlay:'.length);
     if (raw.startsWith('custom:')) return raw.slice('custom:'.length);
+    if (raw.startsWith('trip:')) return raw.slice('trip:'.length);
     return raw;
   };
 
-  const { destinationId } = useParams();
+  const { destinationId, itineraryId } = useParams();
   const { toast } = useToast();
   const { itineraryActivities, setItineraryActivities } = useItineraryActivityStore();
   const updateCustomEvent = useItineraryCustomEventStore((s) => s.updateCustomEvent);
@@ -157,7 +160,7 @@ export function useDragAndDrop(
   
 	  // Drag state
 	  const [activeId, setActiveId] = useState<string | null>(null);
-	  const [activeType, setActiveType] = useState<'scheduled-activity' | 'itinerary-activity' | 'wishlist-item' | 'custom-event' | null>(null);
+	  const [activeType, setActiveType] = useState<'scheduled-activity' | 'itinerary-activity' | 'wishlist-item' | 'custom-event' | 'trip-block' | null>(null);
 	  const [isSaving, setIsSaving] = useState(false);
 	  const [dragOverInfo, setDragOverInfo] = useState<{
 	    dayIndex: number;
@@ -188,9 +191,10 @@ export function useDragAndDrop(
 		      | 'itinerary-activity'
 		      | 'wishlist-item'
 		      | 'custom-event'
+		      | 'trip-block'
 		      | undefined;
 
-		    if (dragType === 'scheduled-activity' || dragType === 'itinerary-activity' || dragType === 'custom-event') {
+		    if (dragType === 'scheduled-activity' || dragType === 'itinerary-activity' || dragType === 'custom-event' || dragType === 'trip-block') {
 		      // Drive the DragOverlay for cross-component drags (sidebar -> calendar).
 		      setActiveId(getActivityIdFromDragId(event.active.id));
 		      setActiveType(dragType);
@@ -237,7 +241,7 @@ export function useDragAndDrop(
 
     // Check if this is a wishlist item being dragged
     const dragData = active.data?.current as any;
-    const isCustomEventDrag = dragData?.type === "custom-event";
+    const isCustomEventDrag = dragData?.type === "custom-event" || dragData?.type === "trip-block";
     if (isCustomEventDrag) mode = "overlap";
     let duration = 60; // Default 1 hour
     let spanSlots = 1;
@@ -279,12 +283,17 @@ export function useDragAndDrop(
             )
           : 60);
 
-	      placeData = itineraryActivity?.activity ?? null;
-	      excludeId = String(itineraryActivity?.itinerary_activity_id ?? activeDragId);
+		      placeData = itineraryActivity?.activity ?? null;
+		      excludeId = String(itineraryActivity?.itinerary_activity_id ?? activeDragId);
 		      spanSlots = Math.max(
 		        1,
 		        Math.ceil(duration / schedulingContext.config.interval)
 		      );
+		    } else if (dragData?.type === "trip-block") {
+		      const template = getTripEventBlockTemplate(String(dragData?.kind ?? "") as TripEventKind);
+		      duration = Math.max(1, Number(template?.defaultDurationMin ?? 60));
+		      spanSlots = Math.max(1, Math.ceil(duration / schedulingContext.config.interval));
+		      excludeId = null;
 		    } else if (dragData?.type === "custom-event") {
 		      const draggedEvent =
 		        dragData?.item ??
@@ -417,7 +426,10 @@ export function useDragAndDrop(
       if (isNaN(dayIndex) || isNaN(slotIndex)) return;
 
       const dragData = active.data?.current as any;
-      const mode = dragData?.type === "custom-event" ? "overlap" : getDropOverlapMode(event);
+      const mode =
+        dragData?.type === "custom-event" || dragData?.type === "trip-block"
+          ? "overlap"
+          : getDropOverlapMode(event);
       const activeDragId = getActivityIdFromDragId(active.id);
       const excludeId =
         dragData?.type === 'itinerary-activity'
@@ -1028,6 +1040,88 @@ export function useDragAndDrop(
       await handleWishlistItemDrop(dragData.item, targetDate, targetSlot);
       return;
     }
+    if (dragData?.type === "trip-block") {
+      const itineraryIdValue = Array.isArray(itineraryId) ? itineraryId[0] : String(itineraryId ?? "");
+      const itineraryIdNumber = /^\d+$/.test(itineraryIdValue) ? Number(itineraryIdValue) : null;
+
+      if (!itineraryIdNumber) {
+        toast({
+          title: "Unable to add block",
+          description: "Missing itinerary id. Refresh the page and try again.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const destinationIdValue = Array.isArray(destinationId) ? destinationId[0] : String(destinationId ?? "");
+      const destinationIdNumber = /^\d+$/.test(destinationIdValue) ? Number(destinationIdValue) : null;
+
+      const template = getTripEventBlockTemplate(String(dragData?.kind ?? "") as TripEventKind);
+      if (!template) {
+        toast({
+          title: "Unable to add block",
+          description: "Unknown block type. Please try again.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const interval = schedulingContext.config.interval;
+      const dayStartMinutes = schedulingContext.config.startHour * 60;
+      const dayEndMinutes = (schedulingContext.config.endHour + 1) * 60;
+
+      const baseDuration = Math.max(interval, Number(template.defaultDurationMin ?? 60));
+      const alignedDuration = Math.max(interval, Math.ceil(baseDuration / interval) * interval);
+      const spanSlots = Math.max(1, Math.ceil(alignedDuration / interval));
+
+      const boundedSlotIndex = Math.max(0, Math.min(slotIndex, timeSlots.length - spanSlots));
+      const boundedSlot = timeSlots[boundedSlotIndex] ?? targetSlot;
+      const proposedStartMinutes = boundedSlot.hour * 60 + boundedSlot.minute;
+      const boundedStartMinutes = Math.min(
+        Math.max(proposedStartMinutes, dayStartMinutes),
+        Math.max(dayStartMinutes, dayEndMinutes - alignedDuration)
+      );
+
+      const newDate = format(targetDate, "yyyy-MM-dd");
+      const newStartTime = minutesToTimeString(boundedStartMinutes);
+      const newEndTime = minutesToTimeString(boundedStartMinutes + alignedDuration);
+
+      setIsSaving(true);
+      try {
+        const result = await createItineraryCustomEvent({
+          itinerary_id: itineraryIdNumber,
+          itinerary_destination_id: destinationIdNumber,
+          kind: template.kind,
+          title: template.title,
+          notes: template.defaultNotes ?? null,
+          date: newDate,
+          start_time: newStartTime,
+          end_time: newEndTime,
+          color_hex: template.colorHex,
+        });
+
+        if (!result.success || !result.data) {
+          throw new Error(result.error?.message ?? "Failed to create");
+        }
+
+        upsertCustomEvent(result.data);
+        toast({
+          title: `${template.title} added`,
+          description: "Drag to adjust timing, or click to edit details.",
+        });
+      } catch (error) {
+        console.error("Failed to create custom event from trip block:", error);
+        toast({
+          title: "Couldn't add block",
+          description: "Please try again.",
+          variant: "destructive",
+        });
+      } finally {
+        setIsSaving(false);
+      }
+
+      return;
+    }
     if (dragData?.type === 'custom-event') {
       const eventIdString = String(activeDragId ?? '').trim();
       if (!/^\d+$/.test(eventIdString)) {
@@ -1208,6 +1302,7 @@ export function useDragAndDrop(
 				  }, [
             days,
             destinationId,
+            itineraryId,
             getCustomEventById,
             handleActivityReschedule,
             handleWishlistItemDrop,

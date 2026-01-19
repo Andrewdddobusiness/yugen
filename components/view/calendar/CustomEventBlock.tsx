@@ -4,7 +4,7 @@ import * as React from "react";
 import { createPortal } from "react-dom";
 import { useDraggable } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
-import { Clock, GripVertical } from "lucide-react";
+import { Clock, GripVertical, LogIn, LogOut, Plane, StickyNote } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSchedulingContext } from "@/store/timeSchedulingStore";
 import { getCalendarSlotHeightPx } from "./layoutMetrics";
@@ -13,17 +13,19 @@ import { createItineraryCustomEvent, deleteItineraryCustomEvent } from "@/action
 import { useItineraryCustomEventStore } from "@/store/itineraryCustomEventStore";
 import type { AnchorRect } from "./CustomEventPopover";
 import { CustomEventBlockPopover } from "./CustomEventBlockPopover";
+import type { ScheduledCustomEvent } from "./hooks/useScheduledCustomEvents";
 
-type ScheduledCustomEvent = {
-  id: string;
-  date: Date;
-  startTime: string;
-  endTime: string;
-  duration: number;
-  position: { day: number; startSlot: number; span: number };
-  title: string;
-  notes?: string | null;
-  colorHex?: string | null;
+const kindToIcon = (kind: ScheduledCustomEvent["kind"]) => {
+  switch (kind) {
+    case "flight":
+      return Plane;
+    case "hotel_check_in":
+      return LogIn;
+    case "hotel_check_out":
+      return LogOut;
+    default:
+      return StickyNote;
+  }
 };
 
 export function CustomEventBlock({
@@ -158,6 +160,8 @@ export function CustomEventBlock({
     return `${displayHour}:${String(m).padStart(2, "0")} ${period}`;
   };
 
+  const KindIcon = kindToIcon(event.kind);
+
   const handleResizeStart = React.useCallback(
     (direction: "top" | "bottom", e: React.MouseEvent) => {
       e.stopPropagation();
@@ -286,7 +290,10 @@ export function CustomEventBlock({
         <div className={cn("relative z-10 flex-1 min-h-0 px-3 py-2", "flex flex-col gap-1")}>
           <div className="flex items-start justify-between gap-2">
             <div className="min-w-0 flex-1">
-              <div className="text-sm font-semibold text-ink-900 truncate leading-tight">{event.title}</div>
+              <div className="flex items-center gap-1.5 min-w-0">
+                <KindIcon className="h-4 w-4 shrink-0 text-ink-700" aria-hidden="true" />
+                <div className="text-sm font-semibold text-ink-900 truncate leading-tight">{event.title}</div>
+              </div>
               <div className="mt-0.5 flex items-center text-xs text-ink-500">
                 <Clock className="h-3 w-3 mr-1 flex-shrink-0" />
                 <span className="truncate">

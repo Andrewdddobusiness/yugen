@@ -2,6 +2,7 @@ import { PlanResultSchema, type Operation, type PlanResult } from "@/lib/ai/itin
 import { openaiChatJSON, type OpenAiUsage } from "@/lib/ai/itinerary/openai";
 import type { ChatMessage } from "@/lib/ai/itinerary/schema";
 import { primaryThemeFromTypes } from "@/lib/ai/itinerary/intelligence/themes";
+import { getCustomEventKindLabel, type ItineraryCustomEventKind } from "@/lib/customEvents/kinds";
 
 type ActivitySnapshotRow = {
   itinerary_activity_id: unknown;
@@ -44,6 +45,18 @@ type ItinerarySnapshot = {
   kids?: number | null;
   budget?: number | string | null;
   currency?: string | null;
+};
+
+type CustomEventSnapshotRow = {
+  itinerary_custom_event_id: unknown;
+  itinerary_destination_id?: unknown;
+  kind?: ItineraryCustomEventKind | string | null;
+  title?: string | null;
+  notes?: string | null;
+  date?: string | null;
+  start_time?: string | null;
+  end_time?: string | null;
+  deleted_at?: string | null;
 };
 
 const normalize = (value: unknown) => String(value ?? "").toLowerCase();
@@ -121,6 +134,34 @@ const formatActivityLine = (row: ActivitySnapshotRow) => {
   return `- ${id}: ${name} | date: ${date} | time: ${time || "none"} | duration: ${duration} | coords: ${coords ?? "n/a"} | types: ${types || "n/a"}${themeLabel} | address: ${address}`;
 };
 
+const isIsoDate = (value: unknown) => typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value);
+
+const formatCustomEventLine = (row: CustomEventSnapshotRow) => {
+  const id = String(row.itinerary_custom_event_id ?? "");
+  const truncate = (value: string, max: number) => (value.length > max ? `${value.slice(0, max - 1)}…` : value);
+
+  const kindRaw = typeof row.kind === "string" ? row.kind : "custom";
+  const kind = (["custom", "flight", "hotel_check_in", "hotel_check_out"].includes(kindRaw)
+    ? kindRaw
+    : "custom") as ItineraryCustomEventKind;
+  const kindLabel = getCustomEventKindLabel(kind);
+
+  const title =
+    typeof row.title === "string" && row.title.trim()
+      ? truncate(row.title.trim(), 60)
+      : kindLabel;
+  const date = isIsoDate(row.date) ? String(row.date) : "unscheduled";
+
+  const start = row.start_time ? String(row.start_time).slice(0, 5) : "";
+  const end = row.end_time ? String(row.end_time).slice(0, 5) : "";
+  const time = start && end ? `${start}-${end}` : start || end ? `${start}${end ? `-${end}` : ""}` : "";
+
+  const notes = typeof row.notes === "string" && row.notes.trim() ? truncate(row.notes.trim(), 90) : "";
+  const notesText = notes ? ` | notes: ${notes}` : "";
+
+  return `- ${id}: ${kindLabel} | title: ${title} | date: ${date} | time: ${time || "none"}${notesText}`;
+};
+
 const formatDraftOperationLine = (operation: Operation, index: number) => {
   const number = index + 1;
 
@@ -193,6 +234,7 @@ export async function planItineraryEdits(args: {
   destination: DestinationSnapshot | null;
   itineraryDestinations?: ItineraryDestinationSummary[];
   activities: ActivitySnapshotRow[];
+  customEvents?: CustomEventSnapshotRow[];
 }): Promise<{ data: PlanResult; usage: OpenAiUsage }> {
   const recentUserContext = (args.chatHistory ?? [])
     .filter((m) => m.role === "user")
@@ -233,6 +275,28 @@ export async function planItineraryEdits(args: {
   const accommodationNotes = args.destination?.accommodation_notes ? String(args.destination.accommodation_notes) : "";
   const transportationNotes = args.destination?.transportation_notes ? String(args.destination.transportation_notes) : "";
 
+  const orderedCustomEvents = (args.customEvents ?? [])
+    .filter((row) => row && !row.deleted_at)
+    .filter((row) => row.date && row.start_time && row.end_time)
+    .sort((a, b) => {
+      const da = isIsoDate(a.date) ? String(a.date) : "9999-99-99";
+      const db = isIsoDate(b.date) ? String(b.date) : "9999-99-99";
+      const sa = a.start_time ? String(a.start_time) : "99:99:99";
+      const sb = b.start_time ? String(b.start_time) : "99:99:99";
+      const ta = normalize(a.title);
+      const tb = normalize(b.title);
+      return da.localeCompare(db) || sa.localeCompare(sb) || ta.localeCompare(tb);
+    })
+    .filter((row) => {
+      if (!fromDate || !toDate) return true;
+      const date = isIsoDate(row.date) ? String(row.date) : null;
+      if (!date) return false;
+      return date >= fromDate && date <= toDate;
+    });
+
+  const MAX_CONTEXT_CUSTOM_EVENTS = 40;
+  const relevantCustomEvents = orderedCustomEvents.slice(0, MAX_CONTEXT_CUSTOM_EVENTS);
+
   const system = [
     "You are an itinerary editing assistant.",
     "You MUST return ONLY valid JSON.",
@@ -265,7 +329,9 @@ export async function planItineraryEdits(args: {
     "- Use dates as YYYY-MM-DD.",
     "- When the user asks to schedule/organize/sequence activities into a plan, set startTime and endTime using the provided duration and keep nearby coordinates together when possible.",
     "- When picking times, prefer the destination's typical day window and avoid overlapping existing timed items.",
+    "- Avoid overlapping fixed time blocks listed under 'Custom events' (flights, hotel check-ins, notes, etc).",
     "- If you change time, ALWAYS provide both startTime and endTime (or set both to null to clear).",
+    "- If you assign a date but are not assigning a time, OMIT startTime/endTime fields (do NOT set them to null) unless the user explicitly asks to clear the time.",
     "- If you set date to null (unschedule), ALSO set startTime and endTime to null.",
     "- If you set startTime and endTime as strings, startTime MUST be before endTime.",
     "- For add_place: provide either query or placeId. If the user asks you to recommend/suggest a place, pick ONE specific real place name for query.",
@@ -320,6 +386,16 @@ export async function planItineraryEdits(args: {
     "",
     ...(args.preferencesPromptLines && args.preferencesPromptLines.length > 0
       ? ["Planning preferences (use as guidance):", ...args.preferencesPromptLines.map((line) => `- ${line}`), ""]
+      : []),
+    ...(relevantCustomEvents.length > 0
+      ? [
+          "Custom events (fixed time blocks; do NOT overlap):",
+          ...relevantCustomEvents.map(formatCustomEventLine),
+          ...(orderedCustomEvents.length > relevantCustomEvents.length
+            ? [`(Showing ${relevantCustomEvents.length} of ${orderedCustomEvents.length} custom events.)`]
+            : []),
+          "",
+        ]
       : []),
     ...(Array.isArray(args.itineraryDestinations) && args.itineraryDestinations.length > 0
       ? [

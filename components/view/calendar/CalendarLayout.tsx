@@ -32,6 +32,9 @@ import type { AnchorRect } from "./CustomEventPopover";
 import { buildCommuteSegmentKey, parseTimeToMinutes, toCoordinates, type CommuteSegment } from "./commute";
 import type { TravelMode } from "@/actions/google/travelTime";
 import { useCommuteTravelTimes } from "./hooks/useCommuteTravelTimes";
+import { TripEventBlockPill } from "./TripEventBlockPill";
+import { getTripEventBlockTemplate } from "@/lib/customEvents/tripEventBlocks";
+import type { TripEventKind } from "@/lib/customEvents/kinds";
 
 const DAY_OF_WEEK_PALETTE = [
   colors.Blue, // Sun
@@ -99,6 +102,7 @@ interface CalendarLayoutProps {
     | "itinerary-activity"
     | "wishlist-item"
     | "custom-event"
+    | "trip-block"
     | null;
   activeActivity?: ScheduledActivity | null;
   activeCustomEvent?: ScheduledCustomEvent | null;
@@ -723,6 +727,18 @@ export function CalendarLayout({
             activeSidebarActivity &&
             !dragOverInfo ? (
               <SidebarActivityDragOverlay activity={activeSidebarActivity} />
+            ) : activeType === "trip-block" && activeId ? (
+              (() => {
+                const template = getTripEventBlockTemplate(activeId as TripEventKind);
+                if (!template) return null;
+                return (
+                  <TripEventBlockPill
+                    kind={template.kind}
+                    colorHex={template.colorHex}
+                    className="opacity-90 rotate-3 shadow-lg"
+                  />
+                );
+              })()
             ) : activeType === "custom-event" && activeCustomEvent ? (
               <CustomEventBlock
                 event={activeCustomEvent}

@@ -1,11 +1,13 @@
 "use client";
 
 import { create } from "zustand";
+import type { ItineraryCustomEventKind } from "@/lib/customEvents/kinds";
 
 export type ItineraryCustomEvent = {
   itinerary_custom_event_id: number;
   itinerary_id: number;
   itinerary_destination_id: number | null;
+  kind?: ItineraryCustomEventKind | null;
   title: string;
   notes: string | null;
   date: string | null;
@@ -61,4 +63,3 @@ export const useItineraryCustomEventStore = create<ItineraryCustomEventState>((s
     return get().customEvents.find((row) => Number(row.itinerary_custom_event_id) === id) ?? null;
   },
 }));
-

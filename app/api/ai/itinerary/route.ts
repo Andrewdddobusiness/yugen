@@ -45,7 +45,9 @@ import {
 import { summarizeItineraryChat } from "@/lib/ai/itinerary/summarizer";
 import { recordApiRequestMetric } from "@/lib/telemetry/server";
 import { formatMinutesToHHmm, getDayOfWeekFromIsoDate, parseTimeToMinutes } from "@/lib/ai/itinerary/intelligence/time";
+import { buildCustomEventOverlapWarnings } from "@/lib/ai/itinerary/intelligence/customEventOverlaps";
 import { classifyTravelTimeConflict } from "@/lib/ai/itinerary/intelligence/travelTime";
+import { suggestTravelTimeShift } from "@/lib/ai/itinerary/intelligence/travelTimeShift";
 import { getOpenIntervalsForDay, isOpenForWindow, suggestNextOpenStart, type OpenHoursRow } from "@/lib/ai/itinerary/intelligence/openHours";
 import {
   buildPreferencesPromptLines,
@@ -1815,6 +1817,306 @@ const buildTravelTimeWarnings = async (args: {
   return warnings;
 };
 
+const applyTravelTimeAutoCorrections = async (args: {
+  supabase: ReturnType<typeof createClient>;
+  itineraryId: string;
+  operations: Operation[];
+  activityById: Map<string, any>;
+  activeActivities: any[];
+  defaultTravelMode?: TravelMode;
+  dayEndMin?: number;
+}): Promise<{ operations: Operation[]; notes: string[] }> => {
+  const bufferMinutes = 10;
+  const maxSegments = 10;
+  const maxShifts = 6;
+  const maxShiftMin = 90;
+  const dayEndMin = Number.isFinite(args.dayEndMin) ? Math.max(0, Math.min(24 * 60, Math.floor(args.dayEndMin!))) : null;
+
+  const touchedDates = new Set<string>();
+  for (const op of args.operations) {
+    if (op.op === "add_place") {
+      if (isIsoDate(op.date)) touchedDates.add(op.date);
+      continue;
+    }
+
+    if (op.op === "update_activity" || op.op === "remove_activity") {
+      const row = args.activityById.get(op.itineraryActivityId);
+      const beforeDate = isIsoDate(row?.date) ? row.date : null;
+      const scheduleTouched =
+        op.op === "remove_activity" ||
+        (op.op === "update_activity" &&
+          (op.date !== undefined || op.startTime !== undefined || op.endTime !== undefined));
+
+      if (scheduleTouched && beforeDate) touchedDates.add(beforeDate);
+
+      if (op.op === "update_activity" && scheduleTouched) {
+        if (isIsoDate(op.date)) touchedDates.add(op.date);
+        if (op.date === null && beforeDate) touchedDates.add(beforeDate);
+      }
+    }
+  }
+
+  if (touchedDates.size === 0) return { operations: args.operations, notes: [] };
+
+  const operations = args.operations.map((op) => ({ ...op })) as Operation[];
+
+  const updateOpIndexByActivityId = new Map<string, number>();
+  for (let i = 0; i < operations.length; i += 1) {
+    const op = operations[i];
+    if (op?.op !== "update_activity") continue;
+    updateOpIndexByActivityId.set(op.itineraryActivityId, i);
+  }
+
+  const byId = new Map<string, PlannedScheduleRow & { activityId: number | null; placeId: string | null }>();
+  for (const row of args.activeActivities) {
+    const id = String(row?.itinerary_activity_id ?? "");
+    if (!id) continue;
+
+    const activity = row?.activity;
+    const name = typeof activity?.name === "string" && activity.name.trim() ? activity.name.trim() : `Activity ${id}`;
+    const date = isIsoDate(row?.date) ? row.date : "";
+    const startTime = typeof row?.start_time === "string" ? row.start_time : "";
+    const endTime = typeof row?.end_time === "string" ? row.end_time : "";
+    const coords = parseCoordinatesToLatLng(activity?.coordinates);
+    const travelModeToNext = normalizeTravelMode(row?.travel_mode_to_next);
+    const activityId = typeof activity?.activity_id === "number" ? activity.activity_id : Number(activity?.activity_id ?? NaN);
+    const placeId = typeof activity?.place_id === "string" ? activity.place_id : null;
+
+    byId.set(id, {
+      id,
+      name,
+      date,
+      startTime,
+      endTime,
+      coords,
+      travelModeToNext,
+      activityId: Number.isFinite(activityId) ? activityId : null,
+      placeId,
+    });
+  }
+
+  const addedPlaces: Array<PlannedScheduleRow & { activityId: number | null; placeId: string | null }> = [];
+  const placeIdsToLookup: string[] = [];
+
+  for (const [idx, op] of operations.entries()) {
+    if (op.op === "remove_activity") {
+      byId.delete(op.itineraryActivityId);
+      continue;
+    }
+
+    if (op.op === "update_activity") {
+      const target = byId.get(op.itineraryActivityId);
+      if (!target) continue;
+
+      if (op.date !== undefined) {
+        target.date = op.date ?? "";
+        if (op.date === null) {
+          target.startTime = "";
+          target.endTime = "";
+        }
+      }
+
+      if (op.startTime !== undefined || op.endTime !== undefined) {
+        target.startTime = typeof op.startTime === "string" ? op.startTime : "";
+        target.endTime = typeof op.endTime === "string" ? op.endTime : "";
+      }
+
+      byId.set(op.itineraryActivityId, target);
+      continue;
+    }
+
+    if (op.op === "add_place") {
+      const pseudoId = `new:${idx}`;
+      const name = op.name || op.query || "New place";
+      const date = isIsoDate(op.date) ? op.date : "";
+      const startTime = typeof op.startTime === "string" ? op.startTime : "";
+      const endTime = typeof op.endTime === "string" ? op.endTime : "";
+      const placeId = op.placeId ? String(op.placeId) : null;
+
+      if (placeId) placeIdsToLookup.push(placeId);
+
+      addedPlaces.push({
+        id: pseudoId,
+        name,
+        date,
+        startTime,
+        endTime,
+        coords: null,
+        travelModeToNext: null,
+        activityId: null,
+        placeId,
+      });
+    }
+  }
+
+  const uniquePlaceIds = Array.from(new Set(placeIdsToLookup.map((id) => String(id ?? "").trim()).filter(Boolean)));
+  const placeIdToCoords = new Map<string, { lat: number; lng: number }>();
+
+  if (uniquePlaceIds.length > 0) {
+    try {
+      const { data: rows, error } = await args.supabase
+        .from("activity")
+        .select("place_id,coordinates,name")
+        .in("place_id", uniquePlaceIds);
+      if (error) throw error;
+
+      for (const row of rows ?? []) {
+        const placeId = String((row as any)?.place_id ?? "").trim();
+        if (!placeId) continue;
+        const coords = parseCoordinatesToLatLng((row as any)?.coordinates);
+        if (coords) placeIdToCoords.set(placeId, coords);
+      }
+    } catch (error) {
+      console.warn("[ai-itinerary] travel_time_place_cache_lookup_failed", {
+        itineraryId: args.itineraryId,
+        error: describeErrorForLog(error),
+      });
+    }
+  }
+
+  for (const place of addedPlaces) {
+    if (place.placeId && placeIdToCoords.has(place.placeId)) {
+      place.coords = placeIdToCoords.get(place.placeId) ?? null;
+    } else if (place.placeId) {
+      try {
+        const details = await fetchPlaceDetails(place.placeId);
+        const coords = parseCoordinatesToLatLng((details as any)?.coordinates);
+        if (coords) {
+          place.coords = coords;
+          placeIdToCoords.set(place.placeId, coords);
+        }
+      } catch {
+        // ignore; travel time will degrade gracefully
+      }
+    }
+  }
+
+  const planned: PlannedScheduleRow[] = [];
+  for (const row of byId.values()) {
+    if (!touchedDates.has(row.date)) continue;
+    planned.push(row);
+  }
+  for (const row of addedPlaces) {
+    if (!touchedDates.has(row.date)) continue;
+    planned.push(row);
+  }
+
+  const byDate = new Map<string, Array<PlannedScheduleRow & { startMin: number; endMin: number }>>();
+  for (const row of planned) {
+    if (!isIsoDate(row.date)) continue;
+    const startMin = parseTimeToMinutes(row.startTime);
+    const endMin = parseTimeToMinutes(row.endTime);
+    if (startMin == null || endMin == null) continue;
+    if (startMin >= endMin) continue;
+
+    const list = byDate.get(row.date) ?? [];
+    list.push({ ...row, startMin, endMin });
+    byDate.set(row.date, list);
+  }
+
+  const canShift = (id: string) => {
+    if (id.startsWith("new:")) {
+      const index = Number(id.slice("new:".length));
+      const op = operations[index];
+      return (
+        op?.op === "add_place" &&
+        isIsoDate(op.date) &&
+        typeof op.startTime === "string" &&
+        typeof op.endTime === "string"
+      );
+    }
+
+    const index = updateOpIndexByActivityId.get(id);
+    if (index == null) return false;
+    const op = operations[index];
+    return op?.op === "update_activity" && typeof op.startTime === "string" && typeof op.endTime === "string" && op.date !== null;
+  };
+
+  const applyShift = (id: string, startMin: number, endMin: number) => {
+    const startTime = formatMinutesToHHmm(startMin);
+    const endTime = formatMinutesToHHmm(endMin);
+
+    if (id.startsWith("new:")) {
+      const index = Number(id.slice("new:".length));
+      const op = operations[index];
+      if (op?.op === "add_place" && op.date !== null) {
+        (op as any).startTime = startTime;
+        (op as any).endTime = endTime;
+      }
+      return;
+    }
+
+    const index = updateOpIndexByActivityId.get(id);
+    if (index == null) return;
+    const op = operations[index];
+    if (op?.op !== "update_activity" || op.date === null) return;
+    (op as any).startTime = startTime;
+    (op as any).endTime = endTime;
+  };
+
+  const notes: string[] = [];
+  let computedSegments = 0;
+  let appliedShifts = 0;
+
+  for (const [date, rows] of byDate.entries()) {
+    const dayRows = rows.slice().sort((a, b) => a.startMin - b.startMin || a.name.localeCompare(b.name) || a.id.localeCompare(b.id));
+    if (dayRows.length < 2) continue;
+
+    for (let i = 0; i < dayRows.length - 1; i += 1) {
+      if (appliedShifts >= maxShifts) break;
+      if (computedSegments >= maxSegments) return { operations, notes };
+
+      const from = dayRows[i]!;
+      const to = dayRows[i + 1]!;
+
+      const gapMinutes = to.startMin - from.endMin;
+      if (gapMinutes <= 0) continue;
+      if (!from.coords || !to.coords) continue;
+
+      const mode = from.travelModeToNext ?? args.defaultTravelMode ?? "walking";
+      computedSegments += 1;
+
+      const travel = await calculateTravelTime(from.coords, to.coords, [mode]);
+      if (!travel.success || !travel.data) continue;
+
+      const result = travel.data.results?.[mode] ?? Object.values(travel.data.results ?? {})[0];
+      const durationSeconds = result?.duration?.value;
+      if (typeof durationSeconds !== "number" || !Number.isFinite(durationSeconds)) continue;
+
+      const travelMinutes = Math.max(0, Math.ceil(durationSeconds / 60));
+      const conflict = classifyTravelTimeConflict({ gapMinutes, travelMinutes, bufferMinutes });
+      if (conflict.status !== "conflict") continue;
+      if (!canShift(to.id)) continue;
+
+      const next = dayRows[i + 2] ?? null;
+      const shift = suggestTravelTimeShift({
+        fromEndMin: from.endMin,
+        toStartMin: to.startMin,
+        toEndMin: to.endMin,
+        requiredGapMin: conflict.requiredGapMinutes,
+        nextStartMin: next ? next.startMin : null,
+        dayEndMin,
+        maxShiftMin,
+      });
+
+      if (!shift) continue;
+
+      to.startMin = shift.newStartMin;
+      to.endMin = shift.newEndMin;
+      to.startTime = formatMinutesToHHmm(shift.newStartMin);
+      to.endTime = formatMinutesToHHmm(shift.newEndMin);
+      applyShift(to.id, shift.newStartMin, shift.newEndMin);
+
+      appliedShifts += 1;
+      notes.push(
+        `Shifted "${to.name}" later by ${shift.shiftMin} min to allow travel from "${from.name}" on ${date}.`
+      );
+    }
+  }
+
+  return { operations, notes };
+};
+
 const buildOpenHoursWarnings = async (args: {
   supabase: ReturnType<typeof createClient>;
   itineraryId: string;
@@ -1986,6 +2288,133 @@ const buildOpenHoursWarnings = async (args: {
   }
 
   return warnings;
+};
+
+const buildCustomEventConflictWarnings = (args: {
+  operations: Operation[];
+  activityById: Map<string, any>;
+  customEvents: any[];
+}): string[] => {
+  if (!Array.isArray(args.customEvents) || args.customEvents.length === 0) return [];
+
+  const byId = new Map<
+    string,
+    { id: string; name: string; date: string; startTime: string; endTime: string }
+  >();
+
+  for (const [id, row] of args.activityById.entries()) {
+    const key = String(id ?? "").trim();
+    if (!key) continue;
+    const name =
+      typeof row?.activity?.name === "string" && row.activity.name.trim()
+        ? row.activity.name.trim()
+        : `Activity ${key}`;
+    byId.set(key, {
+      id: key,
+      name,
+      date: isIsoDate(row?.date) ? String(row.date) : "",
+      startTime: typeof row?.start_time === "string" ? row.start_time : "",
+      endTime: typeof row?.end_time === "string" ? row.end_time : "",
+    });
+  }
+
+  const touchedDates = new Set<string>();
+  const addedPlaces: Array<{ id: string; name: string; date: string; startTime: string; endTime: string }> = [];
+
+  for (let idx = 0; idx < args.operations.length; idx += 1) {
+    const op = args.operations[idx] as Operation;
+    if (!op) continue;
+
+    if (op.op === "update_activity") {
+      const activityId = String(op.itineraryActivityId ?? "").trim();
+      if (!activityId) continue;
+
+      const base = byId.get(activityId) ?? {
+        id: activityId,
+        name: `Activity ${activityId}`,
+        date: "",
+        startTime: "",
+        endTime: "",
+      };
+
+      const previousDate = base.date;
+
+      if (op.date === null) {
+        base.date = "";
+        base.startTime = "";
+        base.endTime = "";
+      } else {
+        if (op.date !== undefined) base.date = isIsoDate(op.date) ? op.date : "";
+        if (op.startTime !== undefined) base.startTime = typeof op.startTime === "string" ? op.startTime : "";
+        if (op.endTime !== undefined) base.endTime = typeof op.endTime === "string" ? op.endTime : "";
+      }
+
+      if (isIsoDate(previousDate)) touchedDates.add(previousDate);
+      if (isIsoDate(base.date)) touchedDates.add(base.date);
+
+      byId.set(activityId, base);
+      continue;
+    }
+
+    if (op.op === "add_place") {
+      const date = isIsoDate(op.date) ? op.date : "";
+      if (isIsoDate(date)) touchedDates.add(date);
+
+      addedPlaces.push({
+        id: `new:${idx}`,
+        name: op.name || op.query || "New place",
+        date,
+        startTime: typeof op.startTime === "string" ? op.startTime : "",
+        endTime: typeof op.endTime === "string" ? op.endTime : "",
+      });
+    }
+  }
+
+  if (touchedDates.size === 0) return [];
+
+  const planned = Array.from(byId.values())
+    .filter((row) => touchedDates.has(row.date))
+    .filter((row) => {
+      const startMin = parseTimeToMinutes(row.startTime);
+      const endMin = parseTimeToMinutes(row.endTime);
+      return startMin != null && endMin != null && endMin > startMin;
+    });
+
+  for (const place of addedPlaces) {
+    if (!touchedDates.has(place.date)) continue;
+    const startMin = parseTimeToMinutes(place.startTime);
+    const endMin = parseTimeToMinutes(place.endTime);
+    if (startMin == null || endMin == null || endMin <= startMin) continue;
+    planned.push(place);
+  }
+
+  const blocks = args.customEvents
+    .filter((row) => row?.deleted_at == null)
+    .map((row) => {
+      const date = isIsoDate((row as any)?.date) ? String((row as any).date) : "";
+      if (!date) return null;
+      const startTime = typeof (row as any)?.start_time === "string" ? (row as any).start_time : "";
+      const endTime = typeof (row as any)?.end_time === "string" ? (row as any).end_time : "";
+      if (!startTime || !endTime) return null;
+      return {
+        id: String((row as any)?.itinerary_custom_event_id ?? ""),
+        title: String((row as any)?.title ?? ""),
+        kind: (row as any)?.kind ?? null,
+        date,
+        startTime,
+        endTime,
+      };
+    })
+    .filter(Boolean) as Array<{
+    id: string;
+    title: string;
+    kind?: any;
+    date: string;
+    startTime: string;
+    endTime: string;
+  }>;
+
+  return buildCustomEventOverlapWarnings({ planned, blocks });
 };
 
 const applyOpenHoursAutoCorrections = async (args: {
@@ -2258,6 +2687,8 @@ export async function POST(request: NextRequest) {
     const toDate = isIsoDate(destination?.to_date) ? destination.to_date : null;
     const rawActivities = Array.isArray((bootstrap.data as any)?.activities) ? (bootstrap.data as any).activities : [];
     const activeActivities = rawActivities.filter((row: any) => row?.deleted_at == null);
+    const rawCustomEvents = Array.isArray((bootstrap.data as any)?.customEvents) ? (bootstrap.data as any).customEvents : [];
+    const activeCustomEvents = rawCustomEvents.filter((row: any) => row?.deleted_at == null);
     const rawSlots = Array.isArray((bootstrap.data as any)?.slots) ? (bootstrap.data as any).slots : [];
     const rawSlotOptions = Array.isArray((bootstrap.data as any)?.slotOptions) ? (bootstrap.data as any).slotOptions : [];
 
@@ -2571,6 +3002,21 @@ export async function POST(request: NextRequest) {
           });
         }
 
+        for (const event of activeCustomEvents) {
+          if (!event) continue;
+          const date = isIsoDate((event as any)?.date) ? String((event as any).date) : null;
+          if (!date) continue;
+          if (!dateRange.includes(date)) continue;
+
+          const startMin = parseTimeToMinutes((event as any)?.start_time);
+          const endMin = parseTimeToMinutes((event as any)?.end_time);
+          if (startMin == null || endMin == null || endMin <= startMin) continue;
+
+          const list = fixedByDate.get(date) ?? [];
+          list.push({ startMin, endMin });
+          fixedByDate.set(date, list);
+        }
+
         if (candidates.length === 0) {
           const message = "I couldn't find any unscheduled activities in this destination to curate into a day plan.";
           const payload: PlanResponsePayload = {
@@ -2750,19 +3196,37 @@ export async function POST(request: NextRequest) {
           })),
         };
 
-        const corrected = await applyOpenHoursAutoCorrections({
+        const correctedHours1 = await applyOpenHoursAutoCorrections({
           supabase,
           itineraryId,
           operations: payload.operations,
           activityById,
         });
 
+        const correctedTravel = await applyTravelTimeAutoCorrections({
+          supabase,
+          itineraryId,
+          operations: correctedHours1.operations,
+          activityById,
+          activeActivities,
+          defaultTravelMode,
+          dayEndMin: parseTimeToMinutes(mergedPreferences.preferences.dayEnd) ?? undefined,
+        });
+
+        const correctedHours2 = await applyOpenHoursAutoCorrections({
+          supabase,
+          itineraryId,
+          operations: correctedTravel.operations,
+          activityById,
+        });
+
+        const autoCorrectionNotes = [...correctedHours1.notes, ...correctedTravel.notes, ...correctedHours2.notes];
+
         payload = {
           ...payload,
-          operations: corrected.operations,
-          previewLines: buildPreviewLines(corrected.operations, activityById, destinationById),
+          operations: correctedHours2.operations,
+          previewLines: buildPreviewLines(correctedHours2.operations, activityById, destinationById),
         };
-        const autoCorrectionNotes = corrected.notes;
 
         const travelWarnings = await buildTravelTimeWarnings({
           supabase,
@@ -2779,7 +3243,13 @@ export async function POST(request: NextRequest) {
           activityById,
         });
 
-        const combinedWarnings = [...autoCorrectionNotes, ...travelWarnings, ...hoursWarnings];
+        const customEventWarnings = buildCustomEventConflictWarnings({
+          operations: payload.operations,
+          activityById,
+          customEvents: activeCustomEvents,
+        });
+
+        const combinedWarnings = [...autoCorrectionNotes, ...travelWarnings, ...hoursWarnings, ...customEventWarnings];
         const planDates = new Set<string>();
         for (const plan of payload.dayPlans ?? []) {
           if (typeof plan.date === "string" && plan.date.trim()) planDates.add(plan.date);
@@ -2958,7 +3428,12 @@ export async function POST(request: NextRequest) {
           operations: draftToReturn,
           activityById,
         });
-        const warnings = [...travelWarnings, ...hoursWarnings];
+        const customEventWarnings = buildCustomEventConflictWarnings({
+          operations: draftToReturn,
+          activityById,
+          customEvents: activeCustomEvents,
+        });
+        const warnings = [...travelWarnings, ...hoursWarnings, ...customEventWarnings];
 
         const assistantParts = [
           "I can update your itinerary destinations based on the travel dates you provided.",
@@ -3064,6 +3539,7 @@ export async function POST(request: NextRequest) {
         destination,
         itineraryDestinations,
         activities: activeActivities,
+        customEvents: activeCustomEvents,
       });
 
       await recordAiUsage({ userId: auth.user.id, feature: "itinerary_assistant", usage: planResult.usage });
@@ -3335,7 +3811,6 @@ export async function POST(request: NextRequest) {
         for (const op of resolvedDraftOperations) {
           if (op.op !== "update_activity") continue;
           if (op.date === null) explicitlyCleared.add(op.itineraryActivityId);
-          if (op.startTime === null || op.endTime === null) explicitlyCleared.add(op.itineraryActivityId);
         }
 
         for (const op of resolvedDraftOperations) {
@@ -3449,7 +3924,7 @@ export async function POST(request: NextRequest) {
             openHours: OpenHoursRow[] | null;
           }>;
 
-          const fixed = Array.from(stateById.entries())
+          const fixedFromActivities = Array.from(stateById.entries())
             .map(([itineraryActivityId, entry]) => {
               if (idsToScheduleSet.has(itineraryActivityId)) return null;
               if (!entry.date || !isIsoDate(entry.date) || !datePool.includes(entry.date)) return null;
@@ -3470,6 +3945,24 @@ export async function POST(request: NextRequest) {
             endMin: number;
             coords: { lat: number; lng: number } | null;
           }>;
+
+          const fixedFromCustomEvents = activeCustomEvents
+            .map((event: any) => {
+              const date = isIsoDate((event as any)?.date) ? String((event as any).date) : null;
+              if (!date || !datePool.includes(date)) return null;
+              const startMin = parseTimeToMinutes((event as any)?.start_time);
+              const endMin = parseTimeToMinutes((event as any)?.end_time);
+              if (startMin == null || endMin == null || endMin <= startMin) return null;
+              return { date, startMin, endMin, coords: null };
+            })
+            .filter(Boolean) as Array<{
+            date: string;
+            startMin: number;
+            endMin: number;
+            coords: { lat: number; lng: number } | null;
+          }>;
+
+          const fixed = [...fixedFromActivities, ...fixedFromCustomEvents];
 
           const dayStartMin = parseTimeToMinutes(mergedPreferences.preferences.dayStart) ?? 9 * 60;
           const dayEndMin = parseTimeToMinutes(mergedPreferences.preferences.dayEnd) ?? 18 * 60;
@@ -3643,19 +4136,38 @@ export async function POST(request: NextRequest) {
         };
       }
 
-      const corrected = await applyOpenHoursAutoCorrections({
+      const correctedHours1 = await applyOpenHoursAutoCorrections({
         supabase,
         itineraryId,
         operations: payload.operations,
         activityById,
       });
 
+      const correctedTravel = await applyTravelTimeAutoCorrections({
+        supabase,
+        itineraryId,
+        operations: correctedHours1.operations,
+        activityById,
+        activeActivities,
+        defaultTravelMode,
+        dayEndMin: parseTimeToMinutes(mergedPreferences.preferences.dayEnd) ?? undefined,
+      });
+
+      const correctedHours2 = await applyOpenHoursAutoCorrections({
+        supabase,
+        itineraryId,
+        operations: correctedTravel.operations,
+        activityById,
+      });
+
+      const mergedAutoNotes = [...correctedHours1.notes, ...correctedTravel.notes, ...correctedHours2.notes];
+
       payload = {
         ...payload,
-        operations: corrected.operations,
-        previewLines: buildPreviewLines(corrected.operations, activityById, destinationById),
+        operations: correctedHours2.operations,
+        previewLines: buildPreviewLines(correctedHours2.operations, activityById, destinationById),
       };
-      autoCorrectionNotes = corrected.notes;
+      autoCorrectionNotes = mergedAutoNotes;
 
       const travelWarnings = await buildTravelTimeWarnings({
         supabase,
@@ -3671,7 +4183,12 @@ export async function POST(request: NextRequest) {
         operations: payload.operations,
         activityById,
       });
-      const combinedWarnings = [...autoCorrectionNotes, ...travelWarnings, ...hoursWarnings];
+      const customEventWarnings = buildCustomEventConflictWarnings({
+        operations: payload.operations,
+        activityById,
+        customEvents: activeCustomEvents,
+      });
+      const combinedWarnings = [...autoCorrectionNotes, ...travelWarnings, ...hoursWarnings, ...customEventWarnings];
       if (combinedWarnings.length > 0) {
         payload = {
           ...payload,

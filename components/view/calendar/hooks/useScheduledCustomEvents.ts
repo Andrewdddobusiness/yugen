@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import { isSameDay } from "date-fns";
 import { TimeSlot } from "../TimeGrid";
 import { useItineraryCustomEventStore } from "@/store/itineraryCustomEventStore";
+import type { ItineraryCustomEventKind } from "@/lib/customEvents/kinds";
 
 export interface ScheduledCustomEvent {
   id: string;
@@ -13,6 +14,7 @@ export interface ScheduledCustomEvent {
   duration: number;
   position: { day: number; startSlot: number; span: number };
   title: string;
+  kind: ItineraryCustomEventKind;
   notes?: string | null;
   colorHex?: string | null;
   createdBy?: string | null;
@@ -92,6 +94,7 @@ export function useScheduledCustomEvents(days: Date[], timeSlots: TimeSlot[]): S
             span: Math.max(1, span),
           },
           title: event.title,
+          kind: event.kind ?? "custom",
           notes: event.notes,
           colorHex: event.color_hex,
           createdBy: event.created_by,

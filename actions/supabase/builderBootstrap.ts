@@ -236,12 +236,18 @@ export async function fetchBuilderBootstrap(
       };
 
       const fetchAllCustomEvents = async () => {
-        const select =
+        const selectWithActorsWithKind =
+          "itinerary_custom_event_id,itinerary_id,itinerary_destination_id,kind,title,notes,date,start_time,end_time,color_hex,created_by,updated_by,created_at,updated_at,deleted_at";
+        const selectWithActorsWithoutKind =
           "itinerary_custom_event_id,itinerary_id,itinerary_destination_id,title,notes,date,start_time,end_time,color_hex,created_by,updated_by,created_at,updated_at,deleted_at";
+        const selectWithoutActorsWithKind =
+          "itinerary_custom_event_id,itinerary_id,itinerary_destination_id,kind,title,notes,date,start_time,end_time,color_hex,created_at,updated_at,deleted_at";
+        const selectWithoutActorsWithoutKind =
+          "itinerary_custom_event_id,itinerary_id,itinerary_destination_id,title,notes,date,start_time,end_time,color_hex,created_at,updated_at,deleted_at";
 
         const { data: events, error: eventsError } = await supabase
           .from("itinerary_custom_event")
-          .select(select)
+          .select(selectWithActorsWithKind)
           .eq("itinerary_id", itin)
           .is("deleted_at", null)
           .order("date", { ascending: true })
@@ -251,7 +257,33 @@ export async function fetchBuilderBootstrap(
         if (eventsError) {
           const code = String((eventsError as any)?.code ?? "");
           if (code === "42P01") return [];
-          throw eventsError;
+
+          const missingActors =
+            isMissingColumn(eventsError, "created_by") || isMissingColumn(eventsError, "updated_by");
+          const missingKind = isMissingColumn(eventsError, "kind");
+
+          const retrySelect: string | null =
+            missingActors && missingKind
+              ? selectWithoutActorsWithoutKind
+              : missingActors
+                ? selectWithoutActorsWithKind
+                : missingKind
+                  ? selectWithActorsWithoutKind
+                  : null;
+
+          if (!retrySelect) throw eventsError;
+
+          const { data: fallback, error: fallbackError } = await supabase
+            .from("itinerary_custom_event")
+            .select(retrySelect)
+            .eq("itinerary_id", itin)
+            .is("deleted_at", null)
+            .order("date", { ascending: true })
+            .order("start_time", { ascending: true })
+            .limit(2000);
+
+          if (fallbackError) throw fallbackError;
+          return Array.isArray(fallback) ? fallback : [];
         }
 
         return Array.isArray(events) ? events : [];

@@ -137,6 +137,7 @@ export interface ItineraryCustomEvent {
   itinerary_custom_event_id: number;
   itinerary_id: number;
   itinerary_destination_id: number | null;
+  kind?: "custom" | "flight" | "hotel_check_in" | "hotel_check_out" | null;
   title: string;
   notes: string | null;
   date: string | null;
