@@ -150,7 +150,7 @@ struct DayPlan {
   - [ ] Apply only Day 1 → verify Day 2 remains untouched
 
 ## 9. Rollout / Migration Notes (Optional)
-- [ ] Feature flag: `assistant_curation_mode`
+- [ ] Feature flag: `NEXT_PUBLIC_ASSISTANT_CURATION_MODE`
 - [ ] Backward compatibility: default `mode` remains `edit`
 
 ## 10. Risks / Open Questions

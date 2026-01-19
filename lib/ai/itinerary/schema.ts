@@ -294,6 +294,17 @@ export const PlanRequestSchema = z.object({
   draftOperations: z.array(OperationSchema).max(25).optional(),
 });
 
+export const CurateRequestSchema = z.object({
+  mode: z.literal("curate"),
+  itineraryId: ItineraryIdSchema,
+  destinationId: DestinationIdSchema,
+  threadKey: ThreadKeySchema.optional(),
+  message: z.string().trim().min(1, "Message is required").max(2000, "Message is too long"),
+  fromDate: IsoDateSchema.optional(),
+  toDate: IsoDateSchema.optional(),
+  draftOperations: z.array(OperationSchema).max(25).optional(),
+});
+
 export const ImportRequestSchema = z.object({
   mode: z.literal("import"),
   itineraryId: ItineraryIdSchema,
@@ -316,6 +327,7 @@ export const ApplyRequestSchema = z.object({
 
 export const ItineraryAssistantRequestSchema = z.discriminatedUnion("mode", [
   PlanRequestSchema,
+  CurateRequestSchema,
   ImportRequestSchema,
   ApplyRequestSchema,
 ]);
@@ -334,7 +346,20 @@ export type PlanResponsePayload = {
   operations: Operation[];
   previewLines: string[];
   warnings?: string[];
+  dayPlans?: CuratedDayPlan[];
   requiresConfirmation: boolean;
+};
+
+export type CuratedDayPlan = {
+  date: string; // YYYY-MM-DD
+  rationale: string;
+  items: Array<{
+    itineraryActivityId: string;
+    title: string;
+    startTime?: string;
+    endTime?: string;
+  }>;
+  warnings?: string[];
 };
 
 export type ImportSourcePreview = {

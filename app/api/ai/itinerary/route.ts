@@ -11,7 +11,7 @@ import { extractPlaceCandidatesFromSources, resolveLinkImportCandidates, LinkImp
 import { planItineraryEdits } from "@/lib/ai/itinerary/planner";
 import { openaiEmbed } from "@/lib/ai/itinerary/openai";
 import { checkAiQuota, recordAiUsage } from "@/lib/ai/usage";
-import { getAiAssistantAccessMode, isDevBillingBypassEnabled } from "@/lib/featureFlags";
+import { getAiAssistantAccessMode, isAssistantCurationModeEnabled, isDevBillingBypassEnabled } from "@/lib/featureFlags";
 import { ingestUrlsFromMessage } from "@/lib/linkImport/server/providers";
 import { rateLimit, rateLimitHeaders } from "@/lib/security/rateLimit";
 import { getClientIp, isSameOrigin } from "@/lib/security/requestGuards";
@@ -58,6 +58,7 @@ import { buildAdjacentSegmentsForDate } from "@/lib/ai/itinerary/intelligence/se
 import { autoCorrectToNextOpenInterval } from "@/lib/ai/itinerary/intelligence/hoursAutoCorrect";
 import { rankSlotAlternativeCandidates } from "@/lib/ai/itinerary/intelligence/alternatives";
 import { inferDayThemeFromMessage } from "@/lib/ai/itinerary/intelligence/themes";
+import { buildCuratedDayPlan, buildIsoDateRange, parseDurationToMinutes, type CurationCandidate } from "@/lib/ai/itinerary/intelligence/curation";
 
 export const runtime = "nodejs";
 // Vercel: allow longer AI requests before timing out (plan-dependent).
@@ -81,6 +82,15 @@ const stripWrappingDelimiters = (value: string) =>
 
 const isLikelyNarrativePlace = (value: string) =>
   /\b(i|we|will|would|be|travel|go|head|arrive|stay|visit|continue|return|next|then|finally|after)\b/i.test(value);
+
+const isCurationIntentMessage = (message: string) => {
+  const text = String(message ?? "").toLowerCase();
+  if (!text.trim()) return false;
+  const wantsPlan = /\b(plan|curate|schedule|organize|arrange|build)\b/.test(text);
+  const mentionsDay = /\b(day|days|week|itinerary)\b/.test(text);
+  const mentionsBacklog = /\b(backlog|unscheduled|ideas|wishlist|list)\b/.test(text);
+  return (wantsPlan && mentionsDay) || (wantsPlan && mentionsBacklog) || /\bplan my day\b/.test(text);
+};
 
 const stripLeadingPlacePhrases = (value: string) => {
   let out = stripWrappingDelimiters(value);
@@ -2261,9 +2271,10 @@ export async function POST(request: NextRequest) {
       activityById.set(id, row);
     }
 
-    if (parsed.data.mode === "plan") {
+    if (parsed.data.mode === "plan" || parsed.data.mode === "curate") {
       const embeddingModel = process.env.OPENAI_EMBEDDING_MODEL ?? "text-embedding-3-small";
       const userText = parsed.data.message.trim();
+      const requestedCurate = parsed.data.mode === "curate";
 
       if (!quota.allowed) {
         if (runId) {
@@ -2289,8 +2300,8 @@ export async function POST(request: NextRequest) {
         const step = await startAiItineraryRunStep({
           supabase,
           runId,
-          kind: "plan",
-          input: { itineraryId, destinationId },
+          kind: requestedCurate ? "curate" : "plan",
+          input: { itineraryId, destinationId, requestedMode: parsed.data.mode },
         });
         planStepId = step.ai_itinerary_run_step_id;
       } catch {
@@ -2394,6 +2405,479 @@ export async function POST(request: NextRequest) {
         ...(inferredTheme ? [`Requested day theme: ${inferredTheme}`] : []),
       ];
       const defaultTravelMode = mergedPreferences.preferences.travelMode as TravelMode;
+
+      const shouldCurate = isAssistantCurationModeEnabled() && isCurationIntentMessage(userText);
+
+      if (requestedCurate || shouldCurate) {
+        if (!isAssistantCurationModeEnabled()) {
+          return jsonErrorTimed(400, "curation_disabled", "Day-plan curation mode is not enabled.");
+        }
+
+        if (prunedDraft.operations.length > 0) {
+          const message = "You have pending draft changes. Please apply or dismiss them before I curate a day plan.";
+          const payload: PlanResponsePayload = {
+            assistantMessage: message,
+            operations: [],
+            previewLines: [],
+            requiresConfirmation: false,
+          };
+          try {
+            await insertAiItineraryMessage({
+              supabase,
+              threadId,
+              role: "assistant",
+              content: payload.assistantMessage,
+              metadata: { mode: "curate", requiresConfirmation: payload.requiresConfirmation, previewLines: [], operationCount: 0 },
+              embedding: null,
+              embeddingModel,
+            });
+          } catch {
+            // ignore
+          }
+
+          if (contextStep?.ai_itinerary_run_step_id) {
+            await finishAiItineraryRunStep({
+              supabase,
+              stepId: contextStep.ai_itinerary_run_step_id,
+              status: "succeeded",
+              output: {
+                recentCount: recentWithoutCurrent.length,
+                retrievedCount: matchedWithoutCurrent.length,
+                summaryPresent: !!threadSummary,
+              },
+            });
+          }
+          if (planStepId) {
+            await finishAiItineraryRunStep({
+              supabase,
+              stepId: planStepId,
+              status: "succeeded",
+              output: { resolvedCount: 0, requiresConfirmation: false },
+            });
+          }
+          if (runId) {
+            await finishAiItineraryRun({ supabase, runId, status: "succeeded" });
+          }
+
+          return respond(NextResponse.json({ ok: true, mode: "curate", ...payload, dayPlans: [] }));
+        }
+
+        const overrideFrom = requestedCurate ? String((parsed.data as any)?.fromDate ?? "") : "";
+        const overrideTo = requestedCurate ? String((parsed.data as any)?.toDate ?? "") : "";
+
+        let curationFrom = isIsoDate(overrideFrom) ? overrideFrom : fromDate;
+        let curationTo = isIsoDate(overrideTo) ? overrideTo : toDate;
+
+        if (fromDate && curationFrom && curationFrom < fromDate) curationFrom = fromDate;
+        if (toDate && curationTo && curationTo > toDate) curationTo = toDate;
+        if (curationFrom && curationTo && curationTo < curationFrom) curationTo = curationFrom;
+
+        if (!curationFrom || !curationTo) {
+          return jsonErrorTimed(400, "invalid_request", "Destination date range is missing, so I can't curate a day plan.");
+        }
+
+        const dateRange = buildIsoDateRange(curationFrom, curationTo, 14);
+        if (dateRange.length === 0) {
+          return jsonErrorTimed(400, "invalid_request", "Invalid curation date range.");
+        }
+
+        const candidates: CurationCandidate[] = [];
+        const fixedByDate = new Map<string, Array<{ startMin: number; endMin: number }>>();
+
+        for (const row of activeActivities) {
+          if (!row) continue;
+          if (Number((row as any)?.itinerary_destination_id ?? NaN) !== Number(destinationId)) continue;
+
+          const itineraryActivityId = String((row as any)?.itinerary_activity_id ?? "");
+          if (!itineraryActivityId) continue;
+
+          const date = isIsoDate((row as any)?.date) ? String((row as any).date) : null;
+          const startMin = parseTimeToMinutes((row as any)?.start_time);
+          const endMin = parseTimeToMinutes((row as any)?.end_time);
+
+          const activity = (row as any)?.activity ?? null;
+          const name =
+            typeof activity?.name === "string" && activity.name.trim()
+              ? activity.name.trim()
+              : `Activity ${itineraryActivityId}`;
+          const activityIdRaw = (activity as any)?.activity_id;
+          const activityId = typeof activityIdRaw === "number" ? activityIdRaw : Number(activityIdRaw ?? NaN);
+          const coords = parseCoordinatesToLatLng(activity?.coordinates);
+          const types = Array.isArray(activity?.types) ? (activity.types as any[]).map((t) => String(t)).filter(Boolean) : [];
+          const durationMin = parseDurationToMinutes((activity as any)?.duration) ?? 60;
+
+          const withinRange = date ? dateRange.includes(date) : false;
+          const hasFullTime = startMin != null && endMin != null && endMin > startMin;
+
+          if (withinRange && hasFullTime) {
+            const list = fixedByDate.get(date as string) ?? [];
+            list.push({ startMin: startMin as number, endMin: endMin as number });
+            fixedByDate.set(date as string, list);
+            continue;
+          }
+
+          const needsScheduling = date == null || withinRange;
+          const lockedDate = withinRange ? (date as string) : null;
+          const missingTime = startMin == null || endMin == null || endMin <= startMin;
+
+          if (!needsScheduling) continue;
+          if (!missingTime && date != null) continue;
+
+          candidates.push({
+            itineraryActivityId,
+            name,
+            activityId: Number.isFinite(activityId) ? activityId : null,
+            coords,
+            types,
+            durationMin,
+            lockedDate,
+          });
+        }
+
+        if (candidates.length === 0) {
+          const message = "I couldn't find any unscheduled activities in this destination to curate into a day plan.";
+          const payload: PlanResponsePayload = {
+            assistantMessage: message,
+            operations: [],
+            previewLines: [],
+            requiresConfirmation: false,
+          };
+          try {
+            await insertAiItineraryMessage({
+              supabase,
+              threadId,
+              role: "assistant",
+              content: payload.assistantMessage,
+              metadata: { mode: "curate", requiresConfirmation: payload.requiresConfirmation, previewLines: [], operationCount: 0 },
+              embedding: null,
+              embeddingModel,
+            });
+          } catch {
+            // ignore
+          }
+
+          if (contextStep?.ai_itinerary_run_step_id) {
+            await finishAiItineraryRunStep({
+              supabase,
+              stepId: contextStep.ai_itinerary_run_step_id,
+              status: "succeeded",
+              output: {
+                recentCount: recentWithoutCurrent.length,
+                retrievedCount: matchedWithoutCurrent.length,
+                summaryPresent: !!threadSummary,
+              },
+            });
+          }
+          if (planStepId) {
+            await finishAiItineraryRunStep({
+              supabase,
+              stepId: planStepId,
+              status: "succeeded",
+              output: { resolvedCount: 0, requiresConfirmation: false },
+            });
+          }
+          if (runId) {
+            await finishAiItineraryRun({ supabase, runId, status: "succeeded" });
+          }
+
+          return respond(NextResponse.json({ ok: true, mode: "curate", ...payload, dayPlans: [] }));
+        }
+
+        const openHoursByActivityId = new Map<number, OpenHoursRow[]>();
+        const activityIdsToLookup = Array.from(
+          new Set(candidates.map((candidate) => candidate.activityId).filter((id): id is number => id != null))
+        );
+        if (activityIdsToLookup.length > 0) {
+          try {
+            const { data, error } = await supabase
+              .from("open_hours")
+              .select("activity_id,day,open_hour,open_minute,close_hour,close_minute")
+              .in("activity_id", activityIdsToLookup);
+
+            if (error) {
+              const code = String((error as any)?.code ?? "");
+              if (code !== "42P01") throw error;
+            }
+
+            for (const row of data ?? []) {
+              const id = Number((row as any)?.activity_id ?? NaN);
+              if (!Number.isFinite(id)) continue;
+              const list = openHoursByActivityId.get(id) ?? [];
+              list.push({
+                day: Number((row as any)?.day ?? -1),
+                open_hour: (row as any)?.open_hour ?? null,
+                open_minute: (row as any)?.open_minute ?? null,
+                close_hour: (row as any)?.close_hour ?? null,
+                close_minute: (row as any)?.close_minute ?? null,
+              });
+              openHoursByActivityId.set(id, list);
+            }
+          } catch (error) {
+            console.warn("[ai-itinerary] curate_open_hours_lookup_failed", {
+              itineraryId,
+              destinationId,
+              error: describeErrorForLog(error),
+            });
+          }
+        }
+
+        const curated = buildCuratedDayPlan({
+          dateRange,
+          candidates,
+          fixedByDate,
+          openHoursByActivityId,
+          preferences: mergedPreferences.preferences,
+          requestedTheme: inferredTheme,
+          maxOperations: MAX_OPERATIONS,
+        });
+
+        const scheduledCount = curated.scheduledIds.size;
+        const candidateCount = candidates.length;
+        const remainingCount = Math.max(0, candidateCount - scheduledCount);
+
+        if (curated.operations.length === 0) {
+          const message =
+            "I couldn't fit any unscheduled activities into a day plan with the current constraints. Try expanding the date range, widening your day start/end window, or choosing a more relaxed pace.";
+          const payload: PlanResponsePayload = {
+            assistantMessage: message,
+            operations: [],
+            previewLines: [],
+            requiresConfirmation: false,
+            dayPlans: [],
+          };
+
+          try {
+            await insertAiItineraryMessage({
+              supabase,
+              threadId,
+              role: "assistant",
+              content: payload.assistantMessage,
+              metadata: { mode: "curate", requiresConfirmation: payload.requiresConfirmation, previewLines: [], operationCount: 0 },
+              embedding: null,
+              embeddingModel,
+            });
+          } catch {
+            // ignore
+          }
+
+          if (contextStep?.ai_itinerary_run_step_id) {
+            await finishAiItineraryRunStep({
+              supabase,
+              stepId: contextStep.ai_itinerary_run_step_id,
+              status: "succeeded",
+              output: {
+                recentCount: recentWithoutCurrent.length,
+                retrievedCount: matchedWithoutCurrent.length,
+                summaryPresent: !!threadSummary,
+              },
+            });
+          }
+          if (planStepId) {
+            await finishAiItineraryRunStep({
+              supabase,
+              stepId: planStepId,
+              status: "succeeded",
+              output: { resolvedCount: 0, requiresConfirmation: false },
+            });
+          }
+          if (runId) {
+            await finishAiItineraryRun({ supabase, runId, status: "succeeded" });
+          }
+
+          return respond(NextResponse.json({ ok: true, mode: "curate", ...payload }));
+        }
+
+        const assistantMessageParts = [
+          `Here's a draft day plan for ${curationFrom} to ${curationTo}. You can apply it day-by-day.`,
+          remainingCount > 0
+            ? curated.operations.length >= MAX_OPERATIONS
+              ? `I scheduled ${scheduledCount} of ${candidateCount} unscheduled item(s) and hit the per-request limit of ${MAX_OPERATIONS}. Narrow the date range or ask me to continue with the remaining items.`
+              : `I scheduled ${scheduledCount} of ${candidateCount} unscheduled item(s). ${remainingCount} item(s) remain unscheduled.`
+            : null,
+        ].filter(Boolean) as string[];
+
+        let payload: PlanResponsePayload = {
+          assistantMessage: assistantMessageParts.join("\n\n"),
+          operations: curated.operations,
+          previewLines: buildPreviewLines(curated.operations, activityById, destinationById),
+          requiresConfirmation: true,
+          dayPlans: curated.dayPlans.map((plan) => ({
+            date: plan.date,
+            rationale: plan.rationale,
+            items: plan.items.map((item) => ({
+              itineraryActivityId: item.itineraryActivityId,
+              title: item.title,
+              startTime: item.startTime,
+              endTime: item.endTime,
+            })),
+          })),
+        };
+
+        const corrected = await applyOpenHoursAutoCorrections({
+          supabase,
+          itineraryId,
+          operations: payload.operations,
+          activityById,
+        });
+
+        payload = {
+          ...payload,
+          operations: corrected.operations,
+          previewLines: buildPreviewLines(corrected.operations, activityById, destinationById),
+        };
+        const autoCorrectionNotes = corrected.notes;
+
+        const travelWarnings = await buildTravelTimeWarnings({
+          supabase,
+          itineraryId,
+          operations: payload.operations,
+          activityById,
+          activeActivities,
+          defaultTravelMode,
+        });
+        const hoursWarnings = await buildOpenHoursWarnings({
+          supabase,
+          itineraryId,
+          operations: payload.operations,
+          activityById,
+        });
+
+        const combinedWarnings = [...autoCorrectionNotes, ...travelWarnings, ...hoursWarnings];
+        const planDates = new Set<string>();
+        for (const plan of payload.dayPlans ?? []) {
+          if (typeof plan.date === "string" && plan.date.trim()) planDates.add(plan.date);
+        }
+        const warningsByDate = new Map<string, string[]>();
+        const globalWarnings: string[] = [];
+        for (const warning of combinedWarnings) {
+          const match = warning.match(/\b\d{4}-\d{2}-\d{2}\b/);
+          const date = match?.[0];
+          if (date && planDates.has(date)) {
+            const list = warningsByDate.get(date) ?? [];
+            list.push(warning);
+            warningsByDate.set(date, list);
+          } else {
+            globalWarnings.push(warning);
+          }
+        }
+
+        // Refresh day plan items after any auto-corrections.
+        const byDateOps = new Map<string, Array<{ itineraryActivityId: string; startTime: string; endTime: string }>>();
+        for (const op of payload.operations) {
+          if (op.op !== "update_activity") continue;
+          if (!op.date || typeof op.date !== "string") continue;
+          if (typeof op.startTime !== "string" || typeof op.endTime !== "string") continue;
+          const list = byDateOps.get(op.date) ?? [];
+          list.push({
+            itineraryActivityId: op.itineraryActivityId,
+            startTime: op.startTime,
+            endTime: op.endTime,
+          });
+          byDateOps.set(op.date, list);
+        }
+
+        payload = {
+          ...payload,
+          dayPlans: (payload.dayPlans ?? []).map((plan) => {
+            const opsForDay = byDateOps.get(plan.date) ?? [];
+            const items = opsForDay
+              .sort((a, b) => a.startTime.localeCompare(b.startTime))
+              .map((entry) => {
+                const row = activityById.get(entry.itineraryActivityId);
+                const title =
+                  typeof row?.activity?.name === "string" && row.activity.name.trim()
+                    ? row.activity.name.trim()
+                    : `Activity ${entry.itineraryActivityId}`;
+                return {
+                  itineraryActivityId: entry.itineraryActivityId,
+                  title,
+                  startTime: entry.startTime,
+                  endTime: entry.endTime,
+                };
+              });
+
+            const warnings = warningsByDate.get(plan.date);
+            return { ...plan, items, warnings: warnings && warnings.length > 0 ? warnings : undefined };
+          }),
+          warnings: globalWarnings.length > 0 ? globalWarnings : undefined,
+          requiresConfirmation: payload.requiresConfirmation || combinedWarnings.length > 0,
+        };
+
+        try {
+          await updateAiItineraryThreadDraftAndSources({
+            supabase,
+            threadId,
+            draft: payload.operations,
+            draftSources: null,
+          });
+          threadDraft = payload.operations;
+          threadDraftSources = null;
+        } catch (error) {
+          console.warn("Failed to persist AI chat draft:", error);
+        }
+
+        try {
+          await insertAiItineraryMessage({
+            supabase,
+            threadId,
+            role: "assistant",
+            content: payload.assistantMessage,
+            metadata: {
+              mode: "curate",
+              requiresConfirmation: payload.requiresConfirmation,
+              previewLines: payload.previewLines,
+              operationCount: payload.operations.length,
+            },
+            embedding: null,
+            embeddingModel,
+          });
+        } catch (error) {
+          console.error("Failed to persist assistant chat message:", error);
+        }
+
+        try {
+          const summarySource = [
+            ...chatHistory,
+            { role: "user" as const, content: userText },
+            { role: "assistant" as const, content: payload.assistantMessage },
+          ];
+          const summaryResult = await summarizeItineraryChat({
+            previousSummary: threadSummary,
+            messages: summarySource.slice(-20),
+          });
+          await recordAiUsage({ userId: auth.user.id, feature: "itinerary_assistant", usage: summaryResult.usage });
+          threadSummary = summaryResult.summary;
+          await updateAiItineraryThreadSummary({ supabase, threadId, summary: summaryResult.summary });
+        } catch (error) {
+          console.warn("Failed to update AI chat summary:", error);
+        }
+
+        if (contextStep?.ai_itinerary_run_step_id) {
+          await finishAiItineraryRunStep({
+            supabase,
+            stepId: contextStep.ai_itinerary_run_step_id,
+            status: "succeeded",
+            output: {
+              recentCount: recentWithoutCurrent.length,
+              retrievedCount: matchedWithoutCurrent.length,
+              summaryPresent: !!threadSummary,
+            },
+          });
+        }
+        if (planStepId) {
+          await finishAiItineraryRunStep({
+            supabase,
+            stepId: planStepId,
+            status: "succeeded",
+            output: { resolvedCount: payload.operations.length, requiresConfirmation: payload.requiresConfirmation },
+          });
+        }
+        if (runId) {
+          await finishAiItineraryRun({ supabase, runId, status: "succeeded" });
+        }
+
+        return respond(NextResponse.json({ ok: true, mode: "curate", ...payload }));
+      }
 
       // Deterministic route parsing: if the user provides a multi-destination itinerary with explicit dates,
       // generate destination draft ops directly (avoids LLM hallucinating "already exists", and avoids overlap failures).

@@ -430,7 +430,7 @@ export type AiItineraryRunRow = {
 export async function startAiItineraryRun(args: {
   supabase: any;
   threadId: string;
-  mode: "plan" | "import" | "apply" | "history";
+  mode: "plan" | "curate" | "import" | "apply" | "history";
 }) {
   const { supabase, threadId, mode } = args;
   const { data, error } = await supabase

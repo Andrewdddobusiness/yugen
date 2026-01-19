@@ -4,6 +4,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { Sparkles, Send, Loader2, AlertTriangle, X } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { useItineraryActivityStore } from "@/store/itineraryActivityStore";
@@ -70,6 +71,29 @@ type PlanResponse = {
   previewLines: string[];
   warnings?: string[];
   requiresConfirmation: boolean;
+};
+
+type CuratedDayPlan = {
+  date: string;
+  rationale: string;
+  items: Array<{
+    itineraryActivityId: string;
+    title: string;
+    startTime?: string;
+    endTime?: string;
+  }>;
+  warnings?: string[];
+};
+
+type CurateResponse = {
+  ok: true;
+  mode: "curate";
+  assistantMessage: string;
+  operations: Operation[];
+  previewLines: string[];
+  warnings?: string[];
+  requiresConfirmation: boolean;
+  dayPlans?: CuratedDayPlan[];
 };
 
 type ImportSource = {
@@ -170,6 +194,7 @@ function ChatHistorySkeleton() {
 const examples = [
   "Move McDonald's to Tuesday at 7:00-8:00 PM and add note \"quick dinner\".",
   "Add Roscioli to Tuesday at 12:30-1:30 PM.",
+  "Plan my days for this destination (schedule my unscheduled activities).",
   "Unschedule everything on Friday.",
   "Clear the notes for the bakery on Monday.",
   "Remove the sandwich shop from the itinerary.",
@@ -482,7 +507,10 @@ function ItineraryAssistantChat(props: {
     operations: Operation[];
     requiresConfirmation: boolean;
     warnings: string[];
+    dayPlans?: CuratedDayPlan[];
   } | null>(null);
+  const [curationSelection, setCurationSelection] = useState<Set<string> | null>(null);
+  const [curationExpanded, setCurationExpanded] = useState<Set<string>>(() => new Set());
   const [draftSources, setDraftSources] = useState<DraftSourcesPreview | null>(null);
   const [planning, setPlanning] = useState(false);
   const [importing, setImporting] = useState(false);
@@ -638,7 +666,9 @@ function ItineraryAssistantChat(props: {
           if (draftOps.length > 0) {
             const requiresConfirmation =
               draftOps.some((op) => op.op === "remove_activity") || draftOps.length > 10;
-            setDraftPlan({ operations: draftOps, requiresConfirmation, warnings: [] });
+            setDraftPlan({ operations: draftOps, requiresConfirmation, warnings: [], dayPlans: undefined });
+            setCurationSelection(null);
+            setCurationExpanded(new Set());
           }
 
           const draftSourcesPayload = payload.draftSources;
@@ -833,21 +863,33 @@ function ItineraryAssistantChat(props: {
         }),
       });
 
-      const data = await readJsonResponse<PlanResponse | ErrorResponse>(res);
+      const data = await readJsonResponse<PlanResponse | CurateResponse | ErrorResponse>(res);
       if (!("ok" in data) || data.ok !== true) {
         const message = data?.error?.message ?? "Failed to plan changes.";
         throw new Error(message);
       }
 
       pushMessage({ role: "assistant", content: data.assistantMessage });
+      const dayPlans =
+        data.mode === "curate" && Array.isArray((data as any).dayPlans) ? ((data as any).dayPlans as CuratedDayPlan[]) : undefined;
       if (Array.isArray(data.operations) && data.operations.length > 0) {
         setDraftPlan({
           operations: data.operations,
           requiresConfirmation: data.requiresConfirmation,
           warnings: Array.isArray(data.warnings) ? data.warnings : [],
+          dayPlans,
         });
+        if (dayPlans && dayPlans.length > 0) {
+          setCurationSelection(new Set(dayPlans.map((plan) => plan.date)));
+          setCurationExpanded(new Set([dayPlans[0].date]));
+        } else {
+          setCurationSelection(null);
+          setCurationExpanded(new Set());
+        }
       } else {
         setDraftPlan(null);
+        setCurationSelection(null);
+        setCurationExpanded(new Set());
       }
       setDraftSources(null);
     } catch (e) {
@@ -906,9 +948,14 @@ function ItineraryAssistantChat(props: {
           operations: data.operations,
           requiresConfirmation: data.requiresConfirmation,
           warnings: Array.isArray(data.warnings) ? data.warnings : [],
+          dayPlans: undefined,
         });
+        setCurationSelection(null);
+        setCurationExpanded(new Set());
       } else {
         setDraftPlan(null);
+        setCurationSelection(null);
+        setCurationExpanded(new Set());
       }
     } catch (e) {
       if (isAbortError(e)) return;
@@ -923,6 +970,8 @@ function ItineraryAssistantChat(props: {
 
   const applyPlan = async () => {
     if (!draftPlan || draftPlan.operations.length === 0) return;
+    const operationsToApply = selectedDraftOperations;
+    if (operationsToApply.length === 0) return;
     setApplying(true);
     setError(null);
 
@@ -939,7 +988,7 @@ function ItineraryAssistantChat(props: {
           destinationId,
           threadKey,
           confirmed: true,
-          operations: sortedDraftOperations,
+          operations: operationsToApply,
         }),
       });
 
@@ -1009,6 +1058,8 @@ function ItineraryAssistantChat(props: {
       if (failures.length === 0) {
         setDraftPlan(null);
         setDraftSources(null);
+        setCurationSelection(null);
+        setCurationExpanded(new Set());
       }
     } catch (e) {
       console.error("[itinerary-assistant] apply error", e);
@@ -1031,6 +1082,8 @@ function ItineraryAssistantChat(props: {
       );
       setDraftPlan(null);
       setDraftSources(null);
+      setCurationSelection(null);
+      setCurationExpanded(new Set());
     } catch (e) {
       setError(toUserFacingError(e, "Failed to dismiss draft changes. Please try again."));
     } finally {
@@ -1255,6 +1308,28 @@ function ItineraryAssistantChat(props: {
       rows: groups.get(dateKey) ?? [],
     }));
   }, [activityById, destinationLabelById, sortedDraftOperations]);
+
+  const selectedDraftOperations = useMemo(() => {
+    const ops = sortedDraftOperations ?? [];
+    const selected = curationSelection;
+    const hasDayPlans = Array.isArray(draftPlan?.dayPlans) && (draftPlan?.dayPlans?.length ?? 0) > 0;
+    if (!hasDayPlans) return ops;
+    if (!selected) return ops;
+    if (selected.size === 0) return [];
+    return ops.filter((op) => selected.has(getOperationEffectiveDateKey(op, activityById)));
+  }, [activityById, curationSelection, draftPlan?.dayPlans, sortedDraftOperations]);
+
+  const applyButtonLabel = useMemo(() => {
+    const base = draftPlan?.requiresConfirmation ? "Confirm & Apply" : "Apply";
+    const dayPlans = draftPlan?.dayPlans;
+    if (!Array.isArray(dayPlans) || dayPlans.length === 0) return base;
+
+    const selectedCount = curationSelection ? curationSelection.size : dayPlans.length;
+    if (selectedCount === 0) return "Select day(s) to apply";
+    if (selectedCount === dayPlans.length) return `${base} all days`;
+    if (selectedCount === 1) return `${base} 1 day`;
+    return `${base} ${selectedCount} days`;
+  }, [curationSelection, draftPlan?.dayPlans, draftPlan?.requiresConfirmation]);
 
   return (
     <div className={cn("h-full flex flex-col", className)}>
@@ -1481,6 +1556,103 @@ function ItineraryAssistantChat(props: {
                 </div>
               ) : null}
 
+              {Array.isArray(draftPlan.dayPlans) && draftPlan.dayPlans.length > 0 ? (
+                <div className="mt-3 space-y-3">
+                  <div className="text-xs text-ink-600">
+                    Curated day plan — select which days to apply.
+                  </div>
+
+                  {draftPlan.dayPlans.map((plan) => {
+                    const selected = curationSelection ? curationSelection.has(plan.date) : true;
+                    const expanded = curationExpanded.has(plan.date);
+                    const warningsCount = Array.isArray(plan.warnings) ? plan.warnings.length : 0;
+
+                    return (
+                      <div key={plan.date} className="rounded-xl border border-stroke-200/70 bg-bg-50 p-3">
+                        <div className="flex items-start justify-between gap-3">
+                          <label className="flex items-start gap-3">
+                            <Checkbox
+                              checked={selected}
+                              onCheckedChange={(next) => {
+                                setCurationSelection((prev) => {
+                                  const allDates = draftPlan.dayPlans?.map((d) => d.date) ?? [];
+                                  const out = new Set(prev ?? allDates);
+                                  if (next) out.add(plan.date);
+                                  else out.delete(plan.date);
+                                  return out;
+                                });
+                              }}
+                            />
+                            <div className="min-w-0">
+                              <div className="text-xs font-semibold text-ink-900">
+                                {formatDateLabel(plan.date)}
+                              </div>
+                              <div className="mt-0.5 flex items-center gap-2 text-[11px] text-ink-500">
+                                <span>{plan.items.length} item(s)</span>
+                                {warningsCount > 0 ? (
+                                  <span className="text-coral-700 bg-coral-500/10 border border-coral-500/20 rounded-full px-2 py-0.5">
+                                    {warningsCount} warning(s)
+                                  </span>
+                                ) : null}
+                              </div>
+                            </div>
+                          </label>
+
+                          <button
+                            type="button"
+                            className="text-xs text-ink-600 hover:underline whitespace-nowrap"
+                            onClick={() => {
+                              setCurationExpanded((prev) => {
+                                const next = new Set(prev);
+                                if (next.has(plan.date)) next.delete(plan.date);
+                                else next.add(plan.date);
+                                return next;
+                              });
+                            }}
+                          >
+                            {expanded ? "Hide" : "Show"}
+                          </button>
+                        </div>
+
+                        {expanded ? (
+                          <div className="mt-2 text-xs text-ink-700">
+                            {plan.rationale ? (
+                              <div className="text-ink-600 whitespace-pre-wrap">{plan.rationale}</div>
+                            ) : null}
+
+                            {plan.items.length > 0 ? (
+                              <div className="mt-2 space-y-1">
+                                {plan.items.map((item) => (
+                                  <div
+                                    key={`${plan.date}-${item.itineraryActivityId}`}
+                                    className="flex items-start justify-between gap-3"
+                                  >
+                                    <div className="min-w-0 truncate">{item.title}</div>
+                                    <div className="shrink-0 text-ink-500">
+                                      {formatTimeRange12h(item.startTime ?? null, item.endTime ?? null)}
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            ) : null}
+
+                            {warningsCount > 0 ? (
+                              <div className="mt-2 space-y-1 text-coral-700">
+                                {(plan.warnings ?? []).map((warning, idx) => (
+                                  <div key={`${plan.date}-warning-${idx}`} className="whitespace-pre-wrap">
+                                    {warning}
+                                  </div>
+                                ))}
+                              </div>
+                            ) : null}
+                          </div>
+                        ) : null}
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : null}
+
 	            <div className="mt-3 space-y-4">
 	              {draftGroups.map((group) => (
 	                <div key={group.dateKey} className="rounded-xl border border-stroke-200/70 bg-bg-50 p-3">
@@ -1568,7 +1740,7 @@ function ItineraryAssistantChat(props: {
                   size="sm"
                   className="h-9 rounded-xl"
                   onClick={applyPlan}
-                  disabled={applying}
+                  disabled={applying || selectedDraftOperations.length === 0}
                 >
                   {applying ? (
                     <>
@@ -1576,7 +1748,7 @@ function ItineraryAssistantChat(props: {
                       Applying
                     </>
                   ) : (
-                    (draftPlan.requiresConfirmation ? "Confirm & Apply" : "Apply")
+                    applyButtonLabel
                   )}
                 </Button>
               </div>

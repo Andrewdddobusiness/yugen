@@ -22,3 +22,5 @@ export const getAiAssistantUpgradeHref = () => "/settings?tab=billing";
 
 export const isDevBillingBypassEnabled = () =>
   process.env.NODE_ENV !== "production" && normalizeBoolean(process.env.NEXT_PUBLIC_DEV_BYPASS_BILLING);
+
+export const isAssistantCurationModeEnabled = () => normalizeBoolean(process.env.NEXT_PUBLIC_ASSISTANT_CURATION_MODE);
