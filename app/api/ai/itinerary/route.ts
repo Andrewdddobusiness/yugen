@@ -74,7 +74,13 @@ const SHOULD_LOG_AI_ITINERARY = process.env.AI_ITINERARY_LOG === "1";
 
 const stripEmDashes = (value: string) => value.replace(/[—–]/g, "-");
 
-const normalizeDestinationText = (value: unknown) => String(value ?? "").trim().toLowerCase();
+const normalizeDestinationText = (value: unknown) =>
+  String(value ?? "")
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, " ");
 
 const stripWrappingDelimiters = (value: string) =>
   value
@@ -460,9 +466,20 @@ const resolveTripSegmentsWithCountries = async (args: {
   return resolved;
 };
 
-const shouldOverrideDestinationsFromTripSegments = (text: string) => {
+const shouldPruneUnmentionedDestinationsFromTripSegments = (text: string) => {
   const value = String(text ?? "").toLowerCase();
-  return /\b(final|override|replace|exactly|make it(inerary)? exactly|set my itinerary|updated dates)\b/.test(value);
+  // IMPORTANT: Do not infer destination deletions from omission.
+  // Only prune existing destinations when the user explicitly asks to remove extras.
+  const mentionsDestinationKinds = /\b(destinations?|cities|stops?|route|itinerary)\b/.test(value);
+  const explicitRemoval =
+    /\b(remove|delete|drop|discard)\b/.test(value) &&
+    (mentionsDestinationKinds || /\b(other|extra|unmentioned|not\s+listed|everything\s+else|the\s+rest)\b/.test(value));
+  const onlyTheseDestinations =
+    /\b(only|just)\b.*\b(destinations?|cities|stops?|route|itinerary)\b/.test(value) ||
+    /\b(destinations?|cities|stops?|route|itinerary)\b.*\b(only|just)\b/.test(value) ||
+    /\bonly\s+these\b/.test(value) ||
+    /\band\s+nothing\s+else\b/.test(value);
+  return explicitRemoval || onlyTheseDestinations;
 };
 
 const isRedundantAddDestination = (args: {
@@ -3948,16 +3965,47 @@ export async function POST(request: NextRequest) {
             })
           : { operations: [], usedDestinationIds: new Set<string>() };
 
-      const wantsOverride = shouldOverrideDestinationsFromTripSegments(userText);
+      const unresolvedTripSegmentCount = Math.max(0, parsedTrip.segments.length - resolvedTripSegments.length);
+      const wantsPruneUnmentionedDestinations = shouldPruneUnmentionedDestinationsFromTripSegments(userText);
+      const canSafelyPruneUnmentionedDestinations =
+        wantsPruneUnmentionedDestinations && unresolvedTripSegmentCount === 0 && dedupedTripSegments.length >= 2;
+
+      const requestedSegmentsByKey = new Map<string, Array<{ from: string; to: string }>>();
+      for (const segment of dedupedTripSegments) {
+        const cityKey = normalizeDestinationText(segment.city);
+        const countryKey = normalizeDestinationText(segment.country);
+        if (!cityKey || !countryKey) continue;
+        const key = `${cityKey}|${countryKey}`;
+        const list = requestedSegmentsByKey.get(key) ?? [];
+        list.push({ from: segment.from, to: segment.to });
+        requestedSegmentsByKey.set(key, list);
+      }
 
       const removalOps: Operation[] = [];
       const blockedRemovals: string[] = [];
-      if (wantsOverride && segmentOpsRaw.usedDestinationIds.size > 0) {
+      if (canSafelyPruneUnmentionedDestinations && requestedSegmentsByKey.size > 0) {
         for (const row of itineraryDestinations) {
           const id = String((row as any)?.itinerary_destination_id ?? "");
           if (!id) continue;
-          if (segmentOpsRaw.usedDestinationIds.has(id)) continue;
           if (id === String(destinationId)) continue;
+
+          // Never remove a destination we're planning to update/re-use for a requested segment.
+          if (segmentOpsRaw.usedDestinationIds.has(id)) continue;
+
+          // Treat destinations mentioned in the requested route as locked, even if we failed to match IDs.
+          const rowCityKey = normalizeDestinationText((row as any)?.city);
+          const rowCountryKey = normalizeDestinationText((row as any)?.country);
+          const rowKey = rowCityKey && rowCountryKey ? `${rowCityKey}|${rowCountryKey}` : "";
+          const segmentWindows = rowKey ? (requestedSegmentsByKey.get(rowKey) ?? []) : [];
+          if (segmentWindows.length > 0) {
+            const rowFrom = isIsoDate((row as any)?.from_date) ? String((row as any).from_date) : null;
+            const rowTo = isIsoDate((row as any)?.to_date) ? String((row as any).to_date) : null;
+            const overlapsRequestedWindow =
+              rowFrom && rowTo
+                ? segmentWindows.some((window) => !(rowTo < window.from || rowFrom > window.to))
+                : true;
+            if (overlapsRequestedWindow) continue;
+          }
 
           if (destinationIdsWithActivities.has(id)) {
             const city = String((row as any)?.city ?? "").trim();
@@ -4070,7 +4118,10 @@ export async function POST(request: NextRequest) {
           parsedTrip.adjusted
             ? "Note: To avoid overlapping days between destinations, I adjusted any end dates that overlapped the next destination's start date."
             : null,
-          wantsOverride ? "I'll also remove destinations you didn't include in your list (when safe)." : null,
+          wantsPruneUnmentionedDestinations && unresolvedTripSegmentCount > 0
+            ? `Note: I couldn't resolve ${unresolvedTripSegmentCount} destination(s) in your list, so I didn't remove any existing destinations.`
+            : null,
+          canSafelyPruneUnmentionedDestinations ? "I'll also remove destinations you didn't include in your list (when safe)." : null,
           blockedRemovals.length > 0
             ? `Note: I couldn't remove ${blockedRemovals.length} destination(s) because they still have activities: ${blockedRemovals.join(
                 ", "
