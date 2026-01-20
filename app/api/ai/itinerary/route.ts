@@ -401,6 +401,70 @@ const canonicalizeDestinationOpsWithGoogle = async (operations: Operation[]): Pr
   return result;
 };
 
+const resolveTripSegmentsWithCountries = async (args: {
+  segments: ParsedTripSegment[];
+  itineraryDestinations: any[];
+}): Promise<ParsedTripSegment[]> => {
+  const cityToCountries = new Map<string, string[]>();
+  for (const row of args.itineraryDestinations) {
+    const city = String((row as any)?.city ?? "").trim();
+    const country = String((row as any)?.country ?? "").trim();
+    const cityNorm = normalizeDestinationText(city);
+    if (!cityNorm || !country) continue;
+    const list = cityToCountries.get(cityNorm) ?? [];
+    if (!list.includes(country)) list.push(country);
+    cityToCountries.set(cityNorm, list);
+  }
+
+  const cache = new Map<string, { city: string; country: string } | null>();
+  const resolved: ParsedTripSegment[] = [];
+
+  for (const segment of args.segments) {
+    let city = String(segment.city ?? "").trim();
+    let country = String(segment.country ?? "").trim();
+    if (!city) continue;
+
+    if (!country) {
+      const candidates = cityToCountries.get(normalizeDestinationText(city)) ?? [];
+      if (candidates.length === 1) {
+        country = candidates[0]!;
+      }
+    }
+
+    if (!country) {
+      const query = city;
+      let canonical = cache.get(query) ?? null;
+      if (!cache.has(query)) {
+        try {
+          const geo = await geocodeAddress(query);
+          canonical =
+            geo.success && geo.data?.formatted_address
+              ? canonicalizeDestinationFromGoogleFormattedAddress(geo.data.formatted_address)
+              : null;
+        } catch {
+          canonical = null;
+        }
+        cache.set(query, canonical);
+      }
+
+      if (canonical?.city && canonical?.country) {
+        city = canonical.city;
+        country = canonical.country;
+      }
+    }
+
+    if (!city || !country) continue;
+    resolved.push({ ...segment, city, country });
+  }
+
+  return resolved;
+};
+
+const shouldOverrideDestinationsFromTripSegments = (text: string) => {
+  const value = String(text ?? "").toLowerCase();
+  return /\b(final|override|replace|exactly|make it(inerary)? exactly|set my itinerary|updated dates)\b/.test(value);
+};
+
 const isRedundantAddDestination = (args: {
   operation: Operation & { op: "add_destination" };
   itineraryDestinations: any[];
@@ -537,12 +601,27 @@ const toIsoDate = (year: number, month: number, day: number): string | null => {
 
 type ParsedTripSegment = {
   city: string;
+  // May be empty until resolved via existing destinations or Google geocoding.
   country: string;
   from: string;
   to: string;
 };
 
+const stripMarkdownMarkers = (value: string) => value.replace(/[*_`]+/g, "");
+
+const normalizeDashCharacters = (value: string) => value.replace(/[–—]/g, "-");
+
+const parseTripSegmentLocation = (raw: string): { city: string; country: string } => {
+  const phrase = stripWrappingDelimiters(stripMarkdownMarkers(stripEmDashes(String(raw ?? "")))).trim();
+  if (!phrase) return { city: "", country: "" };
+  const extracted = extractCityCountryFromPhrase(phrase);
+  if (extracted) return extracted;
+  return { city: phrase, country: "" };
+};
+
 const parseTripSegmentsFromMessage = (text: string): { segments: ParsedTripSegment[]; adjusted: boolean } => {
+  const normalizedText = normalizeDashCharacters(String(text ?? ""));
+
   // Matches phrases like:
   // - "Rome, Italy from March 18 to March 22, 2026"
   // - "Florence, Italy from Mar 22 to Mar 25"
@@ -552,13 +631,10 @@ const parseTripSegmentsFromMessage = (text: string): { segments: ParsedTripSegme
   const segments: ParsedTripSegment[] = [];
   let lastYear: number | null = null;
 
-  for (const match of text.matchAll(pattern)) {
+  for (const match of normalizedText.matchAll(pattern)) {
     const locationPhrase = String(match[1] ?? "");
-    const extracted = extractCityCountryFromPhrase(locationPhrase);
-    if (!extracted) continue;
-
-    const cityRaw = extracted.city;
-    const countryRaw = extracted.country;
+    const { city: cityRaw, country: countryRaw } = parseTripSegmentLocation(locationPhrase);
+    if (!cityRaw) continue;
 
     const fromMonthName = String(match[2] ?? "");
     const fromDay = Number(match[3]);
@@ -581,6 +657,73 @@ const parseTripSegmentsFromMessage = (text: string): { segments: ParsedTripSegme
 
     segments.push({ city: cityRaw, country: countryRaw, from, to });
   }
+
+  // Also support list-style inputs like:
+  // - "19-23 March 2026: Rome"
+  // - "31 March - 3 April 2026: Zurich"
+  //
+  // Countries may be omitted; we'll resolve them later using existing destinations or geocoding.
+  for (const rawLine of normalizedText.split(/\r?\n/)) {
+    let line = stripMarkdownMarkers(rawLine).trim();
+    if (!line) continue;
+    line = line.replace(/^\s*[-•*]+\s*/, "").trim();
+    if (!line.includes(":")) continue;
+
+    // Cross-month: "31 March - 3 April 2026: Zurich"
+    const crossMonthMatch = line.match(
+      /^(\d{1,2})\s+([A-Za-z]+)\s*-\s*(\d{1,2})\s+([A-Za-z]+)\s*(\d{4})?\s*:\s*(.+)$/
+    );
+    if (crossMonthMatch) {
+      const startDay = Number(crossMonthMatch[1]);
+      const startMonth = monthNameToNumber(String(crossMonthMatch[2] ?? ""));
+      const endDay = Number(crossMonthMatch[3]);
+      const endMonth = monthNameToNumber(String(crossMonthMatch[4] ?? ""));
+      const year = crossMonthMatch[5] ? Number(crossMonthMatch[5]) : (lastYear ?? new Date().getUTCFullYear());
+      if (crossMonthMatch[5]) lastYear = year;
+      if (!startMonth || !endMonth) continue;
+
+      const from = toIsoDate(year, startMonth, startDay);
+      const to = toIsoDate(year, endMonth, endDay);
+      if (!from || !to) continue;
+      if (!isIsoDate(from) || !isIsoDate(to)) continue;
+      if (to < from) continue;
+
+      const { city, country } = parseTripSegmentLocation(String(crossMonthMatch[6] ?? ""));
+      if (!city) continue;
+      segments.push({ city, country, from, to });
+      continue;
+    }
+
+    // Same-month: "19-23 March 2026: Rome"
+    const sameMonthMatch = line.match(
+      /^(\d{1,2})\s*-\s*(\d{1,2})\s+([A-Za-z]+)\s*(\d{4})?\s*:\s*(.+)$/
+    );
+    if (!sameMonthMatch) continue;
+
+    const startDay = Number(sameMonthMatch[1]);
+    const endDay = Number(sameMonthMatch[2]);
+    const month = monthNameToNumber(String(sameMonthMatch[3] ?? ""));
+    const year = sameMonthMatch[4] ? Number(sameMonthMatch[4]) : (lastYear ?? new Date().getUTCFullYear());
+    if (sameMonthMatch[4]) lastYear = year;
+    if (!month) continue;
+
+    const from = toIsoDate(year, month, startDay);
+    const to = toIsoDate(year, month, endDay);
+    if (!from || !to) continue;
+    if (!isIsoDate(from) || !isIsoDate(to)) continue;
+    if (to < from) continue;
+
+    const { city, country } = parseTripSegmentLocation(String(sameMonthMatch[5] ?? ""));
+    if (!city) continue;
+    segments.push({ city, country, from, to });
+  }
+
+  // Prefer chronological ordering for downstream overlap normalization.
+  segments.sort((a, b) => {
+    if (a.from !== b.from) return a.from.localeCompare(b.from);
+    if (a.to !== b.to) return a.to.localeCompare(b.to);
+    return `${a.city}|${a.country}`.localeCompare(`${b.city}|${b.country}`);
+  });
 
   if (segments.length < 2) return { segments, adjusted: false };
 
@@ -609,7 +752,8 @@ const parseTripSegmentsFromMessage = (text: string): { segments: ParsedTripSegme
 const buildDestinationOpsFromTripSegments = (args: {
   segments: ParsedTripSegment[];
   itineraryDestinations: any[];
-}): Operation[] => {
+  destinationIdsWithActivities?: Set<string>;
+}): { operations: Operation[]; usedDestinationIds: Set<string> } => {
   const destinations: Array<{
     id: string;
     cityNorm: string;
@@ -681,6 +825,7 @@ const buildDestinationOpsFromTripSegments = (args: {
     const overlapCandidates = destinations.filter((dest) => {
       if (usedDestinationIds.has(dest.id)) return false;
       if (!dest.from || !dest.to) return false;
+      if (args.destinationIdsWithActivities?.has(dest.id)) return false;
       return !(segment.to < dest.from || segment.from > dest.to);
     });
 
@@ -707,7 +852,7 @@ const buildDestinationOpsFromTripSegments = (args: {
     } as any);
   }
 
-  return operations;
+  return { operations, usedDestinationIds };
 };
 
 function addDaysIso(value: string, days: number) {
@@ -3551,23 +3696,65 @@ export async function POST(request: NextRequest) {
       // Deterministic route parsing: if the user provides a multi-destination itinerary with explicit dates,
       // generate destination draft ops directly (avoids LLM hallucinating "already exists", and avoids overlap failures).
       const parsedTrip = parseTripSegmentsFromMessage(userText);
-      const hasDuplicateDestinationSegments = (() => {
+      const resolvedTripSegments = await resolveTripSegmentsWithCountries({
+        segments: parsedTrip.segments,
+        itineraryDestinations,
+      });
+
+      const destinationIdsWithActivities = new Set<string>(
+        activeActivities
+          .map((row: any) => String((row as any)?.itinerary_destination_id ?? ""))
+          .filter(Boolean)
+      );
+
+      const dedupedTripSegments = (() => {
         const seen = new Set<string>();
-        for (const segment of parsedTrip.segments) {
+        const deduped: ParsedTripSegment[] = [];
+        for (const segment of resolvedTripSegments) {
           const city = normalizeDestinationText(segment.city);
           const country = normalizeDestinationText(segment.country);
           if (!city || !country) continue;
-          const key = `${city}|${country}`;
-          if (seen.has(key)) return true;
+          const key = `${city}|${country}|${segment.from}|${segment.to}`;
+          if (seen.has(key)) continue;
           seen.add(key);
+          deduped.push(segment);
         }
-        return false;
+        return deduped;
       })();
       const segmentOpsRaw =
-        parsedTrip.segments.length >= 2 && !hasDuplicateDestinationSegments
-          ? buildDestinationOpsFromTripSegments({ segments: parsedTrip.segments, itineraryDestinations })
-          : [];
-      const segmentOpsSanitized = segmentOpsRaw.map((operation) => sanitizeDestinationOperation(operation));
+        dedupedTripSegments.length >= 2
+          ? buildDestinationOpsFromTripSegments({
+              segments: dedupedTripSegments,
+              itineraryDestinations,
+              destinationIdsWithActivities,
+            })
+          : { operations: [], usedDestinationIds: new Set<string>() };
+
+      const wantsOverride = shouldOverrideDestinationsFromTripSegments(userText);
+
+      const removalOps: Operation[] = [];
+      const blockedRemovals: string[] = [];
+      if (wantsOverride && segmentOpsRaw.usedDestinationIds.size > 0) {
+        for (const row of itineraryDestinations) {
+          const id = String((row as any)?.itinerary_destination_id ?? "");
+          if (!id) continue;
+          if (segmentOpsRaw.usedDestinationIds.has(id)) continue;
+          if (id === String(destinationId)) continue;
+
+          if (destinationIdsWithActivities.has(id)) {
+            const city = String((row as any)?.city ?? "").trim();
+            const country = String((row as any)?.country ?? "").trim();
+            blockedRemovals.push([city, country].filter(Boolean).join(", ") || `Destination ${id}`);
+            continue;
+          }
+
+          removalOps.push({ op: "remove_destination", itineraryDestinationId: id } as any);
+        }
+      }
+
+      const segmentOpsSanitized = [...segmentOpsRaw.operations, ...removalOps].map((operation) =>
+        sanitizeDestinationOperation(operation)
+      );
       const prunedSegmentOps = pruneRedundantDestinationOperations({
         operations: segmentOpsSanitized,
         itineraryDestinations,
@@ -3575,7 +3762,69 @@ export async function POST(request: NextRequest) {
       }).operations;
 
       if (prunedSegmentOps.length > 0) {
-        const draftToReturn = [...prunedDraft.operations, ...prunedSegmentOps].slice(0, MAX_OPERATIONS);
+        const destinationOpKinds = new Set([
+          "add_destination",
+          "insert_destination_after",
+          "update_destination_dates",
+          "update_destination",
+          "remove_destination",
+        ]);
+
+        const orderNumberForDestinationId = (id: string) => {
+          const row = destinationById.get(id);
+          const order = row ? Number((row as any)?.order_number ?? NaN) : NaN;
+          return Number.isFinite(order) ? order : null;
+        };
+
+        const destinationRank = (op: Operation) => {
+          if (op.op === "update_destination_dates" || op.op === "update_destination") return 0;
+          if (op.op === "insert_destination_after" || op.op === "add_destination") return 1;
+          if (op.op === "remove_destination") return 2;
+          return 99;
+        };
+
+        const sortedDestinationOps = prunedSegmentOps
+          .map((op, index) => ({ op, index }))
+          .sort((a, b) => {
+            const aRank = destinationRank(a.op);
+            const bRank = destinationRank(b.op);
+            if (aRank !== bRank) return aRank - bRank;
+
+            if (aRank === 0) {
+              const aId = String((a.op as any)?.itineraryDestinationId ?? "");
+              const bId = String((b.op as any)?.itineraryDestinationId ?? "");
+              const aOrder = aId ? orderNumberForDestinationId(aId) : null;
+              const bOrder = bId ? orderNumberForDestinationId(bId) : null;
+              if (aOrder != null && bOrder != null && aOrder !== bOrder) return aOrder - bOrder;
+            }
+
+            if (aRank === 1) {
+              if (a.op.op === "add_destination" && b.op.op === "add_destination") {
+                if (a.op.fromDate !== b.op.fromDate) return a.op.fromDate.localeCompare(b.op.fromDate);
+              } else if (a.op.op === "insert_destination_after" && b.op.op === "insert_destination_after") {
+                const aAnchor = String(a.op.afterItineraryDestinationId ?? "");
+                const bAnchor = String(b.op.afterItineraryDestinationId ?? "");
+                const aOrder = aAnchor ? orderNumberForDestinationId(aAnchor) : null;
+                const bOrder = bAnchor ? orderNumberForDestinationId(bAnchor) : null;
+                if (aOrder != null && bOrder != null && aOrder !== bOrder) return aOrder - bOrder;
+              }
+            }
+
+            if (aRank === 2) {
+              const aId = String((a.op as any)?.itineraryDestinationId ?? "");
+              const bId = String((b.op as any)?.itineraryDestinationId ?? "");
+              const aOrder = aId ? orderNumberForDestinationId(aId) : null;
+              const bOrder = bId ? orderNumberForDestinationId(bId) : null;
+              if (aOrder != null && bOrder != null && aOrder !== bOrder) return bOrder - aOrder;
+            }
+
+            return a.index - b.index;
+          })
+          .map((entry) => entry.op);
+
+        const draftWithoutDestinationOps = prunedDraft.operations.filter((op) => !destinationOpKinds.has(op.op));
+
+        const draftToReturn = [...sortedDestinationOps, ...draftWithoutDestinationOps].slice(0, MAX_OPERATIONS);
         const previewLines = buildPreviewLines(draftToReturn, activityById, destinationById);
         const travelWarnings = await buildTravelTimeWarnings({
           supabase,
@@ -3602,6 +3851,12 @@ export async function POST(request: NextRequest) {
           "I can update your itinerary destinations based on the travel dates you provided.",
           parsedTrip.adjusted
             ? "Note: To avoid overlapping days between destinations, I adjusted any end dates that overlapped the next destination's start date."
+            : null,
+          wantsOverride ? "I'll also remove destinations you didn't include in your list (when safe)." : null,
+          blockedRemovals.length > 0
+            ? `Note: I couldn't remove ${blockedRemovals.length} destination(s) because they still have activities: ${blockedRemovals.join(
+                ", "
+              )}.`
             : null,
         ].filter(Boolean) as string[];
 
