@@ -872,6 +872,224 @@ function diffDaysIso(from: string, to: string) {
   return Math.round((b - a) / (24 * 60 * 60 * 1000));
 }
 
+const DESTINATION_OPERATION_KINDS = new Set<Operation["op"]>([
+  "add_destination",
+  "insert_destination_after",
+  "update_destination_dates",
+  "update_destination",
+  "remove_destination",
+]);
+
+const reorderDestinationOpsForApply = (ops: Operation[]) => {
+  const destOps: Operation[] = [];
+  const nonDest: Operation[] = [];
+
+  for (const op of ops) {
+    if (DESTINATION_OPERATION_KINDS.has(op.op)) destOps.push(op);
+    else nonDest.push(op);
+  }
+
+  const insertAnchors = new Set<string>();
+  for (const op of destOps) {
+    if (op.op !== "insert_destination_after") continue;
+    insertAnchors.add(String(op.afterItineraryDestinationId ?? ""));
+  }
+
+  const rank = (op: Operation) => {
+    if (op.op === "remove_destination") {
+      const removingId = String(op.itineraryDestinationId ?? "");
+      // Avoid removing an anchor before an insert_destination_after runs.
+      if (removingId && insertAnchors.has(removingId)) return 3;
+      return 0;
+    }
+    if (op.op === "update_destination_dates" || op.op === "update_destination") return 1;
+    if (op.op === "insert_destination_after" || op.op === "add_destination") return 2;
+    return 9;
+  };
+
+  const sortedDestOps = destOps
+    .map((op, index) => ({ op, index }))
+    .sort((a, b) => {
+      const aRank = rank(a.op);
+      const bRank = rank(b.op);
+      if (aRank !== bRank) return aRank - bRank;
+      return a.index - b.index;
+    })
+    .map((entry) => entry.op);
+
+  return [...sortedDestOps, ...nonDest];
+};
+
+const isFatalApplyError = (error: unknown) => {
+  if (!(error instanceof Error)) return false;
+  const message = String(error.message ?? "");
+  if (/Missing database function/i.test(message)) return true;
+  return false;
+};
+
+const sortDestinationsByOrderNumber = (destinations: any[]) =>
+  destinations
+    .slice()
+    .sort((a, b) => Number((a as any)?.order_number ?? 0) - Number((b as any)?.order_number ?? 0));
+
+const getDestinationNeighborsByOrder = (destinations: any[], targetId: string) => {
+  const sorted = sortDestinationsByOrderNumber(destinations);
+  const idx = sorted.findIndex((row) => String((row as any)?.itinerary_destination_id ?? "") === String(targetId));
+  if (idx === -1) return { prev: null as any | null, next: null as any | null };
+  return {
+    prev: idx > 0 ? sorted[idx - 1] : null,
+    next: idx < sorted.length - 1 ? sorted[idx + 1] : null,
+  };
+};
+
+const destinationHasActivities = async (args: {
+  supabase: ReturnType<typeof createClient>;
+  itineraryId: string;
+  itineraryDestinationId: string;
+}) => {
+  const { data } = await args.supabase
+    .from("itinerary_activity")
+    .select("itinerary_activity_id")
+    .eq("itinerary_id", Number(args.itineraryId))
+    .eq("itinerary_destination_id", Number(args.itineraryDestinationId))
+    .is("deleted_at", null)
+    .limit(1)
+    .maybeSingle();
+  return Boolean((data as any)?.itinerary_activity_id);
+};
+
+const resolveDestinationDateConflicts = async (args: {
+  supabase: ReturnType<typeof createClient>;
+  itineraryId: string;
+  itineraryDestinations: any[];
+  targetId: string;
+  requestedFrom: string;
+  requestedTo: string;
+  shiftActivities: boolean;
+  markWrite?: () => void;
+}) => {
+  let from = String(args.requestedFrom);
+  let to = String(args.requestedTo);
+
+  if (!isIsoDate(from) || !isIsoDate(to) || to < from) {
+    throw new Error("Invalid date range for conflict resolution");
+  }
+
+  const durationDays = diffDaysIso(from, to) + 1;
+  const { prev, next } = getDestinationNeighborsByOrder(args.itineraryDestinations, args.targetId);
+
+  // Resolve overlap with previous destination by trimming it (only if safe), else clamp the target start.
+  if (prev && isIsoDate((prev as any)?.to_date)) {
+    const prevId = String((prev as any)?.itinerary_destination_id ?? "");
+    const prevTo = String((prev as any)?.to_date ?? "");
+
+    if (prevId && from <= prevTo) {
+      const prevHasActivities = await destinationHasActivities({
+        supabase: args.supabase,
+        itineraryId: args.itineraryId,
+        itineraryDestinationId: prevId,
+      });
+
+      if (!prevHasActivities) {
+        const newPrevTo = addDaysIso(from, -1);
+        const prevFrom = String((prev as any)?.from_date ?? "");
+        if (isIsoDate(prevFrom) && newPrevTo >= prevFrom) {
+          const { error } = await args.supabase.rpc("ai_shift_destination_dates", {
+            _itinerary_id: Number(args.itineraryId),
+            _itinerary_destination_id: Number(prevId),
+            _new_from: prevFrom,
+            _new_to: newPrevTo,
+            _shift_activities: false,
+          });
+
+          if (error) {
+            const code = String((error as any)?.code ?? "");
+            if (code === "42883") {
+              throw new Error(
+                "Missing database function ai_shift_destination_dates. Please run the latest Supabase migrations."
+              );
+            }
+            throw new Error(error.message || "Failed to trim previous destination");
+          }
+
+          args.markWrite?.();
+        } else {
+          from = addDaysIso(prevTo, 1);
+          to = addDaysIso(from, durationDays - 1);
+        }
+      } else {
+        from = addDaysIso(prevTo, 1);
+        to = addDaysIso(from, durationDays - 1);
+      }
+    }
+  }
+
+  // Apply the shift to the target destination.
+  {
+    const { error } = await args.supabase.rpc("ai_shift_destination_dates", {
+      _itinerary_id: Number(args.itineraryId),
+      _itinerary_destination_id: Number(args.targetId),
+      _new_from: from,
+      _new_to: to,
+      _shift_activities: args.shiftActivities,
+    });
+
+    if (error) {
+      const code = String((error as any)?.code ?? "");
+      if (code === "42883") {
+        throw new Error("Missing database function ai_shift_destination_dates. Please run the latest Supabase migrations.");
+      }
+      throw new Error(error.message || "Failed to shift destination");
+    }
+    args.markWrite?.();
+  }
+
+  // Resolve overlap with next destination by shifting it (and all later) forward only when needed.
+  if (next && isIsoDate((next as any)?.from_date)) {
+    const nextId = Number((next as any)?.itinerary_destination_id);
+    const nextFrom = String((next as any)?.from_date ?? "");
+
+    if (Number.isFinite(nextId) && isIsoDate(nextFrom) && nextFrom <= to) {
+      const desiredNextFrom = addDaysIso(to, 1);
+      const deltaDays = diffDaysIso(nextFrom, desiredNextFrom);
+      if (deltaDays > 0) {
+        const sorted = sortDestinationsByOrderNumber(args.itineraryDestinations);
+        const startIdx = sorted.findIndex((row) => Number((row as any)?.itinerary_destination_id) === nextId);
+        const toShift = startIdx >= 0 ? sorted.slice(startIdx) : [];
+
+        for (const dest of toShift) {
+          const destId = Number((dest as any)?.itinerary_destination_id);
+          const destFrom = String((dest as any)?.from_date ?? "");
+          const destTo = String((dest as any)?.to_date ?? "");
+          if (!Number.isFinite(destId) || !isIsoDate(destFrom) || !isIsoDate(destTo)) continue;
+
+          const shiftedFrom = addDaysIso(destFrom, deltaDays);
+          const shiftedTo = addDaysIso(destTo, deltaDays);
+
+          const { error } = await args.supabase.rpc("ai_shift_destination_dates", {
+            _itinerary_id: Number(args.itineraryId),
+            _itinerary_destination_id: destId,
+            _new_from: shiftedFrom,
+            _new_to: shiftedTo,
+            _shift_activities: true,
+          });
+
+          if (error) {
+            const code = String((error as any)?.code ?? "");
+            if (code === "42883") {
+              throw new Error(
+                "Missing database function ai_shift_destination_dates. Please run the latest Supabase migrations."
+              );
+            }
+            throw new Error(error.message || "Failed to shift later destination");
+          }
+          args.markWrite?.();
+        }
+      }
+    }
+  }
+};
+
 const jsonError = (status: number, code: string, message: string, details?: unknown, headers?: HeadersInit) => {
   return NextResponse.json(
     {
@@ -5267,6 +5485,7 @@ export async function POST(request: NextRequest) {
     destinationById,
   });
   operations = applyPruned.operations;
+  operations = reorderDestinationOpsForApply(operations);
   const importDraftSourcesParsed = LinkImportDraftSourcesSchema.safeParse(threadDraftSources);
   const importDraftSources = importDraftSourcesParsed.success ? importDraftSourcesParsed.data : null;
 
@@ -5853,74 +6072,41 @@ export async function POST(request: NextRequest) {
 	        }
 
 	        if (touchesDates) {
-	          const oldTo = String((destinationRow as any)?.to_date ?? "");
-	          const oldOrder = Number((destinationRow as any)?.order_number ?? NaN);
-	          const oldFrom = String((destinationRow as any)?.from_date ?? "");
-	          const newFrom = (operation as any).fromDate;
-	          const newTo = (operation as any).toDate;
+	          let wrote = 0;
+	          const attempt = async () => {
+	            await resolveDestinationDateConflicts({
+	              supabase,
+	              itineraryId,
+	              itineraryDestinations,
+	              targetId: String(operation.itineraryDestinationId),
+	              requestedFrom: String((operation as any).fromDate),
+	              requestedTo: String((operation as any).toDate),
+	              shiftActivities: (operation as any).shiftActivities !== false,
+	              markWrite: () => {
+	                wrote += 1;
+	              },
+	            });
+	          };
 
-	          if (isIsoDate(oldFrom) && isIsoDate(oldTo) && isIsoDate(newFrom) && isIsoDate(newTo)) {
-	            const prev = Number.isFinite(oldOrder)
-	              ? itineraryDestinations
-	                  .filter((dest) => Number((dest as any)?.order_number ?? NaN) < oldOrder)
-	                  .sort((a, b) => Number((b as any)?.order_number ?? 0) - Number((a as any)?.order_number ?? 0))[0]
-	              : null;
-	            const prevTo = prev && isIsoDate((prev as any)?.to_date) ? String((prev as any).to_date) : null;
-	            if (prevTo && newFrom <= prevTo) {
-	              throw new Error("That date change would overlap the previous destination.");
-	            }
-	          }
-
-	          const { error: updateError } = await supabase.rpc("ai_shift_destination_dates", {
-	            _itinerary_id: Number(itineraryId),
-	            _itinerary_destination_id: Number(operation.itineraryDestinationId),
-	            _new_from: newFrom,
-	            _new_to: newTo,
-	            _shift_activities: (operation as any).shiftActivities !== false,
-	          });
-
-	          if (updateError) {
-	            const code = String((updateError as any)?.code ?? "");
-	            if (code === "42883") {
-	              throw new Error(
-	                "Missing database function ai_shift_destination_dates. Please run the latest Supabase migrations."
+	          try {
+	            await attempt();
+	          } catch (error) {
+	            // Retry once only if we didn't successfully apply any writes (avoid double-shifting).
+	            if (wrote === 0) {
+	              const { data: refreshed1 } = await supabase
+	                .from("itinerary_destination")
+	                .select("itinerary_destination_id,city,country,from_date,to_date,order_number")
+	                .eq("itinerary_id", Number(itineraryId))
+	                .order("order_number", { ascending: true });
+	              itineraryDestinations = Array.isArray(refreshed1) ? refreshed1 : itineraryDestinations;
+	              destinationById = new Map(
+	                itineraryDestinations
+	                  .map((row) => [String((row as any)?.itinerary_destination_id ?? ""), row] as const)
+	                  .filter((entry) => entry[0])
 	              );
-	            }
-	            throw new Error(updateError.message || "Failed to update destination dates");
-	          }
-
-	          // Shift later destinations (and their scheduled items) based on how the destination end date changed.
-	          if (isIsoDate(oldTo) && isIsoDate(newTo) && Number.isFinite(oldOrder)) {
-	            const deltaEnd = diffDaysIso(oldTo, newTo);
-	            if (deltaEnd !== 0) {
-	              const toShift = itineraryDestinations
-	                .filter((dest) => Number((dest as any)?.order_number ?? NaN) > oldOrder)
-	                .filter((dest) => isIsoDate((dest as any)?.from_date) && isIsoDate((dest as any)?.to_date))
-	                .sort((a, b) => Number((a as any)?.order_number ?? 0) - Number((b as any)?.order_number ?? 0));
-
-	              for (const dest of toShift) {
-	                const destId = Number((dest as any)?.itinerary_destination_id);
-	                const shiftedFrom = addDaysIso(String((dest as any).from_date), deltaEnd);
-	                const shiftedTo = addDaysIso(String((dest as any).to_date), deltaEnd);
-
-	                const { error: shiftError } = await supabase.rpc("ai_shift_destination_dates", {
-	                  _itinerary_id: Number(itineraryId),
-	                  _itinerary_destination_id: destId,
-	                  _new_from: shiftedFrom,
-	                  _new_to: shiftedTo,
-	                  _shift_activities: true,
-	                });
-
-	                if (shiftError) {
-	                  const code = String((shiftError as any)?.code ?? "");
-	                  if (code === "42883") {
-	                    throw new Error(
-	                      "Missing database function ai_shift_destination_dates. Please run the latest Supabase migrations."
-	                    );
-	                  }
-	                  throw new Error(shiftError.message || "Failed to shift later destinations");
-	                }
-	              }
+	              await attempt();
+	            } else {
+	              throw error;
 	            }
 	          }
 	        }
@@ -5983,74 +6169,41 @@ export async function POST(request: NextRequest) {
 		          throw new Error("Destination not found (or already removed).");
 		        }
 
-		        const oldTo = String((destinationRow as any)?.to_date ?? "");
-		        const oldOrder = Number((destinationRow as any)?.order_number ?? NaN);
-		        const oldFrom = String((destinationRow as any)?.from_date ?? "");
-		        const newFrom = operation.fromDate;
-		        const newTo = operation.toDate;
+		        let wrote = 0;
+		        const attempt = async () => {
+		          await resolveDestinationDateConflicts({
+		            supabase,
+		            itineraryId,
+		            itineraryDestinations,
+		            targetId: String(operation.itineraryDestinationId),
+		            requestedFrom: operation.fromDate,
+		            requestedTo: operation.toDate,
+		            shiftActivities: operation.shiftActivities !== false,
+		            markWrite: () => {
+		              wrote += 1;
+		            },
+		          });
+		        };
 
-		        if (isIsoDate(oldFrom) && isIsoDate(oldTo) && isIsoDate(newFrom) && isIsoDate(newTo)) {
-		          const prev = Number.isFinite(oldOrder)
-		            ? itineraryDestinations
-		                .filter((dest) => Number((dest as any)?.order_number ?? NaN) < oldOrder)
-		                .sort((a, b) => Number((b as any)?.order_number ?? 0) - Number((a as any)?.order_number ?? 0))[0]
-		            : null;
-		          const prevTo = prev && isIsoDate((prev as any)?.to_date) ? String((prev as any).to_date) : null;
-		          if (prevTo && newFrom <= prevTo) {
-		            throw new Error("That date change would overlap the previous destination.");
-		          }
-		        }
-
-		        const { error: updateError } = await supabase.rpc("ai_shift_destination_dates", {
-		          _itinerary_id: Number(itineraryId),
-		          _itinerary_destination_id: Number(operation.itineraryDestinationId),
-		          _new_from: newFrom,
-		          _new_to: newTo,
-		          _shift_activities: operation.shiftActivities !== false,
-		        });
-
-		        if (updateError) {
-		          const code = String((updateError as any)?.code ?? "");
-		          if (code === "42883") {
-		            throw new Error(
-		              "Missing database function ai_shift_destination_dates. Please run the latest Supabase migrations."
+		        try {
+		          await attempt();
+		        } catch (error) {
+		          // Retry once only if we didn't successfully apply any writes (avoid double-shifting).
+		          if (wrote === 0) {
+		            const { data: refreshed1 } = await supabase
+		              .from("itinerary_destination")
+		              .select("itinerary_destination_id,city,country,from_date,to_date,order_number")
+		              .eq("itinerary_id", Number(itineraryId))
+		              .order("order_number", { ascending: true });
+		            itineraryDestinations = Array.isArray(refreshed1) ? refreshed1 : itineraryDestinations;
+		            destinationById = new Map(
+		              itineraryDestinations
+		                .map((row) => [String((row as any)?.itinerary_destination_id ?? ""), row] as const)
+		                .filter((entry) => entry[0])
 		            );
-		          }
-		          throw new Error(updateError.message || "Failed to update destination dates");
-		        }
-
-		        // Shift later destinations (and their scheduled items) based on how the destination end date changed.
-		        if (isIsoDate(oldTo) && isIsoDate(newTo) && Number.isFinite(oldOrder)) {
-		          const deltaEnd = diffDaysIso(oldTo, newTo);
-		          if (deltaEnd !== 0) {
-		            const toShift = itineraryDestinations
-		              .filter((dest) => Number((dest as any)?.order_number ?? NaN) > oldOrder)
-		              .filter((dest) => isIsoDate((dest as any)?.from_date) && isIsoDate((dest as any)?.to_date))
-		              .sort((a, b) => Number((a as any)?.order_number ?? 0) - Number((b as any)?.order_number ?? 0));
-
-		            for (const dest of toShift) {
-		              const destId = Number((dest as any)?.itinerary_destination_id);
-		              const shiftedFrom = addDaysIso(String((dest as any).from_date), deltaEnd);
-		              const shiftedTo = addDaysIso(String((dest as any).to_date), deltaEnd);
-
-		              const { error: shiftError } = await supabase.rpc("ai_shift_destination_dates", {
-		                _itinerary_id: Number(itineraryId),
-		                _itinerary_destination_id: destId,
-		                _new_from: shiftedFrom,
-		                _new_to: shiftedTo,
-		                _shift_activities: true,
-		              });
-
-		              if (shiftError) {
-		                const code = String((shiftError as any)?.code ?? "");
-		                if (code === "42883") {
-		                  throw new Error(
-		                    "Missing database function ai_shift_destination_dates. Please run the latest Supabase migrations."
-		                  );
-		                }
-		                throw new Error(shiftError.message || "Failed to shift later destinations");
-		              }
-		            }
+		            await attempt();
+		          } else {
+		            throw error;
 		          }
 		        }
 
@@ -6298,7 +6451,6 @@ export async function POST(request: NextRequest) {
           operation,
           error: "Activity not found (or already removed).",
         });
-        halted = true;
 
         if (executeStep?.ai_itinerary_run_step_id) {
           await insertAiItineraryToolInvocation({
@@ -6498,7 +6650,9 @@ export async function POST(request: NextRequest) {
         operation,
         error: error instanceof Error ? error.message : "Operation failed",
       });
-      halted = true;
+      if (isFatalApplyError(error)) {
+        halted = true;
+      }
 
       if (executeStep?.ai_itinerary_run_step_id) {
         await insertAiItineraryToolInvocation({
