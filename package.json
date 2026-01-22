@@ -16,7 +16,8 @@
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
-    "bench:supabase": "node scripts/bench-supabase-latency.js"
+    "bench:supabase": "node scripts/bench-supabase-latency.js",
+    "reset:ai-usage": "node scripts/reset-ai-usage.js"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.1.0",
