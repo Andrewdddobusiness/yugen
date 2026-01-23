@@ -32,6 +32,21 @@ const extractCountry = (address: string): string => {
   return parts[parts.length - 1] || "";
 };
 
+const toSearchUnavailableMessage = (message?: string | null) => {
+  const normalized = String(message ?? "").trim();
+  if (!normalized) return "Search is temporarily unavailable. Please try again.";
+
+  if (/API_KEY_HTTP_REFERRER_BLOCKED/i.test(normalized) || /Requests from referer/i.test(normalized)) {
+    return "Search is blocked by Google API key referrer restrictions. Please check your allowed HTTP referrers.";
+  }
+
+  if (/API key not configured/i.test(normalized)) {
+    return "Search isn't configured yet. Please add a Google Maps API key.";
+  }
+
+  return "Search is temporarily unavailable. Please try again.";
+};
+
 export function DestinationAutocompleteInput({
   value,
   onChange,
@@ -83,14 +98,14 @@ export function DestinationAutocompleteInput({
         } else {
           setSuggestions([]);
           setOpen(true);
-          setError("Search is temporarily unavailable. Please try again.");
+          setError(toSearchUnavailableMessage(response.error?.message));
         }
       } catch (err) {
         if (cancelled) return;
         console.error("Destination autocomplete error:", err);
         setSuggestions([]);
         setOpen(true);
-        setError("Search is temporarily unavailable. Please try again.");
+        setError(toSearchUnavailableMessage(err instanceof Error ? err.message : null));
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -115,7 +130,7 @@ export function DestinationAutocompleteInput({
       if (!geocodeResponse.success || !geocodeResponse.data) {
         setSuggestions([]);
         setOpen(true);
-        setError("Search is temporarily unavailable. Please try again.");
+        setError(toSearchUnavailableMessage(geocodeResponse.error?.message));
         return;
       }
 
@@ -141,7 +156,7 @@ export function DestinationAutocompleteInput({
       console.error("Error selecting destination:", err);
       setSuggestions([]);
       setOpen(true);
-      setError("Search is temporarily unavailable. Please try again.");
+      setError(toSearchUnavailableMessage(err instanceof Error ? err.message : null));
     } finally {
       setLoading(false);
     }

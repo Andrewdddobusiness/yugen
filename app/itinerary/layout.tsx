@@ -461,7 +461,7 @@ export default function Layout({ children }: { children: ReactNode }) {
         {collaborationOpen ? <ItineraryCollaborationPanel itineraryId={itineraryIdValue} /> : null}
 	        {isAiEnabledFlag ? (
 	          <aside
-	            className={`hidden md:block sticky top-0 z-[60] h-screen shrink-0 border-l border-stroke-200 bg-bg-0 overflow-hidden transition-[width] duration-200 ease-out ${
+	            className={`hidden md:block sticky top-0 z-40 h-screen shrink-0 border-l border-stroke-200 bg-bg-0 overflow-hidden transition-[width] duration-200 ease-out ${
 	              assistantOpen ? "w-[var(--sidebar-width)]" : "w-0"
 	            }`}
 	            aria-hidden={!assistantOpen}

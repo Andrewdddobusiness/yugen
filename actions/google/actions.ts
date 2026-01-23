@@ -2,6 +2,7 @@
 
 import { IActivity, type IOpenHours, type IReview } from "@/store/activityStore";
 import { foodTypes, shoppingTypes, historicalTypes, SearchType, includedTypes } from "@/lib/googleMaps/includedTypes";
+import { headers } from "next/headers";
 
 const GOOGLE_MAPS_API_KEY =
   process.env.GOOGLE_PLACES_API_KEY ||
@@ -37,11 +38,59 @@ const GOOGLE_HTTP_ORIGIN = (() => {
   }
 })();
 
-const googleRequestHeaders = (headers: Record<string, string>) => ({
-  ...headers,
-  ...(GOOGLE_HTTP_REFERER ? { Referer: GOOGLE_HTTP_REFERER } : {}),
-  ...(GOOGLE_HTTP_ORIGIN ? { Origin: GOOGLE_HTTP_ORIGIN } : {}),
-});
+const getRequestReferrerFallback = () => {
+  try {
+    const requestHeaders = headers();
+    const referer = requestHeaders.get("referer");
+    if (referer) {
+      try {
+        return new URL(referer).href;
+      } catch {
+        // Ignore invalid header values.
+      }
+    }
+
+    const origin = requestHeaders.get("origin");
+    if (origin) {
+      try {
+        const url = new URL(origin);
+        return `${url.origin}/`;
+      } catch {
+        // Ignore invalid header values.
+      }
+    }
+
+    const proto = requestHeaders.get("x-forwarded-proto") || "https";
+    const host = requestHeaders.get("x-forwarded-host") || requestHeaders.get("host");
+    if (host) return `${proto}://${host}/`;
+  } catch {
+    // headers() not available outside request context.
+  }
+
+  return null;
+};
+
+const resolveGoogleHttpReferer = () => GOOGLE_HTTP_REFERER || getRequestReferrerFallback();
+
+const resolveGoogleHttpOrigin = (referer: string | null) => {
+  if (GOOGLE_HTTP_ORIGIN) return GOOGLE_HTTP_ORIGIN;
+  if (!referer) return null;
+  try {
+    return new URL(referer).origin;
+  } catch {
+    return null;
+  }
+};
+
+const googleRequestHeaders = (baseHeaders: Record<string, string>) => {
+  const referer = resolveGoogleHttpReferer();
+  const origin = resolveGoogleHttpOrigin(referer);
+  return {
+    ...baseHeaders,
+    ...(referer ? { Referer: referer } : {}),
+    ...(origin ? { Origin: origin } : {}),
+  };
+};
 
 const dayOfWeekToNumber = (value: unknown): number | null => {
   if (typeof value === "number" && Number.isFinite(value)) {

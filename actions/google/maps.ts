@@ -2,6 +2,7 @@
 
 import type { Coordinates, DatabaseResponse } from "@/types/database";
 import { toJsonSafe } from "@/lib/security/toJsonSafe";
+import { headers } from "next/headers";
 
 /**
  * Geocoding and reverse geocoding functions for Google Maps integration
@@ -16,11 +17,26 @@ const getServerGeocodingKey = () =>
   process.env.NEXT_PUBLIC_GOOGLE_MAPS_GEOCODING_API_KEY ||
   process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
 
-const GOOGLE_HTTP_REFERER = (() => {
-  const value = process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_SITE_URL;
-  if (!value) return null;
-  return value.endsWith("/") ? value : `${value}/`;
-})();
+const normalizeBaseUrl = (value: string | undefined | null) => {
+  const raw = String(value ?? "").trim();
+  if (!raw) return null;
+
+  const withProtocol = /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
+  try {
+    const url = new URL(withProtocol);
+    const href = url.href;
+    return href.endsWith("/") ? href : `${href}/`;
+  } catch {
+    return null;
+  }
+};
+
+const GOOGLE_HTTP_REFERER =
+  normalizeBaseUrl(process.env.NEXT_PUBLIC_APP_URL) ||
+  normalizeBaseUrl(process.env.NEXT_PUBLIC_SITE_URL) ||
+  normalizeBaseUrl(process.env.VERCEL_PROJECT_PRODUCTION_URL) ||
+  normalizeBaseUrl(process.env.NEXT_PUBLIC_VERCEL_URL) ||
+  normalizeBaseUrl(process.env.VERCEL_URL);
 
 const GOOGLE_HTTP_ORIGIN = (() => {
   if (!GOOGLE_HTTP_REFERER) return null;
@@ -31,11 +47,57 @@ const GOOGLE_HTTP_ORIGIN = (() => {
   }
 })();
 
-function googleRequestHeaders(headers: Record<string, string>) {
+const getRequestReferrerFallback = () => {
+  try {
+    const requestHeaders = headers();
+    const referer = requestHeaders.get("referer");
+    if (referer) {
+      try {
+        return new URL(referer).href;
+      } catch {
+        // Ignore invalid header values.
+      }
+    }
+
+    const origin = requestHeaders.get("origin");
+    if (origin) {
+      try {
+        const url = new URL(origin);
+        return `${url.origin}/`;
+      } catch {
+        // Ignore invalid header values.
+      }
+    }
+
+    const proto = requestHeaders.get("x-forwarded-proto") || "https";
+    const host = requestHeaders.get("x-forwarded-host") || requestHeaders.get("host");
+    if (host) return `${proto}://${host}/`;
+  } catch {
+    // headers() not available outside request context.
+  }
+
+  return null;
+};
+
+const resolveGoogleHttpReferer = () => GOOGLE_HTTP_REFERER || getRequestReferrerFallback();
+
+const resolveGoogleHttpOrigin = (referer: string | null) => {
+  if (GOOGLE_HTTP_ORIGIN) return GOOGLE_HTTP_ORIGIN;
+  if (!referer) return null;
+  try {
+    return new URL(referer).origin;
+  } catch {
+    return null;
+  }
+};
+
+function googleRequestHeaders(baseHeaders: Record<string, string>) {
+  const referer = resolveGoogleHttpReferer();
+  const origin = resolveGoogleHttpOrigin(referer);
   return {
-    ...headers,
-    ...(GOOGLE_HTTP_REFERER ? { Referer: GOOGLE_HTTP_REFERER } : {}),
-    ...(GOOGLE_HTTP_ORIGIN ? { Origin: GOOGLE_HTTP_ORIGIN } : {}),
+    ...baseHeaders,
+    ...(referer ? { Referer: referer } : {}),
+    ...(origin ? { Origin: origin } : {}),
   };
 }
 
