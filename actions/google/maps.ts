@@ -137,10 +137,36 @@ export async function geocodeAddress(address: string): Promise<DatabaseResponse<
     }
 
     if (data.status !== 'OK' || !data.results || data.results.length === 0) {
+      const errorMessage = typeof data?.error_message === "string" ? data.error_message.trim() : "";
+      const isReferrerKeyBlocked = /referer restrictions cannot be used with this API/i.test(errorMessage);
+      const isGeocodingNotEnabled =
+        /not authorized to use this API/i.test(errorMessage) || /has not been used in project/i.test(errorMessage);
+
+      // If the Geocoding API can't be used (common when the key is restricted by HTTP referrer),
+      // fall back to Places Text Search, which works with browser-style API key restrictions.
+      if ((data.status === "REQUEST_DENIED" && (isReferrerKeyBlocked || isGeocodingNotEnabled)) || isReferrerKeyBlocked) {
+        const fallback = await searchPlacesByText(String(address ?? "").trim());
+        const first = fallback.success && Array.isArray(fallback.data) ? fallback.data.find((place: any) => {
+          const coords = place?.coordinates;
+          return coords && Number.isFinite(coords.lat) && Number.isFinite(coords.lng);
+        }) : null;
+
+        if (first?.coordinates) {
+          return {
+            success: true,
+            data: {
+              coordinates: first.coordinates,
+              formatted_address: String(first.address ?? first.formattedAddress ?? ""),
+              place_id: String(first.place_id ?? first.placeId ?? ""),
+            },
+          };
+        }
+      }
+
       return {
         success: false,
         error: { 
-          message: `Geocoding failed: ${data.status}`,
+          message: errorMessage ? `Geocoding failed: ${data.status} - ${errorMessage}` : `Geocoding failed: ${data.status}`,
           details: data
         }
       };

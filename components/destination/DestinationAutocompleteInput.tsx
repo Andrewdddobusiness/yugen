@@ -9,7 +9,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Command, CommandEmpty, CommandItem, CommandList } from "@/components/ui/command";
 import { useDebounce } from "@/components/hooks/use-debounce";
 import { cn } from "@/lib/utils";
-import { geocodeAddress, getPlaceAutocomplete } from "@/actions/google/maps";
+import { getPlaceAutocomplete, getPlaceDetailsForDestination } from "@/actions/google/maps";
 import type { Destination } from "@/store/createItineraryStore";
 
 type DestinationSuggestion = {
@@ -124,26 +124,25 @@ export function DestinationAutocompleteInput({
     setError(null);
 
     try {
-      const lookup = `${suggestion.mainText}, ${suggestion.secondaryText}`.trim();
-      const geocodeResponse = await geocodeAddress(lookup);
+      const details = await getPlaceDetailsForDestination(suggestion.placeId);
 
-      if (!geocodeResponse.success || !geocodeResponse.data) {
+      if (!details.success || !details.data) {
         setSuggestions([]);
         setOpen(true);
-        setError(toSearchUnavailableMessage(geocodeResponse.error?.message));
+        setError(toSearchUnavailableMessage(details.error?.message));
         return;
       }
 
-      const formattedAddress = geocodeResponse.data.formatted_address;
+      const formattedAddress = details.data.formatted_address;
 
       const destination: Destination = {
-        id: geocodeResponse.data.place_id,
+        id: details.data.place_id,
         name: suggestion.mainText,
         city: suggestion.mainText,
         country: extractCountry(formattedAddress),
         formatted_address: formattedAddress,
-        place_id: geocodeResponse.data.place_id,
-        coordinates: geocodeResponse.data.coordinates,
+        place_id: details.data.place_id,
+        coordinates: details.data.coordinates,
         timezone: "",
         photos: [],
       };
@@ -200,7 +199,9 @@ export function DestinationAutocompleteInput({
           />
 
           {loading ? (
-            <Loader2 className="absolute right-10 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 animate-spin" />
+            <span className="absolute right-10 top-1/2 -translate-y-1/2 pointer-events-none">
+              <Loader2 className="h-4 w-4 text-gray-400 animate-spin" />
+            </span>
           ) : null}
 
           {query ? (

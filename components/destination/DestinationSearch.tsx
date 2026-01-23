@@ -168,7 +168,9 @@ export default function DestinationSearch({ onDestinationSelect, onBack }: Desti
               className="pl-10 h-12 border-gray-300 focus:border-blue-400"
             />
             {loading && (
-              <Loader2 className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 animate-spin" />
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                <Loader2 className="h-4 w-4 text-gray-400 animate-spin" />
+              </span>
             )}
           </div>
         </div>
