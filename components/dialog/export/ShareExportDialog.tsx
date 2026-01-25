@@ -15,6 +15,7 @@ import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { downloadKML } from "@/utils/export/kmlExport";
 import { createClient } from "@/utils/supabase/client";
+import { isValid, parseISO } from "date-fns";
 
 interface ExportOption {
   id: string;
@@ -159,10 +160,13 @@ export function ShareExportDialog({ open, onOpenChange, itineraryId, destination
       const itineraryDetails = {
         city: destination.city,
         country: destination.country,
-        fromDate: new Date(destination.from_date),
-        toDate: new Date(destination.to_date),
+        fromDate: parseISO(destination.from_date),
+        toDate: parseISO(destination.to_date),
         activities: activitiesForExport,
       };
+      if (!isValid(itineraryDetails.fromDate) || !isValid(itineraryDetails.toDate)) {
+        throw new Error("Invalid destination date range.");
+      }
 
       if (showDownloadState === "pdf") {
         const { exportToPDF } = await import("@/utils/export/pdfExport");
@@ -201,13 +205,16 @@ export function ShareExportDialog({ open, onOpenChange, itineraryId, destination
         const exportDetails = {
           city: firstDestination.city,
           country: firstDestination.country,
-          fromDate: new Date(firstDestination.from_date),
-          toDate: new Date(firstDestination.to_date),
+          fromDate: parseISO(firstDestination.from_date),
+          toDate: parseISO(firstDestination.to_date),
           activities: (allActivities ?? []) as any,
           destinations: (destinations ?? []) as any,
           exportScope: "itinerary" as const,
           itineraryName: `${destination.city} itinerary`,
         };
+        if (!isValid(exportDetails.fromDate) || !isValid(exportDetails.toDate)) {
+          throw new Error("Invalid itinerary date range.");
+        }
 
         await exportToExcel(exportDetails as any);
       }

@@ -4,6 +4,7 @@ import { createActivitySchema } from "@/schemas/activitySchema";
 import { createAdminClient } from "@/utils/supabase/admin";
 import { createClient } from "@/utils/supabase/server";
 import { toJsonSafe } from "@/lib/security/toJsonSafe";
+import { isValid, parseISO } from "date-fns";
 
 const SAFE_IDENTIFIER = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
 const ensureSafeIdentifiers = (values: string[]) => values.every((value) => SAFE_IDENTIFIER.test(value));
@@ -263,7 +264,7 @@ export async function setTableDataWithCheck(tableName: string, tableData: any, u
 export async function setItineraryDestinationDateRange(
   itineraryId: string,
   destinationId: string,
-  dateRange: { from: Date; to: Date }
+  dateRange: { from: string; to: string }
 ) {
   const itineraryIdValue = String(itineraryId ?? "").trim();
   const destinationIdValue = String(destinationId ?? "").trim();
@@ -275,13 +276,24 @@ export async function setItineraryDestinationDateRange(
     };
   }
 
+  const fromValue = String(dateRange?.from ?? "").trim().slice(0, 10);
+  const toValue = String(dateRange?.to ?? "").trim().slice(0, 10);
+  const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+  if (!ISO_DATE_RE.test(fromValue) || !ISO_DATE_RE.test(toValue) || fromValue > toValue) {
+    return {
+      success: false,
+      message: "Invalid date range",
+      error: { from: fromValue, to: toValue },
+    };
+  }
+
   const supabase = createClient();
 
   const { data, error } = await supabase
     .from("itinerary_destination")
     .update({
-      from_date: dateRange.from,
-      to_date: dateRange.to,
+      from_date: fromValue,
+      to_date: toValue,
     })
     .eq("itinerary_id", itineraryIdValue)
     .eq("itinerary_destination_id", destinationIdValue);
@@ -714,11 +726,21 @@ export async function fetchItineraryDestinationDateRange(itineraryId: string, de
     return { success: false, message: "Fetch date range failed", error: toJsonSafe(error) };
   }
 
+  const from = parseISO(data.from_date);
+  const to = parseISO(data.to_date);
+  if (!isValid(from) || !isValid(to)) {
+    return {
+      success: false,
+      message: "Fetch date range failed",
+      error: { message: "Invalid itinerary destination date range", details: data },
+    };
+  }
+
   return {
     success: true,
     data: {
-      from: new Date(data.from_date),
-      to: new Date(data.to_date),
+      from,
+      to,
     },
   };
 }
@@ -889,14 +911,16 @@ export async function fetchUserItineraries(userId: string): Promise<{ data: IIti
         const last = destinations[destinations.length - 1] ?? first;
 
         const fromDate = destinations.reduce<Date>((min, dest) => {
-          const current = new Date(dest.from_date);
+          const current = parseISO(dest.from_date);
+          if (!isValid(current)) return min;
           return current < min ? current : min;
-        }, new Date(first.from_date));
+        }, parseISO(first.from_date));
 
         const toDate = destinations.reduce<Date>((max, dest) => {
-          const current = new Date(dest.to_date);
+          const current = parseISO(dest.to_date);
+          if (!isValid(current)) return max;
           return current > max ? current : max;
-        }, new Date(first.to_date));
+        }, parseISO(first.to_date));
 
         return {
           itinerary_destination_id: first.itinerary_destination_id,

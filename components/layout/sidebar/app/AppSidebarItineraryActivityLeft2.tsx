@@ -34,7 +34,7 @@ import { useDateRangeStore } from '@/store/dateRangeStore';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { listItineraryDestinationsSummary } from "@/actions/supabase/destinations";
 import { AddDestinationDialog } from "@/components/dialog/itinerary/AddDestinationDialog";
-import { addDays, format } from "date-fns";
+import { addDays, format, isValid, parseISO } from "date-fns";
 
 const SimplifiedItinerarySidebar = dynamic(
   () => import("@/components/layout/sidebar/SimplifiedItinerarySidebar").then((mod) => mod.SimplifiedItinerarySidebar),
@@ -104,7 +104,9 @@ export function AppSidebarItineraryActivityLeft({
   const lastDestination = destinationsSummary[destinationsSummary.length - 1] ?? null;
   const defaultNewDestinationRange = lastDestination?.to_date
     ? (() => {
-        const from = addDays(new Date(lastDestination.to_date), 1);
+        const parsedTo = parseISO(lastDestination.to_date);
+        if (!isValid(parsedTo)) return undefined;
+        const from = addDays(parsedTo, 1);
         return { from, to: from };
       })()
     : undefined;
@@ -112,9 +114,9 @@ export function AppSidebarItineraryActivityLeft({
   const itineraryWideRange = React.useMemo(() => {
     const ranges = destinationsSummary
       .map((dest) => {
-        const from = new Date(dest.from_date);
-        const to = new Date(dest.to_date);
-        if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime())) return null;
+        const from = parseISO(dest.from_date);
+        const to = parseISO(dest.to_date);
+        if (!isValid(from) || !isValid(to)) return null;
         return { from, to };
       })
       .filter((range): range is { from: Date; to: Date } => range != null);
@@ -133,9 +135,9 @@ export function AppSidebarItineraryActivityLeft({
 
   useEffect(() => {
     if (!itinerary?.from_date || !itinerary?.to_date) return;
-    const from = new Date(itinerary.from_date);
-    const to = new Date(itinerary.to_date);
-    if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime())) return;
+    const from = parseISO(itinerary.from_date);
+    const to = parseISO(itinerary.to_date);
+    if (!isValid(from) || !isValid(to)) return;
 
     const dateRangeValue = { from, to };
     setDateRange(dateRangeValue);
@@ -143,8 +145,9 @@ export function AppSidebarItineraryActivityLeft({
 
   const formatRange = (fromDate: string, toDate: string) => {
     try {
-      const from = new Date(fromDate);
-      const to = new Date(toDate);
+      const from = parseISO(fromDate);
+      const to = parseISO(toDate);
+      if (!isValid(from) || !isValid(to)) return "";
       return `${format(from, "MMM d")} - ${format(to, "MMM d, yyyy")}`;
     } catch {
       return "";
@@ -179,10 +182,10 @@ export function AppSidebarItineraryActivityLeft({
       destinationFromDate == null
         ? null
         : typeof destinationFromDate === "string"
-          ? new Date(destinationFromDate)
+          ? parseISO(destinationFromDate)
           : destinationFromDate;
 
-    if (jumpDate && !Number.isNaN(jumpDate.getTime())) {
+    if (jumpDate && isValid(jumpDate)) {
       params.set("date", format(jumpDate, "yyyy-MM-dd"));
     }
 
@@ -216,8 +219,8 @@ export function AppSidebarItineraryActivityLeft({
       
       if (dateRange && dateRange.from && dateRange.to) {
         const result = await setItineraryDestinationDateRange(itineraryIdValue, destinationIdValue, {
-          from: dateRange.from,
-          to: dateRange.to,
+          from: format(dateRange.from, "yyyy-MM-dd"),
+          to: format(dateRange.to, "yyyy-MM-dd"),
         });
 
         if (result.success) {

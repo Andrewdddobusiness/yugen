@@ -16,12 +16,12 @@ import { NotebookPen, SquareChevronLeft, TextSearch } from "lucide-react";
 
 import { fetchItineraryDestination, setItineraryDestinationDateRange } from "@/actions/supabase/actions";
 
-import { formatDate } from "@/utils/formatting/datetime";
 import { Skeleton } from "@/components/ui/skeleton";
 
 import { DateRange } from "react-day-picker";
 import { useEffect, useState } from "react";
 import { DatePickerWithRangePopover3 } from "@/components/form/date/DateRangePickerPopover3";
+import { format, isValid, parseISO } from "date-fns";
 
 export function NavMainItineraryActivity() {
   const { itineraryId, destinationId } = useParams();
@@ -42,9 +42,11 @@ export function NavMainItineraryActivity() {
   const itinerary = destinationData?.data;
 
   useEffect(() => {
-    if (itinerary) {
-      setDateRange({ from: itinerary.from_date as Date, to: itinerary.to_date as Date });
-    }
+    if (!itinerary?.from_date || !itinerary?.to_date) return;
+    const from = parseISO(itinerary.from_date);
+    const to = parseISO(itinerary.to_date);
+    if (!isValid(from) || !isValid(to)) return;
+    setDateRange({ from, to });
   }, [itinerary]);
 
   const handleDateRangeConfirm = async (dateRange: DateRange | undefined) => {
@@ -52,8 +54,8 @@ export function NavMainItineraryActivity() {
       setDateRange(dateRange);
       if (dateRange && dateRange.from && dateRange.to) {
         const result = await setItineraryDestinationDateRange(itineraryId as string, destinationId as string, {
-          from: dateRange.from,
-          to: dateRange.to,
+          from: format(dateRange.from, "yyyy-MM-dd"),
+          to: format(dateRange.to, "yyyy-MM-dd"),
         });
 
         if (result.success) {

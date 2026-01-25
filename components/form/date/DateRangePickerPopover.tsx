@@ -2,7 +2,7 @@
 "use client";
 
 import * as React from "react";
-import { addDays, format } from "date-fns";
+import { addDays, format, isValid, parseISO } from "date-fns";
 import { Calendar as CalendarIcon, Loader2 } from "lucide-react";
 import { DateRange } from "react-day-picker";
 
@@ -47,8 +47,9 @@ export function DatePickerWithRangePopover({
             "to_date" in result.data[0]
           ) {
             const { from_date, to_date } = result.data[0];
-            const startDate = new Date(from_date as string);
-            const endDate = new Date(to_date as string);
+            const startDate = parseISO(from_date as string);
+            const endDate = parseISO(to_date as string);
+            if (!isValid(startDate) || !isValid(endDate)) return;
             setDate({
               from: startDate,
               to: endDate,

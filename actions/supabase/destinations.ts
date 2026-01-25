@@ -1,6 +1,7 @@
 "use server";
 
 import { createClient } from "@/utils/supabase/server";
+import { isValid, parseISO } from "date-fns";
 import { 
   createDestinationSchema,
   updateDestinationSchema,
@@ -77,7 +78,10 @@ export async function createDestination(data: CreateDestinationData & { itinerar
       .map((dest: any) => ({
         itinerary_destination_id: Number(dest.itinerary_destination_id),
         order_number: Number(dest.order_number ?? 0),
-        from_time: new Date(dest.from_date).getTime(),
+        from_time: (() => {
+          const parsed = parseISO(String(dest.from_date ?? ""));
+          return isValid(parsed) ? parsed.getTime() : Number.NaN;
+        })(),
       }))
       .filter((dest) => Number.isFinite(dest.itinerary_destination_id) && Number.isFinite(dest.order_number));
 
@@ -362,12 +366,16 @@ export async function updateDestination(
 
           if (!listError && Array.isArray(allDestinations)) {
             const sorted = [...allDestinations].sort((a: any, b: any) => {
-              const aFrom = new Date(a.from_date).getTime();
-              const bFrom = new Date(b.from_date).getTime();
+              const aFromParsed = parseISO(String(a.from_date ?? ""));
+              const bFromParsed = parseISO(String(b.from_date ?? ""));
+              const aFrom = isValid(aFromParsed) ? aFromParsed.getTime() : Number.NaN;
+              const bFrom = isValid(bFromParsed) ? bFromParsed.getTime() : Number.NaN;
               if (aFrom !== bFrom) return aFrom - bFrom;
 
-              const aTo = new Date(a.to_date).getTime();
-              const bTo = new Date(b.to_date).getTime();
+              const aToParsed = parseISO(String(a.to_date ?? ""));
+              const bToParsed = parseISO(String(b.to_date ?? ""));
+              const aTo = isValid(aToParsed) ? aToParsed.getTime() : Number.NaN;
+              const bTo = isValid(bToParsed) ? bToParsed.getTime() : Number.NaN;
               if (aTo !== bTo) return aTo - bTo;
 
               const aOrder = Number(a.order_number ?? 0);

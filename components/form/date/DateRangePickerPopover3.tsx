@@ -3,7 +3,7 @@
 
 import * as React from "react";
 import { useState, useEffect } from "react";
-import { format } from "date-fns";
+import { format, startOfDay } from "date-fns";
 import { Calendar as CalendarIcon } from "lucide-react";
 import { DateRange } from "react-day-picker";
 
@@ -30,8 +30,8 @@ export function DatePickerWithRangePopover3({ selectedDateRange, onDateRangeConf
   const handleSelect = (newDate: DateRange | undefined) => {
     if (newDate?.from || newDate?.to) {
       const formattedRange = {
-        from: newDate.from ? new Date(format(newDate.from, "yyyy-MM-dd")) : undefined,
-        to: newDate.to ? new Date(format(newDate.to, "yyyy-MM-dd")) : undefined,
+        from: newDate.from ? startOfDay(newDate.from) : undefined,
+        to: newDate.to ? startOfDay(newDate.to) : undefined,
       };
       setDate(formattedRange);
     } else {
@@ -42,8 +42,8 @@ export function DatePickerWithRangePopover3({ selectedDateRange, onDateRangeConf
   const handleConfirm = () => {
     if (date?.from || date?.to) {
       const formattedRange = {
-        from: date.from ? new Date(format(date.from, "yyyy-MM-dd")) : undefined,
-        to: date.to ? new Date(format(date.to, "yyyy-MM-dd")) : undefined,
+        from: date.from ? startOfDay(date.from) : undefined,
+        to: date.to ? startOfDay(date.to) : undefined,
       };
       onDateRangeConfirm(formattedRange);
     } else {

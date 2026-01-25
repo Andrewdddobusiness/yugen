@@ -52,6 +52,21 @@ export function getCityLabelForDateKey(
 
   const normalizedDestinations = normalizeDestinations(destinations);
 
+  // If a destination explicitly starts on this day, prefer it even if the data overlaps
+  // with the previous destination. This keeps the calendar and sidebar in sync when a user
+  // sets adjacent destinations to share a boundary day.
+  for (let index = 0; index < normalizedDestinations.length; index += 1) {
+    const destination = normalizedDestinations[index];
+    if (destination.from_date !== key) continue;
+
+    const previous = normalizedDestinations[index - 1] ?? null;
+    if (previous && previous.city !== destination.city) {
+      return `${previous.city} → ${destination.city}`;
+    }
+
+    return destination.city;
+  }
+
   for (let index = 0; index < normalizedDestinations.length; index += 1) {
     const destination = normalizedDestinations[index];
     if (key < destination.from_date || key > destination.to_date) continue;
@@ -84,4 +99,3 @@ export function getCityLabelForDateKey(
 
   return null;
 }
-
