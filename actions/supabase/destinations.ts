@@ -73,7 +73,8 @@ export async function createDestination(data: CreateDestinationData & { itinerar
       };
     }
 
-    const newFromTime = validatedData.from_date.getTime();
+    const newFromParsed = parseISO(validatedData.from_date);
+    const newFromTime = isValid(newFromParsed) ? newFromParsed.getTime() : Number.NaN;
     const normalizedExisting = (existingDestinations ?? [])
       .map((dest: any) => ({
         itinerary_destination_id: Number(dest.itinerary_destination_id),

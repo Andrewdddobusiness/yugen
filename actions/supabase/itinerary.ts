@@ -55,9 +55,8 @@ export async function createItinerary(
       })
       .sort((a, b) => {
         // Keep destinations ordered by date, then order_number.
-        const aTime = a.from_date?.getTime?.() ?? 0;
-        const bTime = b.from_date?.getTime?.() ?? 0;
-        if (aTime !== bTime) return aTime - bTime;
+        const fromDelta = a.from_date.localeCompare(b.from_date);
+        if (fromDelta !== 0) return fromDelta;
         return (a.order_number ?? 0) - (b.order_number ?? 0);
       })
       .map((destination, index) => ({

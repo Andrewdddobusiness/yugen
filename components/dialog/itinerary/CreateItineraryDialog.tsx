@@ -18,6 +18,7 @@ import { createItinerary } from "@/actions/supabase/itinerary";
 import { useCreateItineraryStore, type Destination, type CreateItineraryLeg } from "@/store/createItineraryStore";
 import { DatePickerWithRangePopover2 } from "@/components/form/date/DateRangePickerPopover2";
 import { format } from "date-fns";
+import { toIsoDateString } from "@/utils/dateOnly";
 
 const formSchema = z.object({
   destination: z.string().min(2, {
@@ -250,8 +251,8 @@ export default function PopUpCreateItinerary({ children, className, ...props }: 
         destinations: sorted.map((leg, index) => ({
           city: leg.destination.city,
           country: leg.destination.country,
-          from_date: leg.dateRange.from!,
-          to_date: leg.dateRange.to!,
+          from_date: toIsoDateString(leg.dateRange.from!),
+          to_date: toIsoDateString(leg.dateRange.to!),
           order_number: index + 1,
         })),
       });

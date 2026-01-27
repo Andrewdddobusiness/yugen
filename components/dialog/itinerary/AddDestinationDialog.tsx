@@ -18,6 +18,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
+import { toIsoDateString } from "@/utils/dateOnly";
 import type { Destination } from "@/store/createItineraryStore";
 
 type AddDestinationDialogProps = {
@@ -480,8 +481,8 @@ export function AddDestinationDialog({
         const result = await updateDestination(String(row.itineraryDestinationId), {
           city: row.destination.city,
           country: row.destination.country,
-          from_date: row.dateRange.from!,
-          to_date: row.dateRange.to!,
+          from_date: toIsoDateString(row.dateRange.from!),
+          to_date: toIsoDateString(row.dateRange.to!),
         });
 
         if (!result.success) {
@@ -497,8 +498,8 @@ export function AddDestinationDialog({
           itinerary_id: Number(itineraryId),
           city: row.destination.city,
           country: row.destination.country,
-          from_date: row.dateRange.from!,
-          to_date: row.dateRange.to!,
+          from_date: toIsoDateString(row.dateRange.from!),
+          to_date: toIsoDateString(row.dateRange.to!),
           order_number: nextOrderNumber,
         });
 
