@@ -35,6 +35,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import { listItineraryDestinationsSummary } from "@/actions/supabase/destinations";
 import { AddDestinationDialog } from "@/components/dialog/itinerary/AddDestinationDialog";
 import { addDays, format, isValid, parseISO } from "date-fns";
+import { toIsoDateString } from "@/utils/dateOnly";
 
 const SimplifiedItinerarySidebar = dynamic(
   () => import("@/components/layout/sidebar/SimplifiedItinerarySidebar").then((mod) => mod.SimplifiedItinerarySidebar),
@@ -219,8 +220,8 @@ export function AppSidebarItineraryActivityLeft({
       
       if (dateRange && dateRange.from && dateRange.to) {
         const result = await setItineraryDestinationDateRange(itineraryIdValue, destinationIdValue, {
-          from: format(dateRange.from, "yyyy-MM-dd"),
-          to: format(dateRange.to, "yyyy-MM-dd"),
+          from: toIsoDateString(dateRange.from),
+          to: toIsoDateString(dateRange.to),
         });
 
         if (result.success) {
